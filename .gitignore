@@ -1,0 +1,8 @@
+*.pyc
+*.env
+*.html
+.vscode/
+*.pylintrc
+.cache/
+build/
+*pycache*
