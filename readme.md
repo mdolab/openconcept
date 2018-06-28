@@ -2,6 +2,10 @@
 
 ### Author: Benjamin J. Brelje
 
+[![Build Status](https://travis-ci.org/bbrelje/openconcept.svg?branch=master)](https://travis-ci.org/bbrelje/openconcept)
+
+[![Coverage Status](https://coveralls.io/repos/github/bbrelje/openconcept/badge.svg)](https://coveralls.io/github/bbrelje/openconcept)
+
 OpenConcept is a new toolkit for the conceptual design of aircraft. OpenConcept was developed in order to model and optimize aircraft with electric propulsion at low computational cost. The tools are built on top of NASA Glenn's (http://openmdao.org/) framework, which in turn is written in Python.
 
 The following charts show more than 250 individually optimized hybrid-electric light twin aircraft (similar to a King Air C90GT). Optimizing hundreds of configurations can be done in a couple of hours on a standard laptop computer.
