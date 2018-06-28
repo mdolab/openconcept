@@ -6,6 +6,6 @@ install:
   - pip install -r requirements.txt
 # command to run tests
 script:
-  - pytest --cov-config .coveragerc --cov
+  - python -m pytest --cov-config .coveragerc --cov
 after_success:
   - coveralls
