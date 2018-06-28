@@ -7,6 +7,6 @@ install:
   - python setup.py install
 # command to run tests
 script:
-  - pytest --cov=openconcept tests/
+  - pytest --cov-config .coveragerc --cov=openconcept
 after_success:
   - coveralls
