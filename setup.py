@@ -40,7 +40,7 @@ setup(
     ],
     install_requires=[
         'six',
-        'scipy==1.0.0',
+        'scipy>=1.0.0',
         'numpy>=1.14.0',
         'openmdao>=2.3.1',
     ]
