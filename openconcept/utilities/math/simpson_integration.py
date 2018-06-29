@@ -99,11 +99,11 @@ def simpson_partials(dts, q, n_segments=1, n_simpson_intervals_per_segment=2,):
         rowidx_wrt_dt = np.arange(i*n_int_seg,(i+1)*n_int_seg)
         colidx_wrt_dt = np.zeros(n_int_seg)
         partial_wrt_dt = (q[nn_seg*i:nn_seg*(i+1)-2:2]+4*q[nn_seg*i+1:nn_seg*(i+1)-1:2]+q[nn_seg*i+2:nn_seg*(i+1):2])/3
-        rowidxs_wrt_dt.append(rowidx_wrt_dt)
-        colidxs_wrt_dt.append(colidx_wrt_dt)
+        rowidxs_wrt_dt.append(rowidx_wrt_dt.astype(np.int32))
+        colidxs_wrt_dt.append(colidx_wrt_dt.astype(np.int32))
         partials_wrt_dt.append(partial_wrt_dt)
 
-    wrt_q = [rowidx_wrt_q, colidx_wrt_q, partials_wrt_q]
+    wrt_q = [rowidx_wrt_q.astype(np.int32), colidx_wrt_q.astype(np.int32), partials_wrt_q]
     wrt_dt = [rowidxs_wrt_dt, colidxs_wrt_dt, partials_wrt_dt]
     return wrt_q, wrt_dt
 

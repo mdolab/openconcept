@@ -31,6 +31,8 @@ class SimpleBattery(ExplicitComponent):
 
     Options
     -------
+    num_nodes : int
+        (default 1) Number of analysis points to run (sets vec length)
     efficiency : float
         (default 1.0) Shaft power efficiency. Sensible range 0.0 to 1.0
     specific_power : float
