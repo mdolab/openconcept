@@ -233,6 +233,8 @@ class IntegrateQuantity(ExplicitComponent):
         ddQddt = sp.csr_matrix((wrt_dt[2][0],(wrt_dt[0][0],wrt_dt[1][0])))
 
         J['delta_quantity','rate'] = np.asarray(ddQdq.sum(axis=0)).flatten()
+        print('Partial to check:')
+        print(np.asarray(ddQdq.sum(axis=0)).flatten())
         #partial derivative wrt the time interval
         dQddt = ddQddt.sum()
 
