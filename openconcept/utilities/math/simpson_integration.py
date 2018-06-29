@@ -1,7 +1,7 @@
+from __future__ import division
 import numpy as np
 import scipy.sparse as sp
 from openmdao.api import ExplicitComponent
-from __future__ import division
 
 def simpson_integral(dts, q, n_segments=1, n_simpson_intervals_per_segment=2):
     """
