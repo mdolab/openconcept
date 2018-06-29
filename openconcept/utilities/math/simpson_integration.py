@@ -83,8 +83,6 @@ def simpson_partials(dts, q, n_segments=1, n_simpson_intervals_per_segment=2,):
     # create a placeholder for the column indices
     colidx_wrt_q = np.zeros(n_int_tot * 3)
     partials_wrt_q = np.tile([1 / 3, 4 / 3, 1 / 3], n_int_tot)
-    print('line86')
-    print(partials_wrt_q)
     rowidxs_wrt_dt = []
     colidxs_wrt_dt = []
     partials_wrt_dt = []
@@ -231,11 +229,7 @@ class IntegrateQuantity(ExplicitComponent):
         nn = (n_int*2 + 1)
         dts = (inputs['upper_limit'] - inputs['lower_limit']) / (nn - 1)
         wrt_q, wrt_dt = simpson_partials(dts,inputs['rate'],n_segments=1,n_simpson_intervals_per_segment=n_int)
-        print('wrt_q')
-        print(wrt_q)
         ddQdq = sp.csr_matrix((wrt_q[2],(wrt_q[0],wrt_q[1])))
-        print('ddQdq')
-        print(ddQdq)
         ddQddt = sp.csr_matrix((wrt_dt[2][0],(wrt_dt[0][0],wrt_dt[1][0])))
 
         J['delta_quantity','rate'] = np.asarray(ddQdq.sum(axis=0)).flatten()
