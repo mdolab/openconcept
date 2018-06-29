@@ -1,5 +1,5 @@
 import unittest
-import numpy as np 
+import numpy as np
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
 from openconcept.utilities.math.simpson_integration import IntegrateQuantity
@@ -21,7 +21,7 @@ class SimpsonTestGroup(Group):
         self.connect('iv.function','integrate.rate')
         #output is 'delta quantity'
 
-class VectorAtmosTestCase(unittest.TestCase):
+class SimpsonTestCase(unittest.TestCase):
     def test_uniform_single(self):
         prob = Problem(SimpsonTestGroup(n_simp_intervals=1))
         prob.setup(check=True)
@@ -43,8 +43,8 @@ class VectorAtmosTestCase(unittest.TestCase):
         prob.setup(check=False)
         prob['iv.end_pt'] = 2
         prob.run_model()
-        assert_rel_error(self,prob['delta_quantity'],2.,tolerance=1e-15)    
-        
+        assert_rel_error(self,prob['delta_quantity'],2.,tolerance=1e-15)
+
     def test_function_level(self):
         prob = Problem(SimpsonTestGroup(n_simp_intervals=5))
         prob.setup(check=False)
