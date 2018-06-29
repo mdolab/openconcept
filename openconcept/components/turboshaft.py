@@ -10,19 +10,26 @@ class SimpleTurboshaft(ExplicitComponent):
 
     Input Vars
     ----------
-    battery_weight : float
-        (scalar, kg)
-    elec_load: float
-        (n vector, W) Electric power draw upstream
+    shaft_power_rating : float
+        (scalar, W)
+        Rated power of the turboshaft
+    throttle: float
+        (n vector, dimensionless)
+        Engine throttle. Controls power and fuel flow.
+        Produces 100% of rated power at throttle = 1
+        Should be in range 0 to 1 or slightly above 1
 
     Output Vars
     -----------
-    max_energy : float
-        (scalar, Wh)
-    heat_out : float
+    shaft_power_out : float
         (n vector, W)
+    fuel_flow : float
+        (n vector, kg/s)
+        FUEL FLOW IS NEGATIVE!
     component_cost : float
         (scalar, USD)
+    component_weight : float
+        (scalar, kg)
     component_sizing_margin : float
         (n vector, dimensionless)
 
@@ -51,7 +58,7 @@ class SimpleTurboshaft(ExplicitComponent):
         # psfc conversion from g/kW/hr to kg/W/s = 2.777e-10
         # psfc conversion from lbfuel/hp/hr to kg/W/s = 1.690e-7
         self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
-        self.options.declare('psfc', default=0.6 * 1.69e-7, desc='power specific fuel consumption')
+        self.options.declare('psfc', default=0.6 * 1.68965774e-7, desc='power specific fuel consumption')
         self.options.declare('weight_inc', default=0., desc='kg per watt')
         self.options.declare('weight_base', default=0., desc='kg base weight')
         self.options.declare('cost_inc', default=1.04, desc='$ cost per watt')
