@@ -25,7 +25,6 @@ class SimpleBattery(ExplicitComponent):
         nn = self.options['num_nodes']
         self.add_input('battery_weight', units='kg', desc='Total battery pack weight')
         self.add_input('elec_load', units='W', desc='Electrical load drawn',shape=(nn,))
-        #self.add_input('SOC', desc='Battery state of charge (0 to 1)',shape=(nn,))
 
         #outputs and partials
         eta_b = self.options['efficiency']
@@ -44,7 +43,7 @@ class SimpleBattery(ExplicitComponent):
         self.declare_partials('component_sizing_margin','battery_weight')
         self.declare_partials('component_sizing_margin','elec_load',rows=range(nn),cols=range(nn))
         self.declare_partials('max_energy','battery_weight',val=e_b)
-            
+
     def compute(self, inputs, outputs):
         eta_b = self.options['efficiency']
         p_b = self.options['specific_power']
@@ -56,28 +55,9 @@ class SimpleBattery(ExplicitComponent):
         outputs['component_cost'] = inputs['battery_weight'] * cost_inc + cost_base
         outputs['component_sizing_margin'] = inputs['elec_load'] / (p_b * inputs['battery_weight'])
         outputs['max_energy'] = inputs['battery_weight'] * e_b
-        #print('Battery weight:'+str(inputs['battery_weight']))
-        # print('Battery energy:'+str(outputs['max_energy']))
-        
+
     def compute_partials(self, inputs, J):
         eta_b = self.options['efficiency']
         p_b = self.options['specific_power']
         J['component_sizing_margin','elec_load'] = 1 / (p_b * inputs['battery_weight'])
         J['component_sizing_margin','battery_weight'] = - inputs['elec_load'] / (p_b * inputs['battery_weight'] ** 2)
-
-
-if __name__ == "__main__":
-    from openmdao.api import IndepVarComp, Problem
-    prob = Problem()
-    prob.model = Group()
-    prob.model.add_subsystem('load',IndepVarComp('elec_load',val=100.,units='kW'))
-    prob.model.add_subsystem('design',IndepVarComp('battery_weight',val=500.,units='kg'))
-    prob.model.add_subsystem('battery',SimpleBattery(efficiency=0.98))
-    prob.model.connect('load.elec_load','battery.elec_load')
-    prob.model.connect('design.battery_weight','battery.battery_weight')
-    prob.setup()
-    prob.run_model()
-    #print(prob['battery.component_sizing_margin'])
-    #print(prob['battery.heat_out'])
-    data = prob.check_partials()
-
