@@ -1,7 +1,7 @@
 
 import numpy as np
 from openmdao.api import Group, Problem, IndepVarComp, ExplicitComponent
-from openmdao.components.meta_model_structured import MetaModelStructured
+from openmdao.components.meta_model_structured_comp import MetaModelStructured
 
 def propeller_map_Raymer(num_nodes=1):
     # Data from Raymer, Aircraft Design A Conceptual Approach, 4th Ed pg 498 fig 13.12 extrapolated in low cp range
@@ -73,7 +73,7 @@ def propeller_map_highpower(num_nodes=1):
                             [0.06,0.18,0.35,0.50,0.68,0.79,0.86,0.86,0.85],
                             [0.05,0.14,0.25,0.40,0.55,0.70,0.79,0.80,0.72],
                             [0.04,0.12,0.19,0.29,0.40,0.50,0.60,0.60,0.50]])
-    
+
     data[:,0] = np.zeros(13)
     # Create regular grid interpolator instance
     interp = MetaModelStructured(method='cubic',extrapolate=False,num_nodes=num_nodes)
@@ -93,7 +93,7 @@ class ConstantPropEfficiency(ExplicitComponent):
         self.add_input('J', desc='Advance ratio', shape=(nn,))
         self.add_output('eta_prop', desc='Propulsive efficiency',shape=(nn,))
         self.declare_partials(['eta_prop'],['*'],rows=range(nn),cols=range(nn),val=np.zeros(nn))
-    
+
     def compute(self, inputs, outputs):
         outputs['eta_prop'] = 0.85
 
@@ -127,7 +127,7 @@ def propeller_map_quadratic(num_nodes=1):
         import matplotlib.pyplot as plt
         CS = plt.contour(J,cp,eta)
         plt.clabel(CS, inline=1, fontsize=10)
-        plt.show()    
+        plt.show()
     interp = MetaModelStructured(method='cubic',extrapolate=False,num_nodes=num_nodes)
     interp.add_input('cp', 0.3, cpvec)
     interp.add_input('J', 1, Jvec)
@@ -145,7 +145,7 @@ def static_propeller_map_Raymer(num_nodes=1):
     return interp
 
 def static_propeller_map_highpower(num_nodes=1):
-    #Factoring up the thrust of the Raymer static thrust data to match the high power data 
+    #Factoring up the thrust of the Raymer static thrust data to match the high power data
     cp = np.linspace(0.0,1.0,41)
     factored_raymer_static_data = np.array([2.5,3.0,2.55,2.0,1.85,1.5,1.25,1.05,0.95,0.86,0.79,0.70,0.62,0.53,0.45,0.38,0.32,0.28,0.24,0.21,0.18,0.16,0.14,0.12,0.10,0.09,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08])
     factored_raymer_static_data[6:] = factored_raymer_static_data[6:]*1.2
