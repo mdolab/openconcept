@@ -46,7 +46,7 @@ class SimpleGearbox(ExplicitComponent):
 
 
 
-            
+
     def compute(self, inputs, outputs):
         eta_gb = self.options['efficiency']
         weight_inc = self.options['weight_inc']
@@ -59,23 +59,7 @@ class SimpleGearbox(ExplicitComponent):
         outputs['component_cost'] = inputs['shaft_power_rating'] * cost_inc + cost_base
         outputs['component_weight'] = inputs['shaft_power_rating'] * weight_inc + weight_base
         outputs['component_sizing_margin'] = inputs['shaft_power_in'] / inputs['shaft_power_rating']
-        
+
     def compute_partials(self, inputs, J):
         J['component_sizing_margin','shaft_power_in'] = 1 / inputs['shaft_power_rating']
         J['component_sizing_margin','shaft_power_rating'] = - inputs['shaft_power_in'] / inputs['shaft_power_rating'] ** 2
-
-
-if __name__ == "__main__":
-    from openmdao.api import IndepVarComp, Problem
-    prob = Problem()
-    prob.model = Group()
-    prob.model.add_subsystem('P_in',IndepVarComp('P_i',val=100.,units='kW'))
-    prob.model.add_subsystem('P_rated',IndepVarComp('P_r',val=150.,units='kW'))
-    prob.model.add_subsystem('gearbox',SimpleGearbox(efficiency=0.98,weight_inc=0.2,weight_base=20,cost_inc=0.05,cost_base=10000.))
-    prob.model.connect('P_in.P_i','gearbox.shaft_power_in')
-    prob.model.connect('P_rated.P_r','gearbox.shaft_power_rating')
-    prob.setup()
-    prob.run_model()
-    print(prob['gearbox.component_cost'])
-    data = prob.check_partials()
-
