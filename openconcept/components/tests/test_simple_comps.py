@@ -43,13 +43,14 @@ class BatteryTestGroup(Group):
 
 class SimpleBatteryTestCase(unittest.TestCase):
 
-    def test_defaults(self):
+    def test_default_settings(self):
         prob = Problem(BatteryTestGroup(vec_size=10, use_defaults=True))
         prob.setup(check=True,force_alloc_complex=True)
         prob.run_model()
         assert_rel_error(self, prob['battery.heat_out'], np.ones(10)*100*0.0, tolerance=1e-15)
         assert_rel_error(self, prob['battery.component_sizing_margin'], np.ones(10)*0.20, tolerance=1e-15)
         assert_rel_error(self, prob['battery.component_cost'], 5001, tolerance=1e-15)
+        assert_rel_error(self, prob.get_val('battery.max_energy',units='W*h'), 300*100, tolerance=1e-15)
 
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
