@@ -58,7 +58,8 @@ class SimpleTurboshaft(ExplicitComponent):
         # psfc conversion from g/kW/hr to kg/W/s = 2.777e-10
         # psfc conversion from lbfuel/hp/hr to kg/W/s = 1.690e-7
         self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
-        self.options.declare('psfc', default=0.6 * 1.68965774e-7, desc='power specific fuel consumption')
+        self.options.declare('psfc', default=0.6 * 1.68965774e-7,
+                             desc='power specific fuel consumption')
         self.options.declare('weight_inc', default=0., desc='kg per watt')
         self.options.declare('weight_base', default=0., desc='kg base weight')
         self.options.declare('cost_inc', default=1.04, desc='$ cost per watt')
