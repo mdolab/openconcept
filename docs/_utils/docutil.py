@@ -293,7 +293,6 @@ def get_source_code(path):
 
                 # else assume it is a path to a method
                 module_path = '.'.join(parts[:-2])
-                raise ValueError(module_path+'-'+str(parts))
                 module = importlib.import_module(module_path)
                 class_name = parts[-2]
                 method_name = parts[-1]
