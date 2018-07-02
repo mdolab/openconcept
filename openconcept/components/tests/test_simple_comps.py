@@ -201,7 +201,7 @@ class SimpleMotorTestCase(unittest.TestCase):
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
-    def test_default_settings(self):
+    def test_nondefault_settings(self):
         prob = Problem(MotorTestGroup(vec_size=10,
                                       use_defaults=False,
                                       efficiency=0.95,
@@ -236,7 +236,7 @@ class SimpleGeneratorTestCase(unittest.TestCase):
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
-    def test_default_settings(self):
+    def test_nondefault_settings(self):
         prob = Problem(GeneratorTestGroup(vec_size=10,
                                       use_defaults=False,
                                       efficiency=0.95,
@@ -270,7 +270,7 @@ class SimpleTurboshaftTestCase(unittest.TestCase):
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
-    def test_default_settings(self):
+    def test_nondefault_settings(self):
         prob = Problem(TurboshaftTestGroup(vec_size=10,
                                       use_defaults=False,
                                       psfc=0.4*1.68965774e-7,

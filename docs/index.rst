@@ -8,8 +8,9 @@ OpenConcept - A Conceptual Design toolkit with efficient gradients implemented i
 
 .. toctree::
    :maxdepth: 1
-   :caption: Source Documentation:
+   :caption: Documentation:
 
+   features/index.rst
    _srcdocs/index.rst
 
 
