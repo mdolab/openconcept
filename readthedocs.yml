@@ -9,4 +9,3 @@ conda:
 
 formats: []
 
-requirements_file: requirements_conda.txt

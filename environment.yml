@@ -9,3 +9,8 @@ dependencies:
   - sphinx
   - mock
   - pip
+  - pip:
+    - pytest
+    - openmdao
+    - six
+    - sphinx_rtd_theme
