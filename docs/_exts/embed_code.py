@@ -57,10 +57,9 @@ class EmbedCodeDirective(Directive):
         path = self.arguments[0]
         is_script = path.endswith('.py')
 
-        try:
-            source, indent, module, class_ = get_source_code(path)
-        except Exception as err:
-            raise SphinxError(str(err))
+        source, indent, module, class_ = get_source_code(path)
+        # except Exception as err:
+        #     raise SphinxError(str(err))
 
         is_test = class_ is not None and inspect.isclass(class_) and issubclass(class_, unittest.TestCase)
         shows_plot = '.show(' in source
