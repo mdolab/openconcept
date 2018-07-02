@@ -57,6 +57,7 @@ class EmbedCodeDirective(Directive):
         path = self.arguments[0]
         is_script = path.endswith('.py')
 
+        raise ValueError(path)
         source, indent, module, class_ = get_source_code(path)
         # except Exception as err:
         #     raise SphinxError(str(err))
