@@ -1,0 +1,11 @@
+name: openconcept
+dependencies:
+  - numpy
+  - scipy
+  - sphinx
+  - nose
+  - hdf5
+  - h5py
+  - sphinx
+  - mock
+  - pip

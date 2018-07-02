@@ -1,0 +1,12 @@
+build:
+  image: latest
+
+python:
+  version: 3.6
+
+conda:
+  file: environment.yml
+
+formats: []
+
+requirements_file: requirements_conda.txt

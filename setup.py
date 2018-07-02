@@ -43,5 +43,6 @@ setup(
         'scipy>=1.0.0',
         'numpy>=1.14.0',
         'openmdao>=2.3.1',
+        'pytest',
     ]
 )

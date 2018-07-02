@@ -8,8 +8,8 @@ class SimpleTurboshaft(ExplicitComponent):
     A simple turboshaft which generates shaft power consumes fuel
     This model assumes constant power specific fuel consumption (PSFC)
 
-    Input Vars
-    ----------
+    Inputs
+    ------
     shaft_power_rating : float
         (scalar, W)
         Rated power of the turboshaft
@@ -19,8 +19,8 @@ class SimpleTurboshaft(ExplicitComponent):
         Produces 100% of rated power at throttle = 1
         Should be in range 0 to 1 or slightly above 1
 
-    Output Vars
-    -----------
+    Outputs
+    -------
     shaft_power_out : float
         (n vector, W)
     fuel_flow : float

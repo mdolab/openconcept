@@ -10,15 +10,15 @@ class SimpleBattery(ExplicitComponent):
     Specific energy assumption INCLUDING internal losses should be used
     The efficiency parameter only generates heat
 
-    Input Vars
-    ----------
+    Inputs
+    ------
     battery_weight : float
         (scalar, kg)
     elec_load: float
         (n vector, W) Electric power draw upstream
 
-    Output Vars
-    -----------
+    Outputs
+    -------
     max_energy : float
         (scalar, Wh)
     heat_out : float

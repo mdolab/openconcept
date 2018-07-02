@@ -1,4 +1,4 @@
-# openConcept - A Conceptual Design toolkit with efficient gradients implemented in the OpenMDAO framework
+# OpenConcept - A Conceptual Design toolkit with efficient gradients implemented in the OpenMDAO framework
 
 ### Author: Benjamin J. Brelje
 
