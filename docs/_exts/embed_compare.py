@@ -4,7 +4,7 @@ from docutils import nodes
 
 import sphinx
 from docutils.parsers.rst import Directive
-from openconcept.docs._utils.docutil import get_source_code
+from docs._utils.docutil import get_source_code
 
 
 class ContentContainerDirective(Directive):
