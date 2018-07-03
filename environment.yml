@@ -6,7 +6,6 @@ dependencies:
   - nose
   - hdf5
   - h5py
-  - sphinx
   - mock
   - pip
   - pip:
