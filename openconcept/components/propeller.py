@@ -4,7 +4,7 @@ from openmdao.api import Group
 from .empirical_data.prop_maps import propeller_map_quadratic, propeller_map_Raymer, propeller_map_highpower, static_propeller_map_Raymer, static_propeller_map_highpower, propeller_map_scaled, propeller_map_constant_prop_efficiency
 
 class SimplePropeller(Group):
-    """Inputs: (vectorized: shaft_power, rpm, fltcond:rho, fltcond:Utrue) (scalar: diameter)
+    """Inputs: (vectorized: shaft_power, rpm, fltcond|rho, fltcond|Utrue) (scalar: diameter)
     Outputs: (vectorized: thrust)
     Metadata: TBA
 
@@ -76,14 +76,14 @@ class ThrustCalc(ExplicitComponent):
         self.add_input('cp', desc='power coefficient',shape=(nn,))
         self.add_input('eta_prop', desc='propulsive efficiency factor',shape=(nn,))
         self.add_input('J', desc = 'advance ratio',shape=(nn,))
-        self.add_input('fltcond:rho', units='kg / m ** 3', desc='Air density',shape=(nn,))
-        self.add_input('rpm', units='rpm',val=2500*np.ones(nn), desc='Prop speed in rpm')
+        self.add_input('fltcond|rho', units='kg / m ** 3', desc='Air density',shape=(nn,))
+        self.add_input('rpm', units='rpm', val=2500*np.ones(nn), desc='Prop speed in rpm')
         self.add_input('diameter', units='m', val=2.5, desc='Prop diameter in m')
         self.add_input('ct_over_cp', val=1.5*np.ones(nn), desc='ct/cp from raymer for static condition')
 
         self.add_output('thrust', desc='Propeller thrust', units='N',shape=(nn,))
 
-        self.declare_partials('thrust',['cp','eta_prop','J','fltcond:rho','rpm','ct_over_cp'],rows=range(nn),cols=range(nn))
+        self.declare_partials('thrust',['cp','eta_prop','J','fltcond|rho','rpm','ct_over_cp'], rows=range(nn), cols=range(nn))
         self.declare_partials('thrust','diameter')
 
     def compute(self, inputs, outputs):
@@ -113,7 +113,7 @@ class ThrustCalc(ExplicitComponent):
         #else if j >= jinterp_max
         ct[dynamic_idx] = ct2[dynamic_idx]
 
-        outputs['thrust'] = ct * inputs['fltcond:rho'] * (inputs['rpm']/60.)**2 * inputs['diameter']**4
+        outputs['thrust'] = ct * inputs['fltcond|rho'] * (inputs['rpm']/60.)**2 * inputs['diameter']**4
 
     def compute_partials(self, inputs, J):
         #for advance ratio j between 0.10 and 0.20, linearly interpolate between the two surrogate models
@@ -150,13 +150,13 @@ class ThrustCalc(ExplicitComponent):
         j_thrust_eta_prop = np.zeros(nn)
         j_thrust_j = np.zeros(nn)
 
-        thrust_over_ct = inputs['fltcond:rho'] * (inputs['rpm']/60.)**2 * inputs['diameter']**4
-        thrust = ct * inputs['fltcond:rho'] * (inputs['rpm']/60.)**2 * inputs['diameter']**4
+        thrust_over_ct = inputs['fltcond|rho'] * (inputs['rpm']/60.)**2 * inputs['diameter']**4
+        thrust = ct * inputs['fltcond|rho'] * (inputs['rpm']/60.)**2 * inputs['diameter']**4
 
-        J['thrust','fltcond:rho'] = thrust / inputs['fltcond:rho']
+        J['thrust','fltcond|rho'] = thrust / inputs['fltcond|rho']
         J['thrust', 'rpm'] = 2 * thrust / inputs['rpm']
         J['thrust', 'diameter'] = 4 * thrust / inputs['diameter']
-        J['thrust', 'cp']       = dctdcp * inputs['fltcond:rho'] * (inputs['rpm']/60.)**2 * inputs['diameter']**4
+        J['thrust', 'cp']       = dctdcp * inputs['fltcond|rho'] * (inputs['rpm']/60.)**2 * inputs['diameter']**4
 
         #if j <= jinterp_min:
         j_thrust_ct_over_cp[static_idx] = thrust[static_idx] / inputs['ct_over_cp'][static_idx]
@@ -183,43 +183,43 @@ class PropCoefficients(ExplicitComponent):
 
     def setup(self):
         nn = self.options['num_nodes']
-        self.add_input('shaft_power', units='W', desc='Input shaft power',shape=(nn,),val=5*np.ones(nn))
+        self.add_input('shaft_power', units='W', desc='Input shaft power',shape=(nn,), val=5*np.ones(nn))
         self.add_input('diameter', units='m', val=2.5, desc='Prop diameter')
         self.add_input('rpm', units='rpm', val=2500*np.ones(nn), desc='Propeller shaft speed')
-        self.add_input('fltcond:rho',units='kg / m ** 3',desc='Air density',shape=(nn,))
-        self.add_input('fltcond:Utrue', units='m/s', desc='Flight speed',shape=(nn,))
+        self.add_input('fltcond|rho', units='kg / m ** 3',desc='Air density',shape=(nn,))
+        self.add_input('fltcond|Utrue', units='m/s', desc='Flight speed',shape=(nn,))
 
         #outputs and partials
         self.add_output('cp', desc='Power coefficient', val=0.1*np.ones(nn), lower=np.zeros(nn),upper=np.ones(nn)*2.4)
-        self.add_output('J', desc='Advance ratio',val=0.2**np.ones(nn))
+        self.add_output('J', desc='Advance ratio', val=0.2**np.ones(nn))
         self.add_output('prop_Vtip',desc='Propeller tip speed',shape=(nn,))
 
         self.declare_partials('cp','diameter')
-        self.declare_partials('cp','shaft_power',rows=range(nn),cols=range(nn))
-        self.declare_partials('cp', ['fltcond:rho','rpm'],rows=range(nn),cols=range(nn))
+        self.declare_partials('cp','shaft_power', rows=range(nn), cols=range(nn))
+        self.declare_partials('cp', ['fltcond|rho','rpm'], rows=range(nn), cols=range(nn))
         self.declare_partials('J','diameter')
-        self.declare_partials('J', ['fltcond:Utrue','rpm'],rows=range(nn),cols=range(nn))
-        self.declare_partials('prop_Vtip','rpm',rows=range(nn),cols=range(nn))
+        self.declare_partials('J', ['fltcond|Utrue','rpm'], rows=range(nn), cols=range(nn))
+        self.declare_partials('prop_Vtip','rpm', rows=range(nn), cols=range(nn))
         self.declare_partials('prop_Vtip','diameter')
 
     def compute(self, inputs, outputs):
         #print('Prop shaft power input: ' + str(inputs['shaft_power']))
-        outputs['cp'] = inputs['shaft_power']/inputs['fltcond:rho'] / (inputs['rpm']/60)**3 / inputs['diameter']**5
+        outputs['cp'] = inputs['shaft_power']/inputs['fltcond|rho'] / (inputs['rpm']/60)**3 / inputs['diameter']**5
         #print('cp: '+str(outputs['cp']))
-        outputs['J'] = 60. * inputs['fltcond:Utrue'] / inputs['rpm'] / inputs['diameter']
-        # print('U:'+str(inputs['fltcond:Utrue']))
+        outputs['J'] = 60. * inputs['fltcond|Utrue'] / inputs['rpm'] / inputs['diameter']
+        # print('U:'+str(inputs['fltcond|Utrue']))
         # print('J: '+str(outputs['J']))
         outputs['prop_Vtip'] = inputs['rpm'] / 60 * np.pi * inputs['diameter']
 
     def compute_partials(self, inputs, J):
         nn = self.options['num_nodes']
-        cpval = inputs['shaft_power']/inputs['fltcond:rho'] / (inputs['rpm']/60)**3 / inputs['diameter']**5
-        jval = 60. * inputs['fltcond:Utrue'] / inputs['rpm'] / inputs['diameter']
-        J['cp','shaft_power'] = 1 /inputs['fltcond:rho'] / (inputs['rpm']/60)**3 / inputs['diameter']**5
-        J['cp','fltcond:rho'] = - cpval / inputs['fltcond:rho']
+        cpval = inputs['shaft_power']/inputs['fltcond|rho'] / (inputs['rpm']/60)**3 / inputs['diameter']**5
+        jval = 60. * inputs['fltcond|Utrue'] / inputs['rpm'] / inputs['diameter']
+        J['cp','shaft_power'] = 1 /inputs['fltcond|rho'] / (inputs['rpm']/60)**3 / inputs['diameter']**5
+        J['cp','fltcond|rho'] = - cpval / inputs['fltcond|rho']
         J['cp','rpm']  = -3. * cpval / inputs['rpm']
         J['cp','diameter'] = -5. * cpval / inputs['diameter']
-        J['J','fltcond:Utrue'] = jval / inputs['fltcond:Utrue']
+        J['J','fltcond|Utrue'] = jval / inputs['fltcond|Utrue']
         J['J','rpm'] = - jval / inputs['rpm']
         J['J','diameter'] = - jval / inputs['diameter']
         J['prop_Vtip','rpm'] = 1 / 60 * np.pi * inputs['diameter'] *np.ones(nn)
@@ -233,8 +233,8 @@ if __name__ == "__main__":
     model = prob.model
     ivc = model.add_subsystem('ivc', IndepVarComp(),promotes_outputs=['*'])
     ivc.add_output('shaft_power', val=1000, units='kW')
-    ivc.add_output('fltcond:rho', val=1.225, units='kg / m ** 3')
-    ivc.add_output('fltcond:Utrue', val=200, units='mph')
+    ivc.add_output('fltcond|rho', val=1.225, units='kg / m ** 3')
+    ivc.add_output('fltcond|Utrue', val=200, units='mph')
 
     model.add_subsystem('prop1',SimplePropeller(), promotes_inputs=["*"])
     prob.setup()

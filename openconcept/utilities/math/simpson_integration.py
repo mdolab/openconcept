@@ -205,9 +205,9 @@ class IntegrateQuantity(ExplicitComponent):
         self.add_input('rate', units=rate_unit, desc='Rate to integrate', shape=(nn,))
         self.add_output('delta_quantity', units=qty_unit, desc='Total change in the integrand')
 
-        self.declare_partials(['delta_quantity'],['rate'],rows=np.zeros(nn), cols=range(nn))
-        self.declare_partials(['delta_quantity'],['upper_limit'])
-        self.declare_partials(['delta_quantity'],['lower_limit'])
+        self.declare_partials(['delta_quantity'], ['rate'], rows=np.zeros(nn), cols=range(nn))
+        self.declare_partials(['delta_quantity'], ['upper_limit'])
+        self.declare_partials(['delta_quantity'], ['lower_limit'])
 
     def compute(self, inputs, outputs):
         n_int = self.options['num_intervals']

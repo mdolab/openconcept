@@ -1,0 +1,15 @@
+name: openconcept
+dependencies:
+  - numpy
+  - scipy
+  - sphinx
+  - nose
+  - hdf5
+  - h5py
+  - mock
+  - pip
+  - pip:
+    - pytest
+    - openmdao
+    - six
+    - sphinx_rtd_theme

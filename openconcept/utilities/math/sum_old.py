@@ -43,11 +43,11 @@ class Sum(ExplicitComponent):
             raise ValueError('Need to provide either one set of i/os or the same number of inputs and outputs')
         elif not(len(input_names) == len(output_names) == len(units) == len(scaling_factors)):
             raise ValueError('The input names, output names, scaling factors (if specified) and units (if specified) all need to be the same length')
-        
+
         for i, input_name in enumerate(input_names):
             self.add_input(input_name, units=units[i], shape=(nn,))
             self.add_output(output_names[i], units=units[i])
-            self.declare_partials([output_names[i]],[input_name],val=scaling_factors[i]*np.ones((1,nn)))
+            self.declare_partials([output_names[i]], [input_name], val=scaling_factors[i]*np.ones((1,nn)))
 
     def compute(self, inputs, outputs):
         nn = self.options['num_nodes']

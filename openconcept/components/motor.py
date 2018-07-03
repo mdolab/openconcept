@@ -8,15 +8,15 @@ class SimpleMotor(ExplicitComponent):
     """
     A simple motor which creates shaft power and draws electrical load
 
-    Input Vars
-    ----------
+    Inputs
+    ------
     throttle : float
         (n vector, dimensionless) Should be [0, 1]
     elec_power_rating: float
         (scalar, W) Electric (not mech) design power
 
-    Output Vars
-    -----------
+    Outputs
+    -------
     shaft_power_out : float
         (n vector, W)
     elec_load : float

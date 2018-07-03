@@ -36,9 +36,9 @@ class TestOne(unittest.TestCase):
         ivc = DictIndepVarComp(data_dict=data)
         ivc.add_output(name='a', shape=(self.nn,))
         ivc.add_output(name='b', shape=(self.nn,))
-        ivc.add_output_from_dict('geom:S_ref')
-        ivc.add_output_from_dict('aero:CLmax:flaps30')
-        ivc.add_output_from_dict('aero:CLmax:flaps10')
+        ivc.add_output_from_dict('geom|S_ref')
+        ivc.add_output_from_dict('aero|CLmax|flaps30')
+        ivc.add_output_from_dict('aero|CLmax|flaps10')
 
         self.p.model.add_subsystem(name='ivc',
                                    subsys=ivc,
@@ -54,20 +54,20 @@ class TestOne(unittest.TestCase):
     def test_results(self):
         a = self.p['a']
         b = self.p['b']
-        out = self.p['geom:S_ref']
+        out = self.p['geom|S_ref']
         expected = 20
         assert_rel_error(self, out, expected,1e-16)
 
     def test_units(self):
-        out = self.p.get_val('geom:S_ref',units='m**2')
+        out = self.p.get_val('geom|S_ref', units='m**2')
         expected = 20 * 0.3048**2
         assert_rel_error(self, out, expected,1e-4)
 
     def test_twodeep(self):
-        out = self.p.get_val('aero:CLmax:flaps30')
+        out = self.p.get_val('aero|CLmax|flaps30')
         expected = 1.7
         assert_rel_error(self, out, expected,1e-4)
-        out = self.p.get_val('aero:CLmax:flaps10')
+        out = self.p.get_val('aero|CLmax|flaps10')
         expected = 1.5
         assert_rel_error(self, out, expected,1e-4)
 
@@ -84,10 +84,10 @@ class TestAddNonexistentVar(unittest.TestCase):
         self.ivc.add_output(name='b', shape=(self.nn,))
 
     def test_nonexistent_key(self):
-        self.assertRaises(KeyError,self.ivc.add_output_from_dict,'geom:S_ref_blah')
+        self.assertRaises(KeyError,self.ivc.add_output_from_dict,'geom|S_ref_blah')
 
     def test_no_value(self):
-        self.assertRaises(KeyError,self.ivc.add_output_from_dict,'geom:noval')
+        self.assertRaises(KeyError,self.ivc.add_output_from_dict,'geom|noval')
 
 # class TestAddSubtractCompNx1(unittest.TestCase):
 
@@ -266,9 +266,9 @@ class TestAddNonexistentVar(unittest.TestCase):
 #         self.p = Problem(model=Group())
 
 #         ivc = IndepVarComp()
-#         ivc.add_output(name='a', shape=(self.nn, 3),units='ft')
-#         ivc.add_output(name='b', shape=(self.nn, 3),units='m')
-#         ivc.add_output(name='c', shape=(self.nn, 3),units='m')
+#         ivc.add_output(name='a', shape=(self.nn, 3), units='ft')
+#         ivc.add_output(name='b', shape=(self.nn, 3), units='m')
+#         ivc.add_output(name='c', shape=(self.nn, 3), units='m')
 
 #         self.p.model.add_subsystem(name='ivc',
 #                                    subsys=ivc,
@@ -276,7 +276,7 @@ class TestAddNonexistentVar(unittest.TestCase):
 
 #         adder=self.p.model.add_subsystem(name='add_subtract_comp',
 #                                    subsys=AddSubtractComp())
-#         adder.add_equation('adder_output',['input_a','input_b','input_c'],vec_size=self.nn,length=3,units='ft')
+#         adder.add_equation('adder_output',['input_a','input_b','input_c'],vec_size=self.nn,length=3, units='ft')
 
 #         self.p.model.connect('a', 'add_subtract_comp.input_a')
 #         self.p.model.connect('b', 'add_subtract_comp.input_b')
@@ -346,11 +346,11 @@ class TestAddNonexistentVar(unittest.TestCase):
 #         p = Problem(model=Group())
 
 #         ivc = IndepVarComp()
-#         #the vector represents forces at 3 time points (rows) in 2 dimensional plane (cols)
-#         ivc.add_output(name='thrust', shape=(n,2),units='kN')
-#         ivc.add_output(name='drag', shape=(n,2),units='kN')
-#         ivc.add_output(name='lift', shape=(n,2),units='kN')
-#         ivc.add_output(name='weight', shape=(n,2),units='kN')
+#         #the vector represents forces at 3 analysis points (rows) in 2 dimensional plane (cols)
+#         ivc.add_output(name='thrust', shape=(n,2), units='kN')
+#         ivc.add_output(name='drag', shape=(n,2), units='kN')
+#         ivc.add_output(name='lift', shape=(n,2), units='kN')
+#         ivc.add_output(name='weight', shape=(n,2), units='kN')
 #         p.model.add_subsystem(name='ivc',
 #                               subsys=ivc,
 #                               promotes_outputs=['thrust', 'drag', 'lift', 'weight'])
@@ -380,7 +380,7 @@ class TestAddNonexistentVar(unittest.TestCase):
 #         # print(p.get_val('totalforcecomp.total_force', units='kN'))
 
 #         # Verify the results
-#         expected_i = np.array([[100, 200, 300],[0, -1, -2]]).T
+#         expected_i = np.array([[100, 200, 300], [0, -1, -2]]).T
 #         assert_rel_error(self, p.get_val('totalforcecomp.total_force', units='kN'), expected_i)
 
 

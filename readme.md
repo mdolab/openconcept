@@ -1,17 +1,22 @@
-# openConcept - A Conceptual Design toolkit with efficient gradients implemented in the OpenMDAO framework
+# OpenConcept - A Conceptual Design toolkit with efficient gradients implemented in the OpenMDAO framework
 
 ### Author: Benjamin J. Brelje
 
-[![Linux Status](https://travis-ci.org/bbrelje/openconcept.svg?branch=master)](https://travis-ci.org/bbrelje/openconcept) [![Windows status](https://ci.appveyor.com/api/projects/status/u3x3mne0i03blv9w/branch/master?svg=true)](https://ci.appveyor.com/project/bbrelje/openconcept/branch/master) [![Coverage Status](https://coveralls.io/repos/github/bbrelje/openconcept/badge.svg)](https://coveralls.io/github/bbrelje/openconcept)
+[![Linux Status](https://travis-ci.org/bbrelje/openconcept.svg?branch=master)](https://travis-ci.org/bbrelje/openconcept) [![Windows status](https://ci.appveyor.com/api/projects/status/u3x3mne0i03blv9w/branch/master?svg=true)](https://ci.appveyor.com/project/bbrelje/openconcept/branch/master) [![Coverage Status](https://coveralls.io/repos/github/bbrelje/openconcept/badge.svg)](https://coveralls.io/github/bbrelje/openconcept)[![Documentation Status](//readthedocs.org/projects/openconcept/badge/?version=latest)](https://openconcept.readthedocs.io/en/latest/?badge=latest)
+
 
 
 OpenConcept is a new toolkit for the conceptual design of aircraft. OpenConcept was developed in order to model and optimize aircraft with electric propulsion at low computational cost. The tools are built on top of NASA Glenn's (http://openmdao.org/) framework, which in turn is written in Python.
 
 The following charts show more than 250 individually optimized hybrid-electric light twin aircraft (similar to a King Air C90GT). Optimizing hundreds of configurations can be done in a couple of hours on a standard laptop computer.
 
-![Example charts](images/readme_charts.PNG)
+![Example charts](docs/_static/images/readme_charts.png)
 
 The reason for OpenConcept's efficiency is the analytic derivatives built into each analysis routine and component. Accurate, efficient derivatives enable the use of Newton nonlinear equation solutions and gradient-based optimization at low computational cost.
+
+## Documentation
+
+Automatically-generated documentation is available at (https://openconcept.readthedocs.io)
 
 ## Getting Started
 
@@ -26,9 +31,7 @@ The reason for OpenConcept's efficiency is the analytic derivatives built into e
 
 ### Requirements
 
-This toolkit requires the use of OpenMDAO 2.3.0 or later and will evolve rapidly as general utilities are moved from OpenConcept into the main OpenMDAO repository. OpenMDAO requires a late numpy.
-
-Currently, only scipy=1.0.0 is supported by openconcept due to some issue with numpy type conversions. Until I debug the error, you'll need to manually downgrade scipy when you install or update OpenMDAO (which installs the latest scipy by default).
+This toolkit requires the use of OpenMDAO 2.3.0 or later and will evolve rapidly as general utilities are moved from OpenConcept into the main OpenMDAO repository. OpenMDAO requires a late numpy and scipy.
 
 ## Citation
 

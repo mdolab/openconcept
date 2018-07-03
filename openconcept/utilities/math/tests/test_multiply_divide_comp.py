@@ -268,9 +268,9 @@ class TestElementMultiplyDivideUnits(unittest.TestCase):
         self.p = Problem(model=Group())
 
         ivc = IndepVarComp()
-        ivc.add_output(name='a', shape=(self.nn, 3),units='kg')
-        ivc.add_output(name='b', shape=(self.nn, 3),units='m')
-        ivc.add_output(name='c', shape=(self.nn, 3),units='s ** 2')
+        ivc.add_output(name='a', shape=(self.nn, 3), units='kg')
+        ivc.add_output(name='b', shape=(self.nn, 3), units='m')
+        ivc.add_output(name='c', shape=(self.nn, 3), units='s ** 2')
 
         self.p.model.add_subsystem(name='ivc',
                                    subsys=ivc,
@@ -314,9 +314,9 @@ class TestElementMultiplyDivideUnits_DivideFirst(unittest.TestCase):
         self.p = Problem(model=Group())
 
         ivc = IndepVarComp()
-        ivc.add_output(name='a', shape=(self.nn, 3),units='kg')
-        ivc.add_output(name='b', shape=(self.nn, 3),units='m')
-        ivc.add_output(name='c', shape=(self.nn, 3),units='s ** 2')
+        ivc.add_output(name='a', shape=(self.nn, 3), units='kg')
+        ivc.add_output(name='b', shape=(self.nn, 3), units='m')
+        ivc.add_output(name='c', shape=(self.nn, 3), units='s ** 2')
 
         self.p.model.add_subsystem(name='ivc',
                                    subsys=ivc,
@@ -411,7 +411,7 @@ class TestForDocs(unittest.TestCase):
     def test(self):
         """
         A simple example to compute inertial forces on four projectiles at
-            a number of time points (F_inertial = - m*a)
+            a number of analysis points (F_inertial = - m*a)
         """
         import numpy as np
         #from openmdao.api import Problem, Group, IndepVarComp
@@ -423,9 +423,9 @@ class TestForDocs(unittest.TestCase):
         p = Problem(model=Group())
 
         ivc = IndepVarComp()
-        #the vector represents forces at 3 time points (rows) in 2 dimensional plane (cols)
-        ivc.add_output(name='mass', shape=(n,length),units='kg')
-        ivc.add_output(name='acceleration', shape=(n,length),units='m / s**2')
+        #the vector represents forces at 3 analysis points (rows) in 2 dimensional plane (cols)
+        ivc.add_output(name='mass', shape=(n,length), units='kg')
+        ivc.add_output(name='acceleration', shape=(n,length), units='m / s**2')
         p.model.add_subsystem(name='ivc',
                               subsys=ivc,
                               promotes_outputs=['mass', 'acceleration'])

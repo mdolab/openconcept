@@ -8,15 +8,15 @@ class SimpleGenerator(ExplicitComponent):
     """
     A simple generator which transforms shaft power into electrical power
 
-    Input Vars
-    ----------
+    Inputs
+    ------
     shaft_power_in : float
         (n vector, W)
     elec_power_rating: float
         (scalar, W) Electric (not mech) design power
 
-    Output Vars
-    -----------
+    Outputs
+    -------
     elec_power_out : float
         (n vector, W)
     heat_out : float

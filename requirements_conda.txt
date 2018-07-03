@@ -1,0 +1,4 @@
+pytest
+openmdao==2.3.1
+six
+sphinx_rtd_theme

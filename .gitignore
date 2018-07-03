@@ -6,3 +6,5 @@
 .cache/
 build/
 *pycache*
+docs/_build
+docs/_srcdocs
