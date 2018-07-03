@@ -2,7 +2,8 @@
 
 ### Author: Benjamin J. Brelje
 
-[![Linux Status](https://travis-ci.org/bbrelje/openconcept.svg?branch=master)](https://travis-ci.org/bbrelje/openconcept) [![Windows status](https://ci.appveyor.com/api/projects/status/u3x3mne0i03blv9w/branch/master?svg=true)](https://ci.appveyor.com/project/bbrelje/openconcept/branch/master) [![Coverage Status](https://coveralls.io/repos/github/bbrelje/openconcept/badge.svg)](https://coveralls.io/github/bbrelje/openconcept)
+[![Linux Status](https://travis-ci.org/bbrelje/openconcept.svg?branch=master)](https://travis-ci.org/bbrelje/openconcept) [![Windows status](https://ci.appveyor.com/api/projects/status/u3x3mne0i03blv9w/branch/master?svg=true)](https://ci.appveyor.com/project/bbrelje/openconcept/branch/master) [![Coverage Status](https://coveralls.io/repos/github/bbrelje/openconcept/badge.svg)](https://coveralls.io/github/bbrelje/openconcept)[![Documentation Status](//readthedocs.org/projects/openconcept/badge/?version=latest)](https://openconcept.readthedocs.io/en/latest/?badge=latest)
+
 
 
 OpenConcept is a new toolkit for the conceptual design of aircraft. OpenConcept was developed in order to model and optimize aircraft with electric propulsion at low computational cost. The tools are built on top of NASA Glenn's (http://openmdao.org/) framework, which in turn is written in Python.
@@ -12,6 +13,10 @@ The following charts show more than 250 individually optimized hybrid-electric l
 ![Example charts](docs/_static/images/readme_charts.png)
 
 The reason for OpenConcept's efficiency is the analytic derivatives built into each analysis routine and component. Accurate, efficient derivatives enable the use of Newton nonlinear equation solutions and gradient-based optimization at low computational cost.
+
+## Documentation
+
+Automatically-generated documentation is available at (https://openconcept.readthedocs.io)
 
 ## Getting Started
 
