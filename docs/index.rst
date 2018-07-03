@@ -6,25 +6,21 @@
 OpenConcept
 ===========
 
-[![Linux Status](https://travis-ci.org/bbrelje/openconcept.svg?branch=master)](https://travis-ci.org/bbrelje/openconcept)
-[![Windows status](https://ci.appveyor.com/api/projects/status/u3x3mne0i03blv9w/branch/master?svg=true)](https://ci.appveyor.com/project/bbrelje/openconcept/branch/master)
-[![Coverage Status](https://coveralls.io/repos/github/bbrelje/openconcept/badge.svg)](https://coveralls.io/github/bbrelje/openconcept)
-
 .. image:: https://travis-ci.org/bbrelje/openconcept.svg?branch=master
-:target: https://travis-ci.org/bbrelje/openconcept
-:alt: Linux Status
+    :target: https://travis-ci.org/bbrelje/openconcept
+    :alt: Linux Status
 
 .. image:: https://ci.appveyor.com/api/projects/status/u3x3mne0i03blv9w/branch/master?svg=true
-:target: https://ci.appveyor.com/project/bbrelje/openconcept/branch/master
-:alt: Windows Status
+    :target: https://ci.appveyor.com/project/bbrelje/openconcept/branch/master
+    :alt: Windows Status
 
 .. image:: https://coveralls.io/repos/github/bbrelje/openconcept/badge.svg
-:target: https://coveralls.io/github/bbrelje/openconcept
-:alt: Coverage Status
+    :target: https://coveralls.io/github/bbrelje/openconcept
+    :alt: Coverage Status
 
 .. image:: https://readthedocs.org/projects/openconcept/badge/?version=latest
-:target: https://openconcept.readthedocs.io/en/latest/?badge=latest
-:alt: Documentation Status
+    :target: https://openconcept.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
 
 
 
