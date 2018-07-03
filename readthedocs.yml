@@ -7,3 +7,5 @@ python:
 conda:
   file: environment.yml
 
+formats: [htmlzip,epub]
+

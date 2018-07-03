@@ -9,7 +9,7 @@ OpenConcept is a new toolkit for the conceptual design of aircraft. OpenConcept 
 
 The following charts show more than 250 individually optimized hybrid-electric light twin aircraft (similar to a King Air C90GT). Optimizing hundreds of configurations can be done in a couple of hours on a standard laptop computer.
 
-![Example charts](docs/_static/images/readme_charts.PNG)
+![Example charts](docs/_static/images/readme_charts.png)
 
 The reason for OpenConcept's efficiency is the analytic derivatives built into each analysis routine and component. Accurate, efficient derivatives enable the use of Newton nonlinear equation solutions and gradient-based optimization at low computational cost.
 
