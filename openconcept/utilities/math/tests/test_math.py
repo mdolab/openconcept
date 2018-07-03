@@ -13,9 +13,9 @@ class SimpsonTestGroup(Group):
         ni = self.options['n_simp_intervals']
         iv = self.add_subsystem('iv', IndepVarComp())
         self.add_subsystem('integrate', IntegrateQuantity(num_intervals=ni,diff_units='s',quantity_units='m'),promotes_outputs=['*'])
-        iv.add_output('start_pt',val=0,units='s')
-        iv.add_output('end_pt',val=1,units='s')
-        iv.add_output('function',val=np.ones(2*ni+1),units='m/s')
+        iv.add_output('start_pt', val=0, units='s')
+        iv.add_output('end_pt', val=1, units='s')
+        iv.add_output('function', val=np.ones(2*ni+1), units='m/s')
         self.connect('iv.start_pt','integrate.lower_limit')
         self.connect('iv.end_pt','integrate.upper_limit')
         self.connect('iv.function','integrate.rate')

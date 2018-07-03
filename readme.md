@@ -9,7 +9,7 @@ OpenConcept is a new toolkit for the conceptual design of aircraft. OpenConcept 
 
 The following charts show more than 250 individually optimized hybrid-electric light twin aircraft (similar to a King Air C90GT). Optimizing hundreds of configurations can be done in a couple of hours on a standard laptop computer.
 
-![Example charts](images/readme_charts.PNG)
+![Example charts](docs/_static/images/readme_charts.PNG)
 
 The reason for OpenConcept's efficiency is the analytic derivatives built into each analysis routine and component. Accurate, efficient derivatives enable the use of Newton nonlinear equation solutions and gradient-based optimization at low computational cost.
 
@@ -26,9 +26,7 @@ The reason for OpenConcept's efficiency is the analytic derivatives built into e
 
 ### Requirements
 
-This toolkit requires the use of OpenMDAO 2.3.0 or later and will evolve rapidly as general utilities are moved from OpenConcept into the main OpenMDAO repository. OpenMDAO requires a late numpy.
-
-Currently, only scipy=1.0.0 is supported by openconcept due to some issue with numpy type conversions. Until I debug the error, you'll need to manually downgrade scipy when you install or update OpenMDAO (which installs the latest scipy by default).
+This toolkit requires the use of OpenMDAO 2.3.0 or later and will evolve rapidly as general utilities are moved from OpenConcept into the main OpenMDAO repository. OpenMDAO requires a late numpy and scipy.
 
 ## Citation
 

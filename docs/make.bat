@@ -1,6 +1,8 @@
 @ECHO OFF
 
 pushd %~dp0
+rmdir /s /q _srcdocs
+rmdir /s /q _srcdocs_native
 
 REM Command file for Sphinx documentation
 

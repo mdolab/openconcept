@@ -226,7 +226,7 @@ class TestConcatenateNx3Units(unittest.TestCase):
 
         combiner=self.p.model.add_subsystem(name='vector_concat_comp',
                                    subsys=VectorConcatenateComp())
-        combiner.add_relation('concat_output',['input_a','input_b'],vec_sizes=[self.nn,self.nn],length=self.length,units='m')
+        combiner.add_relation('concat_output',['input_a','input_b'],vec_sizes=[self.nn,self.nn],length=self.length, units='m')
 
         self.p.model.connect('a', 'vector_concat_comp.input_a')
         self.p.model.connect('b', 'vector_concat_comp.input_b')
@@ -540,7 +540,7 @@ class TestSplitNx3Units(unittest.TestCase):
         self.nn = 5
         self.p = Problem(model=Group())
         ivc = IndepVarComp()
-        ivc.add_output(name='input_to_split', shape=(self.nn*2,3),units='m')
+        ivc.add_output(name='input_to_split', shape=(self.nn*2,3), units='m')
 
         self.p.model.add_subsystem(name='ivc',
                                    subsys=ivc,
@@ -548,7 +548,7 @@ class TestSplitNx3Units(unittest.TestCase):
 
         splitter=self.p.model.add_subsystem(name='vector_split_comp',
                                    subsys=VectorSplitComp())
-        splitter.add_relation(['output_a','output_b'],'input_to_split',vec_sizes=[self.nn,self.nn],length=3,units='m')
+        splitter.add_relation(['output_a','output_b'],'input_to_split',vec_sizes=[self.nn,self.nn],length=3, units='m')
 
         self.p.model.connect('input_to_split', 'vector_split_comp.input_to_split')
         self.p.setup()
@@ -614,12 +614,12 @@ class TestForDocs(unittest.TestCase):
         p = Problem(model=Group())
 
         takeoff_conditions = IndepVarComp()
-        takeoff_conditions.add_output(name='velocity', shape=(n_takeoff_pts,2),units='m/s')
-        takeoff_conditions.add_output(name='altitude', shape=(n_takeoff_pts,),units='m')
+        takeoff_conditions.add_output(name='velocity', shape=(n_takeoff_pts,2), units='m/s')
+        takeoff_conditions.add_output(name='altitude', shape=(n_takeoff_pts,), units='m')
 
         cruise_conditions = IndepVarComp()
-        cruise_conditions.add_output(name='velocity', shape=(n_cruise_pts,2),units='m/s')
-        cruise_conditions.add_output(name='altitude', shape=(n_cruise_pts,),units='m')
+        cruise_conditions.add_output(name='velocity', shape=(n_cruise_pts,2), units='m/s')
+        cruise_conditions.add_output(name='altitude', shape=(n_cruise_pts,), units='m')
 
         p.model.add_subsystem(name='takeoff_conditions',
                               subsys=takeoff_conditions)
@@ -630,10 +630,10 @@ class TestForDocs(unittest.TestCase):
                                             subsys=VectorConcatenateComp())
 
         combiner.add_relation('velocity',['to_vel','cruise_vel'],
-                              vec_sizes=[3,5],length=2,units='m/s')
+                              vec_sizes=[3,5],length=2, units='m/s')
 
         combiner.add_relation('altitude',['to_alt','cruise_alt'],
-                              vec_sizes=[3,5],units='m')
+                              vec_sizes=[3,5], units='m')
 
         p.model.connect('takeoff_conditions.velocity', 'combiner.to_vel')
         p.model.connect('cruise_conditions.velocity', 'combiner.cruise_vel')
@@ -643,7 +643,7 @@ class TestForDocs(unittest.TestCase):
         divider=p.model.add_subsystem(name='divider',
                                             subsys=VectorSplitComp())
         divider.add_relation(['to_vel','cruise_vel'],'velocity',
-                              vec_sizes=[3,5],length=2,units='m/s')
+                              vec_sizes=[3,5],length=2, units='m/s')
         p.model.connect('combiner.velocity','divider.velocity')
 
         p.setup()
@@ -659,9 +659,9 @@ class TestForDocs(unittest.TestCase):
         p.run_model()
 
         # Verify the results
-        expected_vel = np.array([[30, 0],[40, 0],[50, 0],[60, 5],[60, 0],[60, 0],[60, 0],[60, -5]])
+        expected_vel = np.array([[30, 0], [40, 0], [50, 0], [60, 5], [60, 0], [60, 0], [60, 0], [60, -5]])
         expected_alt = np.array([0, 0, 0, 6000, 7500, 8000, 8500, 5000])
-        expected_split_vel = np.array([[60, 5],[60, 0],[60, 0],[60, 0],[60, -5]])
+        expected_split_vel = np.array([[60, 5], [60, 0], [60, 0], [60, 0], [60, -5]])
         assert_rel_error(self, p.get_val('combiner.velocity', units='m/s'), expected_vel)
         assert_rel_error(self, p.get_val('combiner.altitude', units='m'), expected_alt)
         assert_rel_error(self, p.get_val('divider.cruise_vel', units='m/s'), expected_split_vel)

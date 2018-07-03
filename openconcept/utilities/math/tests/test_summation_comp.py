@@ -266,8 +266,8 @@ class TestSummationNx3UnitsMultipleSystems(unittest.TestCase):
 
         multi=self.p.model.add_subsystem(name='sum_comp',
                                    subsys=SumComp())
-        multi.add_equation('sum_output1','sum_input_a',vec_size=self.nn,length=self.length,units='m')
-        multi.add_equation('sum_output2','sum_input_b',vec_size=self.nn,length=self.length,units='kg')
+        multi.add_equation('sum_output1','sum_input_a',vec_size=self.nn,length=self.length, units='m')
+        multi.add_equation('sum_output2','sum_input_b',vec_size=self.nn,length=self.length, units='kg')
 
         self.p.model.connect('a', 'sum_comp.sum_input_a')
         self.p.model.connect('b', 'sum_comp.sum_input_b')
@@ -369,7 +369,7 @@ class TestForDocs(unittest.TestCase):
 
         ivc = IndepVarComp()
         #the vector represents fuel burns over several mission segments
-        ivc.add_output(name='fuel_burn_by_seg', shape=(n,),units='kg')
+        ivc.add_output(name='fuel_burn_by_seg', shape=(n,), units='kg')
         p.model.add_subsystem(name='ivc',
                               subsys=ivc,
                               promotes_outputs=['fuel_burn_by_seg'])

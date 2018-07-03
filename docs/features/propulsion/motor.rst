@@ -1,4 +1,4 @@
-.. _motor:
+.. _motor|
 
 ********
 Motor Component

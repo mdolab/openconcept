@@ -27,7 +27,7 @@ class DictIndepVarComp(IndepVarComp):
         super(DictIndepVarComp, self).__init__(**kwargs)
         self._data_dict = data_dict
 
-    def add_output_from_dict(self, structured_name, separator=':', **kwargs):
+    def add_output_from_dict(self, structured_name, separator='|', **kwargs):
         """
         Create a new output based on data from the data dictionary
 

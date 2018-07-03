@@ -37,11 +37,11 @@ class SimpleGearbox(ExplicitComponent):
         self.add_output('component_weight', units='kg', desc='Gearbox component weight')
         self.add_output('component_sizing_margin', desc='Fraction of rated power',shape=(nn,))
 
-        self.declare_partials('shaft_power_out','shaft_power_in', val=eta_gb*np.ones(nn),rows=range(nn),cols=range(nn))
-        self.declare_partials('heat_out', 'shaft_power_in', val=(1-eta_gb)*np.ones(nn),rows=range(nn),cols=range(nn))
+        self.declare_partials('shaft_power_out','shaft_power_in', val=eta_gb*np.ones(nn), rows=range(nn), cols=range(nn))
+        self.declare_partials('heat_out', 'shaft_power_in', val=(1-eta_gb)*np.ones(nn), rows=range(nn), cols=range(nn))
         self.declare_partials('component_cost','shaft_power_rating', val=cost_inc)
         self.declare_partials('component_weight','shaft_power_rating', val=weight_inc)
-        self.declare_partials('component_sizing_margin','shaft_power_in',rows=range(nn),cols=range(nn))
+        self.declare_partials('component_sizing_margin','shaft_power_in', rows=range(nn), cols=range(nn))
         self.declare_partials('component_sizing_margin','shaft_power_rating')
 
 

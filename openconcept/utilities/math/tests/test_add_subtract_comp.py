@@ -224,9 +224,9 @@ class TestAddSubtractUnits(unittest.TestCase):
         self.p = Problem(model=Group())
 
         ivc = IndepVarComp()
-        ivc.add_output(name='a', shape=(self.nn, 3),units='ft')
-        ivc.add_output(name='b', shape=(self.nn, 3),units='m')
-        ivc.add_output(name='c', shape=(self.nn, 3),units='m')
+        ivc.add_output(name='a', shape=(self.nn, 3), units='ft')
+        ivc.add_output(name='b', shape=(self.nn, 3), units='m')
+        ivc.add_output(name='c', shape=(self.nn, 3), units='m')
 
         self.p.model.add_subsystem(name='ivc',
                                    subsys=ivc,
@@ -234,7 +234,7 @@ class TestAddSubtractUnits(unittest.TestCase):
 
         adder=self.p.model.add_subsystem(name='add_subtract_comp',
                                    subsys=AddSubtractComp())
-        adder.add_equation('adder_output',['input_a','input_b','input_c'],vec_size=self.nn,length=3,units='ft')
+        adder.add_equation('adder_output',['input_a','input_b','input_c'],vec_size=self.nn,length=3, units='ft')
 
         self.p.model.connect('a', 'add_subtract_comp.input_a')
         self.p.model.connect('b', 'add_subtract_comp.input_b')
@@ -304,11 +304,11 @@ class TestForDocs(unittest.TestCase):
         p = Problem(model=Group())
 
         ivc = IndepVarComp()
-        #the vector represents forces at 3 time points (rows) in 2 dimensional plane (cols)
-        ivc.add_output(name='thrust', shape=(n,2),units='kN')
-        ivc.add_output(name='drag', shape=(n,2),units='kN')
-        ivc.add_output(name='lift', shape=(n,2),units='kN')
-        ivc.add_output(name='weight', shape=(n,2),units='kN')
+        #the vector represents forces at 3 analysis points (rows) in 2 dimensional plane (cols)
+        ivc.add_output(name='thrust', shape=(n,2), units='kN')
+        ivc.add_output(name='drag', shape=(n,2), units='kN')
+        ivc.add_output(name='lift', shape=(n,2), units='kN')
+        ivc.add_output(name='weight', shape=(n,2), units='kN')
         p.model.add_subsystem(name='ivc',
                               subsys=ivc,
                               promotes_outputs=['thrust', 'drag', 'lift', 'weight'])
@@ -338,7 +338,7 @@ class TestForDocs(unittest.TestCase):
         # print(p.get_val('totalforcecomp.total_force', units='kN'))
 
         # Verify the results
-        expected_i = np.array([[100, 200, 300],[0, -1, -2]]).T
+        expected_i = np.array([[100, 200, 300], [0, -1, -2]]).T
         assert_rel_error(self, p.get_val('totalforcecomp.total_force', units='kN'), expected_i)
 
 

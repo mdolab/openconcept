@@ -199,7 +199,7 @@ release = openconcept.__version__ + ' alpha'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
- #   'sphinx.ext.autosummary',
+    'sphinx.ext.autosummary',
     'sphinx.ext.doctest',
 #    'sphinx.ext.intersphinx',
 	'sphinx.ext.napoleon',
@@ -211,7 +211,7 @@ extensions = [
 
 ]
 
-#autosummary_generate = True
+autosummary_generate = False
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -342,9 +342,14 @@ generate_srcdocs = True
 
 if generate_srcdocs:
     # native way
-    # subprocess.call(['sphinx-apidoc','-o','_srcdocs','../openconcept'])
+    # subprocess.call(['sphinx-apidoc','-o','_srcdocs_native','../openconcept'])
+    # os.rename('_srcdocs_native/modules.rst','_srcdocs_native/index.rst')
     # openmdao way
-    packages = ['analysis','components','utilities']
+    packages = ['analysis',
+                'analysis.atmospherics',
+                'components',
+                'utilities',
+                'utilities.math']
     generate_src_docs(".", "../openconcept", packages)
 
 

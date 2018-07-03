@@ -92,7 +92,7 @@ class ConstantPropEfficiency(ExplicitComponent):
         self.add_input('cp', desc='Power coefficient',shape=(nn,))
         self.add_input('J', desc='Advance ratio', shape=(nn,))
         self.add_output('eta_prop', desc='Propulsive efficiency',shape=(nn,))
-        self.declare_partials(['eta_prop'],['*'],rows=range(nn),cols=range(nn),val=np.zeros(nn))
+        self.declare_partials(['eta_prop'], ['*'], rows=range(nn), cols=range(nn), val=np.zeros(nn))
 
     def compute(self, inputs, outputs):
         outputs['eta_prop'] = 0.85
@@ -109,8 +109,8 @@ def propeller_map_quadratic(vec_size=1):
     #enter three points in xyz array format:
     #the center of the efficiency bucket (J, cp, eta)
     #two more points (J, cp, eta)
-    #points = np.array([[2.2,0.18,0.93],[0.2,0.03,0.40],[0.2,0.7,0.02]])
-    points = np.array([[3.1,1.55,0.91],[0,0,0.3],[1.0,2.0,0.5]])
+    #points = np.array([[2.2,0.18,0.93], [0.2,0.03,0.40], [0.2,0.7,0.02]])
+    points = np.array([[3.1,1.55,0.91], [0,0,0.3], [1.0,2.0,0.5]])
     #solve a linear system for the constants in AJ^2+BJ+C*cp^2+D*cp+E = eta
     #the first point meets the value and has zero gradient
     #the second and third points meet value

@@ -22,7 +22,7 @@ from openmdao.api import ExplicitComponent
 
 class SeriesHybridElectricPropulsionSystem(Group):
     """This is an example model of a series-hybrid propulsion system. One motor
-        draws electrical load from two sources in a fractional split: a battery pack,
+        draws electrical load from two sources in a fractional split| a battery pack,
         and a turbogenerator setup. The control inputs are the power split fraction and the
         motor throttle setting; the turboshaft throttle matches the power level necessary
         to drive the generator at the required power level.
@@ -38,7 +38,7 @@ class SeriesHybridElectricPropulsionSystem(Group):
 
     def setup(self):
         #define design variables that are independent of flight condition or control states
-        dvlist = [['ac:propulsion:engine:rating','eng1_rating',260.0,'kW'],
+        dvlist = [['ac|propulsion|engine|rating','eng1_rating',260.0,'kW'],
                     ['dv_prop1_diameter','prop1_diameter',2.5,'m'],
                     ['dv_motor1_rating','motor1_rating',240.0,'kW'],
                     ['dv_gen1_rating','gen1_rating',250.0,'kW'],
@@ -75,7 +75,7 @@ class SeriesHybridElectricPropulsionSystem(Group):
         #there is an implicit gap between gen1 output and split input B
         #add implicit component to match gen1 elec output and hybrid_split.power_out_B
         # eng1_bal = BalanceComp()
-        # eng1_bal.add_balance('eng1t',val=np.ones(nn)*0.5,eq_units='W')
+        # eng1_bal.add_balance('eng1t', val=np.ones(nn)*0.5,eq_units='W')
         # self.add_subsystem('eng1_control',eng1_bal)
         # self.connect('eng1_control.eng1t','eng1.throttle')
         # self.connect('hybrid_split.power_out_B','eng1_control.lhs:eng1t')
@@ -90,7 +90,7 @@ class SeriesHybridElectricPropulsionSystem(Group):
 
 class SingleSeriesHybridElectricPropulsionSystem(Group):
     """This is an example model of a series-hybrid propulsion system. One motor
-        draws electrical load from two sources in a fractional split: a battery pack,
+        draws electrical load from two sources in a fractional split| a battery pack,
         and a turbogenerator setup. The control inputs are the power split fraction and the
         motor throttle setting; the turboshaft throttle matches the power level necessary
         to drive the generator at the required power level.
@@ -135,7 +135,7 @@ class SingleSeriesHybridElectricPropulsionSystem(Group):
         e_b = self.options['specific_energy']
         #introduce model components
         self.add_subsystem('motor1', SimpleMotor(efficiency=0.97,num_nodes=nn))
-        self.add_subsystem('prop1',SimplePropeller(num_nodes=nn),promotes_inputs=["fltcond:*"],promotes_outputs=['thrust'])
+        self.add_subsystem('prop1',SimplePropeller(num_nodes=nn),promotes_inputs=["fltcond|*"],promotes_outputs=['thrust'])
         self.connect('motor1.shaft_power_out','prop1.shaft_power')
 
         self.add_subsystem('hybrid_split',PowerSplit(rule='fraction',num_nodes=nn))
@@ -148,13 +148,13 @@ class SingleSeriesHybridElectricPropulsionSystem(Group):
 
         self.add_subsystem('batt1',SimpleBattery(num_nodes=nn,specific_energy=e_b))
         self.connect('hybrid_split.power_out_A','batt1.elec_load')
-        self.add_subsystem('eng_gen_resid',AddSubtractComp(output_name='eng_gen_residual',input_names=['gen_power_available','gen_power_required'],vec_size=nn,units='kW',scaling_factors=[1,-1]))
+        self.add_subsystem('eng_gen_resid',AddSubtractComp(output_name='eng_gen_residual',input_names=['gen_power_available','gen_power_required'],vec_size=nn, units='kW',scaling_factors=[1,-1]))
         #need to use the optimizer to drive hybrid_split.power_out_B to the same value as gen1.elec_power_out
         self.connect('hybrid_split.power_out_B','eng_gen_resid.gen_power_required')
         self.connect('gen1.elec_power_out','eng_gen_resid.gen_power_available')
 
-        addweights = AddSubtractComp(output_name='motors_weight',input_names=['motor1_weight'],units='kg')
-        addweights.add_equation(output_name='propellers_weight',input_names=['prop1_weight'],units='kg')
+        addweights = AddSubtractComp(output_name='motors_weight',input_names=['motor1_weight'], units='kg')
+        addweights.add_equation(output_name='propellers_weight',input_names=['prop1_weight'], units='kg')
         self.add_subsystem('add_weights',subsys=addweights,promotes_inputs=['*'],promotes_outputs=['*'])
 
         self.connect('motor1.component_weight','motor1_weight')
@@ -170,7 +170,7 @@ class SingleSeriesHybridElectricPropulsionSystem(Group):
 
 class TwinSeriesHybridElectricPropulsionSystem(Group):
     """This is an example model of a series-hybrid propulsion system. One motor
-        draws electrical load from two sources in a fractional split: a battery pack,
+        draws electrical load from two sources in a fractional split| a battery pack,
         and a turbogenerator setup. The control inputs are the power split fraction and the
         motor throttle setting; the turboshaft throttle matches the power level necessary
         to drive the generator at the required power level.
@@ -205,26 +205,26 @@ class TwinSeriesHybridElectricPropulsionSystem(Group):
 
     def setup(self):
         #define design variables that are independent of flight condition or control states
-        dvlist = [['ac:propulsion:engine:rating','eng_rating',260.0,'kW'],
-                    ['ac:propulsion:propeller:diameter','prop_diameter',2.5,'m'],
-                    ['ac:propulsion:motor:rating','motor_rating',240.0,'kW'],
-                    ['ac:propulsion:generator:rating','gen_rating',250.0,'kW'],
-                    ['ac:weights:W_battery','batt_weight',2000,'kg']]
+        dvlist = [['ac|propulsion|engine|rating','eng_rating',260.0,'kW'],
+                    ['ac|propulsion|propeller|diameter','prop_diameter',2.5,'m'],
+                    ['ac|propulsion|motor|rating','motor_rating',240.0,'kW'],
+                    ['ac|propulsion|generator|rating','gen_rating',250.0,'kW'],
+                    ['ac|weights|W_battery','batt_weight',2000,'kg']]
         self.add_subsystem('dvs',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
         nn = self.options['num_nodes']
         e_b = self.options['specific_energy']
         #introduce model components
         self.add_subsystem('motor1', SimpleMotor(efficiency=0.97,num_nodes=nn))
-        self.add_subsystem('prop1',SimplePropeller(num_nodes=nn),promotes_inputs=["fltcond:*"])
+        self.add_subsystem('prop1',SimplePropeller(num_nodes=nn),promotes_inputs=["fltcond|*"])
         self.connect('motor1.shaft_power_out','prop1.shaft_power')
 
 
         self.add_subsystem('motor2', SimpleMotor(efficiency=0.97,num_nodes=nn))
-        self.add_subsystem('prop2',SimplePropeller(num_nodes=nn),promotes_inputs=["fltcond:*"])
+        self.add_subsystem('prop2',SimplePropeller(num_nodes=nn),promotes_inputs=["fltcond|*"])
         self.connect('motor2.shaft_power_out','prop2.shaft_power')
 
-        addpower = AddSubtractComp(output_name='motors_elec_load',input_names=['motor1_elec_load','motor2_elec_load'],units='kW',vec_size=nn)
-        addpower.add_equation(output_name='thrust',input_names=['prop1_thrust','prop2_thrust'],units='N',vec_size=nn)
+        addpower = AddSubtractComp(output_name='motors_elec_load',input_names=['motor1_elec_load','motor2_elec_load'], units='kW',vec_size=nn)
+        addpower.add_equation(output_name='thrust',input_names=['prop1_thrust','prop2_thrust'], units='N',vec_size=nn)
         self.add_subsystem('add_power',subsys=addpower,promotes_outputs=['*'])
         self.connect('motor1.elec_load','add_power.motor1_elec_load')
         self.connect('motor2.elec_load','add_power.motor2_elec_load')
@@ -241,12 +241,12 @@ class TwinSeriesHybridElectricPropulsionSystem(Group):
 
         self.add_subsystem('batt1',SimpleBattery(num_nodes=nn,specific_energy=e_b))
         self.connect('hybrid_split.power_out_A','batt1.elec_load')
-        self.add_subsystem('eng_gen_resid',AddSubtractComp(output_name='eng_gen_residual',input_names=['gen_power_available','gen_power_required'],vec_size=nn,units='kW',scaling_factors=[1,-1]))
+        self.add_subsystem('eng_gen_resid',AddSubtractComp(output_name='eng_gen_residual',input_names=['gen_power_available','gen_power_required'],vec_size=nn, units='kW',scaling_factors=[1,-1]))
         #need to use the optimizer to drive hybrid_split.power_out_B to the same value as gen1.elec_power_out
         self.connect('hybrid_split.power_out_B','eng_gen_resid.gen_power_required')
         self.connect('gen1.elec_power_out','eng_gen_resid.gen_power_available')
-        addweights = AddSubtractComp(output_name='motors_weight',input_names=['motor1_weight','motor2_weight'],units='kg')
-        addweights.add_equation(output_name='propellers_weight',input_names=['prop1_weight','prop2_weight'],units='kg')
+        addweights = AddSubtractComp(output_name='motors_weight',input_names=['motor1_weight','motor2_weight'], units='kg')
+        addweights.add_equation(output_name='propellers_weight',input_names=['prop1_weight','prop2_weight'], units='kg')
         self.add_subsystem('add_weights',subsys=addweights,promotes_inputs=['*'],promotes_outputs=['*'])
         self.connect('motor1.component_weight','motor1_weight')
         self.connect('motor2.component_weight','motor2_weight')
@@ -266,11 +266,11 @@ class VehicleSizingModel(Group):
     def setup(self):
         dvs = self.add_subsystem('dvs',IndepVarComp(),promotes_outputs=["*"])
         climb = self.add_subsystem('missionanalysis',MissionAnalysis(),promotes_inputs=["dv_*"])
-        dvs.add_output('dv_prop1_diameter',3.0,units='m')
-        dvs.add_output('dv_motor1_rating',1.5,units='MW')
-        dvs.add_output('dv_gen1_rating',1.55,units='MW')
-        dvs.add_output('ac:propulsion:engine:rating',1.6,units='MW')
-        dvs.add_output('dv_batt1_weight',2000,units='kg')
+        dvs.add_output('dv_prop1_diameter',3.0, units='m')
+        dvs.add_output('dv_motor1_rating',1.5, units='MW')
+        dvs.add_output('dv_gen1_rating',1.55, units='MW')
+        dvs.add_output('ac|propulsion|engine|rating',1.6, units='MW')
+        dvs.add_output('dv_batt1_weight',2000, units='kg')
 
 
 
