@@ -9,8 +9,26 @@ from openmdao.api import ExplicitComponent, Group, Problem, IndepVarComp
 
 class InputConverter(ExplicitComponent):
     """
-    The differentiable standard atmosphere from Hwang and Jasa is unitless and modular.
-    This model adds a unitized interface to other higher-level model interfaces.
+    This component adds a unitized interface to the Hwang and Jasa model.
+
+    Inputs
+    ------
+    fltcond|h : float
+        Altitude (vector, km)
+    fltcond|Ueas : float
+        Equivalent airspeed (vector, m/s)
+
+    Outputs
+    -------
+    h_km : float
+        Altitude in km to pass to the standard atmosphere modules (vector, unitless)
+    v_m_s : float
+        Airspeed in m/s to pass to the standard atmosphere modules (vector, unitless)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (sets vec length) (default 1)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
@@ -34,8 +52,30 @@ class InputConverter(ExplicitComponent):
 
 class OutputConverter(ExplicitComponent):
     """
-    The differentiable standard atmosphere from Hwang and Jasa is unitless and modular.
-    This model adds a unitized interface to other higher-level model interfaces.
+    This component adds a unitized interface to the Hwang and Jasa model.
+
+    Inputs
+    ------
+    p_MPa : float
+        Pressure in megapascals from the standard atm model (vector, unitless)
+    T_1e2_K : float
+        Tempreature in 100K units from the std atm model (vector, unitless)
+    rho_kg_m3 : float
+        Density in kg / m3 from the std atm model (vector, unitless)
+
+    Outputs
+    -------
+    fltcond|p : float
+        Pressure with units (vector, Pa)
+    fltcond|rho : float
+        Density with units (vector, kg/m3)
+    fltcond|T : float
+        Temperature with units (vector, K)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (sets vec length) (default 1)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
@@ -72,8 +112,35 @@ class OutputConverter(ExplicitComponent):
 
 
 class ComputeAtmosphericProperties(Group):
-    """This computes pressure, temperature, and density for a given altitude at ISA condtions. Also true airspeed from equivalent ~ indicated airspeed
-    """
+    '''
+    Computes pressure, density, temperature, dyn pressure, and true airspeed
+
+    Inputs
+    ------
+    fltcond|h : float
+        Altitude (vector, km)
+    fltcond|Ueas : float
+        Equivalent airspeed (vector, m/s)
+
+    Outputs
+    -------
+    fltcond|p : float
+        Pressure (vector, Pa)
+    fltcond|rho : float
+        Density (vector, kg/m3)
+    fltcond|T : float
+        Temperature (vector, K)
+    fltcond|Utrue : float
+        True airspeed (vector, m/s)
+    fltcond|q : float
+        Dynamic pressure (vector, Pa)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (sets vec length) (default 1)
+    '''
+
     def initialize(self):
         self.options.declare('num_nodes',default=1,desc="Number of mission analysis points to run")
 
@@ -94,39 +161,3 @@ class ComputeAtmosphericProperties(Group):
         self.connect('pressure.p_MPa','outputconv.p_MPa')
         self.connect('temp.T_1e2_K','outputconv.T_1e2_K')
         self.connect('density.rho_kg_m3','outputconv.rho_kg_m3')
-
-
-
-class TestModel(Group):
-    def setup(self):
-        dvs = self.add_subsystem('alts',IndepVarComp(),promotes_outputs=["*"])
-        fltconds = self.add_subsystem('stdatm',ComputeAtmosphericProperties(num_nodes=10),promotes_inputs=["fltcond|*"])
-        dvs.add_output('fltcond|h',np.linspace(0,28000,10), units='ft')
-        dvs.add_output('fltcond|Ueas',np.ones(10)*150, units='kn')
-
-# class TestUnitConv(ExplicitComponent):
-#     def setup(self):
-#         self.add_input('fltcond|Ueas',unit='m/s',desc='Equiv airspeed')
-#         self.add_output('fltcond|Utrue',unit='m/s'desc='True airspeed')
-#     def compute(self, inputs, outputs):
-#         outputs['fltcond|Utrue'] = inputs['fltcond|Ueas']
-
-
-def testfunc():
-    prob = Problem()
-    prob.model= TestModel()
-    prob.setup()
-    prob.run_model()
-    print('Altitude: ' + str(prob['stdatm.inputconv.h_km']))
-    print('Temp: ' + str(prob['stdatm.fltcond|T']))
-    print('Pressure: ' + str(prob['stdatm.fltcond|p']))
-    print('Density: ' + str(prob['stdatm.fltcond|rho']))
-    print('TAS: ' + str(prob['stdatm.fltcond|Utrue']))
-    print('Dynamic pressure:' + str(prob['stdatm.fltcond|q']))
-    #prob.model.list_inputs()
-    #prob.model.list_outputs()
-    prob.check_partials(compact_print=True)
-
-if __name__ == "__main__":
-    from openconcept.analysis.atmospherics.compute_atmos_props import testfunc
-    testfunc()

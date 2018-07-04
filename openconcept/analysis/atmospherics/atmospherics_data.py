@@ -1,6 +1,12 @@
 from __future__ import division
 import numpy as np
+'''
+This module provides 1976 Standard Atmosphere constants and calculations.
 
+Adapted from:
+J.P. Jasa, J.T. Hwang, and J.R.R.A. Martins: Design and Trajectory Optimization of a Morphing Wing Aircraft
+2018 AIAA/ASCE/AHS/ASC Structures, Structural Dynamics, and Materials Conference; AIAA SciTech Forum, January 2018
+'''
 
 # tropopause
 epsilon = 500

@@ -12,20 +12,75 @@ from openconcept.utilities.dvlabel import DVLabel
 
 def takeoff_check(prob):
     """
-    In some cases, the numeric integration scheme used to calculate TOFL can give a spurious result if the airplane can't accelerate through to V1. This function
-    detects this case and raises an error. It should be called following every model.run_driver or run_model call.
+    Checks to ensure positive accelerations during each takeoff phase.
+
+    In some cases, the numeric integration scheme used to calculate TOFL can give a spurious result
+    if the airplane can't accelerate through to V1. This function detects this case and raises an error.
+    It should be called following every model.run_driver or run_model call.
+
+    Arguments
+    ---------
+    prob : OpenMDAO problem object
+        The OpenMDAO problem object
+
+    Inputs
+    ------
+    'takeoff._rate_to_integrate_v0v1' : float
+    'takeoff._rate_to_integrate_v1vr' : float
+    'takeoff._rate_to_integrate_v1v0' : float
+
+    Raises
+    -------
+    ValueError if negative distances are produced
+
     """
     v0v1 = prob['takeoff._rate_to_integrate_v0v1']
     v1vr = prob['takeoff._rate_to_integrate_v1vr']
     v1v0 = prob['takeoff._rate_to_integrate_v1v0']
     if np.sum(v0v1 < 0) > 0:
-        raise ValueError('The aircraft was unable to reach v1 speed at the optimized design point. Restrict the design variables to add power or re-enable takeoff constraints')
+        raise ValueError('The aircraft was unable to reach v1 speed at the optimized design point. '
+                         'Restrict design variables to add power or reenable takeoff constraints')
     if np.sum(v1vr < 0) > 0:
-        raise ValueError('The aircraft was unable to accelerate to vr from v1 (try adding power), or the v1 speed is higher than vr')
+        raise ValueError('The aircraft was unable to accelerate to vr from v1 (try adding power), '
+                         'or the v1 speed is higher than vr')
     if np.sum(v1v0 > 0) < 0:
-        raise ValueError('Unusually, the aircraft continues to accelerate even after heavy braking in the abort phase of takeoff. Check your engine-out abort throttle settings (should be near zero thrust)')
+        raise ValueError('The aircraft continues to accelerate even after heavy braking in '
+                         'the abort phase of takeoff. Check your RTO throttle settings '
+                         '(should be near zero thrust)')
 
 class ComputeBalancedFieldLengthResidual(ExplicitComponent):
+    """
+    Computes a residual equation so Newton solver can set v1 to analyze balanced field length
+
+    This residual is equal to zero if:
+        - The rejected takeoff and engine-out takeoff distances are equal, or:
+        - V1 is equal to VR and the engine out takeoff distance is longer than the RTO distance
+
+    Since this is a discontinous function, the partial derivatives are written in a special way
+    to 'coax' the V1 value into the right setting with a Newton step. It's kind of a hack.
+
+    Inputs
+    ------
+    takeoff|distance : float
+        Engine-out takeoff distance (scalar, m)
+    takeoff|distance_abort : float
+        Distance to full-stop when takeoff is rejected at V1 (scalar, m)
+    mission|takeoff|v1 : float
+        Decision speed (scalar, m/s)
+    mission|takeoff|vr : float
+        Rotation speed (scalar, m/s)
+
+    Outputs
+    -------
+    BFL_residual : float
+        Difference between OEI TO distance and RTO distance for diagnostic purposes (scalar, m/s)
+    v1vr_diff : float
+        Difference between decision and rotation speed for diagnostic purposes (scalar, m/s)
+    BFL_combined : float
+        Residual equation combining both criteria with special partial derivatives.
+        Should be used for the Newton solver when doing takeoff field length analysis
+        (scalar, m)
+    """
     def setup(self):
         self.add_input('takeoff|distance', units='m')
         self.add_input('takeoff|distance_abort', units='m')
@@ -78,6 +133,40 @@ class ComputeBalancedFieldLengthResidual(ExplicitComponent):
             partials['BFL_combined','mission|takeoff|v1'] = 0
 
 class TakeoffFlightConditions(ExplicitComponent):
+    """
+    Generates flight condition vectors for takeoff segments
+
+    Inputs
+    ------
+    mission|takeoff|h : float
+        Runway altitude (scalar, m)
+    mission|takeoff|v1 : float
+        Takeoff decision speed (scalar, m/s)
+    Vstall_eas : float
+        Flaps down stall airspeed (scalar, m/s)
+
+    Outputs
+    -------
+    mission|takeoff|vr
+        Takeoff rotation speed (set as multiple of stall speed). (scalar, m/s)
+    mission|takeoff|v2
+        Takeoff safety speed (set as multiple of stall speed). (scalar, m/s)
+    fltcond|takeoff|Ueas
+        Takeoff indicated/equiv. airspeed (vector, m/s)
+    fltcond|takeoff|h
+        Takeoff altitude turned into a vector (vector, m/s)
+
+    Options
+    -------
+    n_int_per_seg : int
+        Number of Simpson's rule intervals to use per mission segment.
+        The total number of points is 2 * n_int_per_seg + 1
+    vr_multiple : float
+        Rotation speed multiplier on top of stall speed (default 1.1)
+    v2_multiple : float
+        Climb out safety speed multiplier on top of stall speed (default 1.2)
+    """
+
     def initialize(self):
         self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg. Number of analysis points is 2N+1")
         self.options.declare('vr_multiple',default=1.1, desc="Rotation speed multiple of Vstall")
@@ -129,6 +218,34 @@ class TakeoffFlightConditions(ExplicitComponent):
 
 
 class TakeoffCLs(ExplicitComponent):
+    """
+    Computes lift coefficient at every takeoff and transition analysis point
+
+    During the ground roll, CL is assumed constant.
+    During rotation and transition, a 1.2g maneuver is assumed
+
+    Inputs
+    ------
+    weight : float
+        Takeoff weight (scalar, kg)
+    fltcond|takeoff|q : float
+        Dynamic pressure at each analysis point (vector, Pascals)
+    ac|geom|wing|S_ref : float
+        Wing reference area (scalar, m**2)
+
+    Outputs
+    -------
+    CL_takeoff : float
+        Wing lift coefficient at each TO analysis point (vector, dimensionless)
+
+    Options
+    -------
+    n_int_per_seg : int
+        Number of Simpson's rule intervals to use per mission segment.
+        The total number of points is 2 * n_int_per_seg + 1
+    ground_CL : float
+        Assumed CL during takeoff roll (default 0.1)
+    """
     def initialize(self):
         self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg. Number of analysis points is 2N+1")
         self.options.declare('ground_CL',default=0.1,desc="Assumed CL during the takeoff roll")
@@ -166,8 +283,38 @@ class TakeoffCLs(ExplicitComponent):
         J['CL_takeoff','ac|geom|wing|S_ref'] = - loadfactors*inputs['weight'][-2:] * g / inputs['fltcond|takeoff|q'][-2:] / inputs['ac|geom|wing|S_ref'][-2:]**2
 
 class TakeoffAccels(ExplicitComponent):
-    """This returns the INVERSE of the accelerations during the takeoff run
-        This is due to the integration wrt velocity: int( dr/dt * dt / dv) dv = int( v / a) dv
+    """
+    Computes acceleration during takeoff run and returns the inverse for the integrator.
+
+    This returns the **INVERSE** of the accelerations during the takeoff run.
+    Inverse acceleration is required due to integration wrt velocity:
+    int( dr/dt * dt / dv) dv = int( v / a) dv
+
+    Inputs
+    ------
+    weight : float
+        Takeoff weight (scalar, kg)
+    drag : float
+        Aircraft drag at each TO analysis point (vector, N)
+    lift : float
+        Aircraft lift at each TO analysis point (vector, N)
+    takeoff|thrust : float
+        Thrust at each TO analysis point (vector, N)
+
+    Outputs
+    -------
+    _inverse_accel : float
+        Inverse of the acceleration at ecah time point (vector, s**2/m)
+
+    Options
+    -------
+    n_int_per_seg : int
+        Number of Simpson's rule intervals to use per mission segment.
+        The total number of points is 2 * n_int_per_seg + 1
+    free_rolling_friction_coeff : float
+        Rolling coefficient without brakes applied (default 0.03)
+    braking_friction_coeff : float
+        Rolling coefficient with max braking applied (default 0.40)
     """
     def initialize(self):
         self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg. Number of analysis points is 2N+1")
@@ -231,6 +378,26 @@ class TakeoffAccels(ExplicitComponent):
         J['_inverse_accel','weight'] = ddweight
 
 class TakeoffV2ClimbAngle(ExplicitComponent):
+    """
+    Computes climb out angle based on excess thrust.
+
+    Inputs
+    ------
+    drag_v2 : float
+        Aircraft drag at v2 (climb out) flight condition (scalar, N)
+    weight : float
+        Takeoff weight (scalar, kg)
+    takeoff|thrust_v2 : float
+        Thrust at the v2 (climb out) flight condition (scalar, N)
+
+    Outputs
+    -------
+    takeoff|climb|gamma : float
+        Climb out flight path angle (scalar, rad)
+
+    Options
+    -------
+    """
     def setup(self):
         self.add_input('drag_v2', units='N')
         self.add_input('weight', units='kg')
@@ -252,6 +419,33 @@ class TakeoffV2ClimbAngle(ExplicitComponent):
         J['takeoff|climb|gamma','weight'] = -d_arcsin*(inputs['takeoff|thrust_v2']-inputs['drag_v2'])/inputs['weight']**2/g
 
 class TakeoffTransition(ExplicitComponent):
+    """
+    Computes distance and altitude at end of circular transition
+
+    Based on TO distance analysis method in Raymer book.
+    Obstacle clearance height set for GA / Part 23 aircraft
+    Override for analyzing Part 25 aircraft
+
+    Inputs
+    ------
+    fltcond|takeoff|Utrue_vtrans
+        Transition true airspeed (generally avg of vr and v2) (scalar, m/s)
+    takeoff|climb|gamma : float
+        Climb out flight path angle (scalar, rad)
+
+    Outputs
+    -------
+    s_transition : float
+        Horizontal distance during transition to v2 climb out (scalar, m)
+    h_transition : float
+        Altitude at transition point (scalar, m)
+
+    Options
+    -------
+    h_obstacle : float
+        Obstacle height to clear (in **meters**) (default 10.66, equiv. 35 ft)
+    """
+
     def initialize(self):
         self.options.declare('h_obstacle',default=10.66,desc='Obstacle clearance height in m')
 
@@ -306,6 +500,29 @@ class TakeoffTransition(ExplicitComponent):
 
 
 class TakeoffClimb(ExplicitComponent):
+    """
+    Computes ground distance from end of transition until obstacle is cleared
+
+    Analysis based on Raymer book.
+
+    Inputs
+    ------
+    takeoff|climb|gamma : float
+        Climb out flight path angle (scalar, rad)
+    h_transition : float
+        Altitude at transition point (scalar, m)
+
+    Outputs
+    -------
+    s_climb : float
+        Horizontal distance from end of transition until obstacle is cleared (scalar, m)
+
+    Options
+    -------
+    h_obstacle : float
+        Obstacle height to clear (in **meters**) (default 10.66, equiv. 35 ft)
+    """
+
     def initialize(self):
         self.options.declare('h_obstacle',default=10.66,desc='Obstacle clearance height in m')
     def setup(self):
@@ -330,7 +547,59 @@ class TakeoffClimb(ExplicitComponent):
         J['s_climb','h_transition'] = -1/np.tan(gam)
 
 class TakeoffTotalDistance(Group):
-    """This high level component calculates lift, drag, rolling resistance during a takeoff roll, including one-engine-out and abort.
+    """This analysis group calculates takeoff field length and fuel/energy consumption.
+
+    This component should be instantiated in the top-level aircraft analysis / optimization script.
+
+    **Suggested variable promotion list:**
+    *'ac|aero\*', 'ac|weights|MTOW', 'ac|geom|\*', 'fltcond|takeoff|\*', 'takeoff|battery_load',*
+    *'takeoff|thrust','takeoff|fuel_flow','mission|takeoff|v\*'*
+
+    **Inputs List:**
+
+    From aircraft config:
+        - ac|aero|polar|CD0_TO
+        - ac|aero|polar|e
+        - ac|geom|wing|S_ref
+        - ac|geom|wing|AR
+        - ac|weights|MTOW
+
+    From Newton solver:
+        - mission|takeoff|v1
+
+    From takeoff flight condition generator:
+        - mission|takeoff|vr
+
+    From standard atmosphere model/splitter:
+        - fltcond|takeoff|q
+        - fltcond|takeoff|Utrue
+
+    From propulsion model:
+        - takeoff|battery_load
+        - takeoff|fuel_flow
+        - takeoff|thrust
+
+    Outputs
+    -------
+    takeoff|total_fuel : float
+        Total fuel burn for takeoff (scalar, kg)
+    takeoff|total_battery_energy : float
+        Total energy consumption for takeoff (scalar, kJ)
+    takeoff|distance : float
+        Takeoff distance with given propulsion settings (scalar, m)
+    takeoff|distance_abort : float
+        Takeoff distance if maximum braking applied at v1 speed (scalar, m)
+
+    Options
+    -------
+    n_int_per_seg : int
+        Number of Simpson's rule intervals to use per mission segment.
+        The total number of points is 2 * n_int_per_seg + 1
+    track_battery : bool
+        Set to `True` to track battery energy consumption during takeoff (default False)
+    track_fuel : bool
+        Set to `True` to track fuel burned during takeoff (default False)
+
     """
     def initialize(self):
         self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg. Number of analysis points is 2N+1")
@@ -383,9 +652,6 @@ class TakeoffTotalDistance(Group):
                                                                        vec_size=nn_tot,
                                                                        input_units=['s**2/m','J / s']),
                                                                        promotes_inputs=['*'],promotes_outputs=['*'])
-
-
-
 
         #==The following boilerplate splits the input flight conditions, thrusts, and fuel flows into the takeoff segments for further analysis
         inputs_to_split = ['_rate_to_integrate','fltcond|takeoff|Utrue','takeoff|thrust','drag','lift']
@@ -471,138 +737,3 @@ class TakeoffTotalDistance(Group):
             self.connect('v0v1_fuel.delta_quantity','total_fuel.fuel_v0v1')
             self.connect('v1vr_fuel.delta_quantity','total_fuel.fuel_v1vr')
             self.add_subsystem('climb_weight',AddSubtractComp(output_name='weight_after_takeoff',input_names=['weight','takeoff|total_fuel'], units='kg',scaling_factors=[1,-1]),promotes_inputs=["*"],promotes_outputs=["*"])
-
-
-
-# class TakeoffAnalysisTest(Group):
-#     """This analysis group calculates TOFL and mission fuel burn as well as many other quantities for an example airplane. Elements may be overridden or replaced as needed.
-#         Should be instantiated as the top-level model
-
-#     """
-
-#     def initialize(self):
-#         self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-#         #self.options.declare('propmodel',desc='Propulsion model to use. Pass in the class, not an instance')
-
-#     def setup(self):
-#         n_int_per_seg = self.options['n_int_per_seg']
-#         nn_tot = (2*n_int_per_seg+1)*3 +2 #v0v1,v1vr,v1v0, vtr, v2
-#         nn = (2*n_int_per_seg+1)
-
-#         #Create holders for control and flight condition parameters. Add these as design variables as necessary for optimization when you define the prob
-
-#         dv_comp = self.add_subsystem('dv_comp',IndepVarComp(),promotes_outputs=["CLmax_flapsdown","ac|geom|*","takeoff_*","dv_*"])
-#         #eventually replace the following with an analysis module
-#         dv_comp.add_output('CLmax_flapsdown', val=1.7)
-#         dv_comp.add_output('polar_e', val=0.78)
-#         dv_comp.add_output('polar_CD0', val=0.03)
-
-#         #wing geometry variables
-#         dv_comp.add_output('ac|geom|wing|S_ref', val=193.5, units='ft**2')
-#         dv_comp.add_output('ac|geom|wing|AR', val=8.95)
-
-#         #design weights
-#         dv_comp.add_output('ac|weights|MTOW', val=3354, units='kg')
-
-#         #takeoff parameters
-#         dv_comp.add_output('mission|takeoff|h', val=0, units='ft')
-#         dv_comp.add_output('mission|takeoff|v1', val=85, units='kn')
-
-#         #propulsion parameters (rename this prefix at some point)
-#         dv_comp.add_output('ac|propulsion|engine|rating',850, units='hp')
-#         dv_comp.add_output('dv_prop1_diameter',2.3, units='m')
-
-
-
-
-#         #== Compute the stall speed (necessary for takeoff analysis)
-#         vstall = self.add_subsystem('vstall', StallSpeed(), promotes_inputs=["ac|geom|wing|S_ref","CLmax_flapsdown"], promotes_outputs=["Vstall_eas"])
-
-#         #==Calculate flight conditions for the takeoff and mission segments here
-#         conditions = self.add_subsystem('conds', TakeoffFlightConditions(n_int_per_seg=n_int_per_seg),promotes_inputs=["takeoff_*","*"],promotes_outputs=["fltcond|*","takeoff_*"])
-#         a=VectorConcatenateComp()
-#         a.add_relation(output_name='fltcond|h',input_names=['fltcond|takeoff|h'],vec_sizes=[nn_tot], units='m')
-#         a.add_relation(output_name='fltcond|Ueas',input_names=['fltcond|takeoff|Ueas'],vec_sizes=[nn_tot], units='m/s')
-#         combiner = self.add_subsystem('combiner',subsys=a,promotes_inputs=["*"],promotes_outputs=["*"])
-#         #==Calculate atmospheric properties and true airspeeds for all mission segments
-#         atmos = self.add_subsystem('atmos',ComputeAtmosphericProperties(num_nodes=nn_tot),promotes_inputs=["fltcond|h","fltcond|Ueas"],promotes_outputs=["fltcond|rho","fltcond|Utrue","fltcond|q"])
-
-#         #==Calculate engine thrusts and fuel flows. You will need to override this module to vary number of engines, prop architecture, etc
-#         # Your propulsion model must promote up a single variable called "thrust" and a single variable called "fuel_flow". You may need to sum these at a lower level in the prop model group
-#         # You will probably need to add more control parameters if you use multiple engines. You may also need to add implicit solver states if, e.g. turbogenerator power setting depends on motor power setting
-#         controls = self.add_subsystem('controls',IndepVarComp())
-#         prop = self.add_subsystem('propmodel',TurbopropPropulsionSystem(num_nodes=nn_tot),promotes_inputs=["fltcond|*","dv_*"],promotes_outputs=["fuel_flow","thrust"])
-
-#         #==Define control settings for the propulsion system.
-#         # Recall that all flight points including takeoff roll are calculated all at once
-#         # The structure of the takeoff vector should be:
-#         #[ nn points (takeoff at full power, v0 to v1),
-#         #  nn points (takeoff at engine-out power (if applicable), v1 to vr),
-#         #  nn points (hard braking at zero power or even reverse, vr to v0),
-#         # !CAUTION! 1 point (transition at OEI power (if applicable), v_trans)
-#         # !CAUTION! 1 point (v2 climb at OEI power (if app), v2)
-#         # ]
-#         controls.add_output('prop1|rpm', val=np.ones(nn_tot)*2000, units='rpm')
-#         throttle_vec = np.concatenate([np.ones(nn),np.ones(nn)*1.0,np.zeros(nn),np.ones(2)*1.0])
-#         controls.add_output('motor1_throttle', val=throttle_vec)
-
-#         #connect control settings to the various states in the propulsion model
-#         self.connect('controls.prop1|rpm','propmodel.prop1.rpm')
-#         self.connect('controls.motor1_throttle','propmodel.throttle')
-
-#         #now we have flight conditions and propulsion outputs for all flight conditions. Split into our individual analysis phases
-#         #== Leave this alone==#
-#         inputs_to_split = ['fltcond|q','fltcond|Utrue','fuel_flow','thrust']
-#         segments_to_split_into = ['takeoff']
-#         units = ['N * m**-2','m/s','kg/s','N']
-#         nn_each_segment = [nn_tot]
-#         b = VectorSplitComp()
-#         for k, input_name in enumerate(inputs_to_split):
-#             output_names_list = []
-#             for segment in segments_to_split_into:
-#                 output_names_list.append(input_name+'_'+segment)
-#             print(output_names_list)
-#             b.add_relation(output_names=output_names_list,input_name=input_name,vec_sizes=nn_each_segment, units=units[k])
-#         splitter = self.add_subsystem('splitter',subsys=b,promotes_inputs=["*"],promotes_outputs=["*"])
-
-#         #==This next module calculates balanced field length, if applicable. Your optimizer or solver MUST implicitly drive the abort distance and oei takeoff distances to the same value by varying v1
-
-#         takeoff = self.add_subsystem('takeoff',TakeoffTotalDistance(n_int_per_seg=n_int_per_seg,track_fuel=True),promotes_inputs=['ac|geom|*','fltcond|*_takeoff','takeoff|thrust','takeoff|fuel_flow','takeoff_*'],promotes_outputs=['*'])
-#         self.connect('dv_comp.polar_CD0','takeoff.drag.polar_CD0')
-#         self.connect('dv_comp.polar_e','takeoff.drag.polar_e')
-#         self.connect('fltcond|takeoff|q','takeoff.drag.fltcond|q')
-#         self.connect('fltcond|takeoff|q','takeoff.lift.fltcond|q')
-#         self.connect('dv_comp.MTOW','vstall.weight')
-#         self.connect('dv_comp.MTOW','takeoff.TOW')
-
-
-# if __name__ == "__main__":
-#     from openconcept.examples.propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
-#     prob = Problem()
-#     prob.model= TakeoffAnalysisTest(n_int_per_seg=4)
-#     #prob.model=TestGroup()
-
-#     prob.setup()
-#     prob.run_model()
-#     # print(prob['fltcond|Ueas'])
-#     # print(prob['fltcond|h'])
-#     # print(prob['fltcond|rho'])
-#     # print(prob['fuel_flow'])
-#     print('Stall speed'+str(prob['Vstall_eas']))
-#     print('Rotate speed'+str(prob['mission|takeoff|vr']))
-
-#     print('V0V1 dist: '+str(prob['takeoff.v0v1_dist.delta_quantity']))
-#     print('V1VR dist: '+str(prob['takeoff.v1vr_dist.delta_quantity']))
-#     print('Braking dist:'+str(prob['takeoff.v1v0_dist.delta_quantity']))
-#     print('Climb angle(rad):'+str(prob['takeoff|climb|gamma']))
-#     print('h_trans:'+str(prob['h_transition']))
-#     print('s_trans:'+str(prob['s_transition']))
-#     print('s_climb|'+str(prob['s_climb']))
-#     print('TO (continue):'+str(prob['takeoff|distance']))
-#     print('TO (abort):'+str(prob['takeoff|distance_abort']))
-
-
-#     #prob.model.list_inputs()
-#     #prob.model.list_outputs()
-#     #prob.check_partials(compact_print=True)
-#     #prob.check_totals(compact_print=True)
