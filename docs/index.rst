@@ -25,6 +25,7 @@ OpenConcept
 
 
 OpenConcept is a new toolkit for the conceptual design of aircraft.
+It is open source (repository located at https://github.com/mdolab/openconcept) and MIT licensed.
 OpenConcept was developed in order to model and optimize aircraft with electric propulsion at low computational cost.
 The tools are built on top of NASA Glenn's `OpenMDAO <http://openmdao.org/>`_ framework, which in turn is written in Python.
 
