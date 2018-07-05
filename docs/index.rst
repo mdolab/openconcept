@@ -6,16 +6,16 @@
 OpenConcept
 ===========
 
-.. image:: https://travis-ci.org/bbrelje/openconcept.svg?branch=master
-    :target: https://travis-ci.org/bbrelje/openconcept
+.. image:: https://travis-ci.org/mdolab/openconcept.svg?branch=master
+    :target: https://travis-ci.org/mdolab/openconcept
     :alt: Linux Status
 
-.. image:: https://ci.appveyor.com/api/projects/status/u3x3mne0i03blv9w/branch/master?svg=true
+.. image:: https://ci.appveyor.com/api/projects/status/tn4hv14w5xlree4t/branch/master?svg=true
     :target: https://ci.appveyor.com/project/bbrelje/openconcept/branch/master
     :alt: Windows Status
 
-.. image:: https://coveralls.io/repos/github/bbrelje/openconcept/badge.svg
-    :target: https://coveralls.io/github/bbrelje/openconcept
+.. image:: https://coveralls.io/repos/github/mdolab/openconcept/badge.svg
+    :target: https://coveralls.io/github/mdolab/openconcept
     :alt: Coverage Status
 
 .. image:: https://readthedocs.org/projects/openconcept/badge/?version=latest
@@ -23,9 +23,8 @@ OpenConcept
     :alt: Documentation Status
 
 
-
 OpenConcept is a new toolkit for the conceptual design of aircraft.
-It is open source (repository located at https://github.com/mdolab/openconcept) and MIT licensed.
+It is open source (GitHub: https://github.com/mdolab/openconcept) and MIT licensed.
 OpenConcept was developed in order to model and optimize aircraft with electric propulsion at low computational cost.
 The tools are built on top of NASA Glenn's `OpenMDAO <http://openmdao.org/>`_ framework, which in turn is written in Python.
 
@@ -41,7 +40,7 @@ Accurate, efficient derivatives enable the use of Newton nonlinear equation solu
 ---------------
 Getting Started
 ---------------
-1. Clone the repo to disk
+1. Clone the repo to disk (`git clone https://github.com/mdolab/openconcept`)
 2. Navigate to the root openconcept folder
 3. Run `python setup.py install` to install the package
 4. Navigate to the `examples` folder

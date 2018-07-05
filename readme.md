@@ -2,9 +2,9 @@
 
 ### Author: Benjamin J. Brelje
 
-[![Linux Status](https://travis-ci.org/bbrelje/openconcept.svg?branch=master)](https://travis-ci.org/bbrelje/openconcept)
-[![Windows status](https://ci.appveyor.com/api/projects/status/u3x3mne0i03blv9w/branch/master?svg=true)](https://ci.appveyor.com/project/bbrelje/openconcept/branch/master)
-[![Coverage Status](https://coveralls.io/repos/github/bbrelje/openconcept/badge.svg)](https://coveralls.io/github/bbrelje/openconcept)
+[![Linux Status](https://travis-ci.org/mdolab/openconcept.svg?branch=master)](https://travis-ci.org/mdolab/openconcept)
+[![Windows status](https://ci.appveyor.com/api/projects/status/tn4hv14w5xlree4t/branch/master?svg=true)](https://ci.appveyor.com/project/bbrelje/openconcept/branch/master)
+[![Coverage Status](https://coveralls.io/repos/github/mdolab/openconcept/badge.svg)](https://coveralls.io/github/mdolab/openconcept)
 [![Documentation Status](https://readthedocs.org/projects/openconcept/badge/?version=latest)](https://openconcept.readthedocs.io/en/latest/?badge=latest)
 
 OpenConcept is a new toolkit for the conceptual design of aircraft. OpenConcept was developed in order to model and optimize aircraft with electric propulsion at low computational cost. The tools are built on top of NASA Glenn's [OpenMDAO](http://openmdao.org/) framework, which in turn is written in Python.
