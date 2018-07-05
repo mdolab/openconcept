@@ -25,6 +25,9 @@ This example illustrates the complexities which arise when electrical components
 
 *Source: `examples.propulsion_layouts.simple_series_hybrid.py`*
 
+.. embed-code::
+    examples.propulsion_layouts.simple_series_hybrid.SingleSeriesHybridElectricPropulsionSystem
+
 Components
 ----------
 
