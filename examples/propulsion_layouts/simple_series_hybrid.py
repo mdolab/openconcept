@@ -11,7 +11,6 @@ from openconcept.utilities.math import AddSubtractComp
 
 
 from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, DirectSolver, NewtonSolver, ScipyKrylov
-import matplotlib.pyplot as plt
 
 import numpy as np
 
