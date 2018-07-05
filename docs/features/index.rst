@@ -7,6 +7,7 @@ Features
 OpenConcept features will be documented here.
 
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 2
 
-   propulsion/motor.rst
+    propulsion/prop_modeling.rst
+    openmdao/openmdao_basics.rst
