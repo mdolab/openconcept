@@ -7,6 +7,14 @@ from .atmospherics_data import get_mask_arrays, compute_temps, compute_temp_deri
 
 
 class TemperatureComp(ExplicitComponent):
+    '''
+    This component computes temperature from altitude.
+
+    Adapted from:
+    J.P. Jasa, J.T. Hwang, and J.R.R.A. Martins: Design and Trajectory Optimization of a Morphing Wing Aircraft
+    2018 AIAA/ASCE/AHS/ASC Structures, Structural Dynamics, and Materials Conference; AIAA SciTech Forum, January 2018
+    '''
+
 
     def initialize(self):
         self.options.declare('num_nodes', types=int)

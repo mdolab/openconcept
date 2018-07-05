@@ -5,6 +5,26 @@ from openmdao.api import ExplicitComponent
 
 
 class DynamicPressureComp(ExplicitComponent):
+    '''
+    Calculates dynamic pressure from true airspeed and density.
+
+    Inputs
+    ------
+    fltcond|Utrue : float
+        True airspeed (vector, m/s)
+    fltcond|rho : float
+        Density (vector, m/s)
+
+    Outputs
+    -------
+    fltcond|q : float
+        Dynamic pressure (vector, Pa)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (sets vec length) (default 1)
+    '''
 
     def initialize(self):
         self.options.declare('num_nodes', types=int)

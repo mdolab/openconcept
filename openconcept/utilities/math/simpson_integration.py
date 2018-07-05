@@ -8,17 +8,20 @@ def simpson_integral(dts, q, n_segments=1, n_simpson_intervals_per_segment=2):
     This method integrates a rate over time using Simpson's rule
 
     A "segment" is defined as a portion of the quantity vector q with a
-        constant delta t (or delta x, etc)
+    constant delta t (or delta x, etc)
     dts = list of doubles representing the time steps for each segment.
-        This is the data timestep - the interval timestep is 2x this
+    This is the data timestep - the interval timestep is 2x this
     q = the data to be integrated
     n_segments = how many segments
     n_simpson_intervals_per_segment = how many simpson intervals to use per segment.
-        Each one requires 2*N+1 data points
+    Each one requires 2*N+1 data points
 
-    returns:
-    delta_q = amount of q accumulated during each interval
-    int_q = total amount of q accumulated during all phases
+    Returns
+    -------
+    delta_q : float
+        Amount of q accumulated during each interval (vector)
+    int_q : float
+        Total amount of q accumulated during all phases (scalar)
 
     """
     n_int_seg = n_simpson_intervals_per_segment
@@ -50,18 +53,21 @@ def simpson_integral(dts, q, n_segments=1, n_simpson_intervals_per_segment=2):
 def simpson_partials(dts, q, n_segments=1, n_simpson_intervals_per_segment=2,):
     """This method integrates a rate over time using Simpson's rule
 
-        A "segment" is defined as a portion of the quantity vector q
-            with a constant delta t (or delta x, etc)
-        dts = list of doubles representing the time steps for each segment.
-            This is the data timestep - the interval timestep is 2x this
-        q = the data to be integrated
-        n_segments = how many segments
-        n_simpson_intervals_per_segment = how many simpson intervals to use per segment.
-            Each one requires 2*N+1 data points
+    A "segment" is defined as a portion of the quantity vector q
+    with a constant delta t (or delta x, etc)
+    dts = list of doubles representing the time steps for each segment.
+    This is the data timestep - the interval timestep is 2x this
+    q = the data to be integrated
+    n_segments = how many segments
+    n_simpson_intervals_per_segment = how many simpson intervals to use per segment.
+    Each one requires 2*N+1 data points
 
-        returns:
-        delta_q = amount of q accumulated during each interval
-        int_q = total amount of q accumulated during all phases
+    Returns
+    -------
+    delta_q : float
+        Amount of q accumulated during each interval (vector)
+    int_q : float
+        Total amount of q accumulated during all phases (scalar)
 
     """
     n_int_seg = n_simpson_intervals_per_segment

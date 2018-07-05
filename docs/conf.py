@@ -46,7 +46,6 @@ Source Docs
 
     ref_sheet_bottom = """
    :members:
-   :undoc-members:
    :special-members: __init__, __contains__, __iter__, __setitem__, __getitem__
    :show-inheritance:
 
@@ -208,8 +207,9 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'embed_code',
-
 ]
+autodoc_inherit_docstrings = False
+autodoc_member_order = 'bysource'
 
 autosummary_generate = False
 

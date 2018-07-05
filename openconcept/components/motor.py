@@ -6,45 +6,45 @@ from openmdao.api import Group
 
 class SimpleMotor(ExplicitComponent):
     """
-    A simple motor which creates shaft power and draws electrical load
+    A simple motor which creates shaft power and draws electrical load.
 
     Inputs
     ------
     throttle : float
-        (n vector, dimensionless) Should be [0, 1]
+        Power control setting. Should be [0, 1]. (vector, dimensionless)
     elec_power_rating: float
-        (scalar, W) Electric (not mech) design power
+        Electric (not mech) design power. (scalar, W)
 
     Outputs
     -------
     shaft_power_out : float
-        (n vector, W)
+        Shaft power output from motor (vector, W)
     elec_load : float
-        (n vector, W)
+        Electrical load consumed by motor (vector, W)
     heat_out : float
-        (n vector, W)
+        Waste heat produced (vector, W)
     component_cost : float
-        (scalar, USD)
+        Nonrecurring cost of the component (scalar, USD)
     component_weight : float
-        (scalar, kg)
+        Weight of the component (scalar, kg)
     component_sizing_margin : float
-        (n vector, dimensionless)
+        Equal to 1 when producing full rated power (vector, dimensionless)
 
 
     Options
     -------
     num_nodes : int
-        (default 1) Number of analysis points to run (sets vec length)
+        Number of analysis points to run (sets vec length; default 1)
     efficiency : float
-        (default 1.0) Shaft power efficiency. Sensible range 0.0 to 1.0
+        Shaft power efficiency. Sensible range 0.0 to 1.0 (default 1)
     weight_inc : float
-        (default 1/5000, kg/W) Weight per unit rated power
+        Weight per unit rated power (default 1/5000, kg/W)
     weight_base : float
-        (default 0, kg) Base weight
+        Base weight (default 0, kg)
     cost_inc : float
-        (default 0.134228, USD/W) Cost per unit rated power
+        Cost per unit rated power (default 0.134228, USD/W)
     cost_base : float
-        (default 1 USD) Base cost
+        Base cost (default 1 USD) B
     """
 
     def initialize(self):

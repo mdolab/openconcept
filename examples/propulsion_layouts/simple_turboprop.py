@@ -6,32 +6,52 @@ from openconcept.utilities.math import AddSubtractComp
 from openmdao.api import Group, IndepVarComp, ExplicitComponent
 
 class TurbopropPropulsionSystem(Group):
-    """This is an example model of the simplest possible propulsion system consisting of a constant-speed prop and a turboshaft.
-        This is the Pratt and Whitney Canada PT6A-66D with 4-bladed propeller used by the SOCATA-DAHER TBM-850
-        INPUTS: ac|propulsion|engine|rating - the maximum rated shaft power of the engine
-                dv_prop1_diameter - propeller diameter
+    """This is an example model of the simplest possible propulsion system
+        consisting of a constant-speed prop and a turboshaft.
+
+        This is the Pratt and Whitney Canada PT6A-66D with 4-bladed
+        propeller used by the SOCATA-DAHER TBM-850.
+
+        Inputs
+        ------
+        ac|propulsion|engine|rating : float
+            The maximum rated shaft power of the engine
+        ac|propulsion|propeller|diameter : float
+            Diameter of the propeller
+
+        Options
+        -------
+        num_nodes : float
+            Number of analysis points to run (default 1)
     """
     def initialize(self):
-        self.options.declare('num_nodes',default=1,desc="Number of mission analysis points to run")
+        self.options.declare('num_nodes', default=1, desc="Number of mission analysis points to run")
 
     def setup(self):
-        #define design variables that are independent of flight condition or control states
-        dvlist = [['ac|propulsion|engine|rating','eng1_rating',850,'hp'],
-                    ['ac|propulsion|propeller|diameter','prop1_diameter',2.3,'m'],
-                    ]
-        self.add_subsystem('dvs',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
         nn = self.options['num_nodes']
-        #introduce model components
-        self.add_subsystem('eng1',SimpleTurboshaft(num_nodes=nn,weight_inc=0.14/1000,weight_base=104),promotes_inputs=["throttle"],promotes_outputs=["fuel_flow"])
-        self.add_subsystem('prop1',SimplePropeller(num_nodes=nn,num_blades=4,design_J=2.2,design_cp=0.55),promotes_inputs=["fltcond|*"],promotes_outputs=["thrust"])
 
-        #connect design variables to model component inputs
-        self.connect('eng1_rating','eng1.shaft_power_rating')
-        self.connect('eng1_rating','prop1.power_rating')
-        self.connect('prop1_diameter','prop1.diameter')
+        # rename incoming design variables
+        dvlist = [['ac|propulsion|engine|rating', 'eng1_rating', 850, 'hp'],
+                  ['ac|propulsion|propeller|diameter', 'prop1_diameter', 2.3, 'm']]
+        self.add_subsystem('dvs', DVLabel(dvlist),
+                           promotes_inputs=["*"], promotes_outputs=["*"])
 
-        #connect components to each other
-        self.connect('eng1.shaft_power_out','prop1.shaft_power')
+        # introduce model components
+        self.add_subsystem('eng1',
+                           SimpleTurboshaft(num_nodes=nn, weight_inc=0.14 / 1000, weight_base=104),
+                           promotes_inputs=["throttle"], promotes_outputs=["fuel_flow"])
+        self.add_subsystem('prop1',
+                           SimplePropeller(num_nodes=nn, num_blades=4,
+                                           design_J=2.2, design_cp=0.55),
+                           promotes_inputs=["fltcond|*"], promotes_outputs=["thrust"])
+
+        # connect design variables to model component inputs
+        self.connect('eng1_rating', 'eng1.shaft_power_rating')
+        self.connect('eng1_rating', 'prop1.power_rating')
+        self.connect('prop1_diameter', 'prop1.diameter')
+
+        # connect components to each other
+        self.connect('eng1.shaft_power_out', 'prop1.shaft_power_in')
 
 
 class TwinTurbopropPropulsionSystem(Group):
@@ -67,8 +87,8 @@ class TwinTurbopropPropulsionSystem(Group):
 
 
         #connect components to each other
-        self.connect('eng1.shaft_power_out','prop1.shaft_power')
-        self.connect('eng2.shaft_power_out','prop2.shaft_power')
+        self.connect('eng1.shaft_power_out','prop1.shaft_power_in')
+        self.connect('eng2.shaft_power_out','prop2.shaft_power_in')
 
         #add up the weights, thrusts and fuel flows
         add1 = AddSubtractComp(output_name='fuel_flow',input_names=['eng1_fuel_flow','eng2_fuel_flow'],vec_size=nn, units='kg/s')

@@ -4,6 +4,26 @@ import numpy as np
 from openmdao.api import ExplicitComponent
 
 class TrueAirspeedComp(ExplicitComponent):
+    '''
+    Computes true airspeed from equivalent airspeed and density
+
+    Inputs
+    ------
+    fltcond|rho : float
+        Density (vector, kg/m3)
+    fltcond|Ueas : float
+        Equivalent airspeed (vector, m/s)
+
+    Outputs
+    -------
+    fltcond|q : float
+        Dynamic pressure (vector, Pa)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (sets vec length) (default 1)
+    '''
 
     def initialize(self):
         self.options.declare('num_nodes', types=int)

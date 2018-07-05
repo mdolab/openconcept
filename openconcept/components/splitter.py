@@ -5,15 +5,56 @@ from openmdao.api import Group
 
 class PowerSplit(ExplicitComponent):
     """
-    The power split module can split shaft power (from source to two sinks)
-    or electrical load (from sink to two sources)
-    'rule'='fixed' will assign a fixed load (absolute terms) to
-    output A and the remainder of power to output B.
-    'rule'='fraction' will assign a fraction of the load to output A.
-    Inputs: power_in, power_rating [power_split_fraction or _amount]
-    Outputs: power_out_A and _B, heat_out, component_cost, component_weight, component_sizing_margin
-    Metadata: rule, efficiency, weight_inc, weight_base, cost_inc, cost_base
-    Weights in kg/W, cost in USD/W
+    A power split mechanism for mechanical or electrical power.
+
+    Inputs
+    ------
+    power_in : float
+        Power fed to the splitter. (vector, W)
+    power_rating : float
+        Maximum rated power of the split mechanism. (scalar, W)
+    power_split_fraction:
+        If `'rule'` is set to `'fraction'`, sets percentage of input power directed
+        to Output A (minus losses). (vector, dimensionless)
+    power_split_amount:
+        If `'rule'` is set to `'fixed'`, sets amount of input power to Output A (minus
+        losses). (vector, W)
+
+    Outputs
+    -------
+    power_out_A : float
+        Power sent to first output (vector, W)
+    power_out_B : float
+        Power sent to second output (vector, W)
+    heat_out : float
+        Waste heat produced (vector, W)
+    component_cost : float
+        Nonrecurring cost of the component (scalar, USD)
+    component_weight : float
+        Weight of the component (scalar, kg)
+    component_sizing_margin : float
+        Equal to 1 when fed full rated power (vector, dimensionless)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (sets vec length; default 1)
+    rule : str
+        Power split control rule to use
+    efficiency : float
+        Component efficiency (default 1)
+    weight_inc : float
+        Weight per unit rated power
+        (default 0, kg/W)
+    weight_base : float
+        Base weight
+        (default 0, kg)
+    cost_inc : float
+        Nonrecurring cost per unit power
+        (default 0, USD/W)
+    cost_base : float
+        Base cost
+        (default 0 USD)
     """
     def initialize(self):
         # define control rules

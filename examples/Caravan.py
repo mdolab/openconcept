@@ -11,11 +11,18 @@ from openconcept.analysis.takeoff import TakeoffFlightConditions, TakeoffTotalDi
 from openconcept.analysis.mission import MissionFlightConditions, MissionNoReserves, ComputeDesignMissionResiduals
 
 #These imports are particular to this airplane
-from propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
-from aircraft_data.caravan import data as acdata
-from aircraft_data.caravan_mission import data as missiondata
-from methods.weights_turboprop import SingleTurboPropEmptyWeight
-from methods.costs_commuter import OperatingCost
+try:
+    from .propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
+    from .aircraft_data.caravan import data as acdata
+    from .aircraft_data.caravan_mission import data as missiondata
+    from .methods.weights_turboprop import SingleTurboPropEmptyWeight
+    from .methods.costs_commuter import OperatingCost
+except:
+    from propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
+    from aircraft_data.caravan import data as acdata
+    from aircraft_data.caravan_mission import data as missiondata
+    from methods.weights_turboprop import SingleTurboPropEmptyWeight
+    from methods.costs_commuter import OperatingCost
 
 class DummyPayload(ExplicitComponent):
     def setup(self):

@@ -7,42 +7,42 @@ from openmdao.api import Group
 class SimpleBattery(ExplicitComponent):
     """
     A simple battery which tracks power limits and generates heat.
+
     Specific energy assumption INCLUDING internal losses should be used
     The efficiency parameter only generates heat
 
     Inputs
     ------
     battery_weight : float
-        (scalar, kg)
+        Weight of the battery pack (scalar, kg)
     elec_load: float
-        (n vector, W) Electric power draw upstream
+        Electric power draw upstream (vector, W)
 
     Outputs
     -------
     max_energy : float
-        (scalar, Wh)
+        Total energy in the battery at 100% SOC (scalar, Wh)
     heat_out : float
-        (n vector, W)
+        Waste heat produced (vector, W)
     component_cost : float
-        (scalar, USD)
+        Nonrecurring cost of the component (scalar, USD)
     component_sizing_margin : float
-        (n vector, dimensionless)
-
+        Equal to 1 when producing full rated power (vector, dimensionless)
 
     Options
     -------
     num_nodes : int
-        (default 1) Number of analysis points to run (sets vec length)
+        Number of analysis points to run (sets vec length; default 1)
     efficiency : float
-        (default 1.0) Shaft power efficiency. Sensible range 0.0 to 1.0
+        Shaft power efficiency. Sensible range 0.0 to 1.0 (default 1.0)
     specific_power : float
-        (default 5000, W/kg) Rated power per unit weight
+        Rated power per unit weight (default 5000, W/kg)
     specific_energy : float
-        (default 300, !!!! Wh/kg) Battery energy per unit weight NOTE UNITS
+        Battery energy per unit weight **NOTE UNITS** (default 300, !!!! Wh/kg)
     cost_inc : float
-        (default 50, USD/kg) Cost per unit weight
+        Cost per unit weight (default 50, USD/kg)
     cost_base : float
-        (default 1 USD) Base cost
+        Base cost (default 1 USD)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')

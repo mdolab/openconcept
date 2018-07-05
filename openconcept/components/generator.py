@@ -6,43 +6,42 @@ from openmdao.api import Group
 
 class SimpleGenerator(ExplicitComponent):
     """
-    A simple generator which transforms shaft power into electrical power
+    A simple generator which transforms shaft power into electrical power.
 
     Inputs
     ------
     shaft_power_in : float
-        (n vector, W)
+        Shaft power in to the generator (vector, W)
     elec_power_rating: float
-        (scalar, W) Electric (not mech) design power
+        Electric (not mech) design power (scalar, W)
 
     Outputs
     -------
     elec_power_out : float
-        (n vector, W)
+        Electric power produced by the generator (vector, W)
     heat_out : float
-        (n vector, W)
+        Waste heat produced (vector, W)
     component_cost : float
-        (scalar, USD)
+        Nonrecurring cost of the component (scalar, USD)
     component_weight : float
-        (scalar, kg)
+        Weight of the component (scalar, kg)
     component_sizing_margin : float
-        (n vector, dimensionless)
-
+        Equal to 1 when producing full rated power (vector, dimensionless)
 
     Options
     -------
     num_nodes : int
-        (default 1) Number of analysis points to run (sets vec length)
+        Number of analysis points to run (sets vec length; default 1)
     efficiency : float
-        (default 1.0) Shaft power efficiency. Sensible range 0.0 to 1.0
+        Shaft power efficiency. Sensible range 0.0 to 1.0 (default 1)
     weight_inc : float
-        (default 1/5000, kg/W) Weight per unit rated power
+        Weight per unit rated power (default 1/5000, kg/W)
     weight_base : float
-        (default 0, kg) Base weight
+        Base weight (default 0, kg)
     cost_inc : float
-        (default 0.134228, USD/W) Cost per unit rated power
+        Cost per unit rated power (default 0.134228, USD/W)
     cost_base : float
-        (default 1 USD) Base cost
+        Base cost (default 1 USD) B
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
