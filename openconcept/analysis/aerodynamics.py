@@ -1,6 +1,7 @@
+"""Aerodynamic analysis routines usable for multiple purposes / flight phases"""
+
 from openmdao.api import ExplicitComponent
 import numpy as np
-"""Aerodynamic analysis routines usable for multiple purposes / flight phases"""
 
 
 class PolarDrag(ExplicitComponent):
@@ -172,4 +173,3 @@ class StallSpeed(ExplicitComponent):
                                                   inputs['CLmax']) *
                                       inputs['weight'] * g / rho /
                                       inputs['ac|geom|wing|S_ref'] / inputs['CLmax'] ** 2)
-

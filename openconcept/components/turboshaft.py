@@ -5,53 +5,56 @@ from openmdao.api import Group
 
 class SimpleTurboshaft(ExplicitComponent):
     """
-    A simple turboshaft which generates shaft power consumes fuel
-    This model assumes constant power specific fuel consumption (PSFC)
+    A simple turboshaft which generates shaft power consumes fuel.
+
+    This model assumes constant power specific fuel consumption (PSFC).
 
     Inputs
     ------
     shaft_power_rating : float
-        (scalar, W)
-        Rated power of the turboshaft
+        Rated power of the turboshaft (scalar, W)
     throttle: float
-        (n vector, dimensionless)
         Engine throttle. Controls power and fuel flow.
-        Produces 100% of rated power at throttle = 1
-        Should be in range 0 to 1 or slightly above 1
+        Produces 100% of rated power at throttle = 1.
+        Should be in range 0 to 1 or slightly above 1.
+        (vector, dimensionless)
 
     Outputs
     -------
     shaft_power_out : float
-        (n vector, W)
+        Shaft power produced by the engine (vector, W)
     fuel_flow : float
-        (n vector, kg/s)
+        Fuel flow consumed (vector, kg/s)
         FUEL FLOW IS NEGATIVE!
     component_cost : float
-        (scalar, USD)
+        Nonrecurring cost of the component (scalar, USD)
     component_weight : float
-        (scalar, kg)
+        Weight of the component (scalar, kg)
     component_sizing_margin : float
-        (n vector, dimensionless)
-
+        Equal to 1 when producing full rated power (vector, dimensionless)
 
     Options
     -------
     num_nodes : int
-        (default 1) Number of analysis points to run (sets vec length)
+        Number of analysis points to run (sets vec length; default 1)
     psfc : float
-        (default 0.6*1.69e-7 kg/W/s)
         Power specific fuel consumption.
+        (default 0.6*1.69e-7 kg/W/s)
         Conversion from lb/hp/hr to kg/W/s is 1.69e-7
     weight_inc : float
-        (default 0, kg/W) Weight per unit rated power
+        Weight per unit rated power
         Override this with a reasonable value for your power class
+        (default 0, kg/W)
     weight_base : float
-        (default 0, kg) Base weight
+        Base weight
         This is a bad assumption for most turboshafts
+        (default 0, kg)
     cost_inc : float
-        (default 1.04, USD/W) Nonrecurring cost per unit power
+        Nonrecurring cost per unit power
+        (default 1.04, USD/W)
     cost_base : float
-        (default 0 USD) Base cost
+        Base cost
+        (default 0 USD)
     """
 
     def initialize(self):

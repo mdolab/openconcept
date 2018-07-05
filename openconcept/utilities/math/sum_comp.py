@@ -20,17 +20,20 @@ class SumComp(ExplicitComponent):
     behavior sums along the columns.
 
     .. math::
+
         \textrm{result}_j = \sum_{i=1} ^\text{vec_size} a_{ij} * \textrm{scaling factor}
 
-    where a is shape (vec_size, n)
-          b is of shape (vec_size, n)
-          c is of shape (vec_size, n)
-          result is of shape (1, n) or (1, )
+    where
+        - a is shape (vec_size, n)
+        - b is of shape (vec_size, n)
+        - c is of shape (vec_size, n)
+
+    Result is of shape (1, n) or (1, )
 
     Attributes
     ----------
     _add_systems : list
-    List of equation systems to be initialized with the system.
+        List of equation systems to be initialized with the system.
     """
 
     def __init__(self, output_name=None, input_name=None, vec_size=1, length=1,

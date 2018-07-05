@@ -17,13 +17,16 @@ class AddSubtractComp(ExplicitComponent):
     add_equation(output_name='my_output', input_names=['a','b', 'c', ...])
 
     .. math::
+
         result = a * \textrm{scaling factor}_a + b * \textrm{scaling factor}_b +
         c * \textrm{scaling factor}_c + ...
 
-    where all inputs  shape (vec_size, n)
-          b is of shape (vec_size, n)
-          c is of shape (vec_size, n)
-          result is of shape (vec_size, n)
+    where:
+        - all inputs  shape (vec_size, n)
+        - b is of shape (vec_size, n)
+        - c is of shape (vec_size, n)
+
+    Result is of shape (vec_size, n)
 
     All input vectors must be of the same shape, specified by the options 'vec_size' and 'length'.
     Use scaling factor -1 for subtraction.
@@ -31,7 +34,7 @@ class AddSubtractComp(ExplicitComponent):
     Attributes
     ----------
     _add_systems : list
-    List of equation systems to be initialized with the system.
+        List of equation systems to be initialized with the system.
     """
 
     def __init__(self, output_name=None, input_names=None, vec_size=1, length=1,

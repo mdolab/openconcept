@@ -7,6 +7,59 @@ from openconcept.analysis.atmospherics.true_airspeed import TrueAirspeedComp
 import numpy as np
 from openmdao.api import ExplicitComponent, Group, Problem, IndepVarComp
 
+
+class ComputeAtmosphericProperties(Group):
+    '''
+    Computes pressure, density, temperature, dyn pressure, and true airspeed
+
+    Inputs
+    ------
+    fltcond|h : float
+        Altitude (vector, km)
+    fltcond|Ueas : float
+        Equivalent airspeed (vector, m/s)
+
+    Outputs
+    -------
+    fltcond|p : float
+        Pressure (vector, Pa)
+    fltcond|rho : float
+        Density (vector, kg/m3)
+    fltcond|T : float
+        Temperature (vector, K)
+    fltcond|Utrue : float
+        True airspeed (vector, m/s)
+    fltcond|q : float
+        Dynamic pressure (vector, Pa)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (sets vec length) (default 1)
+    '''
+
+    def initialize(self):
+        self.options.declare('num_nodes',default=1,desc="Number of mission analysis points to run")
+
+    def setup(self):
+        nn = self.options['num_nodes']
+        self.add_subsystem('inputconv', InputConverter(num_nodes=nn),promotes_inputs=['*'])
+        self.add_subsystem('temp', TemperatureComp(num_nodes=nn))
+        self.add_subsystem('pressure',PressureComp(num_nodes=nn))
+        self.add_subsystem('density',DensityComp(num_nodes=nn))
+        self.add_subsystem('outputconv',OutputConverter(num_nodes=nn),promotes_outputs=['*'])
+        self.add_subsystem('trueairspeed',TrueAirspeedComp(num_nodes=nn),promotes_inputs=['*'],promotes_outputs=['*'])
+        self.add_subsystem('dynamicpressure',DynamicPressureComp(num_nodes=nn),promotes_inputs=["*"],promotes_outputs=["*"])
+
+        self.connect('inputconv.h_km','temp.h_km')
+        self.connect('inputconv.h_km','pressure.h_km')
+        self.connect('pressure.p_MPa','density.p_MPa')
+        self.connect('temp.T_1e2_K','density.T_1e2_K')
+        self.connect('pressure.p_MPa','outputconv.p_MPa')
+        self.connect('temp.T_1e2_K','outputconv.T_1e2_K')
+        self.connect('density.rho_kg_m3','outputconv.rho_kg_m3')
+
+
 class InputConverter(ExplicitComponent):
     """
     This component adds a unitized interface to the Hwang and Jasa model.
@@ -49,6 +102,7 @@ class InputConverter(ExplicitComponent):
         nn = self.options['num_nodes']
         J['h_km','fltcond|h'] = np.ones(nn)
         J['v_m_s','fltcond|Ueas'] = np.ones(nn)
+
 
 class OutputConverter(ExplicitComponent):
     """
@@ -109,55 +163,3 @@ class OutputConverter(ExplicitComponent):
         J['fltcond|T','T_1e2_K'] = 100*np.ones(nn)
         J['fltcond|rho','rho_kg_m3'] = np.ones(nn)
         #J['fltcond|q','q_1e4_N_m2'] = 1e4*np.ones(nn)
-
-
-class ComputeAtmosphericProperties(Group):
-    '''
-    Computes pressure, density, temperature, dyn pressure, and true airspeed
-
-    Inputs
-    ------
-    fltcond|h : float
-        Altitude (vector, km)
-    fltcond|Ueas : float
-        Equivalent airspeed (vector, m/s)
-
-    Outputs
-    -------
-    fltcond|p : float
-        Pressure (vector, Pa)
-    fltcond|rho : float
-        Density (vector, kg/m3)
-    fltcond|T : float
-        Temperature (vector, K)
-    fltcond|Utrue : float
-        True airspeed (vector, m/s)
-    fltcond|q : float
-        Dynamic pressure (vector, Pa)
-
-    Options
-    -------
-    num_nodes : int
-        Number of analysis points to run (sets vec length) (default 1)
-    '''
-
-    def initialize(self):
-        self.options.declare('num_nodes',default=1,desc="Number of mission analysis points to run")
-
-    def setup(self):
-        nn = self.options['num_nodes']
-        self.add_subsystem('inputconv', InputConverter(num_nodes=nn),promotes_inputs=['*'])
-        self.add_subsystem('temp', TemperatureComp(num_nodes=nn))
-        self.add_subsystem('pressure',PressureComp(num_nodes=nn))
-        self.add_subsystem('density',DensityComp(num_nodes=nn))
-        self.add_subsystem('outputconv',OutputConverter(num_nodes=nn),promotes_outputs=['*'])
-        self.add_subsystem('trueairspeed',TrueAirspeedComp(num_nodes=nn),promotes_inputs=['*'],promotes_outputs=['*'])
-        self.add_subsystem('dynamicpressure',DynamicPressureComp(num_nodes=nn),promotes_inputs=["*"],promotes_outputs=["*"])
-
-        self.connect('inputconv.h_km','temp.h_km')
-        self.connect('inputconv.h_km','pressure.h_km')
-        self.connect('pressure.p_MPa','density.p_MPa')
-        self.connect('temp.T_1e2_K','density.T_1e2_K')
-        self.connect('pressure.p_MPa','outputconv.p_MPa')
-        self.connect('temp.T_1e2_K','outputconv.T_1e2_K')
-        self.connect('density.rho_kg_m3','outputconv.rho_kg_m3')

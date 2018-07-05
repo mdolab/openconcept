@@ -5,19 +5,30 @@ import numbers
 
 class DictIndepVarComp(IndepVarComp):
     r"""
-    Create indep variable inputs from an external file with a Python dictionary.
+    Create indep variables from an external file with a Python dictionary.
 
-    Add more here later
+    Outputs from this component are read from a Python dictionary and given
+    a name matching their location in the data tree.
+
+    For example, let's assume we have stored some data about a vehicle in a dictionary
+    which can be accessed using the Python expression `vehicledata['wheels']['diameter']`.
+    The structured_name in this case is `'wheels|diameter'`.
+
+    The user instantiates a component as `DictIndepVarComp(vehicledata)`
+    and adds an output as follows:
+    `component_instance.add_output_from_dict('wheels|diameter')`.
+
+    Outputs are created after initialization and are user-defined.
 
     Attributes
     ----------
     _data_dict : dict
-    A structured dictionary object with input data to read from.
+        A structured dictionary object with input data to read from.
     """
 
     def __init__(self, data_dict, **kwargs):
         """
-        Initialize all attributes.
+        Initialize the component and store the data dictionary as an attribute.
 
         Parameters
         ----------
@@ -58,4 +69,5 @@ class DictIndepVarComp(IndepVarComp):
         if isinstance(val, numbers.Number):
             val = np.array([val])
 
-        super(DictIndepVarComp, self).add_output(name=structured_name, val=val, units=units, shape=val.shape)
+        super(DictIndepVarComp, self).add_output(name=structured_name,
+                                                 val=val, units=units, shape=val.shape)

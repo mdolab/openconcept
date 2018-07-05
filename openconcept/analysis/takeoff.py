@@ -1,3 +1,4 @@
+"""Analysis routines for simulating the takeoff phase and determining takeoff field length"""
 from openmdao.api import Problem, Group, IndepVarComp
 from openmdao.api import ScipyOptimizeDriver, ExplicitComponent, ImplicitComponent
 
@@ -9,6 +10,199 @@ from openconcept.utilities.math.simpson_integration import simpson_integral, sim
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp, VectorConcatenateComp, VectorSplitComp
 from openconcept.analysis.aerodynamics import PolarDrag, Lift, StallSpeed
 from openconcept.utilities.dvlabel import DVLabel
+
+
+class TakeoffTotalDistance(Group):
+    """This analysis group calculates takeoff field length and fuel/energy consumption.
+
+    This component should be instantiated in the top-level aircraft analysis / optimization script.
+
+    **Suggested variable promotion list:**
+    *'ac|aero\*', 'ac|weights|MTOW', 'ac|geom|\*', 'fltcond|takeoff|\*', 'takeoff|battery_load',*
+    *'takeoff|thrust','takeoff|fuel_flow','mission|takeoff|v\*'*
+
+    **Inputs List:**
+
+    From aircraft config:
+        - ac|aero|polar|CD0_TO
+        - ac|aero|polar|e
+        - ac|geom|wing|S_ref
+        - ac|geom|wing|AR
+        - ac|weights|MTOW
+
+    From Newton solver:
+        - mission|takeoff|v1
+
+    From takeoff flight condition generator:
+        - mission|takeoff|vr
+
+    From standard atmosphere model/splitter:
+        - fltcond|takeoff|q
+        - fltcond|takeoff|Utrue
+
+    From propulsion model:
+        - takeoff|battery_load
+        - takeoff|fuel_flow
+        - takeoff|thrust
+
+    Outputs
+    -------
+    takeoff|total_fuel : float
+        Total fuel burn for takeoff (scalar, kg)
+    takeoff|total_battery_energy : float
+        Total energy consumption for takeoff (scalar, kJ)
+    takeoff|distance : float
+        Takeoff distance with given propulsion settings (scalar, m)
+    takeoff|distance_abort : float
+        Takeoff distance if maximum braking applied at v1 speed (scalar, m)
+
+    Options
+    -------
+    n_int_per_seg : int
+        Number of Simpson's rule intervals to use per mission segment.
+        The total number of points is 2 * n_int_per_seg + 1
+    track_battery : bool
+        Set to `True` to track battery energy consumption during takeoff (default False)
+    track_fuel : bool
+        Set to `True` to track fuel burned during takeoff (default False)
+
+    """
+    def initialize(self):
+        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg. Number of analysis points is 2N+1")
+        self.options.declare('track_battery',default=False,desc='Set to true to enable battery inputs')
+        self.options.declare('track_fuel',default=False,desc='Set to true to enable fuel inputs')
+
+    def setup(self):
+        n_int_per_seg = self.options['n_int_per_seg']
+        track_battery = self.options['track_battery']
+        track_fuel = self.options['track_fuel']
+        nn = (n_int_per_seg*2 + 1)
+        nn_tot = 3 * nn+2
+        #===Some of the generic components take "weight" as an input. Need to re-label Takeoff Weight (TOW) as just weight
+        dvlist = [['ac|weights|MTOW','weight',2000.0,'kg'],
+                    ['mission|takeoff|v1','v1',40,'m/s'],
+                    ['mission|takeoff|vr','vr',45,'m/s'],
+                    ['ac|aero|polar|CD0_TO','CD0',0.005,None],
+                    ['ac|aero|polar|e','e',0.95,None],
+                    ['fltcond|takeoff|q','fltcond|q',100*np.ones(nn_tot),'Pa']]
+        self.add_subsystem('dvs',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
+
+        #===We assume the takeoff starts at 1 m/s to avoid singularities at v=0
+        const = self.add_subsystem('const',IndepVarComp())
+        const.add_output('v0', val=1, units='m/s')
+        const.add_output('reaction_time', val=2, units='s')
+
+        #===Lift and Drag Calculations feed the EOMs for the takeoff roll===
+        self.add_subsystem('CL',TakeoffCLs(n_int_per_seg=n_int_per_seg),promotes_inputs=["ac|geom|*","fltcond|*","weight"],)
+        self.add_subsystem('drag',PolarDrag(num_nodes=nn_tot),promotes_inputs=['ac|geom|*','fltcond|q','CD0','e'],promotes_outputs=['drag'])
+        self.add_subsystem('lift',Lift(num_nodes=nn_tot),promotes_inputs=['ac|geom|*','fltcond|q'],promotes_outputs=['lift'])
+        self.connect('CL.CL_takeoff','drag.fltcond|CL')
+        self.connect('CL.CL_takeoff','lift.fltcond|CL')
+
+        #==The takeoff distance integrator numerically integrates the quantity (speed / acceleration) with respect to speed to obtain distance. Obtain this quantity:
+        self.add_subsystem('accel',TakeoffAccels(n_int_per_seg=n_int_per_seg),promotes_inputs=['lift','drag','takeoff|thrust','weight'],promotes_outputs=['_inverse_accel'])
+        self.add_subsystem('mult',ElementMultiplyDivideComp(output_name='_rate_to_integrate',
+                                                            input_names=['_inverse_accel','fltcond|takeoff|Utrue'],
+                                                            vec_size=nn_tot,
+                                                            input_units=['s**2/m','m/s']),
+                                                            promotes_inputs=['*'],promotes_outputs=['_*'])
+        if track_fuel:
+            self.add_subsystem('fuelflowmult',ElementMultiplyDivideComp(output_name='_fuel_flow_rate_to_integrate',
+                                                                        input_names=['_inverse_accel','takeoff|fuel_flow'],
+                                                                        vec_size=nn_tot,
+                                                                        input_units=['s**2/m','kg/s']),
+                                                                        promotes_inputs=['*'],promotes_outputs=['_*'])
+        if track_battery:
+            self.add_subsystem('batterymult',ElementMultiplyDivideComp(output_name='_battery_rate_to_integrate',
+                                                                       input_names=['_inverse_accel','takeoff|battery_load'],
+                                                                       vec_size=nn_tot,
+                                                                       input_units=['s**2/m','J / s']),
+                                                                       promotes_inputs=['*'],promotes_outputs=['*'])
+
+        #==The following boilerplate splits the input flight conditions, thrusts, and fuel flows into the takeoff segments for further analysis
+        inputs_to_split = ['_rate_to_integrate','fltcond|takeoff|Utrue','takeoff|thrust','drag','lift']
+        units = ['s','m/s','N','N','N']
+
+        if track_battery:
+            inputs_to_split.append('_battery_rate_to_integrate')
+            units.append('J*s/m')
+        if track_fuel:
+            inputs_to_split.append('_fuel_flow_rate_to_integrate')
+            units.append('kg*s/m')
+        segments_to_split_into = ['v0v1','v1vr','v1v0','vtrans','v2']
+        nn_each_segment = [nn,nn,nn,1,1]
+        split_inst = VectorSplitComp()
+        for kth, input_name in enumerate(inputs_to_split):
+            output_names_list = []
+            for segment in segments_to_split_into:
+                output_names_list.append(input_name+'_'+segment)
+            split_inst.add_relation(output_names=output_names_list, input_name=input_name, vec_sizes=nn_each_segment, units=units[kth])
+        splitter = self.add_subsystem('splitter',subsys=split_inst,promotes_inputs=["*"],promotes_outputs=["*"])
+
+        #==Now integrate the three continuous segments: 0 to v1, v1 to rotation with reduced power if applicable, and hard braking
+        self.add_subsystem('v0v1_dist',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='m',diff_units='m/s',force_signs=True))
+        self.add_subsystem('v1vr_dist',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='m',diff_units='m/s',force_signs=True))
+        self.add_subsystem('v1v0_dist',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='m',diff_units='m/s',force_signs=True))
+        self.connect('_rate_to_integrate_v0v1','v0v1_dist.rate')
+        self.connect('_rate_to_integrate_v1vr','v1vr_dist.rate')
+        self.connect('_rate_to_integrate_v1v0','v1v0_dist.rate')
+        self.connect('const.v0','v0v1_dist.lower_limit')
+        self.connect('v1','v0v1_dist.upper_limit')
+        self.connect('v1','v1v0_dist.lower_limit')
+        self.connect('const.v0','v1v0_dist.upper_limit')
+        self.connect('v1','v1vr_dist.lower_limit')
+        self.connect('vr','v1vr_dist.upper_limit')
+
+        if track_fuel:
+            self.add_subsystem('v0v1_fuel',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='kg',diff_units='m/s',force_signs=True))
+            self.add_subsystem('v1vr_fuel',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='kg',diff_units='m/s',force_signs=True))
+            self.connect('_fuel_flow_rate_to_integrate_v0v1','v0v1_fuel.rate')
+            self.connect('_fuel_flow_rate_to_integrate_v1vr','v1vr_fuel.rate')
+            self.connect('const.v0','v0v1_fuel.lower_limit')
+            self.connect('v1',['v0v1_fuel.upper_limit','v1vr_fuel.lower_limit'])
+            self.connect('vr','v1vr_fuel.upper_limit')
+
+        if track_battery:
+            self.add_subsystem('v0v1_battery',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='J',diff_units='m/s',force_signs=True))
+            self.add_subsystem('v1vr_battery',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='J',diff_units='m/s',force_signs=True))
+            self.connect('_battery_rate_to_integrate_v0v1','v0v1_battery.rate')
+            self.connect('_battery_rate_to_integrate_v1vr','v1vr_battery.rate')
+            self.connect('const.v0','v0v1_battery.lower_limit')
+            self.connect('v1',['v0v1_battery.upper_limit','v1vr_battery.lower_limit'])
+            self.connect('vr','v1vr_battery.upper_limit')
+
+
+
+        #==Next compute the transition and climb phase to the specified clearance height. First, need the steady climb-out angle at v2 speed
+        self.add_subsystem('gamma',TakeoffV2ClimbAngle(),promotes_inputs=["drag_v2","takeoff|thrust_v2","weight"],promotes_outputs=["takeoff|climb|gamma"])
+        self.add_subsystem('transition',TakeoffTransition(),promotes_inputs=["fltcond|takeoff|Utrue_vtrans","takeoff|climb|gamma"],promotes_outputs=["h_transition","s_transition"])
+        self.add_subsystem('climb',TakeoffClimb(),promotes_inputs=["takeoff|climb|gamma","h_transition"],promotes_outputs=["s_climb"])
+        self.add_subsystem('reaction',ElementMultiplyDivideComp(output_name='s_reaction',
+                                                                input_names=['v1','reaction_time'],
+                                                                vec_size=1,
+                                                                input_units=['m/s','s']),promotes_inputs=['v1'])
+        self.connect('const.reaction_time','reaction.reaction_time')
+
+        self.add_subsystem('total_to_distance_continue',AddSubtractComp(output_name='takeoff|distance',input_names=['s_v0v1','s_v1vr','s_reaction','s_transition','s_climb'],vec_size=1, units='m'),promotes_outputs=["*"])
+        self.add_subsystem('total_to_distance_abort',AddSubtractComp(output_name='takeoff|distance_abort',input_names=['s_v0v1','s_v1v0','s_reaction'],vec_size=1, units='m'),promotes_outputs=["*"])
+
+        self.connect('reaction.s_reaction','total_to_distance_continue.s_reaction')
+        self.connect('reaction.s_reaction','total_to_distance_abort.s_reaction')
+        self.connect('v0v1_dist.delta_quantity',['total_to_distance_continue.s_v0v1','total_to_distance_abort.s_v0v1'])
+        self.connect('v1vr_dist.delta_quantity','total_to_distance_continue.s_v1vr')
+        self.connect('s_transition','total_to_distance_continue.s_transition')
+        self.connect('s_climb','total_to_distance_continue.s_climb')
+        self.connect('v1v0_dist.delta_quantity','total_to_distance_abort.s_v1v0')
+
+        if track_battery:
+            self.add_subsystem('total_battery',AddSubtractComp(output_name='takeoff|total_battery_energy',input_names=['battery_v0v1','battery_v1vr'], units='J'),promotes_outputs=["*"])
+            self.connect('v0v1_battery.delta_quantity','total_battery.battery_v0v1')
+            self.connect('v1vr_battery.delta_quantity','total_battery.battery_v1vr')
+        if track_fuel:
+            self.add_subsystem('total_fuel',AddSubtractComp(output_name='takeoff|total_fuel',input_names=['fuel_v0v1','fuel_v1vr'], units='kg',scaling_factors=[-1,-1]),promotes_outputs=["*"])
+            self.connect('v0v1_fuel.delta_quantity','total_fuel.fuel_v0v1')
+            self.connect('v1vr_fuel.delta_quantity','total_fuel.fuel_v1vr')
+            self.add_subsystem('climb_weight',AddSubtractComp(output_name='weight_after_takeoff',input_names=['weight','takeoff|total_fuel'], units='kg',scaling_factors=[1,-1]),promotes_inputs=["*"],promotes_outputs=["*"])
 
 def takeoff_check(prob):
     """
@@ -219,7 +413,10 @@ class TakeoffFlightConditions(ExplicitComponent):
 
 class TakeoffCLs(ExplicitComponent):
     """
-    Computes lift coefficient at every takeoff and transition analysis point
+    Computes lift coefficient at every takeoff and transition analysis point.
+
+    This is a helper function for the main TOFL analysis group `TakeoffTotalDistance`
+    and shoudln't be instantiated in the top-level model directly.
 
     During the ground roll, CL is assumed constant.
     During rotation and transition, a 1.2g maneuver is assumed
@@ -285,6 +482,9 @@ class TakeoffCLs(ExplicitComponent):
 class TakeoffAccels(ExplicitComponent):
     """
     Computes acceleration during takeoff run and returns the inverse for the integrator.
+
+    This is a helper function for the main TOFL analysis group `TakeoffTotalDistance`
+    and shoudln't be instantiated in the top-level model directly.
 
     This returns the **INVERSE** of the accelerations during the takeoff run.
     Inverse acceleration is required due to integration wrt velocity:
@@ -381,6 +581,10 @@ class TakeoffV2ClimbAngle(ExplicitComponent):
     """
     Computes climb out angle based on excess thrust.
 
+    This is a helper function for the main TOFL analysis group `TakeoffTotalDistance`
+    and shoudln't be instantiated in the top-level model directly.
+
+
     Inputs
     ------
     drag_v2 : float
@@ -420,7 +624,10 @@ class TakeoffV2ClimbAngle(ExplicitComponent):
 
 class TakeoffTransition(ExplicitComponent):
     """
-    Computes distance and altitude at end of circular transition
+    Computes distance and altitude at end of circular transition.
+
+    This is a helper function for the main TOFL analysis group `TakeoffTotalDistance`
+    and shoudln't be instantiated in the top-level model directly.
 
     Based on TO distance analysis method in Raymer book.
     Obstacle clearance height set for GA / Part 23 aircraft
@@ -501,7 +708,10 @@ class TakeoffTransition(ExplicitComponent):
 
 class TakeoffClimb(ExplicitComponent):
     """
-    Computes ground distance from end of transition until obstacle is cleared
+    Computes ground distance from end of transition until obstacle is cleared.
+
+    This is a helper function for the main TOFL analysis group `TakeoffTotalDistance`
+    and shoudln't be instantiated in the top-level model directly.
 
     Analysis based on Raymer book.
 
@@ -545,195 +755,3 @@ class TakeoffClimb(ExplicitComponent):
         sc = (hobs-ht)/np.tan(gam)
         J['s_climb','takeoff|climb|gamma'] = -(hobs-ht)/np.tan(gam)**2 * (1/np.cos(gam))**2
         J['s_climb','h_transition'] = -1/np.tan(gam)
-
-class TakeoffTotalDistance(Group):
-    """This analysis group calculates takeoff field length and fuel/energy consumption.
-
-    This component should be instantiated in the top-level aircraft analysis / optimization script.
-
-    **Suggested variable promotion list:**
-    *'ac|aero\*', 'ac|weights|MTOW', 'ac|geom|\*', 'fltcond|takeoff|\*', 'takeoff|battery_load',*
-    *'takeoff|thrust','takeoff|fuel_flow','mission|takeoff|v\*'*
-
-    **Inputs List:**
-
-    From aircraft config:
-        - ac|aero|polar|CD0_TO
-        - ac|aero|polar|e
-        - ac|geom|wing|S_ref
-        - ac|geom|wing|AR
-        - ac|weights|MTOW
-
-    From Newton solver:
-        - mission|takeoff|v1
-
-    From takeoff flight condition generator:
-        - mission|takeoff|vr
-
-    From standard atmosphere model/splitter:
-        - fltcond|takeoff|q
-        - fltcond|takeoff|Utrue
-
-    From propulsion model:
-        - takeoff|battery_load
-        - takeoff|fuel_flow
-        - takeoff|thrust
-
-    Outputs
-    -------
-    takeoff|total_fuel : float
-        Total fuel burn for takeoff (scalar, kg)
-    takeoff|total_battery_energy : float
-        Total energy consumption for takeoff (scalar, kJ)
-    takeoff|distance : float
-        Takeoff distance with given propulsion settings (scalar, m)
-    takeoff|distance_abort : float
-        Takeoff distance if maximum braking applied at v1 speed (scalar, m)
-
-    Options
-    -------
-    n_int_per_seg : int
-        Number of Simpson's rule intervals to use per mission segment.
-        The total number of points is 2 * n_int_per_seg + 1
-    track_battery : bool
-        Set to `True` to track battery energy consumption during takeoff (default False)
-    track_fuel : bool
-        Set to `True` to track fuel burned during takeoff (default False)
-
-    """
-    def initialize(self):
-        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg. Number of analysis points is 2N+1")
-        self.options.declare('track_battery',default=False,desc='Set to true to enable battery inputs')
-        self.options.declare('track_fuel',default=False,desc='Set to true to enable fuel inputs')
-
-    def setup(self):
-        n_int_per_seg = self.options['n_int_per_seg']
-        track_battery = self.options['track_battery']
-        track_fuel = self.options['track_fuel']
-        nn = (n_int_per_seg*2 + 1)
-        nn_tot = 3 * nn+2
-        #===Some of the generic components take "weight" as an input. Need to re-label Takeoff Weight (TOW) as just weight
-        dvlist = [['ac|weights|MTOW','weight',2000.0,'kg'],
-                    ['mission|takeoff|v1','v1',40,'m/s'],
-                    ['mission|takeoff|vr','vr',45,'m/s'],
-                    ['ac|aero|polar|CD0_TO','CD0',0.005,None],
-                    ['ac|aero|polar|e','e',0.95,None],
-                    ['fltcond|takeoff|q','fltcond|q',100*np.ones(nn_tot),'Pa']]
-        self.add_subsystem('dvs',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
-
-        #===We assume the takeoff starts at 1 m/s to avoid singularities at v=0
-        const = self.add_subsystem('const',IndepVarComp())
-        const.add_output('v0', val=1, units='m/s')
-        const.add_output('reaction_time', val=2, units='s')
-
-        #===Lift and Drag Calculations feed the EOMs for the takeoff roll===
-        self.add_subsystem('CL',TakeoffCLs(n_int_per_seg=n_int_per_seg),promotes_inputs=["ac|geom|*","fltcond|*","weight"],)
-        self.add_subsystem('drag',PolarDrag(num_nodes=nn_tot),promotes_inputs=['ac|geom|*','fltcond|q','CD0','e'],promotes_outputs=['drag'])
-        self.add_subsystem('lift',Lift(num_nodes=nn_tot),promotes_inputs=['ac|geom|*','fltcond|q'],promotes_outputs=['lift'])
-        self.connect('CL.CL_takeoff','drag.fltcond|CL')
-        self.connect('CL.CL_takeoff','lift.fltcond|CL')
-
-        #==The takeoff distance integrator numerically integrates the quantity (speed / acceleration) with respect to speed to obtain distance. Obtain this quantity:
-        self.add_subsystem('accel',TakeoffAccels(n_int_per_seg=n_int_per_seg),promotes_inputs=['lift','drag','takeoff|thrust','weight'],promotes_outputs=['_inverse_accel'])
-        self.add_subsystem('mult',ElementMultiplyDivideComp(output_name='_rate_to_integrate',
-                                                            input_names=['_inverse_accel','fltcond|takeoff|Utrue'],
-                                                            vec_size=nn_tot,
-                                                            input_units=['s**2/m','m/s']),
-                                                            promotes_inputs=['*'],promotes_outputs=['_*'])
-        if track_fuel:
-            self.add_subsystem('fuelflowmult',ElementMultiplyDivideComp(output_name='_fuel_flow_rate_to_integrate',
-                                                                        input_names=['_inverse_accel','takeoff|fuel_flow'],
-                                                                        vec_size=nn_tot,
-                                                                        input_units=['s**2/m','kg/s']),
-                                                                        promotes_inputs=['*'],promotes_outputs=['_*'])
-        if track_battery:
-            self.add_subsystem('batterymult',ElementMultiplyDivideComp(output_name='_battery_rate_to_integrate',
-                                                                       input_names=['_inverse_accel','takeoff|battery_load'],
-                                                                       vec_size=nn_tot,
-                                                                       input_units=['s**2/m','J / s']),
-                                                                       promotes_inputs=['*'],promotes_outputs=['*'])
-
-        #==The following boilerplate splits the input flight conditions, thrusts, and fuel flows into the takeoff segments for further analysis
-        inputs_to_split = ['_rate_to_integrate','fltcond|takeoff|Utrue','takeoff|thrust','drag','lift']
-        units = ['s','m/s','N','N','N']
-
-        if track_battery:
-            inputs_to_split.append('_battery_rate_to_integrate')
-            units.append('J*s/m')
-        if track_fuel:
-            inputs_to_split.append('_fuel_flow_rate_to_integrate')
-            units.append('kg*s/m')
-        segments_to_split_into = ['v0v1','v1vr','v1v0','vtrans','v2']
-        nn_each_segment = [nn,nn,nn,1,1]
-        split_inst = VectorSplitComp()
-        for kth, input_name in enumerate(inputs_to_split):
-            output_names_list = []
-            for segment in segments_to_split_into:
-                output_names_list.append(input_name+'_'+segment)
-            split_inst.add_relation(output_names=output_names_list, input_name=input_name, vec_sizes=nn_each_segment, units=units[kth])
-        splitter = self.add_subsystem('splitter',subsys=split_inst,promotes_inputs=["*"],promotes_outputs=["*"])
-
-        #==Now integrate the three continuous segments: 0 to v1, v1 to rotation with reduced power if applicable, and hard braking
-        self.add_subsystem('v0v1_dist',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='m',diff_units='m/s',force_signs=True))
-        self.add_subsystem('v1vr_dist',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='m',diff_units='m/s',force_signs=True))
-        self.add_subsystem('v1v0_dist',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='m',diff_units='m/s',force_signs=True))
-        self.connect('_rate_to_integrate_v0v1','v0v1_dist.rate')
-        self.connect('_rate_to_integrate_v1vr','v1vr_dist.rate')
-        self.connect('_rate_to_integrate_v1v0','v1v0_dist.rate')
-        self.connect('const.v0','v0v1_dist.lower_limit')
-        self.connect('v1','v0v1_dist.upper_limit')
-        self.connect('v1','v1v0_dist.lower_limit')
-        self.connect('const.v0','v1v0_dist.upper_limit')
-        self.connect('v1','v1vr_dist.lower_limit')
-        self.connect('vr','v1vr_dist.upper_limit')
-
-        if track_fuel:
-            self.add_subsystem('v0v1_fuel',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='kg',diff_units='m/s',force_signs=True))
-            self.add_subsystem('v1vr_fuel',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='kg',diff_units='m/s',force_signs=True))
-            self.connect('_fuel_flow_rate_to_integrate_v0v1','v0v1_fuel.rate')
-            self.connect('_fuel_flow_rate_to_integrate_v1vr','v1vr_fuel.rate')
-            self.connect('const.v0','v0v1_fuel.lower_limit')
-            self.connect('v1',['v0v1_fuel.upper_limit','v1vr_fuel.lower_limit'])
-            self.connect('vr','v1vr_fuel.upper_limit')
-
-        if track_battery:
-            self.add_subsystem('v0v1_battery',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='J',diff_units='m/s',force_signs=True))
-            self.add_subsystem('v1vr_battery',IntegrateQuantity(num_intervals=n_int_per_seg,quantity_units='J',diff_units='m/s',force_signs=True))
-            self.connect('_battery_rate_to_integrate_v0v1','v0v1_battery.rate')
-            self.connect('_battery_rate_to_integrate_v1vr','v1vr_battery.rate')
-            self.connect('const.v0','v0v1_battery.lower_limit')
-            self.connect('v1',['v0v1_battery.upper_limit','v1vr_battery.lower_limit'])
-            self.connect('vr','v1vr_battery.upper_limit')
-
-
-
-        #==Next compute the transition and climb phase to the specified clearance height. First, need the steady climb-out angle at v2 speed
-        self.add_subsystem('gamma',TakeoffV2ClimbAngle(),promotes_inputs=["drag_v2","takeoff|thrust_v2","weight"],promotes_outputs=["takeoff|climb|gamma"])
-        self.add_subsystem('transition',TakeoffTransition(),promotes_inputs=["fltcond|takeoff|Utrue_vtrans","takeoff|climb|gamma"],promotes_outputs=["h_transition","s_transition"])
-        self.add_subsystem('climb',TakeoffClimb(),promotes_inputs=["takeoff|climb|gamma","h_transition"],promotes_outputs=["s_climb"])
-        self.add_subsystem('reaction',ElementMultiplyDivideComp(output_name='s_reaction',
-                                                                input_names=['v1','reaction_time'],
-                                                                vec_size=1,
-                                                                input_units=['m/s','s']),promotes_inputs=['v1'])
-        self.connect('const.reaction_time','reaction.reaction_time')
-
-        self.add_subsystem('total_to_distance_continue',AddSubtractComp(output_name='takeoff|distance',input_names=['s_v0v1','s_v1vr','s_reaction','s_transition','s_climb'],vec_size=1, units='m'),promotes_outputs=["*"])
-        self.add_subsystem('total_to_distance_abort',AddSubtractComp(output_name='takeoff|distance_abort',input_names=['s_v0v1','s_v1v0','s_reaction'],vec_size=1, units='m'),promotes_outputs=["*"])
-
-        self.connect('reaction.s_reaction','total_to_distance_continue.s_reaction')
-        self.connect('reaction.s_reaction','total_to_distance_abort.s_reaction')
-        self.connect('v0v1_dist.delta_quantity',['total_to_distance_continue.s_v0v1','total_to_distance_abort.s_v0v1'])
-        self.connect('v1vr_dist.delta_quantity','total_to_distance_continue.s_v1vr')
-        self.connect('s_transition','total_to_distance_continue.s_transition')
-        self.connect('s_climb','total_to_distance_continue.s_climb')
-        self.connect('v1v0_dist.delta_quantity','total_to_distance_abort.s_v1v0')
-
-        if track_battery:
-            self.add_subsystem('total_battery',AddSubtractComp(output_name='takeoff|total_battery_energy',input_names=['battery_v0v1','battery_v1vr'], units='J'),promotes_outputs=["*"])
-            self.connect('v0v1_battery.delta_quantity','total_battery.battery_v0v1')
-            self.connect('v1vr_battery.delta_quantity','total_battery.battery_v1vr')
-        if track_fuel:
-            self.add_subsystem('total_fuel',AddSubtractComp(output_name='takeoff|total_fuel',input_names=['fuel_v0v1','fuel_v1vr'], units='kg',scaling_factors=[-1,-1]),promotes_outputs=["*"])
-            self.connect('v0v1_fuel.delta_quantity','total_fuel.fuel_v0v1')
-            self.connect('v1vr_fuel.delta_quantity','total_fuel.fuel_v1vr')
-            self.add_subsystem('climb_weight',AddSubtractComp(output_name='weight_after_takeoff',input_names=['weight','takeoff|total_fuel'], units='kg',scaling_factors=[1,-1]),promotes_inputs=["*"],promotes_outputs=["*"])

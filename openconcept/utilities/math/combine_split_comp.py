@@ -24,7 +24,7 @@ class VectorConcatenateComp(ExplicitComponent):
     Attributes
     ----------
     _add_systems : list
-    List of equation systems to be initialized with the system.
+        List of equation systems to be initialized with the system.
     """
 
     def __init__(self, output_name=None, input_names=None, vec_sizes=None, length=1,
@@ -250,7 +250,7 @@ class VectorSplitComp(ExplicitComponent):
     Attributes
     ----------
     _add_systems : list
-    List of equation systems to be initialized with the system.
+        List of equation systems to be initialized with the system.
     """
 
     def __init__(self, output_names=None, input_name=None, vec_sizes=None, length=1,
