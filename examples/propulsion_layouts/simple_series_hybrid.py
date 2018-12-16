@@ -285,6 +285,10 @@ class TwinSeriesHybridElectricPropulsionSystem(Group):
         addweights = AddSubtractComp(output_name='motors_weight',input_names=['motor1_weight','motor2_weight'], units='kg')
         addweights.add_equation(output_name='propellers_weight',input_names=['prop1_weight','prop2_weight'], units='kg')
         self.add_subsystem('add_weights',subsys=addweights,promotes_inputs=['*'],promotes_outputs=['*'])
+        relabel = [['hybrid_split_A_in','battery_load',np.ones(nn)*260.0,'kW']]
+        self.add_subsystem('relabel',DVLabel(relabel),promotes_outputs=["battery_load"])
+        self.connect('hybrid_split.power_out_A','relabel.hybrid_split_A_in')
+
         self.connect('motor1.component_weight','motor1_weight')
         self.connect('motor2.component_weight','motor2_weight')
         self.connect('prop1.component_weight','prop1_weight')

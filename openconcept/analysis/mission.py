@@ -1,19 +1,14 @@
-"""Analysis routines for simulating a mission profile with climb, cruise, and descent"""
-
-from openmdao.api import Problem, Group, IndepVarComp, BalanceComp
-from openmdao.api import DirectSolver, NewtonSolver, ScipyKrylov
-from openmdao.api import ScipyOptimizeDriver, ExplicitComponent, ImplicitComponent
-from openmdao.api import BalanceComp, ArmijoGoldsteinLS, NonlinearBlockGS
+from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, ImplicitComponent
 import numpy as np
-import scipy.sparse as sp
+from openconcept.utilities.dvlabel import DVLabel
+from openconcept.utilities.math.sum_comp import SumComp
+from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
 from openconcept.utilities.math.simpson_integration import simpson_integral, simpson_partials
 from openconcept.utilities.math.simpson_integration import simpson_integral_every_node
 from openconcept.utilities.math.simpson_integration import simpson_partials_every_node
-from openconcept.utilities.math.sum_comp import SumComp
-from openconcept.analysis.aerodynamics import PolarDrag
-from openconcept.utilities.dvlabel import DVLabel
-
+import scipy.sparse as sp
+import warnings
 
 class MissionFlightConditions(ExplicitComponent):
     """
@@ -21,42 +16,31 @@ class MissionFlightConditions(ExplicitComponent):
 
     Inputs
     ------
-    mission|climb|vs : float
-        Vertical speed in the climb segment (scalar, m/s)
-    mission|descent|vs: float
-        Vertical speed in the descent segment (should be neg; scalar, m/s)
-    mission|climb|Ueas : float
-        Indicated/equiv. airspeed during climb (scalar, m/s)
-    mission|cruise|Ueas : float
-        Indicated/equiv. airspeed in cruise (scalar, m/s)
-    mission|descent|Ueas : float
-        Indicated/equiv. airspeed during descent (scalar, m/s)
-    mission|takeoff|h : float
-        Takeoff (and landing, for now) altitude (scalar, m)
-    mission|cruise|h : float
-        Cruise altitude (scalar, m)
+    phasename|time : float
+        Total time for segment 'phasename' (scalar, s)
+    phasename|Ueas : float
+        Indicated/equiv. airspeed during seg 'phasename' (scalar, m/s)
+    phasename|h0 : float
+        INITIAL altitude for segment 'phasename' (scalar, m)
 
     Outputs
     -------
-    fltcond|mission|vs : float
+    fltcond|vs : float
         Vertical speed vector for all mission phases / analysis points (vector, m/s)
-    fltcond|mission|Ueas : float
+    fltcond|Ueas : float
         Equivalent airspeed vector for all mission phases / analysis points (vector, m/s)
-    fltcond|mission|h : float
+    fltcond|h : float
         Altitude at each analysis point (vector, m)
-    mission|climb|time : float
-        Time to ascent from end of takeoff to start of cruise (scalar, s)
-    mission|descent|time : float
-        Time to descend from end of cruise to landing (scalar, s)
-    mission|climb|dt : float
-        Timestep length during climb phase (scalar, s)
-        Note: this represents the timestep for the Simpson subinterval, not the whole inteval
-    mission|descent|dt : float
-        Timestep length during descent phase (scalar, s)
+
+    phasename|dt : float
+        Timestep length during an individual mission phase (scalar, s)
         Note: this represents the timestep for the Simpson subinterval, not the whole inteval
 
     Options
     -------
+    mission_segments : list
+        The names of each mission segment. The number of segments
+        will correspond to the length of the list
     n_int_per_seg : int
         Number of Simpson's rule intervals to use per mission segment.
         The total number of points is 2 * n_int_per_seg + 1
@@ -66,203 +50,250 @@ class MissionFlightConditions(ExplicitComponent):
 
         self.options.declare('n_int_per_seg', default=5,
                              desc="Number of Simpson intervals to use per seg")
+        self.options.declare('mission_segments', default=['climb', 'cruise', 'descent'])
 
     def setup(self):
         n_int_per_seg = self.options['n_int_per_seg']
+        mission_segment_names = self.options['mission_segments']
         nn = (n_int_per_seg * 2 + 1)
-        self.add_input('mission|climb|vs', val=5,
-                       units='m / s', desc='Vertical speed in the climb segment')
-        self.add_input('mission|descent|vs', val=-2.5,
-                       units='m / s', desc='Vertical speed in the descent segment (should be neg)')
-        self.add_input('mission|climb|Ueas', val=90,
-                       units='m / s', desc='Indicated airspeed during climb')
-        self.add_input('mission|cruise|Ueas', val=100,
-                       units='m / s', desc='Cruise airspeed (indicated)')
-        self.add_input('mission|descent|Ueas', val=80,
-                       units='m / s', desc='Descent airspeed (indicated)')
-        self.add_input('mission|takeoff|h', val=0,
-                       units='m', desc='Airport altitude')
-        self.add_input('mission|cruise|h', val=8000,
-                       units='m', desc='Cruise altitude')
+        nn_tot = nn * len(mission_segment_names)
+        n_mission_segments = len(mission_segment_names)
+        last_seg_index = len(mission_segment_names) - 1
+        for i, segment_name in enumerate(mission_segment_names):
+            self.add_input(segment_name+'|time', val=5, units='s')
+            self.add_input(segment_name+'|Ueas', val=90, units='m / s')
+            self.add_input(segment_name+'|h0', val=0, units='m')
+            # last segment needs a final altitude
+            if i == last_seg_index:
+                self.add_input(segment_name+'|hf', val=0, units='m')
 
-        self.add_output('fltcond|mission|Ueas', units='m / s',
-                        desc='indicated airspeed at each analysis point', shape=(3 * nn,))
-        self.add_output('fltcond|mission|h', units='m',
-                        desc='altitude at each analysis point', shape=(3 * nn,))
-        self.add_output('fltcond|mission|vs', units='m / s',
-                        desc='vectorial representation of vertical speed', shape=(3 * nn,))
-        self.add_output('mission|climb|time', units='s',
-                        desc='Time from ground level to cruise')
-        self.add_output('mission|descent|time', units='s',
-                        desc='Time to descend to ground from cruise')
-        self.add_output('mission|climb|dt', units='s',
-                        desc='Timestep in climb phase')
-        self.add_output('mission|descent|dt', units='s',
-                        desc='Timestep in descent phase')
+            self.add_output(segment_name+'|dt', units='s')
 
-        # the climb speeds only have influence over their respective mission segments
-        self.declare_partials(['fltcond|mission|Ueas'], ['mission|climb|Ueas'],
-                              rows=np.arange(0, nn), cols=np.ones(nn) * 0, val=np.ones(nn))
-        self.declare_partials(['fltcond|mission|Ueas'], ['mission|cruise|Ueas'],
-                              rows=np.arange(nn, 2 * nn), cols=np.ones(nn) * 0, val=np.ones(nn))
-        self.declare_partials(['fltcond|mission|Ueas'], ['mission|descent|Ueas'],
-                              rows=np.arange(2 * nn, 3 * nn), cols=np.ones(nn) * 0, val=np.ones(nn))
-        hcruisepartials = np.concatenate([np.linspace(0.0, 1.0, nn),
-                                          np.ones(nn),
-                                          np.linspace(1.0, 0.0, nn)])
-        hgroundpartials = np.concatenate([np.linspace(1.0, 0.0, nn),
-                                          np.linspace(0.0, 1.0, nn)])
-        # the influence of each parameter linearly varies from 0 to 1 and vice versa on
-        # climb and descent. The partials are different lengths on purpose - no influence
-        # of ground on the mid-mission points,  so no partial derivative
-        self.declare_partials(['fltcond|mission|h'], ['mission|cruise|h'],
-                              rows=range(3 * nn), cols=np.zeros(3 * nn), val=hcruisepartials)
-        self.declare_partials(['fltcond|mission|h'], ['mission|takeoff|h'],
-                              rows=np.concatenate([np.arange(0, nn), np.arange(2 * nn, 3 * nn)]),
-                              cols=np.zeros(2 * nn), val=hgroundpartials)
-        self.declare_partials(['fltcond|mission|vs'], ['mission|climb|vs'],
-                              rows=range(nn), cols=np.zeros(nn), val=np.ones(nn))
-        self.declare_partials(['fltcond|mission|vs'], ['mission|descent|vs'],
-                              rows=np.arange(2 * nn, 3 * nn), cols=np.zeros(nn), val=np.ones(nn))
-        self.declare_partials(['mission|climb|time'],
-                              ['mission|takeoff|h', 'mission|cruise|h', 'mission|climb|vs'])
-        self.declare_partials(['mission|descent|time'],
-                              ['mission|takeoff|h', 'mission|cruise|h', 'mission|descent|vs'])
-        self.declare_partials(['mission|climb|dt'],
-                              ['mission|takeoff|h', 'mission|cruise|h', 'mission|climb|vs'])
-        self.declare_partials(['mission|descent|dt'],
-                              ['mission|takeoff|h', 'mission|cruise|h', 'mission|descent|vs'])
+        self.add_output('fltcond|Ueas', units='m / s',
+                        desc='indicated airspeed at each analysis point', shape=(n_mission_segments * nn,))
+        self.add_output('fltcond|h', units='m',
+                        desc='altitude at each analysis point', shape=(n_mission_segments * nn,))
+        self.add_output('fltcond|vs', units='m / s',
+                        desc='vectorial representation of vertical speed', shape=(n_mission_segments * nn,))
+
+
+        for i, segment_name in enumerate(mission_segment_names):
+            # airspeeds are constant across each flight segment
+            self.declare_partials(['fltcond|Ueas'], [segment_name+'|Ueas'],
+                                  rows=np.arange(i*nn, (i+1)*nn), cols=np.zeros(nn), val=np.ones(nn))
+            # vertical speeds depend on the starting altitude and segment time
+            self.declare_partials(['fltcond|vs'], [segment_name+'|time'],
+                                  rows=np.arange(i*nn, (i+1)*nn), cols=np.zeros(nn))
+
+            if i == last_seg_index:
+                self.declare_partials(['fltcond|vs'], [segment_name+'|hf'],
+                                      rows=np.arange(i*nn, (i+1)*nn), cols=np.zeros(nn))
+            if i == 0:
+                self.declare_partials(['fltcond|vs'], [segment_name+'|h0'],
+                                      rows=np.arange(i*nn, (i+1)*nn), cols=np.zeros(nn))
+            else:
+                self.declare_partials(['fltcond|vs'], [segment_name+'|h0'],
+                                      rows=np.arange((i-1)*nn, (i+1)*nn), cols=np.zeros(2*nn))
+
+            # segment dt depends only on the segment time
+            self.declare_partials([segment_name+'|dt'], [segment_name+'|time'],
+                                  val=1/(nn-1))
+
+            # the influence of altitude varies linearly from 0 to 1 back to 0.
+            if i == 0:
+                # first segment
+                rowrange = np.arange(i*nn, (i+1)*nn)
+                cols = np.zeros(nn)
+                h0partials = np.linspace(1.0, 0.0, nn)
+            else:
+                rowrange = np.arange((i-1)*nn, (i+1)*nn)
+                cols = np.zeros(2*nn)
+                h0partials = np.concatenate([np.linspace(0.0, 1.0, nn), np.linspace(1.0, 0.0, nn)])
+
+            self.declare_partials(['fltcond|h'],[segment_name+'|h0'],
+                                  rows=rowrange, cols=cols, val=h0partials)
+
+            if i == last_seg_index:
+                rowrange = np.arange(i*nn, (i+1)*nn)
+                cols = np.zeros(nn)
+                hfpartials = np.linspace(0.0, 1.0, nn)
+                self.declare_partials(['fltcond|h'],[segment_name+'|hf'],
+                                      rows=rowrange, cols=cols, val=hfpartials)
+
 
     def compute(self, inputs, outputs):
 
         n_int_per_seg = self.options['n_int_per_seg']
-        nn = n_int_per_seg*2 + 1
-        hvec_climb = np.linspace(inputs['mission|takeoff|h'],inputs['mission|cruise|h'],nn)
-        hvec_desc = np.linspace(inputs['mission|cruise|h'],inputs['mission|takeoff|h'],nn)
-        hvec_cruise = np.ones(nn)*inputs['mission|cruise|h']
-        outputs['fltcond|mission|h'] = np.concatenate([hvec_climb,hvec_cruise,hvec_desc])
-        debug = np.concatenate([np.ones(nn)*inputs['mission|climb|Ueas'],np.ones(nn)*inputs['mission|cruise|Ueas'],np.ones(nn)*inputs['mission|descent|Ueas']])
-        outputs['fltcond|mission|Ueas'] = np.concatenate([np.ones(nn)*inputs['mission|climb|Ueas'],np.ones(nn)*inputs['mission|cruise|Ueas'],np.ones(nn)*inputs['mission|descent|Ueas']])
-        outputs['fltcond|mission|vs'] = np.concatenate([np.ones(nn)*inputs['mission|climb|vs'],np.ones(nn)*0.0,np.ones(nn)*inputs['mission|descent|vs']])
-        outputs['mission|climb|time'] = (inputs['mission|cruise|h']-inputs['mission|takeoff|h'])/inputs['mission|climb|vs']
-        outputs['mission|descent|time'] = (inputs['mission|takeoff|h']-inputs['mission|cruise|h'])/inputs['mission|descent|vs']
-        outputs['mission|climb|dt'] = (inputs['mission|cruise|h']-inputs['mission|takeoff|h'])/inputs['mission|climb|vs']/(nn-1)
-        outputs['mission|descent|dt'] =  (inputs['mission|takeoff|h']-inputs['mission|cruise|h'])/inputs['mission|descent|vs']/(nn-1)
+        mission_segment_names = self.options['mission_segments']
+        nn = (n_int_per_seg * 2 + 1)
+        nn_tot = nn * len(mission_segment_names)
+        last_seg_index = len(mission_segment_names) - 1
+        altitude_vecs = []
+        Ueas_vecs = []
+        vs_vecs = []
+        for i, segment_name in enumerate(mission_segment_names):
+            if i == last_seg_index:
+                h0 = inputs[segment_name+'|h0']
+                hf = inputs[segment_name+'|hf']
+            else:
+                next_seg_name = mission_segment_names[i+1]
+                h0 = inputs[segment_name+'|h0']
+                hf = inputs[next_seg_name+'|h0']
+            vs = (hf - h0) / inputs[segment_name+'|time']
+
+            altitude_vecs.append(np.linspace(h0,hf,nn))
+            Ueas_vecs.append(np.ones(nn)*inputs[segment_name+'|Ueas'])
+            vs_vecs.append(np.ones(nn)*vs)
+            outputs[segment_name+'|dt'] = inputs[segment_name+'|time'] / (nn-1)
+
+        outputs['fltcond|h'] = np.concatenate(altitude_vecs)
+        outputs['fltcond|Ueas'] = np.concatenate(Ueas_vecs)
+        outputs['fltcond|vs'] = np.concatenate(vs_vecs)
+
+
+    def compute_partials(self, inputs, J):
+        n_int_per_seg = self.options['n_int_per_seg']
+        mission_segment_names = self.options['mission_segments']
+        nn = (n_int_per_seg * 2 + 1)
+        nn_tot = nn * len(mission_segment_names)
+        last_seg_index = len(mission_segment_names) - 1
+        for i, segment_name in enumerate(mission_segment_names):
+            seg_time = inputs[segment_name+'|time']
+            if i == last_seg_index:
+                h0 = inputs[segment_name+'|h0']
+                hf = inputs[segment_name+'|hf']
+                J['fltcond|vs',segment_name+'|hf'] = np.ones(nn) * 1.0 / seg_time
+            else:
+                h0 = inputs[segment_name+'|h0']
+                hf = inputs[mission_segment_names[i+1]+'|h0']
+
+            if i == 0:
+                J['fltcond|vs',segment_name+'|h0'] = np.ones(nn) * -1.0 / seg_time
+            else:
+                prev_seg_name = mission_segment_names[i-1]
+                prev_seg_time = inputs[prev_seg_name+'|time']
+                J['fltcond|vs',segment_name+'|h0'] = np.concatenate([np.ones(nn) * 1.0 / prev_seg_time,
+                                                                                        np.ones(nn) * -1.0 / seg_time])
+
+            J['fltcond|vs',segment_name+'|time'] = np.ones(nn) * -1.0 * (hf - h0) / seg_time ** 2
+
+class MissionComputeRange(ExplicitComponent):
+    """
+    Computes range over the ground during non-reserve mission segments
+
+    This is a helper function for the main mission analysis routine
+    and shouldn't be instantiated directly.
+
+    Inputs
+    ------
+    fltcond|groundspeed : float
+        True groundspeed for all mission phases (vector, m/s)
+    phase|dt : float
+        Timestep during the climb phase (scalar, s)
+
+    Outputs
+    -------
+    range : float
+        Distance over the ground during counted segments (scalar, m)
+
+
+    Options
+    -------
+    n_int_per_seg : int
+        Number of Simpson's rule intervals to use per mission segment.
+        The total number of points is 2 * n_int_per_seg + 1
+    mission_segments : list
+        The names of each mission segment. The number of segments
+        will correspond to the length of the list
+    range_segments : list
+        The list of mission segment names to include in the range computation
+    """
+    def initialize(self):
+        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
+        self.options.declare('mission_segments', default=['climb', 'cruise', 'descent'])
+        self.options.declare('range_segments', default=['climb', 'cruise', 'descent'])
+
+    def setup(self):
+        n_int_per_seg = self.options['n_int_per_seg']
+        mission_segment_names = self.options['mission_segments']
+        segment_names_to_count = self.options['range_segments']
+
+        nn = (n_int_per_seg * 2 + 1)
+        nn_tot = nn * len(mission_segment_names)
+        n_mission_segments = len(mission_segment_names)
+        last_seg_index = len(mission_segment_names) - 1
+
+        self.add_input('fltcond|groundspeed', units='m/s',shape=(n_mission_segments*nn,))
+        self.add_output('range', units='m')
+        aranges = []
+        for i, segment_name in enumerate(mission_segment_names):
+            if segment_name in segment_names_to_count:
+                self.add_input(segment_name+'|dt', units='s')
+                self.declare_partials(['range'], [segment_name+'|dt'])
+                aranges.append(np.arange(i*nn, (i+1)*nn))
+        groundspeed_cols = np.concatenate(aranges)
+        self.declare_partials(['range'], ['fltcond|groundspeed'], rows=np.ones(nn*len(segment_names_to_count))*0, cols=groundspeed_cols)
+
+
+    def compute(self, inputs, outputs):
+        n_int_per_seg = self.options['n_int_per_seg']
+        mission_segment_names = self.options['mission_segments']
+        segment_names_to_count = self.options['range_segments']
+        nn = (n_int_per_seg * 2 + 1)
+
+        groundspeed = inputs['fltcond|groundspeed']
+        #compute distance traveled during climb and desc using Simpson's rule
+        simpsons_vec = np.ones(nn)
+        simpsons_vec[1:nn-1:2] = 4
+        simpsons_vec[2:nn-1:2] = 2
+        running_total = 0
+        for i, segment_name in enumerate(mission_segment_names):
+            if segment_name in segment_names_to_count:
+                dt_seg = inputs[segment_name+'|dt']
+                running_total += np.sum(simpsons_vec*groundspeed[i*nn:(i+1)*nn])*dt_seg/3
+        outputs['range'] = running_total
 
     def compute_partials(self, inputs, J):
 
         n_int_per_seg = self.options['n_int_per_seg']
-        nn = n_int_per_seg*2 + 1
-        J['mission|climb|time','mission|cruise|h'] = 1/inputs['mission|climb|vs']
-        J['mission|climb|time','mission|takeoff|h'] = -1/inputs['mission|climb|vs']
-        J['mission|climb|time','mission|climb|vs'] = -(inputs['mission|cruise|h']-inputs['mission|takeoff|h'])/(inputs['mission|climb|vs']**2)
-        J['mission|descent|time','mission|cruise|h'] = -1/inputs['mission|descent|vs']
-        J['mission|descent|time','mission|takeoff|h'] = 1/inputs['mission|descent|vs']
-        J['mission|descent|time','mission|descent|vs'] = -(inputs['mission|takeoff|h']-inputs['mission|cruise|h'])/(inputs['mission|descent|vs']**2)
-        J['mission|climb|dt','mission|cruise|h'] = 1/inputs['mission|climb|vs']/(nn-1)
-        J['mission|climb|dt','mission|takeoff|h'] = -1/inputs['mission|climb|vs']/(nn-1)
-        J['mission|climb|dt','mission|climb|vs'] = -(inputs['mission|cruise|h']-inputs['mission|takeoff|h'])/(inputs['mission|climb|vs']**2)/(nn-1)
-        J['mission|descent|dt','mission|cruise|h'] = -1/inputs['mission|descent|vs']/(nn-1)
-        J['mission|descent|dt','mission|takeoff|h'] = 1/inputs['mission|descent|vs']/(nn-1)
-        J['mission|descent|dt','mission|descent|vs'] = -(inputs['mission|takeoff|h']-inputs['mission|cruise|h'])/(inputs['mission|descent|vs']**2)/(nn-1)
+        nn = (n_int_per_seg*2 + 1)
+        mission_segment_names = self.options['mission_segments']
+        segment_names_to_count = self.options['range_segments']
 
+        groundspeed = inputs['fltcond|groundspeed']
+        simpsons_vec = np.ones(nn)
+        simpsons_vec[1:nn-1:2] = 4
+        simpsons_vec[2:nn-1:2] = 2
+        partials_list = []
+        for i, segment_name in enumerate(mission_segment_names):
+            if segment_name in segment_names_to_count:
+                dt_seg = inputs[segment_name+'|dt']
+                J['range',segment_name+'|dt'] = np.sum(simpsons_vec*groundspeed[i*nn:(i+1)*nn])/3
+                partials_list.append(simpsons_vec * dt_seg / 3)
+        J['range','fltcond|groundspeed'] = np.concatenate(partials_list)
 
-class MissionNoReserves(Group):
-    """This analysis group calculates energy/fuel consumption and feasibility for a given mission profile.
-
-    This component should be instantiated in the top-level aircraft analysis / optimization script.
-    **Suggested variable promotion list:**
-    *"ac|aero|\*",  "ac|geom|\*",  "fltcond|mission|\*",  "mission|\*"*
-
-    **Inputs List:**
-
-    From aircraft config:
-        - ac|aero|polar|CD0_cruise
-        - ac|aero|polar|e
-        - ac|geom|wing|S_ref
-        - ac|geom|wing|AR
-
-    From mission config:
-        - mission|weight_initial
-
-    From mission flight condition generator:
-        - fltcond|mission|vs
-        - mission|climb|time
-        - mission|climb|dt
-        - mission|descent|time
-        - mission|descent|dt
-
-    From standard atmosphere model/splitter:
-        - fltcond|mission|Utrue
-        - fltcond|mission|q
-
-    From propulsion model:
-        - mission|battery_load
-        - mission|fuel_flow
-        - mission|thrust
-
-    Outputs
-    -------
-    mission|total_fuel : float
-        Total fuel burn for climb, cruise, and descent (scalar, kg)
-    mission|total_battery_energy : float
-        Total energy consumption for climb, cruise, and descent (scalar, kJ)
-    thrust_resid.thrust_residual : float
-        Imbalance between thrust and drag for use with Newton solver (scalar, N)
+class Groundspeeds(ExplicitComponent):
     """
+    Computes groundspeed for vectorial true airspeed and true vertical speed.
 
-    def initialize(self):
-        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-        self.options.declare('track_battery',default=False, desc="Flip to true if you want to track battery state")
-    def setup(self):
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn_tot = (2*n_int_per_seg+1)*3 #climb, cruise, descent
-        #Create holders for control and flight condition parameters
-        track_battery = self.options['track_battery']
-
-        dvlist = [['fltcond|mission|q','fltcond|q',100*np.ones(nn_tot),'Pa'],
-                  ['ac|aero|polar|CD0_cruise','CD0',0.005,None],
-                  ['ac|aero|polar|e','e',0.95,None]]
-        self.add_subsystem('dvs',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
-
-        groundspeeds = self.add_subsystem('gs',MissionGroundspeeds(n_int_per_seg=n_int_per_seg),promotes_inputs=["fltcond|*"],promotes_outputs=["mission|groundspeed","fltcond|*"])
-        ranges = self.add_subsystem('ranges',MissionClimbDescentRanges(n_int_per_seg=n_int_per_seg),promotes_inputs=["mission|groundspeed","mission|*time"],promotes_outputs=["mission|climb|range","mission|descent|range"])
-        timings = self.add_subsystem('timings',MissionTimings(n_int_per_seg=n_int_per_seg),promotes_inputs=["mission|*range","mission|groundspeed"],promotes_outputs=["mission|cruise|range","mission|cruise|time","mission|cruise|dt"])
-
-        fbs = self.add_subsystem('fuelburn',MissionSegmentFuelBurns(n_int_per_seg=n_int_per_seg),promotes_inputs=["mission|fuel_flow","mission|*dt"],promotes_outputs=["mission|segment_fuel"])
-        if track_battery:
-            energy = self.add_subsystem('battery',MissionSegmentBatteryEnergyUsed(n_int_per_seg=n_int_per_seg),promotes_inputs=["mission|battery_load",'mission*dt'],promotes_outputs=["mission|segment_battery_energy_used"])
-        wts = self.add_subsystem('weights',MissionSegmentWeights(n_int_per_seg=n_int_per_seg),promotes_inputs=["mission|segment_fuel","mission|weight_initial"],promotes_outputs=["mission|weights"])
-        CLs = self.add_subsystem('CLs',MissionSegmentCL(n_int_per_seg=n_int_per_seg),promotes_inputs=["mission|weights","fltcond|mission|q",'fltcond|mission|cosgamma',"ac|geom|*"],promotes_outputs=["fltcond|mission|CL"])
-        drag = self.add_subsystem('drag',PolarDrag(num_nodes=nn_tot),promotes_inputs=["fltcond|q","ac|geom|*","CD0","e"],promotes_outputs=["drag"])
-        self.connect('fltcond|mission|CL','drag.fltcond|CL')
-        td = self.add_subsystem('thrust_resid',ExplicitThrustResidual(n_int_per_seg=n_int_per_seg),promotes_inputs=["fltcond|mission|singamma","drag","mission|weights*","mission|thrust"])
-        totals = SumComp(axis=None)
-        totals.add_equation(output_name='mission|total_fuel',input_name='mission|segment_fuel', units='kg',scaling_factor=-1,vec_size=nn_tot-3)
-        if track_battery:
-            totals.add_equation(output_name='mission|total_battery_energy',input_name='mission|segment_battery_energy_used', units='MJ',vec_size=nn_tot-3)
-        self.add_subsystem(name='totals',subsys=totals,promotes_inputs=['*'],promotes_outputs=['*'])
-
-
-class ExplicitThrustResidual(ExplicitComponent):
-    """
-    Computes force imbalance in the aircraft x axis. Enables Newton solve for throttle at steady flight.
+    This is a helper function for the main mission analysis routine `MissionNoReserves`
+    and shouldn't be instantiated directly.
 
     Inputs
     ------
-    drag : float
-        Aircraft drag force at each analysis point (vector, N)
-    fltcond|mission|singamma : float
-        Sine of the flight path angle for all mission phases (vector, dimensionless)
-    mission|weights : float
-        Aircraft weight at each analysis point (vector, kg)
-    mission|thrust : float
-        Aircraft thrust force at each analysis point (vector, N)
+    fltcond|vs : float
+        Vertical speed for all mission phases (vector, m/s)
+    fltcond|Utrue : float
+        True airspeed for all mission phases (vector, m/s)
 
     Outputs
     -------
-    thrust_residual : float
-        Imbalance in x-axis force at each analysis point (vector, N)
+    fltcond|groundspeed : float
+        True groundspeed for all mission phases (vector, m/s)
+    fltcond|cosgamma : float
+        Cosine of the flght path angle for all mission phases (vector, dimensionless)
+    fltcond|singamma : float
+        Sine of the flight path angle for all mission phases (vector, dimensionless)
 
     Options
     -------
@@ -277,36 +308,371 @@ class ExplicitThrustResidual(ExplicitComponent):
     def setup(self):
         n_int_per_seg = self.options['n_int_per_seg']
         nn = (n_int_per_seg*2 + 1)
-        n_seg = 3
-        arange = np.arange(0,n_seg*nn)
-        self.add_input('drag', units='N',shape=(n_seg*nn,))
-        self.add_input('fltcond|mission|singamma', shape=(n_seg*nn,))
-        self.add_input('mission|weights', units='kg', shape=(n_seg*nn,))
-        self.add_input('mission|thrust', units='N', shape=(n_seg*nn,))
-        self.add_output('thrust_residual', shape=(n_seg*nn,), units='N')
-        self.declare_partials(['thrust_residual'], ['drag'], rows=arange, cols=arange, val=-np.ones(nn*n_seg))
-        self.declare_partials(['thrust_residual'], ['mission|thrust'], rows=arange, cols=arange, val=np.ones(nn*n_seg))
-        self.declare_partials(['thrust_residual'], ['fltcond|mission|singamma','mission|weights'], rows=arange, cols=arange)
+        self.add_input('fltcond|vs', units='m/s',shape=(3 * nn,))
+        self.add_input('fltcond|Utrue', units='m/s',shape=(3 * nn,))
+        self.add_output('fltcond|groundspeed', units='m/s',shape=(3 * nn,))
+        self.add_output('fltcond|cosgamma', shape=(3 * nn,), desc='Cosine of the flight path angle')
+        self.add_output('fltcond|singamma', shape=(3 * nn,), desc='sin of the flight path angle' )
+        self.declare_partials(['fltcond|groundspeed','fltcond|cosgamma','fltcond|singamma'], ['fltcond|vs','fltcond|Utrue'], rows=range(3 * nn), cols=range(3 * nn))
 
     def compute(self, inputs, outputs):
 
-        g = 9.80665 #m/s^2
-        debug_nonlinear = False
-        if debug_nonlinear:
-            print('Thrust: ' + str(inputs['mission|thrust']))
-            print('Drag: '+ str(inputs['drag']))
-            print('mgsingamma: ' + str(inputs['mission|weights']*g*inputs['fltcond|mission|singamma']))
-            print('Throttle: ' + str(outputs['throttle']))
-
-        outputs['thrust_residual'] = inputs['mission|thrust'] - inputs['drag'] - inputs['mission|weights']*g*inputs['fltcond|mission|singamma']
-
+        n_int_per_seg = self.options['n_int_per_seg']
+        nn = (n_int_per_seg*2 + 1)
+        #compute the groundspeed on climb and desc
+        groundspeed =  np.sqrt(inputs['fltcond|Utrue']**2-inputs['fltcond|vs']**2)
+        outputs['fltcond|groundspeed'] = groundspeed
+        outputs['fltcond|singamma'] = inputs['fltcond|vs'] / inputs['fltcond|Utrue']
+        outputs['fltcond|cosgamma'] = groundspeed / inputs['fltcond|Utrue']
 
     def compute_partials(self, inputs, J):
 
-        g = 9.80665 #m/s^2
-        J['thrust_residual','mission|weights'] = -g*inputs['fltcond|mission|singamma']
-        J['thrust_residual','fltcond|mission|singamma'] = -g*inputs['mission|weights']
+        groundspeed =  np.sqrt(inputs['fltcond|Utrue']**2-inputs['fltcond|vs']**2)
+        J['fltcond|groundspeed','fltcond|vs'] = (1/2) / np.sqrt(inputs['fltcond|Utrue']**2-inputs['fltcond|vs']**2) * (-2) * inputs['fltcond|vs']
+        J['fltcond|groundspeed','fltcond|Utrue'] = (1/2) / np.sqrt(inputs['fltcond|Utrue']**2-inputs['fltcond|vs']**2) * 2 * inputs['fltcond|Utrue']
+        J['fltcond|singamma','fltcond|vs'] = 1 / inputs['fltcond|Utrue']
+        J['fltcond|singamma','fltcond|Utrue'] = - inputs['fltcond|vs'] / inputs['fltcond|Utrue'] ** 2
+        J['fltcond|cosgamma','fltcond|vs'] = J['fltcond|groundspeed','fltcond|vs'] / inputs['fltcond|Utrue']
+        J['fltcond|cosgamma','fltcond|Utrue'] = (J['fltcond|groundspeed','fltcond|Utrue'] * inputs['fltcond|Utrue'] - groundspeed) / inputs['fltcond|Utrue']**2
 
+class MissionSegmentEnergies(ExplicitComponent):
+    """
+    Integrates delta quantity between each analysis point
+
+    Takes n_segments * nn fuel flow and/or battery drain rates; produces n_segments * (nn - 1) delta quantities
+
+    Inputs
+    ------
+    fuel_flow : float
+        Fuel flow rate for all analysis points (vector, kg/s)
+        Note: only activated when 'track_fuel' = True
+    battery_load : float
+        Battery load for all analysis points (vector, kW)
+        Note: only activated when 'track_battery' = True
+    phase|dt : float
+        Timestep length during each mission phase (scalar, s)
+        Note: this represents the timestep for the Simpson subinterval, not the whole inteval
+
+    Outputs
+    -------
+    segment_fuel : float
+        Fuel burn increment between each analysis point (vector, kg)
+        Note: if the number of analysis points in one phase is `nn`, the number
+        of segment fuel burns is `nn - 1`
+        Note: only activated when 'track_fuel' = True
+
+    segment_battery_energy_used : float
+        Energy used  between each analysis point (vector, kW*s)
+        Note: if the number of analysis points in one phase is `nn`, the number
+        of segment energies is `nn - 1`
+        Note: only activated when 'track_battery' = True
+
+    Options
+    -------
+    n_int_per_seg : int
+        Number of Simpson's rule intervals to use per mission segment.
+        The total number of points is 2 * n_int_per_seg + 1
+    mission_segments : list
+        The list of mission segments to track
+    track_battery : boolean
+        Turn on to track battery energy
+    track_fuel : boolean
+        Turn on to track fuel consumption
+
+    """
+    def initialize(self):
+        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
+        self.options.declare('mission_segments', default=['climb', 'cruise', 'descent'])
+        self.options.declare('track_battery', default=True)
+        self.options.declare('track_fuel', default=True)
+
+    def setup(self):
+        n_int_per_seg = self.options['n_int_per_seg']
+        nn = (n_int_per_seg*2 + 1)
+        mission_segment_names = self.options['mission_segments']
+        n_segments = len(mission_segment_names)
+        track_fuel = self.options['track_fuel']
+        track_battery = self.options['track_battery']
+
+        #use dummy inputs for dt and q, just want the shapes
+        wrt_q, wrt_dt = simpson_partials_every_node(np.ones(n_segments),np.ones(n_segments * nn),n_segments=n_segments,n_simpson_intervals_per_segment=n_int_per_seg)
+
+        if track_fuel:
+            self.add_input('fuel_flow', units='kg/s',shape=(n_segments * nn,))
+            self.add_output('segment_fuel', units='kg',shape=(n_segments*(nn-1)))
+            self.declare_partials(['segment_fuel'], ['fuel_flow'], rows=wrt_q[0], cols=wrt_q[1])
+        if track_battery:
+            self.add_input('battery_load', units='kW',shape=(n_segments * nn,))
+            self.add_output('segment_battery_energy_used', units='kW*s',shape=(n_segments*(nn-1)))
+            self.declare_partials(['segment_battery_energy_used'], ['battery_load'], rows=wrt_q[0], cols=wrt_q[1])
+
+        for i, segment_name in enumerate(mission_segment_names):
+            self.add_input(segment_name+'|dt', units='s')
+            if track_fuel:
+                self.declare_partials(['segment_fuel'], [segment_name+'|dt'], rows=wrt_dt[0][i], cols=wrt_dt[1][i])
+            if track_battery:
+                self.declare_partials(['segment_battery_energy_used'], [segment_name+'|dt'], rows=wrt_dt[0][i], cols=wrt_dt[1][i])
+
+    def compute(self, inputs, outputs):
+        n_int_per_seg = self.options['n_int_per_seg']
+        nn = (n_int_per_seg*2 + 1)
+        mission_segment_names = self.options['mission_segments']
+        n_segments = len(mission_segment_names)
+        track_fuel = self.options['track_fuel']
+        track_battery = self.options['track_battery']
+        dts = []
+        for i, segment_name in enumerate(mission_segment_names):
+            dts.append(inputs[segment_name+'|dt'])
+
+        if track_fuel:
+            ff = inputs['fuel_flow']
+            int_ff, delta_ff = simpson_integral_every_node(dts,ff,n_segments=n_segments,n_simpson_intervals_per_segment=n_int_per_seg)
+            outputs['segment_fuel'] = delta_ff
+        if track_battery:
+            load = inputs['battery_load']
+            int_load, delta_load = simpson_integral_every_node(dts,load,n_segments=n_segments,n_simpson_intervals_per_segment=n_int_per_seg)
+            outputs['segment_battery_energy_used'] = delta_load
+
+    def compute_partials(self, inputs, J):
+        n_int_per_seg = self.options['n_int_per_seg']
+        nn = (n_int_per_seg*2 + 1)
+        mission_segment_names = self.options['mission_segments']
+        n_segments = len(mission_segment_names)
+        track_fuel = self.options['track_fuel']
+        track_battery = self.options['track_battery']
+
+        dts = []
+        for i, segment_name in enumerate(mission_segment_names):
+            dts.append(inputs[segment_name+'|dt'])
+
+        if track_fuel:
+            ff = inputs['fuel_flow']
+            wrt_q, wrt_dt = simpson_partials_every_node(dts,ff,n_segments=n_segments,n_simpson_intervals_per_segment=n_int_per_seg)
+            J['segment_fuel','fuel_flow'] = wrt_q[2]
+            for i, segment_name in enumerate(mission_segment_names):
+                J['segment_fuel',segment_name+'|dt'] =  wrt_dt[2][i]
+        if track_battery:
+            load = inputs['battery_load']
+            wrt_q, wrt_dt = simpson_partials_every_node(dts,load,n_segments=n_segments,n_simpson_intervals_per_segment=n_int_per_seg)
+            J['segment_battery_energy_used','battery_load'] = wrt_q[2]
+            for i, segment_name in enumerate(mission_segment_names):
+                J['segment_battery_energy_used',segment_name+'|dt'] =  wrt_dt[2][i]
+
+class MissionSegmentWeights(ExplicitComponent):
+    """
+    Computes aircraft weight at each analysis point including fuel burned
+
+    This is a helper function for the main mission analysis routine `MissionNoReserves`
+    and shouldn't be instantiated directly.
+
+    Inputs
+    ------
+    segment_fuel : float
+        Fuel burn increment between each analysis point (vector, kg)
+        Note: if the number of analysis points in one phase is `nn`, the number
+        of segment fuel burns is `nn - 1`
+    weight_initial : float
+        Weight immediately following takeoff (scalar, kg)
+
+    Outputs
+    -------
+    weight_vec : float
+        Aircraft weight at each analysis point (vector, kg)
+
+
+    Options
+    -------
+    n_int_per_seg : int
+        Number of Simpson's rule intervals to use per mission segment.
+        The total number of points is 2 * n_int_per_seg + 1
+    mission_segments : list
+        The list of mission segments to track
+
+    """
+    def initialize(self):
+        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
+        self.options.declare('mission_segments',default=['climb','cruise','descent'])
+
+    def setup(self):
+        n_int_per_seg = self.options['n_int_per_seg']
+        nn = (n_int_per_seg*2 + 1)
+        mission_segment_names = self.options['mission_segments']
+        n_segments = len(mission_segment_names)
+        self.add_input('segment_fuel', units='kg',shape=(n_segments*(nn-1),))
+        self.add_input('weight_initial', units='kg')
+        self.add_output('weight_vec', units='kg',shape=(n_segments * nn,))
+
+        jacmat = np.tril(np.ones((n_segments*(nn-1),n_segments*(nn-1))))
+        jacmat = np.insert(jacmat,0,np.zeros(n_segments*(nn-1)),axis=0)
+        for i in range(1,n_segments):
+            duplicate_row = jacmat[nn*i-1,:]
+            jacmat = np.insert(jacmat,nn*i,duplicate_row,axis=0)
+
+        self.declare_partials(['weight_vec'], ['segment_fuel'], val=sp.csr_matrix(jacmat))
+        self.declare_partials(['weight_vec'], ['weight_initial'], rows=range(n_segments * nn), cols=np.zeros(n_segments * nn), val=np.ones(n_segments * nn))
+
+    def compute(self, inputs, outputs):
+
+        n_int_per_seg = self.options['n_int_per_seg']
+        nn = (n_int_per_seg*2 + 1)
+        #first endpoint needs to be the takeoff weight; insert a zero to make them the same length
+        mission_segment_names = self.options['mission_segments']
+        n_segments = len(mission_segment_names)
+        segweights = np.insert(inputs['segment_fuel'],0,0)
+        weights = np.cumsum(segweights)
+        for i in range(1,n_segments):
+            duplicate_row = weights[i*nn-1]
+            weights = np.insert(weights,i*nn,duplicate_row)
+        outputs['weight_vec'] = np.ones(n_segments * nn)*inputs['weight_initial'] + weights
+
+class MissionSegmentCL(ExplicitComponent):
+    """
+    Computes lift coefficient at each analysis point
+
+    This is a helper function for the main mission analysis routine `MissionNoReserves`
+    and shouldn't be instantiated directly.
+
+    Inputs
+    ------
+    weight_vec : float
+        Aircraft weight at each analysis point (vector, kg)
+    fltcond|q : float
+        Dynamic pressure at each analysis point (vector, Pascal)
+    ac|geom|wing|S_ref : float
+        Reference wing area (scalar, m**2)
+    fltcond|cosgamma : float
+        Cosine of the flght path angle for all mission phases (vector, dimensionless)
+
+    Outputs
+    -------
+    fltcond|CL : float
+        Lift coefficient (vector, dimensionless)
+
+    Options
+    -------
+    n_int_per_seg : int
+        Number of Simpson's rule intervals to use per mission segment.
+        The total number of points is 2 * n_int_per_seg + 1
+    mission_segments : list
+        The list of mission segments to track
+    """
+    def initialize(self):
+
+        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
+        self.options.declare('mission_segments',default=['climb','cruise','descent'])
+    def setup(self):
+        n_int_per_seg = self.options['n_int_per_seg']
+        nn = (n_int_per_seg*2 + 1)
+        mission_segment_names = self.options['mission_segments']
+        n_seg = len(mission_segment_names)
+        arange = np.arange(0,n_seg*nn)
+        self.add_input('weight_vec', units='kg', shape=(n_seg*nn,))
+        self.add_input('fltcond|q', units='N * m**-2', shape=(n_seg*nn,))
+        self.add_input('ac|geom|wing|S_ref', units='m **2')
+        self.add_input('fltcond|cosgamma', shape=(n_seg*nn,))
+        self.add_output('fltcond|CL',shape=(n_seg*nn,))
+
+
+        self.declare_partials(['fltcond|CL'], ['weight_vec','fltcond|q',"fltcond|cosgamma"], rows=arange, cols=arange)
+        self.declare_partials(['fltcond|CL'], ['ac|geom|wing|S_ref'], rows=arange, cols=np.zeros(n_seg*nn))
+
+    def compute(self, inputs, outputs):
+
+        n_int_per_seg = self.options['n_int_per_seg']
+        nn = (n_int_per_seg*2 + 1)
+        mission_segment_names = self.options['mission_segments']
+        n_seg = len(mission_segment_names)
+        g = 9.80665 #m/s^2
+        outputs['fltcond|CL'] = inputs['fltcond|cosgamma']*g*inputs['weight_vec']/inputs['fltcond|q']/inputs['ac|geom|wing|S_ref']
+
+    def compute_partials(self, inputs, J):
+
+        n_int_per_seg = self.options['n_int_per_seg']
+        nn = (n_int_per_seg*2 + 1)
+        #first endpoint needs to be the takeoff weight; insert a zero to make them the same length
+        mission_segment_names = self.options['mission_segments']
+        n_seg = len(mission_segment_names)
+
+        g = 9.80665 #m/s^2
+        J['fltcond|CL','weight_vec'] = inputs['fltcond|cosgamma']*g/inputs['fltcond|q']/inputs['ac|geom|wing|S_ref']
+        J['fltcond|CL','fltcond|q'] = - inputs['fltcond|cosgamma']*g*inputs['weight_vec'] / inputs['fltcond|q']**2 / inputs['ac|geom|wing|S_ref']
+        J['fltcond|CL','ac|geom|wing|S_ref'] = - inputs['fltcond|cosgamma']*g*inputs['weight_vec'] / inputs['fltcond|q'] / inputs['ac|geom|wing|S_ref']**2
+        J['fltcond|CL','fltcond|cosgamma'] = g*inputs['weight_vec']/inputs['fltcond|q']/inputs['ac|geom|wing|S_ref']
+
+class ThrustSolver(ImplicitComponent):
+    """
+    Computes force imbalance in the aircraft x axis. Enables Newton solve for throttle at steady flight.
+
+    Inputs
+    ------
+    drag : float
+        Aircraft drag force at each analysis point (vector, N)
+    fltcond|singamma : float
+        Sine of the flight path angle for all mission phases (vector, dimensionless)
+    weight_vec : float
+        Aircraft weight at each analysis point (vector, kg)
+    thrust : float
+        Aircraft thrust force at each analysis point (vector, N)
+
+    Outputs
+    -------
+    throttle : float
+        Throttle setting to maintain steady flight (vector, dimensionless)
+
+    Options
+    -------
+    n_int_per_seg : int
+        Number of Simpson's rule intervals to use per mission segment.
+        The total number of points is 2 * n_int_per_seg + 1
+    mission_segments : list
+        The list of mission segments to track
+
+    """
+    def initialize(self):
+        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
+        self.options.declare('mission_segments', default=['climb','cruise','descent'])
+
+    def setup(self):
+        n_int_per_seg = self.options['n_int_per_seg']
+        nn = (n_int_per_seg*2 + 1)
+        mission_segment_names = self.options['mission_segments']
+        n_seg = len(mission_segment_names)
+        arange = np.arange(0,n_seg*nn)
+        self.add_input('drag', units='N',shape=(n_seg*nn,))
+        self.add_input('fltcond|singamma', shape=(n_seg*nn,))
+        self.add_input('weight_vec', units='kg', shape=(n_seg*nn,))
+        self.add_input('thrust', units='N', shape=(n_seg*nn,))
+        self.add_output('throttle', shape=(n_seg*nn,))
+        self.declare_partials(['throttle'], ['drag'], rows=arange, cols=arange, val=-np.ones(nn*n_seg))
+        self.declare_partials(['throttle'], ['thrust'], rows=arange, cols=arange, val=np.ones(nn*n_seg))
+        self.declare_partials(['throttle'], ['fltcond|singamma','weight_vec'], rows=arange, cols=arange)
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        g = 9.80665 #m/s^2
+        debug_nonlinear = False
+        if debug_nonlinear:
+            print('Thrust: ' + str(inputs['thrust']))
+            print('Drag: '+ str(inputs['drag']))
+            print('mgsingamma: ' + str(inputs['weight_vec']*g*inputs['fltcond|singamma']))
+            print('Throttle: ' + str(outputs['throttle']))
+        residuals['throttle'] = inputs['thrust'] - inputs['drag'] - inputs['weight_vec']*g*inputs['fltcond|singamma']
+
+
+    def linearize(self, inputs, outputs, J):
+        g = 9.80665 #m/s^2
+        J['throttle','weight_vec'] = -g*inputs['fltcond|singamma']
+        J['throttle','fltcond|singamma'] = -g*inputs['weight_vec']
+
+class SolveCruiseTime(ImplicitComponent):
+    def setup(self):
+        self.add_input('design_range', units='m')
+        self.add_input('range', units='m')
+        self.add_output('cruise|time', units='s')
+        self.declare_partials(['cruise|time'], ['range'], val=1)
+        self.declare_partials(['cruise|time'], ['design_range'], val=-1)
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        residuals['cruise|time'] = inputs['range'] - inputs['design_range']
 
 class ComputeDesignMissionResiduals(ExplicitComponent):
     """
@@ -320,10 +686,10 @@ class ComputeDesignMissionResiduals(ExplicitComponent):
         Maximum takeoff weight (scalar, kg)
     ac|weights|W_fuel_max : float
         Max fuel weight (inc. vol limits; scalar, kg)
-    mission|payload : float
+    payload : float
         Payload weight including pax (scalar, kg)
     mission|total_fuel : float
-        Fuel consume during the mission profile (not including TO; scalar, kg)
+        Fuel consumed during the mission profile (not including TO; scalar, kg)
     OEW : float
         Operational empty weight (scalar, kg)
     takeoff|total_fuel : float
@@ -331,10 +697,10 @@ class ComputeDesignMissionResiduals(ExplicitComponent):
 
     Outputs
     -------
-    mission|fuel_capacity_margin : float
+    fuel_capacity_margin : float
         Excess fuel capacity for this mission (scalar, kg)
         Positive is good
-    mission|MTOW_margin : float
+    MTOW_margin : float
         Excess takeoff weight avail. for this mission (scalar, kg)
         Positive is good
     fuel_burn : float
@@ -357,48 +723,47 @@ class ComputeDesignMissionResiduals(ExplicitComponent):
         self.add_input('ac|weights|MTOW', val=2000, units='kg')
         self.add_input('mission|total_fuel', val=180, units='kg')
         self.add_input('OEW', val=1500, units='kg')
-        self.add_input('mission|payload', val=200, units='kg')
+        self.add_input('payload', val=200, units='kg')
         self.add_input('ac|weights|W_fuel_max', val=400, units='kg')
-        self.add_output('mission|fuel_capacity_margin', units='kg')
-        self.add_output('mission|MTOW_margin', units='kg')
-        self.declare_partials('mission|fuel_capacity_margin', 'mission|total_fuel', val=-1)
-        self.declare_partials('mission|fuel_capacity_margin', 'ac|weights|W_fuel_max', val=1)
-        self.declare_partials('mission|MTOW_margin', 'ac|weights|MTOW', val=1)
-        self.declare_partials(['mission|MTOW_margin'],
-                              ['mission|total_fuel', 'OEW', 'mission|payload'],
+        self.add_output('fuel_capacity_margin', units='kg')
+        self.add_output('MTOW_margin', units='kg')
+        self.declare_partials('fuel_capacity_margin', 'mission|total_fuel', val=-1)
+        self.declare_partials('fuel_capacity_margin', 'ac|weights|W_fuel_max', val=1)
+        self.declare_partials('MTOW_margin', 'ac|weights|MTOW', val=1)
+        self.declare_partials(['MTOW_margin'],
+                              ['mission|total_fuel', 'OEW', 'payload'],
                               val=-1)
 
         if include_takeoff:
             self.add_input('takeoff|total_fuel', val=1, units='kg')
             self.add_output('fuel_burn', units='kg')
-            self.declare_partials('mission|MTOW_margin', 'takeoff|total_fuel', val=-1)
+            self.declare_partials('MTOW_margin', 'takeoff|total_fuel', val=-1)
             self.declare_partials('fuel_burn', ['takeoff|total_fuel', 'mission|total_fuel'], val=1)
-            self.declare_partials('mission|fuel_capacity_margin', 'takeoff|total_fuel', val=-1)
+            self.declare_partials('fuel_capacity_margin', 'takeoff|total_fuel', val=-1)
 
     def compute(self, inputs, outputs):
 
         include_takeoff = self.options['include_takeoff']
         if include_takeoff:
-            outputs['mission|fuel_capacity_margin'] = (inputs['ac|weights|W_fuel_max'] -
+            outputs['fuel_capacity_margin'] = (inputs['ac|weights|W_fuel_max'] -
                                                        inputs['mission|total_fuel'] -
                                                        inputs['takeoff|total_fuel'])
-            outputs['mission|MTOW_margin'] = (inputs['ac|weights|MTOW'] -
+            outputs['MTOW_margin'] = (inputs['ac|weights|MTOW'] -
                                               inputs['mission|total_fuel'] -
                                               inputs['takeoff|total_fuel'] -
                                               inputs['OEW'] -
-                                              inputs['mission|payload'])
+                                              inputs['payload'])
             outputs['fuel_burn'] = inputs['mission|total_fuel'] + inputs['takeoff|total_fuel']
 
             if inputs['mission|total_fuel'] < -1e-4 or inputs['takeoff|total_fuel'] < -1e-4:
-                raise ValueError('You have negative total fuel flows for some flight phase')
-
+                warnings.warn('You have negative total fuel flows for some flight phase. Mission fuel: '+str(inputs['mission|total_fuel'])+' Takeoff fuel:'+str(inputs['takeoff|total_fuel'])+'. It is OK if this happens during the implicit solve, but double check the final result is positive.')
         else:
-            outputs['mission|fuel_capacity_margin'] = (inputs['ac|weights|W_fuel_max'] -
+            outputs['fuel_capacity_margin'] = (inputs['ac|weights|W_fuel_max'] -
                                                        inputs['mission|total_fuel'])
-            outputs['mission|MTOW_margin'] = (inputs['ac|weights|MTOW'] -
+            outputs['MTOW_margin'] = (inputs['ac|weights|MTOW'] -
                                               inputs['mission|total_fuel'] -
                                               inputs['OEW'] -
-                                              inputs['mission|payload'])
+                                              inputs['payload'])
 
 
 class ComputeDesignMissionResidualsBattery(ComputeDesignMissionResiduals):
@@ -418,7 +783,7 @@ class ComputeDesignMissionResidualsBattery(ComputeDesignMissionResiduals):
         Max fuel weight (inc. vol limits; scalar, kg)
     battery_max_energy : float
         Maximum energy of the battery at 100% SOC (scalar, MJ)
-    mission|payload : float
+    payload : float
         Payload weight including pax (scalar, kg)
     mission|total_battery_energy : float
         Battery energy consumed during the mission profile (scalar, MJ)
@@ -433,12 +798,12 @@ class ComputeDesignMissionResidualsBattery(ComputeDesignMissionResiduals):
 
     Outputs
     -------
-    mission|battery_margin : float
+    battery_margin : float
         Excess battery energy for this mission (scalar, kg)
-    mission|fuel_capacity_margin : float
+    fuel_capacity_margin : float
         Excess fuel capacity for this mission (scalar, kg)
         Positive is good
-    mission|MTOW_margin : float
+    MTOW_margin : float
         Excess takeoff weight avail. for this mission (scalar, kg)
         Positive is good
     battery_energy_used : float
@@ -460,17 +825,17 @@ class ComputeDesignMissionResidualsBattery(ComputeDesignMissionResiduals):
         self.add_input('ac|weights|W_battery', val=0, units='kg')
         self.add_input('battery_max_energy', val=1, units='MJ')
         self.add_input('mission|total_battery_energy', val=0, units='MJ')
-        self.add_output('mission|battery_margin', units='MJ')
-        self.declare_partials('mission|MTOW_margin', 'ac|weights|W_battery', val=-1)
-        self.declare_partials('mission|battery_margin', 'battery_max_energy', val=1)
-        self.declare_partials('mission|battery_margin', 'mission|total_battery_energy', val=-1)
+        self.add_output('battery_margin', units='MJ')
+        self.declare_partials('MTOW_margin', 'ac|weights|W_battery', val=-1)
+        self.declare_partials('battery_margin', 'battery_max_energy', val=1)
+        self.declare_partials('battery_margin', 'mission|total_battery_energy', val=-1)
         if include_takeoff:
             self.add_input('takeoff|total_battery_energy', val=0, units='MJ')
             self.add_output('battery_energy_used', units='MJ')
             self.declare_partials('battery_energy_used',
                                   ['mission|total_battery_energy', 'takeoff|total_battery_energy'],
                                   val=1)
-            self.declare_partials('mission|battery_margin', 'takeoff|total_battery_energy', val=-1)
+            self.declare_partials('battery_margin', 'takeoff|total_battery_energy', val=-1)
 
     def compute(self, inputs, outputs):
 
@@ -479,561 +844,201 @@ class ComputeDesignMissionResidualsBattery(ComputeDesignMissionResiduals):
         if include_takeoff:
             outputs['battery_energy_used'] = (inputs['mission|total_battery_energy'] +
                                               inputs['takeoff|total_battery_energy'])
-            outputs['mission|battery_margin'] = (inputs['battery_max_energy'] -
+            outputs['battery_margin'] = (inputs['battery_max_energy'] -
                                                  inputs['mission|total_battery_energy'] -
                                                  inputs['takeoff|total_battery_energy'])
-            outputs['mission|MTOW_margin'] = (inputs['ac|weights|MTOW'] -
+            outputs['MTOW_margin'] = (inputs['ac|weights|MTOW'] -
                                               inputs['mission|total_fuel'] -
                                               inputs['takeoff|total_fuel'] -
                                               inputs['ac|weights|W_battery'] -
                                               inputs['OEW'] -
-                                              inputs['mission|payload'])
+                                              inputs['payload'])
 
         else:
-            outputs['mission|battery_margin'] = (inputs['battery_max_energy'] -
+            outputs['battery_margin'] = (inputs['battery_max_energy'] -
                                                  inputs['mission|total_battery_energy'])
-            outputs['mission|MTOW_margin'] = (inputs['ac|weights|MTOW'] -
+            outputs['MTOW_margin'] = (inputs['ac|weights|MTOW'] -
                                               inputs['mission|total_fuel'] -
                                               inputs['ac|weights|W_battery'] -
                                               inputs['OEW'] -
-                                              inputs['mission|payload'])
+                                              inputs['payload'])
 
 
-class MissionGroundspeeds(ExplicitComponent):
-    """
-    Computes groundspeed for vectorial true airspeed and true vertical speed.
+class MissionAnalysis(Group):
+    """This analysis group calculates energy/fuel consumption and feasibility for a given mission profile.
 
-    This is a helper function for the main mission analysis routine `MissionNoReserves`
-    and shouldn't be instantiated directly.
+    This component should be instantiated in the top-level aircraft analysis / optimization script.
+    **Suggested variable promotion list:**
+    *"ac|aero|\*",  "ac|geom|\*",  "fltcond|\*",  "\*"*
 
-    Inputs
-    ------
-    fltcond|mission|vs : float
-        Vertical speed for all mission phases (vector, m/s)
-    fltcond|mission|Utrue : float
-        True airspeed for all mission phases (vector, m/s)
+    **Inputs List:**
 
-    Outputs
-    -------
-    mission|groundspeed : float
-        True groundspeed for all mission phases (vector, m/s)
-    fltcond|mission|cosgamma : float
-        Cosine of the flght path angle for all mission phases (vector, dimensionless)
-    fltcond|mission|singamma : float
-        Sine of the flight path angle for all mission phases (vector, dimensionless)
+    From aircraft config:
+        - ac|aero|polar|CD0_cruise
+        - ac|aero|polar|e
+        - ac|geom|wing|S_ref
+        - ac|geom|wing|AR
+        - any other parameters required for the propulsion system
 
-    Options
-    -------
-    n_int_per_seg : int
-        Number of Simpson's rule intervals to use per mission segment.
-        The total number of points is 2 * n_int_per_seg + 1
-    """
-    def initialize(self):
+    From controls:
+        - any control parameters required for the propulsion system
+        - 'throttle' output from this component should be captured and fed back to propulsion system
+        as it is being driven using the Newton solver internally to achieve steady flight
 
-        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
+    From mission config:
+        - weight_initial
+        - design_range
 
-    def setup(self):
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        self.add_input('fltcond|mission|vs', units='m/s',shape=(3 * nn,))
-        self.add_input('fltcond|mission|Utrue', units='m/s',shape=(3 * nn,))
-        self.add_output('mission|groundspeed', units='m/s',shape=(3 * nn,))
-        self.add_output('fltcond|mission|cosgamma', shape=(3 * nn,), desc='Cosine of the flight path angle')
-        self.add_output('fltcond|mission|singamma', shape=(3 * nn,), desc='sin of the flight path angle' )
-        self.declare_partials(['mission|groundspeed','fltcond|mission|cosgamma','fltcond|mission|singamma'], ['fltcond|mission|vs','fltcond|mission|Utrue'], rows=range(3 * nn), cols=range(3 * nn))
-
-    def compute(self, inputs, outputs):
-
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        #compute the groundspeed on climb and desc
-        groundspeed =  np.sqrt(inputs['fltcond|mission|Utrue']**2-inputs['fltcond|mission|vs']**2)
-        outputs['mission|groundspeed'] = groundspeed
-        outputs['fltcond|mission|singamma'] = inputs['fltcond|mission|vs'] / inputs['fltcond|mission|Utrue']
-        outputs['fltcond|mission|cosgamma'] = groundspeed / inputs['fltcond|mission|Utrue']
-
-    def compute_partials(self, inputs, J):
-
-        groundspeed =  np.sqrt(inputs['fltcond|mission|Utrue']**2-inputs['fltcond|mission|vs']**2)
-        J['mission|groundspeed','fltcond|mission|vs'] = (1/2) / np.sqrt(inputs['fltcond|mission|Utrue']**2-inputs['fltcond|mission|vs']**2) * (-2) * inputs['fltcond|mission|vs']
-        J['mission|groundspeed','fltcond|mission|Utrue'] = (1/2) / np.sqrt(inputs['fltcond|mission|Utrue']**2-inputs['fltcond|mission|vs']**2) * 2 * inputs['fltcond|mission|Utrue']
-        J['fltcond|mission|singamma','fltcond|mission|vs'] = 1 / inputs['fltcond|mission|Utrue']
-        J['fltcond|mission|singamma','fltcond|mission|Utrue'] = - inputs['fltcond|mission|vs'] / inputs['fltcond|mission|Utrue'] ** 2
-        J['fltcond|mission|cosgamma','fltcond|mission|vs'] = J['mission|groundspeed','fltcond|mission|vs'] / inputs['fltcond|mission|Utrue']
-        J['fltcond|mission|cosgamma','fltcond|mission|Utrue'] = (J['mission|groundspeed','fltcond|mission|Utrue'] * inputs['fltcond|mission|Utrue'] - groundspeed) / inputs['fltcond|mission|Utrue']**2
-
-class MissionClimbDescentRanges(ExplicitComponent):
-    """
-    Computes range over the ground during the climb and descent phases
-
-    This is a helper function for the main mission analysis routine `MissionNoReserves`
-    and shouldn't be instantiated directly.
-
-    Inputs
-    ------
-    mission|groundspeed : float
-        True groundspeed for all mission phases (vector, m/s)
-    mission|climb|time : float
-        Time elapsed during the climb phase (scalar, s)
-    mission|descent|time : float
-        Time elapsed during the descent phase (scalar, s)
+    FOR EACH MISSION PHASE
+        - phase|h0
+        - phase|Ueas
+        - phase|time (except for cruise)
+        - phase|hf (for final segment)
 
     Outputs
     -------
-    mission|climb|range : float
-        Distance over the ground during climb phase (scalar, m)
-    mission|descent|range : float
-        Distance over the ground during descent phase (scalar , m)
+    total_fuel : float
+        Total fuel burn for climb, cruise, and descent (scalar, kg)
+    total_battery_energy : float
+        Total energy consumption for climb, cruise, and descent (scalar, kJ)
+    throttle : float
+        Propulsion thrust throttle setting at each mission point (needs to be fed back to the propulsion system from outside)
 
-    Options
-    -------
-    n_int_per_seg : int
-        Number of Simpson's rule intervals to use per mission segment.
-        The total number of points is 2 * n_int_per_seg + 1
-    """
-    def initialize(self):
-
-        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-
-    def setup(self):
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        self.add_input('mission|groundspeed', units='m/s',shape=(3 * nn,))
-        self.add_input('mission|climb|time', units='s')
-        self.add_input('mission|descent|time', units='s')
-        self.add_output('mission|descent|range', units='m')
-        self.add_output('mission|climb|range', units='m')
-        self.declare_partials(['mission|climb|range'], ['mission|groundspeed'], rows=np.ones(nn)*0, cols=range(nn))
-        self.declare_partials(['mission|descent|range'], ['mission|groundspeed'], rows=np.ones(nn)*0, cols=np.arange(2*nn,3 * nn))
-        self.declare_partials(['mission|climb|range'], ['mission|climb|time'])
-        self.declare_partials(['mission|descent|range'], ['mission|descent|time'])
-
-    def compute(self, inputs, outputs):
-
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-
-        groundspeed = inputs['mission|groundspeed']
-        #compute distance traveled during climb and desc using Simpson's rule
-        dt_climb = inputs['mission|climb|time'] / (nn-1)
-        dt_desc = inputs['mission|descent|time'] / (nn-1)
-        simpsons_vec = np.ones(nn)
-        simpsons_vec[1:nn-1:2] = 4
-        simpsons_vec[2:nn-1:2] = 2
-        outputs['mission|climb|range'] = np.sum(simpsons_vec*groundspeed[0:nn])*dt_climb/3
-        outputs['mission|descent|range'] = np.sum(simpsons_vec*groundspeed[2*nn:3 * nn])*dt_desc/3
-
-    def compute_partials(self, inputs, J):
-
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-
-        groundspeed = inputs['mission|groundspeed']
-        simpsons_vec = np.ones(nn)
-        simpsons_vec[1:nn-1:2] = 4
-        simpsons_vec[2:nn-1:2] = 2
-
-        J['mission|climb|range','mission|climb|time'] = np.sum(simpsons_vec*groundspeed[0:nn])/3/(nn-1)
-        J['mission|descent|range','mission|descent|time'] = np.sum(simpsons_vec*groundspeed[2*nn:3 * nn])/3/(nn-1)
-        J['mission|climb|range','mission|groundspeed'] = simpsons_vec * inputs['mission|climb|time'] / (nn-1) / 3
-        J['mission|descent|range','mission|groundspeed'] = simpsons_vec * inputs['mission|descent|time'] / (nn-1) / 3
-
-class MissionTimings(ExplicitComponent):
-    """
-    Computes cruise distance, time, and dt for a given total mission range
-
-    This is a helper function for the main mission analysis routine `MissionNoReserves`
-    and shouldn't be instantiated directly.
-
-    Inputs
-    ------
-    mission|range : float
-        Total specified range for the given mission (vector, m)
-    mission|groundspeed : float
-        True groundspeed for all mission phases (vector, m/s)
-    mission|climb|range : float
-        Distance over the ground during climb phase (scalar, m)
-    mission|descent|range : float
-        Distance over the ground during descent phase (scalar , m)
-
-    Outputs
-    -------
-    mission|cruise|range : float
-        Distance over the ground during the cruise phase (scalar, m)
-    mission|cruise|time : float
-        Time elapsed during cruise phase (scalar, s)
-    mission|cruise|dt : float
-        Simpson subinterval timestep during the cruise phase (scalar, s)
-
-    Options
-    -------
-    n_int_per_seg : int
-        Number of Simpson's rule intervals to use per mission segment.
-        The total number of points is 2 * n_int_per_seg + 1
     """
 
     def initialize(self):
-
         self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
+        self.options.declare('track_battery',default=True, desc="Flip to true if you want to track battery state")
+        self.options.declare('track_fuel', default=True)
+        self.options.declare('include_takeoff', default=True)
+        self.options.declare('mission_segments',default=['climb','cruise','descent'])
+        self.options.declare('range_segments',default=['climb','cruise','descent'])
+        self.options.declare('propulsion_system',default=None)
+
     def setup(self):
         n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
+        mission_segment_names = self.options['mission_segments']
+        range_segment_names = self.options['range_segments']
+        n_segments = len(mission_segment_names)
+        nn_tot = (2*n_int_per_seg+1)*n_segments
+        track_battery = self.options['track_battery']
+        track_fuel = self.options['track_fuel']
+        include_takeoff = self.options['include_takeoff']
 
-        self.add_input('mission|groundspeed', units='m/s',shape=(3 * nn,))
-        self.add_input('mission|climb|range', units='m')
-        self.add_input('mission|descent|range', units='m')
-        self.add_input('mission|range', units='m')
-        self.add_output('mission|cruise|range', units='m')
-        self.add_output('mission|cruise|time', units='s')
-        self.add_output('mission|cruise|dt', units="s")
-        self.declare_partials(['mission|cruise|range'], ['mission|climb|range'], val=-1.0)
-        self.declare_partials(['mission|cruise|range'], ['mission|descent|range'], val=-1.0)
-        self.declare_partials(['mission|cruise|range'], ['mission|range'], val=1.0)
-        self.declare_partials(['mission|cruise|time'], ['mission|groundspeed'], rows=np.zeros(nn), cols=np.arange(nn,2*nn))
-        self.declare_partials(['mission|cruise|time'], ['mission|climb|range','mission|descent|range','mission|range'])
-        self.declare_partials(['mission|cruise|dt'], ['mission|groundspeed'], rows=np.zeros(nn), cols=np.arange(nn,2*nn))
-        self.declare_partials(['mission|cruise|dt'], ['mission|climb|range','mission|descent|range','mission|range'])
+        dvlist = [['ac|aero|polar|CD0_cruise','CD0',0.005,None],
+                  ['ac|aero|polar|e','e',0.95,None]]
+        self.add_subsystem('dvs',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
 
-    def compute(self, inputs, outputs):
+        # time of cruise phase only is solved implicitly based on desired cruise range
+        self.add_subsystem('cruisetime',SolveCruiseTime(),
+                           promotes_inputs=['range','design_range'],promotes_outputs=['cruise|time'])
+        # obtain a vector of flight conditions for the given mission profile
+        # mission parameters (speeds, altitudes, times) will need to be connected in from above (except cruise time)
+        self.add_subsystem('conditions',MissionFlightConditions(n_int_per_seg=n_int_per_seg,
+                                                                mission_segments=mission_segment_names),
+                           promotes_inputs=['*'],
+                           promotes_outputs=['*'])
+        # obtain true airspeeds, densities, dynamic pressure from the standard atmosphere model
+        self.add_subsystem('atmos',
+                           ComputeAtmosphericProperties(num_nodes=nn_tot),
+                           promotes_inputs=["fltcond|h",
+                                            "fltcond|Ueas"],
+                           promotes_outputs=["fltcond|rho",
+                                             "fltcond|Utrue",
+                                             "fltcond|q"])
+        propulsion_promotes_outputs = ['fuel_flow','thrust']
+        propulsion_promotes_inputs = ["fltcond|*","ac|propulsion|*"]
+        if track_battery:
+            propulsion_promotes_outputs.append('battery_load')
+            propulsion_promotes_inputs.append("ac|weights|*")
+        self.add_subsystem('propmodel',self.options['propulsion_system'],
+                           promotes_inputs=propulsion_promotes_inputs,promotes_outputs=propulsion_promotes_outputs)
 
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
 
-        simpsons_vec = np.ones(nn)
-        simpsons_vec[1:nn-1:2] = 4
-        simpsons_vec[2:nn-1:2] = 2
+        # Compute the speed over the ground based on true airspeed and flight path angle
+        self.add_subsystem('gs',Groundspeeds(n_int_per_seg=n_int_per_seg),promotes_inputs=["fltcond|*"],promotes_outputs=["fltcond|groundspeed","fltcond|*"])
+        # Compute the range
+        self.add_subsystem('rangecomp',MissionComputeRange(n_int_per_seg=n_int_per_seg,
+                                                                 mission_segments=mission_segment_names,
+                                                                 range_segments=range_segment_names),
+                                    promotes_inputs=["fltcond|groundspeed","*|dt"],promotes_outputs=["range"])
 
-        #compute the cruise distance
-        r_cruise = inputs['mission|range'] - inputs['mission|climb|range'] - inputs['mission|descent|range']
-        if r_cruise < 0:
-            raise ValueError('Cruise calculated to be less than 0. Change climb and descent rates and airspeeds or increase range')
-        dt_cruise = 3*r_cruise/np.sum(simpsons_vec*inputs['mission|groundspeed'][nn:2*nn])
-        t_cruise = dt_cruise*(nn-1)
 
-        outputs['mission|cruise|time'] = t_cruise
-        outputs['mission|cruise|range'] = r_cruise
-        outputs['mission|cruise|dt'] = dt_cruise
 
-    def compute_partials(self, inputs, J):
+        self.add_subsystem('energies',MissionSegmentEnergies(n_int_per_seg=n_int_per_seg,
+                                                             mission_segments=mission_segment_names,
+                                                             track_fuel = track_fuel,
+                                                             track_battery = track_battery),
+                           promotes_inputs=["*"],promotes_outputs=["*"])
+        self.add_subsystem('weights',MissionSegmentWeights(n_int_per_seg=n_int_per_seg,
+                                                           mission_segments=mission_segment_names),
+                           promotes_inputs=["segment_fuel","weight_initial"],promotes_outputs=["weight_vec"])
+        self.add_subsystem('CLs',MissionSegmentCL(n_int_per_seg=n_int_per_seg,
+                                                  mission_segments=mission_segment_names),
+                           promotes_inputs=["weight_vec","fltcond|q",'fltcond|cosgamma',"ac|geom|*"],
+                           promotes_outputs=["fltcond|CL"])
+        self.add_subsystem('drag',PolarDrag(num_nodes=nn_tot),promotes_inputs=["fltcond|q","fltcond|CL","ac|geom|*","CD0","e"],promotes_outputs=["drag"])
+        self.add_subsystem('thrustsolve',ThrustSolver(n_int_per_seg=n_int_per_seg,mission_segments=mission_segment_names),
+                           promotes_inputs=["fltcond|singamma","drag","weight_vec","thrust"],
+                           promotes_outputs=['throttle'])
+        totals = SumComp(axis=None)
+        totals.add_equation(output_name='mission_total_fuel',input_name='segment_fuel', units='kg',scaling_factor=-1,vec_size=nn_tot-3)
+        if track_battery:
+            totals.add_equation(output_name='mission_total_battery',input_name='segment_battery_energy_used', units='MJ',vec_size=nn_tot-3)
+        self.add_subsystem(name='totals',subsys=totals,promotes_inputs=['*'],promotes_outputs=['*'])
+        if track_battery:
+            self.add_subsystem(name='residuals', subsys=ComputeDesignMissionResidualsBattery(include_takeoff=include_takeoff),
+                               promotes_inputs=['ac|weights*','payload','OEW'],
+                               promotes_outputs=['fuel_burn','battery_energy_used'])
+            self.connect('mission_total_battery','residuals.mission|total_battery_energy')
+            # TODO residuals.takeoff|total_battery_energy needs an incoming connection
+        else:
+            self.add_subsystem(name='residuals', subsys=ComputeDesignMissionResiduals(include_takeoff=include_takeoff),
+                               promotes_inputs=['ac|weights*','payload','OEW'],
+                               promotes_outputs=['fuel_burn'])
+        self.connect('mission_total_fuel','residuals.mission|total_fuel')
+        # TODO residuals.takeoff|total_fuel needs an incoming connection
 
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
 
-        simpsons_vec = np.ones(nn)
-        simpsons_vec[1:nn-1:2] = 4
-        simpsons_vec[2:nn-1:2] = 2
-
-        #compute the cruise distance
-        r_cruise = inputs['mission|range'] - inputs['mission|climb|range'] - inputs['mission|descent|range']
-        J['mission|cruise|time','mission|groundspeed'] = -3*r_cruise/np.sum(simpsons_vec*inputs['mission|groundspeed'][nn:2*nn])**2 * (nn-1) * (simpsons_vec)
-        J['mission|cruise|time','mission|climb|range'] = -3/np.sum(simpsons_vec*inputs['mission|groundspeed'][nn:2*nn])*(nn-1)
-        J['mission|cruise|time','mission|descent|range'] = -3/np.sum(simpsons_vec*inputs['mission|groundspeed'][nn:2*nn])*(nn-1)
-        J['mission|cruise|time','mission|range'] = 3/np.sum(simpsons_vec*inputs['mission|groundspeed'][nn:2*nn])*(nn-1)
-
-        J['mission|cruise|dt','mission|groundspeed'] = -3*r_cruise/np.sum(simpsons_vec*inputs['mission|groundspeed'][nn:2*nn])**2  * (simpsons_vec)
-        J['mission|cruise|dt','mission|climb|range'] = -3/np.sum(simpsons_vec*inputs['mission|groundspeed'][nn:2*nn])
-        J['mission|cruise|dt','mission|descent|range'] = -3/np.sum(simpsons_vec*inputs['mission|groundspeed'][nn:2*nn])
-        J['mission|cruise|dt','mission|range'] = 3/np.sum(simpsons_vec*inputs['mission|groundspeed'][nn:2*nn])
-
-class MissionSegmentFuelBurns(ExplicitComponent):
-    """
-    Integrates delta fuel between each analysis point
-
-    This is a helper function for the main mission analysis routine `MissionNoReserves`
-    and shouldn't be instantiated directly.
-
-    Takes 3 * nn fuel flow rates; produces 3 * (nn - 1) fuel burns
-
-    Inputs
-    ------
-    mission|fuel_flow : float
-        Fuel flow rate for all analysis points (vector, kg/s)
-    mission|climb|dt : float
-        Timestep length during climb phase (scalar, s)
-        Note: this represents the timestep for the Simpson subinterval, not the whole inteval
-    mission|cruise|dt : float
-        Timestep length during descent phase (scalar, s)
-        Note: this represents the timestep for the Simpson subinterval, not the whole inteval
-    mission|descent|dt : float
-        Timestep length during descent phase (scalar, s)
-        Note: this represents the timestep for the Simpson subinterval, not the whole inteval
-
-    Outputs
-    -------
-    mission|segment_fuel : float
-        Fuel burn increment between each analysis point (vector, kg)
-        Note: if the number of analysis points in one phase is `nn`, the number
-        of segment fuel burns is `nn - 1`
-
-    Options
-    -------
-    n_int_per_seg : int
-        Number of Simpson's rule intervals to use per mission segment.
-        The total number of points is 2 * n_int_per_seg + 1
+class MissionTestGroup(Group):
+    """This computes pressure, temperature, and density for a given altitude at ISA condtions. Also true airspeed from equivalent ~ indicated airspeed
     """
     def initialize(self):
-
-        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-
+        self.options.declare('n_int_per_seg', default=5,
+                             desc="Number of Simpson intervals to use per seg")
     def setup(self):
         n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
+        iv = self.add_subsystem('conditions', IndepVarComp(), promotes_outputs=['*'])
+        self.add_subsystem('mission', MissionFlightConditions(n_int_per_seg=n_int_per_seg, mission_segments=['climb','cruise','descent','divert']),
+                                                              promotes_inputs=['*'],
+                                                              promotes_outputs=['*'])
+        self.add_subsystem('distances', MissionComputeRange(n_int_per_seg=n_int_per_seg,
+                                                            mission_segments=['climb','cruise','descent','divert'],
+                                                            range_segments=['climb','cruise','descent']),
+                                                            promotes_inputs=['*|dt'])
 
-        self.add_input('mission|fuel_flow', units='kg/s',shape=(3 * nn,))
-        self.add_input('mission|climb|dt', units='s')
-        self.add_input('mission|descent|dt', units='s')
-        self.add_input('mission|cruise|dt', units='s')
+        iv.add_output('mission|climb|time', val=20*60, units='s')
+        iv.add_output('mission|climb|h0', val=0, units='m')
+        iv.add_output('mission|climb|Ueas',val=100, units='kn')
+        iv.add_output('mission|cruise|time', val=20*60, units='s')
+        iv.add_output('mission|cruise|h0', val=10, units='km')
+        iv.add_output('mission|cruise|Ueas',val=200, units='kn')
+        iv.add_output('mission|descent|time', val=20*60, units='s')
+        iv.add_output('mission|descent|h0', val=11, units='km')
+        iv.add_output('mission|descent|Ueas',val=100, units='kn')
+        iv.add_output('mission|divert|time', val=2*60, units='s')
+        iv.add_output('mission|divert|h0', val=0, units='km')
+        iv.add_output('mission|divert|Ueas',val=100, units='kn')
+        iv.add_output('mission|divert|hf',val=1500, units='m')
 
-        self.add_output('mission|segment_fuel', units='kg',shape=(3*(nn-1)))
-        #use dummy inputs for dt and q, just want the shapes
-        wrt_q, wrt_dt = simpson_partials_every_node(np.ones(3),np.ones(3 * nn),n_segments=3,n_simpson_intervals_per_segment=n_int_per_seg)
-
-        self.declare_partials(['mission|segment_fuel'], ['mission|fuel_flow'], rows=wrt_q[0], cols=wrt_q[1])
-        self.declare_partials(['mission|segment_fuel'], ['mission|climb|dt'], rows=wrt_dt[0][0], cols=wrt_dt[1][0])
-        self.declare_partials(['mission|segment_fuel'], ['mission|cruise|dt'], rows=wrt_dt[0][1], cols=wrt_dt[1][1])
-        self.declare_partials(['mission|segment_fuel'], ['mission|descent|dt'], rows=wrt_dt[0][2], cols=wrt_dt[1][2])
-
-    def compute(self, inputs, outputs):
-
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        ff = inputs['mission|fuel_flow']
-        dts =  [inputs['mission|climb|dt'], inputs['mission|cruise|dt'],inputs['mission|descent|dt']]
-        int_ff, delta_ff = simpson_integral_every_node(dts,ff,n_segments=3,n_simpson_intervals_per_segment=n_int_per_seg)
-
-        outputs['mission|segment_fuel'] = delta_ff
-
-    def compute_partials(self, inputs, J):
-
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        ff = inputs['mission|fuel_flow']
-        dts =  [inputs['mission|climb|dt'], inputs['mission|cruise|dt'],inputs['mission|descent|dt']]
-
-        wrt_q, wrt_dt = simpson_partials_every_node(dts,ff,n_segments=3,n_simpson_intervals_per_segment=n_int_per_seg)
-
-        J['mission|segment_fuel','mission|fuel_flow'] = wrt_q[2]
-        J['mission|segment_fuel','mission|climb|dt'] =  wrt_dt[2][0]
-        J['mission|segment_fuel','mission|cruise|dt'] = wrt_dt[2][1]
-        J['mission|segment_fuel','mission|descent|dt'] = wrt_dt[2][2]
-
-class MissionSegmentBatteryEnergyUsed(ExplicitComponent):
-    """
-    Integrates battery energy used between each analysis point
-
-    This is a helper function for the main mission analysis routine `MissionNoReserves`
-    and shouldn't be instantiated directly.
-
-    Takes 3 * nn battery loads; produces 3 * (nn - 1) energy increments
-
-    Inputs
-    ------
-    mission|battery_load : float
-        Battery load / power  for all analysis points (vector, kW)
-    mission|climb|dt : float
-        Timestep length during climb phase (scalar, s)
-        Note: this represents the timestep for the Simpson subinterval, not the whole inteval
-    mission|cruise|dt : float
-        Timestep length during descent phase (scalar, s)
-        Note: this represents the timestep for the Simpson subinterval, not the whole inteval
-    mission|descent|dt : float
-        Timestep length during descent phase (scalar, s)
-        Note: this represents the timestep for the Simpson subinterval, not the whole inteval
-
-    Outputs
-    -------
-    mission|segment_battery_energy_used : float
-        Battery energy increment between each analysis point (vector, kW*s)
-        Note: if the number of analysis points in one phase is `nn`, the number
-        of segment energies is `nn - 1`
-
-    Options
-    -------
-    n_int_per_seg : int
-        Number of Simpson's rule intervals to use per mission segment.
-        The total number of points is 2 * n_int_per_seg + 1
-    """
-    def initialize(self):
-
-        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-
-    def setup(self):
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-
-        self.add_input('mission|battery_load', units='kW',shape=(3 * nn,))
-        self.add_input('mission|climb|dt', units='s')
-        self.add_input('mission|descent|dt', units='s')
-        self.add_input('mission|cruise|dt', units='s')
-
-        self.add_output('mission|segment_battery_energy_used', units='kW*s',shape=(3*(nn-1)))
-        #use dummy inputs for dt and q, just want the shapes
-        wrt_q, wrt_dt = simpson_partials_every_node(np.ones(3),np.ones(3 * nn),n_segments=3,n_simpson_intervals_per_segment=n_int_per_seg)
-
-        self.declare_partials(['mission|segment_battery_energy_used'], ['mission|battery_load'], rows=wrt_q[0], cols=wrt_q[1])
-        self.declare_partials(['mission|segment_battery_energy_used'], ['mission|climb|dt'], rows=wrt_dt[0][0], cols=wrt_dt[1][0])
-        self.declare_partials(['mission|segment_battery_energy_used'], ['mission|cruise|dt'], rows=wrt_dt[0][1], cols=wrt_dt[1][1])
-        self.declare_partials(['mission|segment_battery_energy_used'], ['mission|descent|dt'], rows=wrt_dt[0][2], cols=wrt_dt[1][2])
-
-    def compute(self, inputs, outputs):
-
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        ff = inputs['mission|battery_load']
-        dts =  [inputs['mission|climb|dt'], inputs['mission|cruise|dt'],inputs['mission|descent|dt']]
-        int_ff, delta_ff = simpson_integral_every_node(dts,ff,n_segments=3,n_simpson_intervals_per_segment=n_int_per_seg)
-
-        outputs['mission|segment_battery_energy_used'] = delta_ff
-
-    def compute_partials(self, inputs, J):
-
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        ff = inputs['mission|battery_load']
-        dts =  [inputs['mission|climb|dt'], inputs['mission|cruise|dt'],inputs['mission|descent|dt']]
-
-        wrt_q, wrt_dt = simpson_partials_every_node(dts,ff,n_segments=3,n_simpson_intervals_per_segment=n_int_per_seg)
-
-        J['mission|segment_battery_energy_used','mission|battery_load'] = wrt_q[2]
-        J['mission|segment_battery_energy_used','mission|climb|dt'] =  wrt_dt[2][0]
-        J['mission|segment_battery_energy_used','mission|cruise|dt'] = wrt_dt[2][1]
-        J['mission|segment_battery_energy_used','mission|descent|dt'] = wrt_dt[2][2]
-
-
-class MissionSegmentWeights(ExplicitComponent):
-    """
-    Computes aircraft weight at each analysis point including fuel burned
-
-    This is a helper function for the main mission analysis routine `MissionNoReserves`
-    and shouldn't be instantiated directly.
-
-    Inputs
-    ------
-    mission|segment_fuel : float
-        Fuel burn increment between each analysis point (vector, kg)
-        Note: if the number of analysis points in one phase is `nn`, the number
-        of segment fuel burns is `nn - 1`
-    mission|weight_initial : float
-        Weight immediately following takeoff (scalar, kg)
-
-    Outputs
-    -------
-    mission|weights : float
-        Aircraft weight at each analysis point (vector, kg)
-
-
-    Options
-    -------
-    n_int_per_seg : int
-        Number of Simpson's rule intervals to use per mission segment.
-        The total number of points is 2 * n_int_per_seg + 1
-    """
-    def initialize(self):
-
-        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-
-    def setup(self):
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        self.add_input('mission|segment_fuel', units='kg',shape=(3*(nn-1),))
-        self.add_input('mission|weight_initial', units='kg')
-        self.add_output('mission|weights', units='kg',shape=(3 * nn,))
-
-        n_seg = 3
-        jacmat = np.tril(np.ones((n_seg*(nn-1),n_seg*(nn-1))))
-        jacmat = np.insert(jacmat,0,np.zeros(n_seg*(nn-1)),axis=0)
-        for i in range(1,n_seg):
-            duplicate_row = jacmat[nn*i-1,:]
-            jacmat = np.insert(jacmat,nn*i,duplicate_row,axis=0)
-
-        self.declare_partials(['mission|weights'], ['mission|segment_fuel'], val=sp.csr_matrix(jacmat))
-        self.declare_partials(['mission|weights'], ['mission|weight_initial'], rows=range(3 * nn), cols=np.zeros(3 * nn), val=np.ones(3 * nn))
-
-    def compute(self, inputs, outputs):
-
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        #first endpoint needs to be the takeoff weight; insert a zero to make them the same length
-        n_seg = 3
-        segweights = np.insert(inputs['mission|segment_fuel'],0,0)
-        weights = np.cumsum(segweights)
-        for i in range(1,n_seg):
-            duplicate_row = weights[i*nn-1]
-            weights = np.insert(weights,i*nn,duplicate_row)
-        outputs['mission|weights'] = np.ones(3 * nn)*inputs['mission|weight_initial'] + weights
-
-class MissionSegmentCL(ExplicitComponent):
-    """
-    Computes lift coefficient at each analysis point
-
-    This is a helper function for the main mission analysis routine `MissionNoReserves`
-    and shouldn't be instantiated directly.
-
-    Inputs
-    ------
-    mission|weights : float
-        Aircraft weight at each analysis point (vector, kg)
-    fltcond|mission|q : float
-        Dynamic pressure at each analysis point (vector, Pascal)
-    ac|geom|wing|S_ref : float
-        Reference wing area (scalar, m**2)
-    fltcond|mission|cosgamma : float
-        Cosine of the flght path angle for all mission phases (vector, dimensionless)
-
-    Outputs
-    -------
-    fltcond|mission|CL : float
-        Lift coefficient (vector, dimensionless)
-
-    Options
-    -------
-    n_int_per_seg : int
-        Number of Simpson's rule intervals to use per mission segment.
-        The total number of points is 2 * n_int_per_seg + 1
-    """
-    def initialize(self):
-
-        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-
-    def setup(self):
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        n_seg = 3
-        arange = np.arange(0,n_seg*nn)
-        self.add_input('mission|weights', units='kg', shape=(n_seg*nn,))
-        self.add_input('fltcond|mission|q', units='N * m**-2', shape=(n_seg*nn,))
-        self.add_input('ac|geom|wing|S_ref', units='m **2')
-        self.add_input('fltcond|mission|cosgamma', shape=(n_seg*nn,))
-        self.add_output('fltcond|mission|CL',shape=(n_seg*nn,))
-
-
-        self.declare_partials(['fltcond|mission|CL'], ['mission|weights','fltcond|mission|q',"fltcond|mission|cosgamma"], rows=arange, cols=arange)
-        self.declare_partials(['fltcond|mission|CL'], ['ac|geom|wing|S_ref'], rows=arange, cols=np.zeros(n_seg*nn))
-
-    def compute(self, inputs, outputs):
-
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        #first endpoint needs to be the takeoff weight; insert a zero to make them the same length
-        n_seg = 3
-
-        g = 9.80665 #m/s^2
-        outputs['fltcond|mission|CL'] = inputs['fltcond|mission|cosgamma']*g*inputs['mission|weights']/inputs['fltcond|mission|q']/inputs['ac|geom|wing|S_ref']
-
-    def compute_partials(self, inputs, J):
-
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        #first endpoint needs to be the takeoff weight; insert a zero to make them the same length
-        n_seg = 3
-
-        g = 9.80665 #m/s^2
-        J['fltcond|mission|CL','mission|weights'] = inputs['fltcond|mission|cosgamma']*g/inputs['fltcond|mission|q']/inputs['ac|geom|wing|S_ref']
-        J['fltcond|mission|CL','fltcond|mission|q'] = - inputs['fltcond|mission|cosgamma']*g*inputs['mission|weights'] / inputs['fltcond|mission|q']**2 / inputs['ac|geom|wing|S_ref']
-        J['fltcond|mission|CL','ac|geom|wing|S_ref'] = - inputs['fltcond|mission|cosgamma']*g*inputs['mission|weights'] / inputs['fltcond|mission|q'] / inputs['ac|geom|wing|S_ref']**2
-        J['fltcond|mission|CL','fltcond|mission|cosgamma'] = g*inputs['mission|weights']/inputs['fltcond|mission|q']/inputs['ac|geom|wing|S_ref']
-
-
-
+        self.connect('fltcond|Ueas','distances.fltcond|groundspeed')
+if __name__ == "__main__":
+        prob = Problem(MissionTestGroup())
+        prob.setup(check=True)
+        prob.run_model()
+        #check conditions at sea level
+        print(prob['fltcond|Ueas'])
+        print(prob['fltcond|vs'])
+        print(prob['fltcond|h'])
+        print(prob['distances.mission|range'])
+        prob.check_partials(compact_print=True)
