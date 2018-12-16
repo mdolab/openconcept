@@ -882,8 +882,7 @@ class MissionAnalysis(Group):
 
     From controls:
         - any control parameters required for the propulsion system
-        - 'throttle' output from this component should be captured and fed back to propulsion system
-        as it is being driven using the Newton solver internally to achieve steady flight
+        - 'throttle' output from this component should be captured and fed back to propulsion system as it is being driven using the Newton solver internally to achieve steady flight
 
     From mission config:
         - weight_initial
