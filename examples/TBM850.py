@@ -15,11 +15,11 @@ from openconcept.utilities.nodes import compute_num_nodes
 
 #These imports are particular to this airplane
 # If run from the root git  directory as 'python examples/script.py', these imports are found because the script's path is added to sys.path by default.
-from methods.weights_turboprop import SingleTurboPropEmptyWeight
-from propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
-from methods.costs_commuter import OperatingCost
-from aircraft_data.TBM850 import data as acdata
-from aircraft_data.TBM850_mission import data as missiondata
+from examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
+from examples.propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
+from examples.methods.costs_commuter import OperatingCost
+from examples.aircraft_data.TBM850 import data as acdata
+from examples.aircraft_data.TBM850_mission import data as missiondata
 
 class TotalAnalysis(Group):
     """This analysis group calculates TOFL and mission fuel burn as well as many other quantities for an example airplane. Elements may be overridden or replaced as needed.
