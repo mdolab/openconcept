@@ -90,7 +90,7 @@ class VectorConcatenateComp(ExplicitComponent):
 
     def add_relation(self, output_name, input_names, vec_sizes, length=1, val=1.0,
                      units=None, res_units=None, desc='', lower=None, upper=None, ref=1.0,
-                     ref0=0.0, res_ref=None, var_set=0):
+                     ref0=0.0, res_ref=None):
         """
         Add a concatenation relation.
 
@@ -135,13 +135,10 @@ class VectorConcatenateComp(ExplicitComponent):
         res_ref : float or ndarray
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
-        var_set : hashable object
-            For advanced users only. ID or color for this variable, relevant for reconfigurability.
-            Default is 0.
         """
         kwargs = {'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref, 'var_set': var_set}
+                  'res_ref': res_ref}
 
         if (not isinstance(input_names, collections.Iterable) or
                 not isinstance(vec_sizes, collections.Iterable)):
@@ -169,7 +166,6 @@ class VectorConcatenateComp(ExplicitComponent):
 
             units = kwargs.get('units', None)
             desc = kwargs.get('desc', '')
-            var_set = kwargs.get('var_set', 0)
 
             if len(vec_sizes) != len(input_names):
                 raise ValueError('vec_sizes list needs to be same length as input names list')
@@ -188,7 +184,7 @@ class VectorConcatenateComp(ExplicitComponent):
                 else:
                     input_shape = (vec_sizes[i], length)
                 self.add_input(input_name, shape=input_shape, units=units,
-                               desc=desc + '_inp_' + input_name, var_set=var_set)
+                               desc=desc + '_inp_' + input_name)
                 if i == 0:
                     start_idx = 0
                 else:
@@ -316,7 +312,7 @@ class VectorSplitComp(ExplicitComponent):
 
     def add_relation(self, output_names, input_name, vec_sizes, length=1, val=1.0,
                      units=None, res_units=None, desc='', lower=None, upper=None, ref=1.0,
-                     ref0=0.0, res_ref=None, var_set=0):
+                     ref0=0.0, res_ref=None):
         """
         Add a concatenation relation.
 
@@ -361,13 +357,10 @@ class VectorSplitComp(ExplicitComponent):
         res_ref : float or ndarray
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
-        var_set : hashable object
-            For advanced users only. ID or color for this variable, relevant for reconfigurability.
-            Default is 0.
         """
         kwargs = {'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref, 'var_set': var_set}
+                  'res_ref': res_ref}
 
         if (not isinstance(output_names, collections.Iterable) or
                 not isinstance(vec_sizes, collections.Iterable)):
@@ -395,7 +388,6 @@ class VectorSplitComp(ExplicitComponent):
 
             units = kwargs.get('units', None)
             desc = kwargs.get('desc', '')
-            var_set = kwargs.get('var_set', 0)
 
             if len(vec_sizes) != len(output_names):
                 raise ValueError('vec_sizes list needs to be same length as output names list')
@@ -405,7 +397,7 @@ class VectorSplitComp(ExplicitComponent):
             else:
                 input_shape = (input_size, length)
             self.add_input(input_name, shape=input_shape, units=units,
-                           desc=desc + '_inp_' + input_name, var_set=var_set)
+                           desc=desc + '_inp_' + input_name)
 
             for i, output_name in enumerate(output_names):
                 if length == 1:
