@@ -103,7 +103,7 @@ class AddSubtractComp(ExplicitComponent):
 
     def add_equation(self, output_name, input_names, vec_size=1, length=1, val=1.0,
                      units=None, res_units=None, desc='', lower=None, upper=None, ref=1.0,
-                     ref0=0.0, res_ref=None, var_set=0, scaling_factors=None):
+                     ref0=0.0, res_ref=None,  scaling_factors=None):
         """
         Add an addition/subtraction relation.
 
@@ -155,13 +155,10 @@ class AddSubtractComp(ExplicitComponent):
         res_ref : float or ndarray
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
-        var_set : hashable object
-            For advanced users only. ID or color for this variable, relevant for reconfigurability.
-            Default is 0.
         """
         kwargs = {'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref, 'var_set': var_set}
+                  'res_ref': res_ref}
         self._add_systems.append((output_name, input_names, vec_size, length, val,
                                   scaling_factors, kwargs))
 
@@ -194,11 +191,10 @@ class AddSubtractComp(ExplicitComponent):
             super(AddSubtractComp, self).add_output(output_name, val, shape=shape, **kwargs)
             units = kwargs.pop('units', None)
             desc = kwargs.pop('desc', '')
-            var_set = kwargs.pop('var_set', 0)
 
             for i, input_name in enumerate(input_names):
                 self.add_input(input_name, shape=shape, units=units,
-                               desc=desc + '_inp_' + input_name, var_set=var_set)
+                               desc=desc + '_inp_' + input_name)
                 sf = scaling_factors[i]
                 self.declare_partials([output_name], [input_name],
                                       val=sf * sp.eye(vec_size * length, format='csc'))

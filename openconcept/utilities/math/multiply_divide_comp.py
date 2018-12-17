@@ -106,7 +106,7 @@ class ElementMultiplyDivideComp(ExplicitComponent):
 
     def add_equation(self, output_name, input_names, vec_size=1, length=1, val=1.0,
                      res_units=None, desc='', lower=None, upper=None, ref=1.0,
-                     ref0=0.0, res_ref=None, var_set=0, scaling_factor=1,
+                     ref0=0.0, res_ref=None,  scaling_factor=1,
                      divide=None, input_units=None):
         """
         Add a multiplication relation.
@@ -160,13 +160,10 @@ class ElementMultiplyDivideComp(ExplicitComponent):
         res_ref : float or ndarray
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
-        var_set : hashable object
-            For advanced users only. ID or color for this variable, relevant for reconfigurability.
-            Default is 0.
         """
         kwargs = {'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref, 'var_set': var_set}
+                  'res_ref': res_ref}
         self._add_systems.append((output_name, input_names, vec_size, length, val,
                                   scaling_factor, divide, input_units, kwargs))
 
@@ -186,7 +183,6 @@ class ElementMultiplyDivideComp(ExplicitComponent):
             if isinstance(input_names, string_types):
                 input_names = [input_names]
             desc = kwargs.get('desc', '')
-            var_set = kwargs.get('var_set', 0)
 
             if divide is None:
                 divide = [False for k in range(len(input_names))]
@@ -207,7 +203,7 @@ class ElementMultiplyDivideComp(ExplicitComponent):
 
             for i, input_name in enumerate(input_names):
                 self.add_input(input_name, shape=shape, units=input_units[i],
-                               desc=desc + '_inp_' + input_name, var_set=var_set)
+                               desc=desc + '_inp_' + input_name)
                 self.declare_partials([output_name], [input_name],
                                       rows=np.arange(0, vec_size * length),
                                       cols=np.arange(0, vec_size * length))

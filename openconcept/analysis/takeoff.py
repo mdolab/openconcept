@@ -12,13 +12,13 @@ from openconcept.analysis.aerodynamics import PolarDrag, Lift, StallSpeed
 from openconcept.utilities.dvlabel import DVLabel
 
 
-class TakeoffTotalDistance(Group):
+class BalancedFieldLengthTakeoff(Group):
     """This analysis group calculates takeoff field length and fuel/energy consumption.
 
     This component should be instantiated in the top-level aircraft analysis / optimization script.
 
     **Suggested variable promotion list:**
-    *'ac|aero\*', 'ac|weights|MTOW', 'ac|geom|\*', 'fltcond|takeoff|\*', 'takeoff|battery_load',*
+    *'ac|aero\*', 'ac|weights|MTOW', 'ac|geom|\*', 'fltcond|\*', 'takeoff|battery_load',*
     *'takeoff|thrust','takeoff|fuel_flow','mission|takeoff|v\*'*
 
     **Inputs List:**
@@ -31,14 +31,14 @@ class TakeoffTotalDistance(Group):
         - ac|weights|MTOW
 
     From Newton solver:
-        - mission|takeoff|v1
+        - takeoff|v1
 
     From takeoff flight condition generator:
-        - mission|takeoff|vr
+        - takeoff|vr
 
     From standard atmosphere model/splitter:
-        - fltcond|takeoff|q
-        - fltcond|takeoff|Utrue
+        - fltcond|q
+        - fltcond|Utrue
 
     From propulsion model:
         - takeoff|battery_load
@@ -47,13 +47,13 @@ class TakeoffTotalDistance(Group):
 
     Outputs
     -------
-    takeoff|total_fuel : float
+    total_fuel : float
         Total fuel burn for takeoff (scalar, kg)
-    takeoff|total_battery_energy : float
+    total_battery_energy : float
         Total energy consumption for takeoff (scalar, kJ)
-    takeoff|distance : float
+    distance_continue : float
         Takeoff distance with given propulsion settings (scalar, m)
-    takeoff|distance_abort : float
+    distance_abort : float
         Takeoff distance if maximum braking applied at v1 speed (scalar, m)
 
     Options
@@ -71,6 +71,7 @@ class TakeoffTotalDistance(Group):
         self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg. Number of analysis points is 2N+1")
         self.options.declare('track_battery',default=False,desc='Set to true to enable battery inputs')
         self.options.declare('track_fuel',default=False,desc='Set to true to enable fuel inputs')
+        self.options.declare('propulsion_system',default=None)
 
     def setup(self):
         n_int_per_seg = self.options['n_int_per_seg']
@@ -80,12 +81,42 @@ class TakeoffTotalDistance(Group):
         nn_tot = 3 * nn+2
         #===Some of the generic components take "weight" as an input. Need to re-label Takeoff Weight (TOW) as just weight
         dvlist = [['ac|weights|MTOW','weight',2000.0,'kg'],
-                    ['mission|takeoff|v1','v1',40,'m/s'],
-                    ['mission|takeoff|vr','vr',45,'m/s'],
+                    ['takeoff|v1','v1',40,'m/s'],
+                    ['takeoff|vr','vr',45,'m/s'],
+                    ['ac|geom|wing|S_ref','S_ref',20,'m ** 2'],
+                    ['ac|aero|CLmax_flaps30','CLmax_flaps30',1.5,None],
                     ['ac|aero|polar|CD0_TO','CD0',0.005,None],
-                    ['ac|aero|polar|e','e',0.95,None],
-                    ['fltcond|takeoff|q','fltcond|q',100*np.ones(nn_tot),'Pa']]
+                    ['ac|aero|polar|e','e',0.95,None]]
+
         self.add_subsystem('dvs',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
+        self.add_subsystem('vstall', StallSpeed())
+        self.connect('weight','vstall.weight')
+        self.connect('S_ref','vstall.ac|geom|wing|S_ref')
+        self.connect('CLmax_flaps30', 'vstall.CLmax')
+
+        takeoff_conditions = self.add_subsystem('conditions',
+                                                TakeoffFlightConditions(n_int_per_seg=n_int_per_seg),
+                                                promotes_inputs =['takeoff|v1','takeoff|h'],
+                                                promotes_outputs=["fltcond|*",
+                                                                  "takeoff|*"])
+        self.connect('vstall.Vstall_eas','conditions.Vstall_eas')
+
+        self.add_subsystem('atmos',
+                           ComputeAtmosphericProperties(num_nodes=nn_tot),
+                           promotes_inputs=["fltcond|h",
+                                            "fltcond|Ueas"],
+                           promotes_outputs=["fltcond|rho",
+                                             "fltcond|Utrue",
+                                             "fltcond|q"])
+
+        propulsion_promotes_outputs = ['fuel_flow','thrust']
+        propulsion_promotes_inputs = ["fltcond|*","ac|propulsion|*"]
+        if track_battery:
+            propulsion_promotes_outputs.append('battery_load')
+            propulsion_promotes_inputs.append('ac|weights|*')
+        self.add_subsystem('propmodel',self.options['propulsion_system'],
+                           promotes_inputs=propulsion_promotes_inputs,promotes_outputs=propulsion_promotes_outputs)
+
 
         #===We assume the takeoff starts at 1 m/s to avoid singularities at v=0
         const = self.add_subsystem('const',IndepVarComp())
@@ -100,27 +131,27 @@ class TakeoffTotalDistance(Group):
         self.connect('CL.CL_takeoff','lift.fltcond|CL')
 
         #==The takeoff distance integrator numerically integrates the quantity (speed / acceleration) with respect to speed to obtain distance. Obtain this quantity:
-        self.add_subsystem('accel',TakeoffAccels(n_int_per_seg=n_int_per_seg),promotes_inputs=['lift','drag','takeoff|thrust','weight'],promotes_outputs=['_inverse_accel'])
+        self.add_subsystem('accel',TakeoffAccels(n_int_per_seg=n_int_per_seg),promotes_inputs=['lift','drag','thrust','weight'],promotes_outputs=['_inverse_accel'])
         self.add_subsystem('mult',ElementMultiplyDivideComp(output_name='_rate_to_integrate',
-                                                            input_names=['_inverse_accel','fltcond|takeoff|Utrue'],
+                                                            input_names=['_inverse_accel','fltcond|Utrue'],
                                                             vec_size=nn_tot,
                                                             input_units=['s**2/m','m/s']),
-                                                            promotes_inputs=['*'],promotes_outputs=['_*'])
+                                                            promotes_inputs=['*'],promotes_outputs=['*'])
         if track_fuel:
             self.add_subsystem('fuelflowmult',ElementMultiplyDivideComp(output_name='_fuel_flow_rate_to_integrate',
-                                                                        input_names=['_inverse_accel','takeoff|fuel_flow'],
+                                                                        input_names=['_inverse_accel','fuel_flow'],
                                                                         vec_size=nn_tot,
                                                                         input_units=['s**2/m','kg/s']),
                                                                         promotes_inputs=['*'],promotes_outputs=['_*'])
         if track_battery:
             self.add_subsystem('batterymult',ElementMultiplyDivideComp(output_name='_battery_rate_to_integrate',
-                                                                       input_names=['_inverse_accel','takeoff|battery_load'],
+                                                                       input_names=['_inverse_accel','battery_load'],
                                                                        vec_size=nn_tot,
                                                                        input_units=['s**2/m','J / s']),
                                                                        promotes_inputs=['*'],promotes_outputs=['*'])
 
         #==The following boilerplate splits the input flight conditions, thrusts, and fuel flows into the takeoff segments for further analysis
-        inputs_to_split = ['_rate_to_integrate','fltcond|takeoff|Utrue','takeoff|thrust','drag','lift']
+        inputs_to_split = ['_rate_to_integrate','fltcond|Utrue','thrust','drag','lift']
         units = ['s','m/s','N','N','N']
 
         if track_battery:
@@ -174,17 +205,17 @@ class TakeoffTotalDistance(Group):
 
 
         #==Next compute the transition and climb phase to the specified clearance height. First, need the steady climb-out angle at v2 speed
-        self.add_subsystem('gamma',TakeoffV2ClimbAngle(),promotes_inputs=["drag_v2","takeoff|thrust_v2","weight"],promotes_outputs=["takeoff|climb|gamma"])
-        self.add_subsystem('transition',TakeoffTransition(),promotes_inputs=["fltcond|takeoff|Utrue_vtrans","takeoff|climb|gamma"],promotes_outputs=["h_transition","s_transition"])
-        self.add_subsystem('climb',TakeoffClimb(),promotes_inputs=["takeoff|climb|gamma","h_transition"],promotes_outputs=["s_climb"])
+        self.add_subsystem('gamma',TakeoffV2ClimbAngle(),promotes_inputs=["drag_v2","thrust_v2","weight"],promotes_outputs=["climb|gamma"])
+        self.add_subsystem('transition',TakeoffTransition(),promotes_inputs=["fltcond|Utrue_vtrans","climb|gamma"],promotes_outputs=["h_transition","s_transition"])
+        self.add_subsystem('climb',TakeoffClimb(),promotes_inputs=["climb|gamma","h_transition"],promotes_outputs=["s_climb"])
         self.add_subsystem('reaction',ElementMultiplyDivideComp(output_name='s_reaction',
                                                                 input_names=['v1','reaction_time'],
                                                                 vec_size=1,
                                                                 input_units=['m/s','s']),promotes_inputs=['v1'])
         self.connect('const.reaction_time','reaction.reaction_time')
 
-        self.add_subsystem('total_to_distance_continue',AddSubtractComp(output_name='takeoff|distance',input_names=['s_v0v1','s_v1vr','s_reaction','s_transition','s_climb'],vec_size=1, units='m'),promotes_outputs=["*"])
-        self.add_subsystem('total_to_distance_abort',AddSubtractComp(output_name='takeoff|distance_abort',input_names=['s_v0v1','s_v1v0','s_reaction'],vec_size=1, units='m'),promotes_outputs=["*"])
+        self.add_subsystem('total_to_distance_continue',AddSubtractComp(output_name='distance_continue',input_names=['s_v0v1','s_v1vr','s_reaction','s_transition','s_climb'],vec_size=1, units='m'),promotes_outputs=["*"])
+        self.add_subsystem('total_to_distance_abort',AddSubtractComp(output_name='distance_abort',input_names=['s_v0v1','s_v1v0','s_reaction'],vec_size=1, units='m'),promotes_outputs=["*"])
 
         self.connect('reaction.s_reaction','total_to_distance_continue.s_reaction')
         self.connect('reaction.s_reaction','total_to_distance_abort.s_reaction')
@@ -195,14 +226,16 @@ class TakeoffTotalDistance(Group):
         self.connect('v1v0_dist.delta_quantity','total_to_distance_abort.s_v1v0')
 
         if track_battery:
-            self.add_subsystem('total_battery',AddSubtractComp(output_name='takeoff|total_battery_energy',input_names=['battery_v0v1','battery_v1vr'], units='J'),promotes_outputs=["*"])
+            self.add_subsystem('total_battery',AddSubtractComp(output_name='total_battery_energy',input_names=['battery_v0v1','battery_v1vr'], units='J'),promotes_outputs=["*"])
             self.connect('v0v1_battery.delta_quantity','total_battery.battery_v0v1')
             self.connect('v1vr_battery.delta_quantity','total_battery.battery_v1vr')
         if track_fuel:
-            self.add_subsystem('total_fuel',AddSubtractComp(output_name='takeoff|total_fuel',input_names=['fuel_v0v1','fuel_v1vr'], units='kg',scaling_factors=[-1,-1]),promotes_outputs=["*"])
+            self.add_subsystem('total_fuel',AddSubtractComp(output_name='total_fuel',input_names=['fuel_v0v1','fuel_v1vr'], units='kg',scaling_factors=[-1,-1]),promotes_outputs=["*"])
             self.connect('v0v1_fuel.delta_quantity','total_fuel.fuel_v0v1')
             self.connect('v1vr_fuel.delta_quantity','total_fuel.fuel_v1vr')
-            self.add_subsystem('climb_weight',AddSubtractComp(output_name='weight_after_takeoff',input_names=['weight','takeoff|total_fuel'], units='kg',scaling_factors=[1,-1]),promotes_inputs=["*"],promotes_outputs=["*"])
+            self.add_subsystem('climb_weight',AddSubtractComp(output_name='weight_after_takeoff',input_names=['weight','total_fuel'], units='kg',scaling_factors=[1,-1]),promotes_inputs=["*"],promotes_outputs=["*"])
+        self.add_subsystem('v1_solve', BFLImplicitSolve(), promotes_inputs=['*'], promotes_outputs=['*'])
+
 
 def takeoff_check(prob):
     """
@@ -255,13 +288,13 @@ class ComputeBalancedFieldLengthResidual(ExplicitComponent):
 
     Inputs
     ------
-    takeoff|distance : float
+    distance_continue : float
         Engine-out takeoff distance (scalar, m)
-    takeoff|distance_abort : float
+    distance_abort : float
         Distance to full-stop when takeoff is rejected at V1 (scalar, m)
-    mission|takeoff|v1 : float
+    takeoff|v1 : float
         Decision speed (scalar, m/s)
-    mission|takeoff|vr : float
+    takeoff|vr : float
         Rotation speed (scalar, m/s)
 
     Outputs
@@ -276,55 +309,121 @@ class ComputeBalancedFieldLengthResidual(ExplicitComponent):
         (scalar, m)
     """
     def setup(self):
-        self.add_input('takeoff|distance', units='m')
-        self.add_input('takeoff|distance_abort', units='m')
-        self.add_input('mission|takeoff|v1', units='m/s')
-        self.add_input('mission|takeoff|vr', units='m/s')
+        self.add_input('distance_continue', units='m')
+        self.add_input('distance_abort', units='m')
+        self.add_input('takeoff|v1', units='m/s')
+        self.add_input('takeoff|vr', units='m/s')
         self.add_output('BFL_residual', units='m')
         self.add_output('v1vr_diff', units='m/s')
         self.add_output('BFL_combined', units='m')
-        self.declare_partials('BFL_residual','takeoff|distance', val=1)
-        self.declare_partials('BFL_residual','takeoff|distance_abort', val=-1)
-        self.declare_partials('v1vr_diff','mission|takeoff|vr', val=1)
-        self.declare_partials('v1vr_diff','mission|takeoff|v1', val=-1)
-        self.declare_partials('BFL_combined',['takeoff|distance','takeoff|distance_abort','mission|takeoff|v1','mission|takeoff|vr'])
+        self.declare_partials('BFL_residual','distance_continue', val=1)
+        self.declare_partials('BFL_residual','distance_abort', val=-1)
+        self.declare_partials('v1vr_diff','takeoff|vr', val=1)
+        self.declare_partials('v1vr_diff','takeoff|v1', val=-1)
+        self.declare_partials('BFL_combined',['distance_continue','distance_abort','takeoff|v1','takeoff|vr'])
     def compute(self, inputs, outputs):
-        outputs['BFL_residual'] = inputs['takeoff|distance'] - inputs['takeoff|distance_abort']
-        outputs['v1vr_diff'] = inputs['mission|takeoff|vr'] - inputs['mission|takeoff|v1']
+        outputs['BFL_residual'] = inputs['distance_continue'] - inputs['distance_abort']
+        outputs['v1vr_diff'] = inputs['takeoff|vr'] - inputs['takeoff|v1']
         speedtol = 1e-1
         disttol = 0
         #force the decision speed to zero
-        if inputs['mission|takeoff|vr'] < inputs['mission|takeoff|v1'] + speedtol:
-            outputs['BFL_combined'] = inputs['mission|takeoff|vr'] - inputs['mission|takeoff|v1']
+        if inputs['takeoff|vr'] < inputs['takeoff|v1'] + speedtol:
+            outputs['BFL_combined'] = inputs['takeoff|vr'] - inputs['takeoff|v1']
         else:
-            outputs['BFL_combined'] = inputs['takeoff|distance'] - inputs['takeoff|distance_abort']
+            outputs['BFL_combined'] = inputs['distance_continue'] - inputs['distance_abort']
         #if you are within vtol on the correct side but the stopping distance bigger, use the regular mode
-        if inputs['mission|takeoff|vr'] >= inputs['mission|takeoff|v1'] and inputs['mission|takeoff|vr'] - inputs['mission|takeoff|v1'] < speedtol and (inputs['takeoff|distance_abort'] - inputs['takeoff|distance']) > disttol:
-            outputs['BFL_combined'] = inputs['takeoff|distance'] - inputs['takeoff|distance_abort']
+        if inputs['takeoff|vr'] >= inputs['takeoff|v1'] and inputs['takeoff|vr'] - inputs['takeoff|v1'] < speedtol and (inputs['distance_abort'] - inputs['distance_continue']) > disttol:
+            outputs['BFL_combined'] = inputs['distance_continue'] - inputs['distance_abort']
 
-        # print('Cont: '+str(inputs['takeoff|distance'])+' Abort: '+str(inputs['takeoff|distance_abort']))
-        # print('V1: '+str(inputs['mission|takeoff|v1'])+' Vr: '+str(inputs['mission|takeoff|vr']))
 
     def compute_partials(self, inputs, partials):
         speedtol = 1e-1
         disttol = 0
 
-        if inputs['mission|takeoff|vr'] < inputs['mission|takeoff|v1'] + speedtol:
-            partials['BFL_combined','takeoff|distance'] = 0
-            partials['BFL_combined','takeoff|distance_abort'] = 0
-            partials['BFL_combined','mission|takeoff|vr'] = 1
-            partials['BFL_combined','mission|takeoff|v1'] = -1
+        if inputs['takeoff|vr'] < inputs['takeoff|v1'] + speedtol:
+            partials['takeoff|v1','distance_continue'] = 0
+            partials['takeoff|v1','distance_abort'] = 0
+            partials['takeoff|v1','takeoff|vr'] = 1
+            partials['takeoff|v1','takeoff|v1'] = -1
         else:
-            partials['BFL_combined','takeoff|distance'] = 1
-            partials['BFL_combined','takeoff|distance_abort'] = -1
-            partials['BFL_combined','mission|takeoff|vr'] = 0
-            partials['BFL_combined','mission|takeoff|v1'] = 0
+            partials['takeoff|v1','distance_continue'] = 1
+            partials['takeoff|v1','distance_abort'] = -1
+            partials['takeoff|v1','takeoff|vr'] = 0
+            partials['takeoff|v1','takeoff|v1'] = 0
 
-        if inputs['mission|takeoff|vr'] >= inputs['mission|takeoff|v1'] and inputs['mission|takeoff|vr'] - inputs['mission|takeoff|v1'] < speedtol and (inputs['takeoff|distance_abort'] - inputs['takeoff|distance']) > disttol:
-            partials['BFL_combined','takeoff|distance'] = 1
-            partials['BFL_combined','takeoff|distance_abort'] = -1
-            partials['BFL_combined','mission|takeoff|vr'] = 0
-            partials['BFL_combined','mission|takeoff|v1'] = 0
+        if inputs['takeoff|vr'] >= inputs['takeoff|v1'] and inputs['takeoff|vr'] - inputs['takeoff|v1'] < speedtol and (inputs['distance_abort'] - inputs['distance_continue']) > disttol:
+            partials['takeoff|v1','distance_continue'] = 1
+            partials['takeoff|v1','distance_abort'] = -1
+            partials['takeoff|v1','takeoff|vr'] = 0
+            partials['takeoff|v1','takeoff|v1'] = 0
+
+class BFLImplicitSolve(ImplicitComponent):
+    """
+    Computes a residual equation so Newton solver can set v1 to analyze balanced field length
+
+    This residual is equal to zero if:
+        - The rejected takeoff and engine-out takeoff distances are equal, or:
+        - V1 is equal to VR and the engine out takeoff distance is longer than the RTO distance
+
+    Since this is a discontinous function, the partial derivatives are written in a special way
+    to 'coax' the V1 value into the right setting with a Newton step. It's kind of a hack.
+
+    Inputs
+    ------
+    distance_continue : float
+        Engine-out takeoff distance (scalar, m)
+    distance_abort : float
+        Distance to full-stop when takeoff is rejected at V1 (scalar, m)
+    takeoff|vr : float
+        Rotation speed (scalar, m/s)
+
+    Outputs
+    -------
+    takeoff|v1 : float
+        Decision speed (scalar, m/s)
+
+    """
+    def setup(self):
+        self.add_input('distance_continue', units='m')
+        self.add_input('distance_abort', units='m')
+        self.add_input('takeoff|vr', units='m/s')
+        self.add_output('takeoff|v1', units='m/s')
+        self.declare_partials('takeoff|v1',['distance_continue','distance_abort','takeoff|v1','takeoff|vr'])
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        speedtol = 1e-1
+        disttol = 0
+        #force the decision speed to zero
+        if inputs['takeoff|vr'] < outputs['takeoff|v1'] + speedtol:
+            residuals['takeoff|v1'] = inputs['takeoff|vr'] - outputs['takeoff|v1']
+        else:
+            residuals['takeoff|v1'] = inputs['distance_continue'] - inputs['distance_abort']
+
+        #if you are within vtol on the correct side but the stopping distance bigger, use the regular mode
+        if inputs['takeoff|vr'] >= outputs['takeoff|v1'] and inputs['takeoff|vr'] - outputs['takeoff|v1'] < speedtol and (inputs['distance_abort'] - inputs['distance_continue']) > disttol:
+            residuals['takeoff|v1'] = inputs['distance_continue'] - inputs['distance_abort']
+
+
+    def linearize(self, inputs, outputs, partials):
+        speedtol = 1e-1
+        disttol = 0
+
+        if inputs['takeoff|vr'] < outputs['takeoff|v1'] + speedtol:
+            partials['takeoff|v1','distance_continue'] = 0
+            partials['takeoff|v1','distance_abort'] = 0
+            partials['takeoff|v1','takeoff|vr'] = 1
+            partials['takeoff|v1','takeoff|v1'] = -1
+        else:
+            partials['takeoff|v1','distance_continue'] = 1
+            partials['takeoff|v1','distance_abort'] = -1
+            partials['takeoff|v1','takeoff|vr'] = 0
+            partials['takeoff|v1','takeoff|v1'] = 0
+
+        if inputs['takeoff|vr'] >= outputs['takeoff|v1'] and inputs['takeoff|vr'] - outputs['takeoff|v1'] < speedtol and (inputs['distance_abort'] - inputs['distance_continue']) > disttol:
+            partials['takeoff|v1','distance_continue'] = 1
+            partials['takeoff|v1','distance_abort'] = -1
+            partials['takeoff|v1','takeoff|vr'] = 0
+            partials['takeoff|v1','takeoff|v1'] = 0
 
 class TakeoffFlightConditions(ExplicitComponent):
     """
@@ -332,22 +431,22 @@ class TakeoffFlightConditions(ExplicitComponent):
 
     Inputs
     ------
-    mission|takeoff|h : float
+    takeoff|h : float
         Runway altitude (scalar, m)
-    mission|takeoff|v1 : float
+    takeoff|v1 : float
         Takeoff decision speed (scalar, m/s)
     Vstall_eas : float
         Flaps down stall airspeed (scalar, m/s)
 
     Outputs
     -------
-    mission|takeoff|vr
+    takeoff|vr
         Takeoff rotation speed (set as multiple of stall speed). (scalar, m/s)
-    mission|takeoff|v2
+    takeoff|v2
         Takeoff safety speed (set as multiple of stall speed). (scalar, m/s)
-    fltcond|takeoff|Ueas
+    fltcond|Ueas
         Takeoff indicated/equiv. airspeed (vector, m/s)
-    fltcond|takeoff|h
+    fltcond|h
         Takeoff altitude turned into a vector (vector, m/s)
 
     Options
@@ -371,11 +470,11 @@ class TakeoffFlightConditions(ExplicitComponent):
         nn = (n_int_per_seg*2 + 1)
         vrmult = self.options['vr_multiple']
         v2mult = self.options['v2_multiple']
-        self.add_input('mission|takeoff|h', val=0, units='m', desc='Takeoff runway altitude')
-        self.add_input('mission|takeoff|v1', val=75, units='m / s', desc='Takeoff decision airspeed')
+        self.add_input('takeoff|h', val=0, units='m', desc='Takeoff runway altitude')
+        self.add_input('takeoff|v1', val=75, units='m / s', desc='Takeoff decision airspeed')
         self.add_input('Vstall_eas', val=90, units='m / s', desc='Flaps down stall airspeed')
-        self.add_output('mission|takeoff|vr', units='m/s', desc='Takeoff rotation speed')
-        self.add_output('mission|takeoff|v2', units='m/s', desc='Takeoff climbout speed')
+        self.add_output('takeoff|vr', units='m/s', desc='Takeoff rotation speed')
+        self.add_output('takeoff|v2', units='m/s', desc='Takeoff climbout speed')
 
         ## the total length of the vector is 3 * nn (3 integrated segments) + 2 scalar flight conditions
         # condition 1: v0 to v1 [nn points]
@@ -383,17 +482,17 @@ class TakeoffFlightConditions(ExplicitComponent):
         # condition 3: v1 to v0 (with braking) [nn points]
         # condition 4: average between vr and v2 [1 point]
         # condition 5: v2 [1 point]
-        self.add_output('fltcond|takeoff|Ueas', units='m / s', desc='indicated airspeed at each analysis point',shape=(3 * nn+2,))
-        self.add_output('fltcond|takeoff|h', units='m', desc='altitude at each analysis point',shape=(3 * nn+2,))
+        self.add_output('fltcond|Ueas', units='m / s', desc='indicated airspeed at each analysis point',shape=(3 * nn+2,))
+        self.add_output('fltcond|h', units='m', desc='altitude at each analysis point',shape=(3 * nn+2,))
         linear_nn = np.linspace(0,1,nn)
         linear_rev_nn = np.linspace(1,0,nn)
 
         #the climb speeds only have influence over their respective mission segments
-        self.declare_partials(['fltcond|takeoff|Ueas'], ['mission|takeoff|v1'], val=np.concatenate([linear_nn,linear_rev_nn,linear_rev_nn,np.zeros(2)]))
-        self.declare_partials(['fltcond|takeoff|Ueas'], ['Vstall_eas'], val=np.concatenate([np.zeros(nn),linear_nn*vrmult,np.zeros(nn),np.array([(vrmult+v2mult)/2,v2mult])]))
-        self.declare_partials(['fltcond|takeoff|h'], ['mission|takeoff|h'], val=np.ones(3 * nn+2))
-        self.declare_partials(['mission|takeoff|vr'], ['Vstall_eas'], val=vrmult)
-        self.declare_partials(['mission|takeoff|v2'], ['Vstall_eas'], val=v2mult)
+        self.declare_partials(['fltcond|Ueas'], ['takeoff|v1'], val=np.concatenate([linear_nn,linear_rev_nn,linear_rev_nn,np.zeros(2)]))
+        self.declare_partials(['fltcond|Ueas'], ['Vstall_eas'], val=np.concatenate([np.zeros(nn),linear_nn*vrmult,np.zeros(nn),np.array([(vrmult+v2mult)/2,v2mult])]))
+        self.declare_partials(['fltcond|h'], ['takeoff|h'], val=np.ones(3 * nn+2))
+        self.declare_partials(['takeoff|vr'], ['Vstall_eas'], val=vrmult)
+        self.declare_partials(['takeoff|v2'], ['Vstall_eas'], val=v2mult)
 
 
     def compute(self, inputs, outputs):
@@ -401,14 +500,14 @@ class TakeoffFlightConditions(ExplicitComponent):
         nn = n_int_per_seg*2 + 1
         vrmult = self.options['vr_multiple']
         v2mult = self.options['v2_multiple']
-        v1 = inputs['mission|takeoff|v1'][0]
+        v1 = inputs['takeoff|v1'][0]
         vstall = inputs['Vstall_eas'][0]
         vr = vrmult*vstall
         v2 = v2mult*vstall
-        outputs['mission|takeoff|vr'] = vr
-        outputs['mission|takeoff|v2'] = v2
-        outputs['fltcond|takeoff|h'] = inputs['mission|takeoff|h']*np.ones(3 * nn+2)
-        outputs['fltcond|takeoff|Ueas'] = np.concatenate([np.linspace(1,v1,nn),np.linspace(v1,vr,nn),np.linspace(v1,1,nn),np.array([(vr+v2)/2, v2])])
+        outputs['takeoff|vr'] = vr
+        outputs['takeoff|v2'] = v2
+        outputs['fltcond|h'] = inputs['takeoff|h']*np.ones(3 * nn+2)
+        outputs['fltcond|Ueas'] = np.concatenate([np.linspace(1,v1,nn),np.linspace(v1,vr,nn),np.linspace(v1,1,nn),np.array([(vr+v2)/2, v2])])
 
 
 class TakeoffCLs(ExplicitComponent):
@@ -425,7 +524,7 @@ class TakeoffCLs(ExplicitComponent):
     ------
     weight : float
         Takeoff weight (scalar, kg)
-    fltcond|takeoff|q : float
+    fltcond|q : float
         Dynamic pressure at each analysis point (vector, Pascals)
     ac|geom|wing|S_ref : float
         Wing reference area (scalar, m**2)
@@ -451,12 +550,12 @@ class TakeoffCLs(ExplicitComponent):
         nn = (n_int_per_seg*2 + 1)
         nn_tot = 3 * nn+2
         self.add_input('weight', units='kg')
-        self.add_input('fltcond|takeoff|q', units='N * m**-2',shape=(nn_tot,))
+        self.add_input('fltcond|q', units='N * m**-2',shape=(nn_tot,))
         self.add_input('ac|geom|wing|S_ref', units='m**2')
         self.add_output('CL_takeoff',shape=(nn_tot,))
         #the partials only apply for the last two entries
         self.declare_partials(['CL_takeoff'], ['weight','ac|geom|wing|S_ref'], rows=np.arange(nn_tot-2,nn_tot), cols=np.zeros(2))
-        self.declare_partials(['CL_takeoff'], ['fltcond|takeoff|q'], rows=np.arange(nn_tot-2,nn_tot), cols=np.arange(nn_tot-2,nn_tot))
+        self.declare_partials(['CL_takeoff'], ['fltcond|q'], rows=np.arange(nn_tot-2,nn_tot), cols=np.arange(nn_tot-2,nn_tot))
 
     def compute(self, inputs, outputs):
         n_int_per_seg = self.options['n_int_per_seg']
@@ -466,7 +565,7 @@ class TakeoffCLs(ExplicitComponent):
         CLs = np.ones(nn_tot) * self.options['ground_CL']
         #the 1.2 load factor is an assumption from Raymer. May want to revisit or make an option /default in the future
         loadfactors = np.array([1.2,1.2])
-        CLs[-2:] = loadfactors*inputs['weight'][-2:] * g / inputs['fltcond|takeoff|q'][-2:] / inputs['ac|geom|wing|S_ref'][-2:]
+        CLs[-2:] = loadfactors*inputs['weight'][-2:] * g / inputs['fltcond|q'][-2:] / inputs['ac|geom|wing|S_ref'][-2:]
         outputs['CL_takeoff'] = CLs
     def compute_partials(self, inputs, J):
         n_int_per_seg = self.options['n_int_per_seg']
@@ -475,9 +574,9 @@ class TakeoffCLs(ExplicitComponent):
         g = 9.80665 #m/s^2
         #the 1.2 load factor is an assumption from Raymer. May want to revisit or make an option /default in the future
         loadfactors = np.array([1.2,1.2])
-        J['CL_takeoff','weight'] = loadfactors * g / inputs['fltcond|takeoff|q'][-2:] / inputs['ac|geom|wing|S_ref'][-2:]
-        J['CL_takeoff','fltcond|takeoff|q'] = - loadfactors*inputs['weight'][-2:] * g / inputs['fltcond|takeoff|q'][-2:]**2 / inputs['ac|geom|wing|S_ref'][-2:]
-        J['CL_takeoff','ac|geom|wing|S_ref'] = - loadfactors*inputs['weight'][-2:] * g / inputs['fltcond|takeoff|q'][-2:] / inputs['ac|geom|wing|S_ref'][-2:]**2
+        J['CL_takeoff','weight'] = loadfactors * g / inputs['fltcond|q'][-2:] / inputs['ac|geom|wing|S_ref'][-2:]
+        J['CL_takeoff','fltcond|q'] = - loadfactors*inputs['weight'][-2:] * g / inputs['fltcond|q'][-2:]**2 / inputs['ac|geom|wing|S_ref'][-2:]
+        J['CL_takeoff','ac|geom|wing|S_ref'] = - loadfactors*inputs['weight'][-2:] * g / inputs['fltcond|q'][-2:] / inputs['ac|geom|wing|S_ref'][-2:]**2
 
 class TakeoffAccels(ExplicitComponent):
     """
@@ -498,7 +597,7 @@ class TakeoffAccels(ExplicitComponent):
         Aircraft drag at each TO analysis point (vector, N)
     lift : float
         Aircraft lift at each TO analysis point (vector, N)
-    takeoff|thrust : float
+    thrust : float
         Thrust at each TO analysis point (vector, N)
 
     Outputs
@@ -527,10 +626,10 @@ class TakeoffAccels(ExplicitComponent):
         self.add_input('weight', units='kg')
         self.add_input('drag', units='N',shape=(nn_tot,))
         self.add_input('lift', units='N',shape=(nn_tot,))
-        self.add_input('takeoff|thrust', units='N',shape=(nn_tot,))
+        self.add_input('thrust', units='N',shape=(nn_tot,))
         self.add_output('_inverse_accel', units='s**2 / m',shape=(nn_tot,))
         arange=np.arange(0,nn_tot-2)
-        self.declare_partials(['_inverse_accel'], ['drag','lift','takeoff|thrust'], rows=arange, cols=arange)
+        self.declare_partials(['_inverse_accel'], ['drag','lift','thrust'], rows=arange, cols=arange)
         self.declare_partials(['_inverse_accel'], ['weight'], rows=arange, cols=np.zeros(nn_tot-2))
 
     def compute(self, inputs, outputs):
@@ -541,12 +640,7 @@ class TakeoffAccels(ExplicitComponent):
         mu_brake = self.options['braking_friction_coeff']
         mu = np.concatenate([np.ones(2*nn)*mu_free,np.ones(nn)*mu_brake,np.zeros(2)])
         g = 9.80665 #m/s^2
-        # print('Thrust:' +str(inputs['takeoff|thrust']))
-        # print('Drag:'+str(inputs['drag']))
-        # print('Rolling resistance:'+str(mu*(inputs['weight']*g-inputs['lift'])))
-        # print(inputs['takeoff|thrust'])
-        # print(inputs['drag'])
-        forcebal = inputs['takeoff|thrust'] - inputs['drag'] - mu*(inputs['weight']*g-inputs['lift'])
+        forcebal = inputs['thrust'] - inputs['drag'] - mu*(inputs['weight']*g-inputs['lift'])
         #print(forcebal)
         # print('Force balance:'+str(forcebal))
         inv_accel = inputs['weight'] / forcebal
@@ -561,7 +655,7 @@ class TakeoffAccels(ExplicitComponent):
         mu_brake = self.options['braking_friction_coeff']
         mu = np.concatenate([np.ones(2*nn)*mu_free,np.ones(nn)*mu_brake,np.zeros(2)])
         g = 9.80665 #m/s^2
-        forcebal = inputs['takeoff|thrust'] - inputs['drag'] - mu*(inputs['weight']*g-inputs['lift'])
+        forcebal = inputs['thrust'] - inputs['drag'] - mu*(inputs['weight']*g-inputs['lift'])
         #(f/g)' = (f'g-fg')/g^2 where f is weight and g is forcebal
         ddweight = (1*forcebal - inputs['weight']*-mu*g)/forcebal**2
         ddweight=ddweight[:-2]
@@ -572,7 +666,7 @@ class TakeoffAccels(ExplicitComponent):
         ddthrust = - inputs['weight'] / forcebal**2
         ddthrust = ddthrust[:-2]
 
-        J['_inverse_accel','takeoff|thrust'] = ddthrust
+        J['_inverse_accel','thrust'] = ddthrust
         J['_inverse_accel','drag'] = dddrag
         J['_inverse_accel','lift'] = ddlift
         J['_inverse_accel','weight'] = ddweight
@@ -591,12 +685,12 @@ class TakeoffV2ClimbAngle(ExplicitComponent):
         Aircraft drag at v2 (climb out) flight condition (scalar, N)
     weight : float
         Takeoff weight (scalar, kg)
-    takeoff|thrust_v2 : float
+    thrust_v2 : float
         Thrust at the v2 (climb out) flight condition (scalar, N)
 
     Outputs
     -------
-    takeoff|climb|gamma : float
+    climb|gamma : float
         Climb out flight path angle (scalar, rad)
 
     Options
@@ -605,22 +699,22 @@ class TakeoffV2ClimbAngle(ExplicitComponent):
     def setup(self):
         self.add_input('drag_v2', units='N')
         self.add_input('weight', units='kg')
-        self.add_input('takeoff|thrust_v2', units='N')
-        self.add_output('takeoff|climb|gamma', units='rad')
+        self.add_input('thrust_v2', units='N')
+        self.add_output('climb|gamma', units='rad')
 
-        self.declare_partials(['takeoff|climb|gamma'], ['weight','takeoff|thrust_v2','drag_v2'])
+        self.declare_partials(['climb|gamma'], ['weight','thrust_v2','drag_v2'])
 
     def compute(self, inputs, outputs):
         g = 9.80665 #m/s^2
-        outputs['takeoff|climb|gamma'] = np.arcsin((inputs['takeoff|thrust_v2']-inputs['drag_v2'])/inputs['weight']/g)
+        outputs['climb|gamma'] = np.arcsin((inputs['thrust_v2']-inputs['drag_v2'])/inputs['weight']/g)
 
     def compute_partials(self, inputs, J):
         g = 9.80665 #m/s^2
-        interior_qty = (inputs['takeoff|thrust_v2']-inputs['drag_v2'])/inputs['weight']/g
+        interior_qty = (inputs['thrust_v2']-inputs['drag_v2'])/inputs['weight']/g
         d_arcsin = 1/np.sqrt(1-interior_qty**2)
-        J['takeoff|climb|gamma','takeoff|thrust_v2'] = d_arcsin/inputs['weight']/g
-        J['takeoff|climb|gamma','drag_v2'] = -d_arcsin/inputs['weight']/g
-        J['takeoff|climb|gamma','weight'] = -d_arcsin*(inputs['takeoff|thrust_v2']-inputs['drag_v2'])/inputs['weight']**2/g
+        J['climb|gamma','thrust_v2'] = d_arcsin/inputs['weight']/g
+        J['climb|gamma','drag_v2'] = -d_arcsin/inputs['weight']/g
+        J['climb|gamma','weight'] = -d_arcsin*(inputs['thrust_v2']-inputs['drag_v2'])/inputs['weight']**2/g
 
 class TakeoffTransition(ExplicitComponent):
     """
@@ -635,9 +729,9 @@ class TakeoffTransition(ExplicitComponent):
 
     Inputs
     ------
-    fltcond|takeoff|Utrue_vtrans
+    fltcond|Utrue_vtrans
         Transition true airspeed (generally avg of vr and v2) (scalar, m/s)
-    takeoff|climb|gamma : float
+    climb|gamma : float
         Climb out flight path angle (scalar, rad)
 
     Outputs
@@ -657,17 +751,17 @@ class TakeoffTransition(ExplicitComponent):
         self.options.declare('h_obstacle',default=10.66,desc='Obstacle clearance height in m')
 
     def setup(self):
-        self.add_input('fltcond|takeoff|Utrue_vtrans', units='m/s')
-        self.add_input('takeoff|climb|gamma', units='rad')
+        self.add_input('fltcond|Utrue_vtrans', units='m/s')
+        self.add_input('climb|gamma', units='rad')
         self.add_output('s_transition', units='m')
         self.add_output('h_transition', units='m')
-        self.declare_partials(['s_transition','h_transition'], ['fltcond|takeoff|Utrue_vtrans','takeoff|climb|gamma'])
+        self.declare_partials(['s_transition','h_transition'], ['fltcond|Utrue_vtrans','climb|gamma'])
 
     def compute(self, inputs, outputs):
         hobs = self.options['h_obstacle']
         g = 9.80665 #m/s^2
-        gam = inputs['takeoff|climb|gamma']
-        ut = inputs['fltcond|takeoff|Utrue_vtrans']
+        gam = inputs['climb|gamma']
+        ut = inputs['fltcond|Utrue_vtrans']
 
         R = ut**2/0.2/g
         st = R*np.sin(gam)
@@ -682,8 +776,8 @@ class TakeoffTransition(ExplicitComponent):
     def compute_partials(self, inputs, J):
         hobs = self.options['h_obstacle']
         g = 9.80665 #m/s^2
-        gam = inputs['takeoff|climb|gamma']
-        ut = inputs['fltcond|takeoff|Utrue_vtrans']
+        gam = inputs['climb|gamma']
+        ut = inputs['fltcond|Utrue_vtrans']
         R = ut**2/0.2/g
         dRdut =  2*ut/0.2/g
         st = R*np.sin(gam)
@@ -700,10 +794,10 @@ class TakeoffTransition(ExplicitComponent):
             dhtdgam = R*np.sin(gam)
             dstdut = dRdut*np.sin(gam)
             dstdgam = R*np.cos(gam)
-        J['s_transition','takeoff|climb|gamma'] = dstdgam
-        J['s_transition','fltcond|takeoff|Utrue_vtrans'] = dstdut
-        J['h_transition','takeoff|climb|gamma'] = dhtdgam
-        J['h_transition','fltcond|takeoff|Utrue_vtrans'] = dhtdut
+        J['s_transition','climb|gamma'] = dstdgam
+        J['s_transition','fltcond|Utrue_vtrans'] = dstdut
+        J['h_transition','climb|gamma'] = dhtdgam
+        J['h_transition','fltcond|Utrue_vtrans'] = dhtdut
 
 
 class TakeoffClimb(ExplicitComponent):
@@ -717,7 +811,7 @@ class TakeoffClimb(ExplicitComponent):
 
     Inputs
     ------
-    takeoff|climb|gamma : float
+    climb|gamma : float
         Climb out flight path angle (scalar, rad)
     h_transition : float
         Altitude at transition point (scalar, m)
@@ -737,21 +831,21 @@ class TakeoffClimb(ExplicitComponent):
         self.options.declare('h_obstacle',default=10.66,desc='Obstacle clearance height in m')
     def setup(self):
         self.add_input('h_transition', units='m')
-        self.add_input('takeoff|climb|gamma', units='rad')
+        self.add_input('climb|gamma', units='rad')
         self.add_output('s_climb', units='m')
-        self.declare_partials(['s_climb'], ['h_transition','takeoff|climb|gamma'])
+        self.declare_partials(['s_climb'], ['h_transition','climb|gamma'])
 
     def compute(self, inputs, outputs):
         hobs = self.options['h_obstacle']
-        gam = inputs['takeoff|climb|gamma']
+        gam = inputs['climb|gamma']
         ht = inputs['h_transition']
         sc = (hobs-ht)/np.tan(gam)
         outputs['s_climb'] = sc
 
     def compute_partials(self, inputs, J):
         hobs = self.options['h_obstacle']
-        gam = inputs['takeoff|climb|gamma']
+        gam = inputs['climb|gamma']
         ht = inputs['h_transition']
         sc = (hobs-ht)/np.tan(gam)
-        J['s_climb','takeoff|climb|gamma'] = -(hobs-ht)/np.tan(gam)**2 * (1/np.cos(gam))**2
+        J['s_climb','climb|gamma'] = -(hobs-ht)/np.tan(gam)**2 * (1/np.cos(gam))**2
         J['s_climb','h_transition'] = -1/np.tan(gam)

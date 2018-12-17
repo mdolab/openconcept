@@ -1,28 +1,33 @@
 data = dict()
-mission = dict()
 takeoff = dict()
 takeoff['h'] = {'value': 0, 'units': 'ft'}
-mission['takeoff'] = takeoff
+data['takeoff'] = takeoff
 
 landing = dict()
 landing['h'] = takeoff['h']
-mission['landing'] = landing
+data['landing'] = landing
 
 climb = dict()
+climb['h0'] = takeoff['h']
 climb['vs'] = {'value': 1500, 'units': 'ft/min'}
+climb['time'] = {'value': 1160, 'units': 's'}
 climb['Ueas'] = {'value': 124, 'units': 'kn'}
-mission['climb'] = climb
+data['climb'] = climb
 
 cruise = dict()
 cruise['h'] = {'value': 29000, 'units': 'ft'}
+cruise['h0'] = cruise['h']
 cruise['Ueas'] = {'value': 170, 'units': 'kn'}
-mission['cruise'] = cruise
+data['cruise'] = cruise
 
 descent = dict()
+descent['h0'] = cruise['h0']
+descent['hf'] = landing['h']
 descent['vs'] = {'value': -600, 'units': 'ft/min'}
+descent['time'] = {'value': 2900, 'units': 's'}
 descent['Ueas'] = {'value': 140, 'units': 'kn'}
-mission['descent'] = descent
+data['descent'] = descent
 
-mission['range'] = {'value': 1000, 'units': 'NM'}
-mission['payload'] = {'value': 1000, 'units': 'lb'}
-data['mission'] = mission
+data['range'] = {'value': 1000, 'units': 'NM'}
+data['design_range'] = {'value': 1000, 'units': 'NM'}
+data['payload'] = {'value': 1000, 'units': 'lb'}
