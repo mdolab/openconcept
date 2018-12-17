@@ -16,8 +16,8 @@ class TrueAirspeedComp(ExplicitComponent):
 
     Outputs
     -------
-    fltcond|q : float
-        Dynamic pressure (vector, Pa)
+    fltcond|Utrue : float
+        True airspeed (vector, m/s)
 
     Options
     -------
