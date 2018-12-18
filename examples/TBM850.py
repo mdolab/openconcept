@@ -144,7 +144,7 @@ def define_analysis(n_int_per_seg):
     prob.model= TotalAnalysis(n_int_per_seg=n_int_per_seg)
     prob.model.options['assembled_jac_type'] = 'dense'
     prob.model.nonlinear_solver=NewtonSolver()
-    prob.model.linear_solver = DirectSolver(assemble_jac=True)
+    prob.model.linear_solver = DirectSolver()
     prob.model.nonlinear_solver.options['solve_subsystems'] = True
     prob.model.nonlinear_solver.options['maxiter'] = 10
     prob.model.nonlinear_solver.options['atol'] = 1e-6
