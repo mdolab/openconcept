@@ -142,7 +142,7 @@ def define_analysis(n_int_per_seg):
     """
     prob = Problem()
     prob.model= TotalAnalysis(n_int_per_seg=n_int_per_seg)
-    prob.model.options['assembled_jac_type'] = 'csc'
+    prob.model.options['assembled_jac_type'] = 'dense'
     prob.model.nonlinear_solver=NewtonSolver()
     prob.model.linear_solver = DirectSolver(assemble_jac=True)
     prob.model.nonlinear_solver.options['solve_subsystems'] = True
