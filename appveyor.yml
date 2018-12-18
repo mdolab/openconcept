@@ -26,6 +26,7 @@ install:
   - conda update conda
   - conda create --name openconcept
   - activate openconcept
+  - conda install nomkl
   - conda env update -f=environment.yml
   # - conda install numpy scipy nose hdf5 h5py sphinx mock pip --quiet
   #Grab testflo for running tests, to ensure examples are run
