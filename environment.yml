@@ -2,6 +2,7 @@ name: openconcept
 dependencies:
   - numpy==1.14
   - scipy==1.0.1
+  - networkx==2.1
   - sphinx
   - nose
   - hdf5
