@@ -668,11 +668,15 @@ class SolveCruiseTime(ImplicitComponent):
         self.add_input('design_range', units='m')
         self.add_input('range', units='m')
         self.add_output('cruise|time', units='s')
-        self.declare_partials(['cruise|time'], ['range'], val=1)
-        self.declare_partials(['cruise|time'], ['design_range'], val=-1)
+        self.declare_partials(['cruise|time'], ['range'])
+        self.declare_partials(['cruise|time'], ['design_range'])
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         residuals['cruise|time'] = inputs['range'] - inputs['design_range']
+
+    def linearize(self, inputs, outputs, J):
+        J['cruise|time','range'] = 1.0
+        J['cruise|time','design_range'] = -1.0
 
 class ComputeDesignMissionResiduals(ExplicitComponent):
     """
