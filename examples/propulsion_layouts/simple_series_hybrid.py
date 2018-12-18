@@ -1,4 +1,5 @@
 
+from __future__ import division
 from openconcept.components.motor import SimpleMotor
 from openconcept.components.splitter import PowerSplit
 from openconcept.components.generator import SimpleGenerator
@@ -8,7 +9,6 @@ from openconcept.components.propeller import SimplePropeller
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math import AddSubtractComp
-from __future__ import division
 
 from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, DirectSolver, NewtonSolver, ScipyKrylov
 

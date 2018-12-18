@@ -1,8 +1,8 @@
+from __future__ import division
 import numpy as np
 from openmdao.api import ExplicitComponent
 from openmdao.api import Group
 from .empirical_data.prop_maps import propeller_map_quadratic, propeller_map_Raymer, propeller_map_highpower, static_propeller_map_Raymer, static_propeller_map_highpower, propeller_map_scaled, propeller_map_constant_prop_efficiency
-
 
 class SimplePropeller(Group):
     """This propeller is representative of a constant-speed prop.
