@@ -1,3 +1,4 @@
+from __future__ import division
 import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials

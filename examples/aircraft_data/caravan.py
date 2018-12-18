@@ -1,6 +1,7 @@
 # https://www.globalair.com/aircraft-for-sale/Specifications?specid=1273
 # http://www.airliners.net/aircraft-data/cessna-208-caravan-i-grand-caravan-cargomaster/158
 # http://b.org.za/fly/C208Bproc.pdf
+from __future__ import division
 
 data = dict()
 ac = dict()

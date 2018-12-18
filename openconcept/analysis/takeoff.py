@@ -1,4 +1,5 @@
 """Analysis routines for simulating the takeoff phase and determining takeoff field length"""
+from __future__ import division
 from openmdao.api import Problem, Group, IndepVarComp
 from openmdao.api import ScipyOptimizeDriver, ExplicitComponent, ImplicitComponent
 

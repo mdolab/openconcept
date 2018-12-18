@@ -3,6 +3,7 @@ from openmdao.api import ExplicitComponent, IndepVarComp
 from openmdao.api import Group
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
 import math
+from __future__ import division
 
 ##TODO: add fuel system weight back in (depends on Wf, which depends on MTOW and We, and We depends on fuel system weight)
 

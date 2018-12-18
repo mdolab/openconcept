@@ -1,3 +1,4 @@
+from __future__ import division
 from openconcept.analysis.atmospherics.temperature_comp import TemperatureComp
 from openconcept.analysis.atmospherics.pressure_comp import PressureComp
 from openconcept.analysis.atmospherics.density_comp import DensityComp

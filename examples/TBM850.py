@@ -1,3 +1,4 @@
+from __future__ import division
 from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver
 from openmdao.api import ScipyOptimizeDriver, ExplicitComponent, ImplicitComponent
 # ------This is a hack for testing scripts on openconcept source directories that haven't been installed.

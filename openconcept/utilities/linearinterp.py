@@ -1,5 +1,6 @@
 from openmdao.api import ExplicitComponent
 import numpy as np
+from __future__ import division
 
 
 class LinearInterpolator(ExplicitComponent):

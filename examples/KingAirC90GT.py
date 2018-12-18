@@ -5,6 +5,7 @@ from openmdao.api import ScipyOptimizeDriver, ExplicitComponent, ImplicitCompone
 # The script can be run from the root git directory as 'python examples/script.py' and the latest openconcept package will be imported by default
 import sys, os
 sys.path.insert(0,os.getcwd())
+from __future__ import division
 #-------These imports are generic and should be left alone
 import numpy as np
 import scipy.sparse as sp

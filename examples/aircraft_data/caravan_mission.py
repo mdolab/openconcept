@@ -1,3 +1,5 @@
+from __future__ import division
+
 data = dict()
 takeoff = dict()
 takeoff['h'] = {'value': 0, 'units': 'ft'}

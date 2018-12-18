@@ -1,6 +1,7 @@
 # DATA FOR TBM T80
 # Collected from various sources
 # including SOCATA pilot manual
+from __future__ import division
 
 data = dict()
 ac = dict()

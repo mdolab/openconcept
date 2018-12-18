@@ -1,4 +1,5 @@
 
+from __future__ import division
 import numpy as np
 from openmdao.api import Group, Problem, IndepVarComp, ExplicitComponent
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp

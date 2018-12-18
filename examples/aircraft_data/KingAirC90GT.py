@@ -1,6 +1,7 @@
 # DATA FOR King Air C90GT
 # Collected from AOPA Pilot article
 # and rough photogrammetry
+from __future__ import division
 
 data = dict()
 ac = dict()

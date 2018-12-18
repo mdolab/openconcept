@@ -3,8 +3,7 @@ This file contains a module to calculate operating costs for airplanes in the ge
 costs, so mission optimization routines will tend to favor slower, longer-time routes than they  probably should (could fix in future).
 """
 
-
-
+from __future__ import division
 from openmdao.api import ExplicitComponent
 import numpy as np
 

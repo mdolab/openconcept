@@ -1,8 +1,8 @@
+from __future__ import division
 from openconcept.components.turboshaft import SimpleTurboshaft
 from openconcept.components.propeller import SimplePropeller
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math import AddSubtractComp
-
 from openmdao.api import Group, IndepVarComp, ExplicitComponent
 
 class TurbopropPropulsionSystem(Group):
