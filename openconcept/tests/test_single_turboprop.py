@@ -7,7 +7,7 @@ from examples.TBM850 import define_analysis
 from openconcept.analysis.takeoff import takeoff_check
 from openconcept.utilities.nodes import compute_num_nodes
 
-class VectorDragTestCase(unittest.TestCase):
+class TBMAnalysisTestCase(unittest.TestCase):
     def setUp(self):
         n_int_per_seg = 5
         self.prob = define_analysis(n_int_per_seg)
