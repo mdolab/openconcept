@@ -1,4 +1,4 @@
-from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver
+from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver, BoundsEnforceLS
 from openmdao.api import ScipyOptimizeDriver, ExplicitComponent, ImplicitComponent
 # ------This is a hack for testing scripts on openconcept source directories that haven't been installed.
 # By default, a script includes its path in sys.path. We need to add the folder one level higher (where the interpreter is run from)
@@ -144,12 +144,13 @@ def define_analysis(n_int_per_seg):
     prob.model= TotalAnalysis(n_int_per_seg=n_int_per_seg)
     prob.model.options['assembled_jac_type'] = 'dense'
     prob.model.nonlinear_solver=NewtonSolver()
-    prob.model.linear_solver = DirectSolver()
+    prob.model.linear_solver = DirectSolver(assemble_jac=True)
     prob.model.nonlinear_solver.options['solve_subsystems'] = True
     prob.model.nonlinear_solver.options['maxiter'] = 10
     prob.model.nonlinear_solver.options['atol'] = 1e-6
     prob.model.nonlinear_solver.options['rtol'] = 1e-6
-
+    prob.model.nonlinear_solver.linesearch = BoundsEnforceLS()
+    prob.model.nonlinear_solver.linesearch.options['bound_enforcement'] = 'wall'
     prob.driver = ScipyOptimizeDriver()
     return prob
 

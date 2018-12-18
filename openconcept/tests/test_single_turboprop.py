@@ -19,6 +19,7 @@ class TBMAnalysisTestCase(unittest.TestCase):
         self.prob['OEW.const.structural_fudge'] = 1.67
         self.prob['takeoff.v1_solve.takeoff|v1'] = 30
         self.prob['design_mission.throttle'] = np.ones(nn_tot_m)*0.7
+        self.prob['design_mission.cruise|time'] = 1000
         self.prob.run_model()
 
     def test_values_TBM(self):

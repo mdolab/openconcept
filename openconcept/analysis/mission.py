@@ -667,7 +667,7 @@ class SolveCruiseTime(ImplicitComponent):
     def setup(self):
         self.add_input('design_range', units='m')
         self.add_input('range', units='m')
-        self.add_output('cruise|time', units='s')
+        self.add_output('cruise|time', units='s',lower=1.0)
         self.declare_partials(['cruise|time'], ['range'])
         self.declare_partials(['cruise|time'], ['design_range'])
 
