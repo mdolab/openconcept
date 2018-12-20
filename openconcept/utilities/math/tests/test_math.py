@@ -230,7 +230,7 @@ class FirstDerivCommonTestCases(object):
         prob.run_model()
         assert_rel_error(self, prob.get_val('derivative.dqdt','m/s'), fp_exact, tolerance=1e-12)
         partials = prob.check_partials(method='cs',compact_print=True)
-        assert_check_partials(partials, atol=1e-8, rtol=1e-8)
+        assert_check_partials(partials, atol=1e-6, rtol=1e-6)
 
     def test_quadratic_multi_phase_units_7int(self):
         prob = Problem(FirstDerivativeTestGroup(segment_names=['climb','cruise','descent'],
@@ -249,7 +249,7 @@ class FirstDerivCommonTestCases(object):
         prob.run_model()
         assert_rel_error(self, prob.get_val('derivative.dqdt','m/s'), fp_exact, tolerance=1e-12)
         partials = prob.check_partials(method='cs',compact_print=True)
-        assert_check_partials(partials, atol=1e-8, rtol=1e-8)
+        assert_check_partials(partials, atol=1e-6, rtol=1e-6)
 
 class FirstDerivativeSecondOrderTestCases(unittest.TestCase, FirstDerivCommonTestCases):
     """
@@ -296,7 +296,7 @@ class FirstDerivativeFourthOrderTestCases(unittest.TestCase, FirstDerivCommonTes
         prob.run_model()
         assert_rel_error(self, prob['derivative.dqdt'], fp_exact, tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
-        assert_check_partials(partials, atol=1e-8, rtol=1e-8)
+        assert_check_partials(partials, atol=1e-6, rtol=1e-6)
 
     def test_quartic_single_phase_units(self):
         prob = Problem(FirstDerivativeTestGroup(order=self.order, quantity_units='m', diff_units='s'))
