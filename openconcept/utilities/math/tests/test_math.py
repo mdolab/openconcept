@@ -137,7 +137,7 @@ class FirstDerivCommonTestCases(object):
         prob.run_model()
         n_int_per_seg = 5
         nn_tot = (n_int_per_seg*2 + 1)
-        assert_rel_error(self, prob['derivative.dqdt'], np.zeros((nn_tot,)),tolerance=1e-15)
+        assert_rel_error(self, prob['derivative.dqdt'], np.zeros((nn_tot,)),tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
