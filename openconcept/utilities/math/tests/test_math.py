@@ -75,6 +75,7 @@ class SimpsonTestCase(unittest.TestCase):
         partials = prob.check_partials(method='fd',compact_print=True)
         assert_check_partials(partials)
 
+
 class FirstDerivativeTestGroup(Group):
     """An OpenMDAO group to test the differentiation tools
 
