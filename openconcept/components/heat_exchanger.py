@@ -950,17 +950,227 @@ class NTUEffectivenessActualHeatTransfer(ExplicitComponent):
         J['heat_transfer', 'effectiveness'] = inputs['heat_max']
         J['heat_transfer', 'heat_max'] = inputs['effectiveness']
 
+class OutletTemperatures(ExplicitComponent):
+    """
+    Computes outlet temperatures of hot and cold streams, given
+    mass flow rates, cp, and heat transfer
+
+    Inputs
+    -------
+    heat_transfer : float
+        Actual heat transfer from hot to cold side (vector, W)
+    mdot_cold : float
+        Mass flow rate, cold side  (vector, kg/s)
+    T_in_cold : float
+        Inlet temperature, cold side (vector, K)
+    cp_cold : float
+        Specific heat at constant pressure, cold side (scalar, J/kg/K)
+    mdot_hot : float
+        Mass flow rate, cold side  (vector, kg/s)
+    T_in_hot : float
+        Inlet temperature, hot side (vector, K)
+    cp_hot : float
+        Specific heat at constant pressure, cold side (scalar, J/kg/K)
+
+    Outputs
+    -------
+    T_out_cold : float
+        Outlet temperature, cold side (vector, K)
+    T_out_hot : float
+        Outlet temperature, hot side (vector, K)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (scalar, dimensionless)
+    """
+
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
+
+    def setup(self):
+        nn = self.options['num_nodes']
+        self.add_input('heat_transfer', shape=(nn,), units='W')
+        self.add_input('mdot_cold', shape=(nn,), units='kg/s')
+        self.add_input('T_in_cold', shape=(nn,), units='K')
+        self.add_input('cp_cold', units='J/kg/K')
+        self.add_input('mdot_hot', shape=(nn,), units='kg/s')
+        self.add_input('T_in_hot', shape=(nn,), units='K')
+        self.add_input('cp_hot', units='J/kg/K')
+        self.add_output('T_out_cold', shape=(nn,), units='K')
+        self.add_output('T_out_hot', shape=(nn,), units='K')
+
+        arange = np.arange(0, nn)
+        self.declare_partials(['T_out_cold'],
+                              ['heat_transfer', 'mdot_cold'],
+                              rows=arange, cols=arange)
+        self.declare_partials(['T_out_cold'],
+                              ['T_in_cold'],
+                              rows=arange, cols=arange, val=np.ones((nn,)))
+        self.declare_partials(['T_out_hot'],
+                              ['heat_transfer', 'mdot_hot'],
+                              rows=arange, cols=arange)
+        self.declare_partials(['T_out_hot'],
+                              ['T_in_hot'],
+                              rows=arange, cols=arange, val=np.ones((nn,)))
+        self.declare_partials(['T_out_cold'], ['cp_cold'], rows=arange, cols=np.zeros((nn,), dtype=np.int32))
+        self.declare_partials(['T_out_hot'], ['cp_hot'], rows=arange, cols=np.zeros((nn,), dtype=np.int32))
+
+    def compute(self, inputs, outputs):
+        outputs['T_out_cold'] = inputs['T_in_cold'] + inputs['heat_transfer'] / inputs['mdot_cold'] / inputs['cp_cold']
+        outputs['T_out_hot'] = inputs['T_in_hot'] - inputs['heat_transfer'] / inputs['mdot_hot'] / inputs['cp_hot']
+
+    def compute_partials(self, inputs, J):
+        J['T_out_cold', 'heat_transfer'] = 1 / inputs['mdot_cold'] / inputs['cp_cold']
+        J['T_out_cold', 'mdot_cold'] = - inputs['heat_transfer'] / inputs['mdot_cold']**2 / inputs['cp_cold']
+        J['T_out_cold', 'cp_cold'] = - inputs['heat_transfer'] / inputs['mdot_cold'] / inputs['cp_cold'] ** 2
+        J['T_out_hot', 'heat_transfer'] = - 1 / inputs['mdot_hot'] / inputs['cp_hot']
+        J['T_out_hot', 'mdot_hot'] = inputs['heat_transfer'] / inputs['mdot_hot']**2 / inputs['cp_hot']
+        J['T_out_hot', 'cp_hot'] = inputs['heat_transfer'] / inputs['mdot_hot'] / inputs['cp_hot'] ** 2
+
+class PressureDrop(ExplicitComponent):
+    """
+    Computes total pressure drop in the hot and cold streams
+
+    Inputs
+    -------
+    length_overall : float
+        Overall length of the cold side flowpath (scalar, m)
+    width_overall : float
+        Overall length of the hot side flowpath (scalar, m)
+    f_cold : float
+        Fanning friction factor (vector, dimensionless)
+    mdot_cold : float
+        Mass flow rate, cold side  (vector, kg/s)
+    rho_cold : float
+        Inlet density, cold side (vector, kg/m**3)
+    dh_cold : float
+        Hydraulic diameter of the cold side flow channels (scalar, m)
+    xs_area_cold : float
+        Cross-sectional flow area of the cold side (scalar, m**2)
+    f_hot : float
+        Fanning friction factor (vector, dimensionless)
+    mdot_hot : float
+        Mass flow rate, hot side  (vector, kg/s)
+    rho_hot : float
+        Inlet density, hot side (vector, kg/m**3)
+    dh_hot : float
+        Hydraulic diameter of the hot side flow channels (scalar, m)
+    xs_area_hot : float
+        Cross-sectional flow area of the hot side (scalar, m**2)
+
+    Outputs
+    -------
+    delta_p_cold : float
+        Pressure drop, cold side. Negative is pressure drop (vector, Pa)
+    delta_p_hot : float
+        Pressure drop, cold side. Negative is pressure drop (vector, Pa)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (scalar, dimensionless)
+    Kc_cold : float
+        Irreversible contraction loss coefficient (per Kays and London) (scalar, dimensionless)
+    Ke_cold : float
+        Irreversible expansion loss coefficient (per Kays and London) (scalar, dimensionless)
+    Kc_hot : float
+        Irreversible contraction loss coefficient (per Kays and London) (scalar, dimensionless)
+    Ke_hot : float
+        Irreversible expansion loss coefficient (per Kays and London) (scalar, dimensionless)
+
+    """
+
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
+        self.options.declare('Kc_cold', default=0.3, desc='Irreversible contraction loss coefficient')
+        self.options.declare('Ke_cold', default=-0.1, desc='Irreversible contraction loss coefficient')
+        self.options.declare('Kc_hot', default=0.3, desc='Irreversible contraction loss coefficient')
+        self.options.declare('Ke_hot', default=-0.1, desc='Irreversible contraction loss coefficient')
+
+    def setup(self):
+        nn = self.options['num_nodes']
+        self.add_input('length_overall', units='m')
+        self.add_input('width_overall', units='m')
+
+        self.add_input('f_cold', shape=(nn,))
+        self.add_input('mdot_cold', shape=(nn,), units='kg/s')
+        self.add_input('rho_cold', shape=(nn,), units='kg/m**3')
+        self.add_input('dh_cold', units='m')
+        self.add_input('xs_area_cold',  units='m**2')
+
+        self.add_input('f_hot', shape=(nn,))
+        self.add_input('mdot_hot', shape=(nn,), units='kg/s')
+        self.add_input('rho_hot', shape=(nn,), units='kg/m**3')
+        self.add_input('dh_hot', units='m')
+        self.add_input('xs_area_hot',  units='m**2')
+
+        self.add_output('delta_p_cold', shape=(nn,), units='Pa')
+        self.add_output('delta_p_hot', shape=(nn,), units='Pa')
+
+        arange = np.arange(0, nn)
+        self.declare_partials(['delta_p_cold'],
+                              ['mdot_cold', 'rho_cold','f_cold'],
+                              rows=arange, cols=arange)
+        self.declare_partials(['delta_p_cold'],
+                              ['xs_area_cold', 'length_overall','dh_cold'],
+                              rows=arange, cols=np.zeros((nn,), dtype=np.int32))
+        self.declare_partials(['delta_p_hot'],
+                              ['mdot_hot', 'rho_hot','f_hot'],
+                              rows=arange, cols=arange)
+        self.declare_partials(['delta_p_hot'],
+                              ['xs_area_hot', 'width_overall','dh_hot'],
+                              rows=arange, cols=np.zeros((nn,), dtype=np.int32))
+    def compute(self, inputs, outputs):
+        dyn_press_cold = (1/2)*(inputs['mdot_cold']/inputs['xs_area_cold'])**2/inputs['rho_cold']
+        dyn_press_hot = (1/2)*(inputs['mdot_hot']/inputs['xs_area_hot'])**2/inputs['rho_hot']
+        Kec = self.options['Ke_cold']
+        Kcc = self.options['Kc_cold']
+        Keh = self.options['Ke_hot']
+        Kch = self.options['Kc_hot']
+        outputs['delta_p_cold'] = dyn_press_cold * (-Kec-Kcc-4*inputs['length_overall']*inputs['f_cold']/inputs['dh_cold'])
+        outputs['delta_p_hot'] = dyn_press_hot * (-Kec-Kcc-4*inputs['width_overall']*inputs['f_hot']/inputs['dh_hot'])
+
+    def compute_partials(self, inputs, J):
+        dyn_press_cold = (1/2)*(inputs['mdot_cold']/inputs['xs_area_cold'])**2/inputs['rho_cold']
+        dyn_press_hot = (1/2)*(inputs['mdot_hot']/inputs['xs_area_hot'])**2/inputs['rho_hot']
+        Kec = self.options['Ke_cold']
+        Kcc = self.options['Kc_cold']
+        Keh = self.options['Ke_hot']
+        Kch = self.options['Kc_hot']
+        losses_cold = (-Kec-Kcc-4*inputs['length_overall']*inputs['f_cold']/inputs['dh_cold'])
+        losses_hot = (-Kec-Kcc-4*inputs['width_overall']*inputs['f_hot']/inputs['dh_hot'])
+
+        J['delta_p_cold', 'mdot_cold'] = (inputs['mdot_cold']/inputs['xs_area_cold']**2)/inputs['rho_cold'] * losses_cold
+        J['delta_p_cold', 'rho_cold'] = - dyn_press_cold / inputs['rho_cold'] * losses_cold
+        J['delta_p_cold', 'f_cold'] = dyn_press_cold * (-4*inputs['length_overall']/inputs['dh_cold'])
+        J['delta_p_cold', 'xs_area_cold'] = - 2 * dyn_press_cold / inputs['xs_area_cold'] * losses_cold
+        J['delta_p_cold', 'length_overall'] = dyn_press_cold * (-4 * inputs['f_cold'] / inputs['dh_cold'])
+        J['delta_p_cold', 'dh_cold'] = dyn_press_cold * (4*inputs['length_overall']*inputs['f_cold']/inputs['dh_cold']**2)
+
+        J['delta_p_hot', 'mdot_hot'] = (inputs['mdot_hot']/inputs['xs_area_hot']**2)/inputs['rho_hot'] * losses_hot
+        J['delta_p_hot', 'rho_hot'] = - dyn_press_hot / inputs['rho_hot'] * losses_hot
+        J['delta_p_hot', 'f_hot'] = dyn_press_hot * (-4*inputs['width_overall']/inputs['dh_hot'])
+        J['delta_p_hot', 'xs_area_hot'] = - 2 * dyn_press_hot / inputs['xs_area_hot'] * losses_hot
+        J['delta_p_hot', 'width_overall'] = dyn_press_hot * (-4 * inputs['f_hot'] / inputs['dh_hot'])
+        J['delta_p_hot', 'dh_hot'] = dyn_press_hot * (4*inputs['width_overall']*inputs['f_hot']/inputs['dh_hot']**2)
+
+
+
 if __name__ == '__main__':
         # run this script from the root openconcept directory like so:
         # python .\openconcept\components\heat_exchanger.py
         import sys, os
         sys.path.insert(0,os.getcwd())
         from openconcept.components.tests.test_heat_exchanger import OSFGeometryTestGroup
-        prob = Problem(OSFGeometryTestGroup(num_nodes=3))
+        prob = Problem(OSFGeometryTestGroup(num_nodes=1))
         prob.setup(check=True,force_alloc_complex=True)
         prob.run_model()
         prob.check_partials(method='cs', compact_print=True)
         prob.model.list_inputs()
         prob.model.list_outputs()
         check = prob.get_val('heat.heat_transfer')
+        check2 = prob.get_val('delta_p_cold')
+
         print(check)
+        print(check2)

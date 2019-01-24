@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
-from openconcept.components.heat_exchanger import OffsetStripFinGeometry, OffsetStripFinData, HydraulicDiameterReynoldsNumber
+from openconcept.components.heat_exchanger import OffsetStripFinGeometry, OffsetStripFinData, HydraulicDiameterReynoldsNumber, OutletTemperatures, PressureDrop
 from openconcept.components.heat_exchanger import NusseltFromColburnJ, ConvectiveCoefficient, FinEfficiency, UAOverall, NTUMethod, CrossFlowNTUEffectiveness, NTUEffectivenessActualHeatTransfer
 class OSFGeometryTestGroup(Group):
     """
@@ -22,16 +22,20 @@ class OSFGeometryTestGroup(Group):
         iv.add_output('material_k', val=190, units='W/m/K')
         iv.add_output('material_rho', val=2700, units='kg/m**3')
 
-        iv.add_output('mdot_cold', val=np.ones(nn), units='kg/s')
-        iv.add_output('mdot_hot', val=0.1*np.ones(nn), units='kg/s')
+        iv.add_output('mdot_cold', val=np.ones(nn)*1.5, units='kg/s')
+        iv.add_output('rho_cold', val=np.ones(nn)*0.5, units='kg/m**3')
+
+        iv.add_output('mdot_hot', val=0.075*np.ones(nn), units='kg/s')
+        iv.add_output('rho_hot', val=np.ones(nn)*1020.2, units='kg/m**3')
+
         iv.add_output('T_in_cold', val=np.ones(nn)*45, units='degC')
         iv.add_output('T_in_hot', val=np.ones(nn)*90, units='degC')
         iv.add_output('n_long_cold', val=3)
-        iv.add_output('n_wide_cold', val=50)
-        iv.add_output('n_tall', val=20)
+        iv.add_output('n_wide_cold', val=430)
+        iv.add_output('n_tall', val=19)
 
-        iv.add_output('channel_height_cold', val=12, units='mm')
-        iv.add_output('channel_width_cold', val=1, units='mm')
+        iv.add_output('channel_height_cold', val=14, units='mm')
+        iv.add_output('channel_width_cold', val=1.35, units='mm')
         iv.add_output('fin_length_cold', val=6, units='mm')
         iv.add_output('cp_cold', val=1005, units='J/kg/K')
         iv.add_output('k_cold', val=0.02596, units='W/m/K')
@@ -56,14 +60,21 @@ class OSFGeometryTestGroup(Group):
         self.add_subsystem('ntu', NTUMethod(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('effectiveness', CrossFlowNTUEffectiveness(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('heat', NTUEffectivenessActualHeatTransfer(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('t_out', OutletTemperatures(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('delta_p', PressureDrop(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
 
 class OSFGeometryTestCase(unittest.TestCase):
 
     def test_default_settings(self):
-        prob = Problem(OSFGeometryTestGroup(num_nodes=2))
+        prob = Problem(OSFGeometryTestGroup(num_nodes=1))
         prob.setup(check=True,force_alloc_complex=True)
         prob.run_model()
-        assert_rel_error(self, prob['osfgeometry.dh_cold'], 1.84615384e-3, tolerance=1e-8)
+        assert_rel_error(self, prob['osfgeometry.dh_cold'], 0.002462541, tolerance=1e-6)
+        assert_rel_error(self, prob['heat_transfer'], 10020.13126, tolerance=1e-6 )
+        assert_rel_error(self, prob['delta_p_cold'], -131.9862069, tolerance=1e-6 )
+        assert_rel_error(self, prob['delta_p_hot'], -9112.282754, tolerance=1e-6 )
+        assert_rel_error(self, prob['component_weight'], 1.147605, tolerance=1e-5 )
+
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
