@@ -1,4 +1,4 @@
-pytest
+pytest>=3.6
 python-coveralls
 coverage>=4.4
 pytest-cov
