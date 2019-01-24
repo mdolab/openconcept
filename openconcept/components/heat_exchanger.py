@@ -1,7 +1,7 @@
 from __future__ import division
 import numpy as np
 from openmdao.api import ExplicitComponent, Problem
-from openmdao.api import Group
+from openmdao.api import Group, ScipyOptimizeDriver
 
 class OffsetStripFinGeometry(ExplicitComponent):
     """
@@ -602,8 +602,6 @@ class FinEfficiency(ExplicitComponent):
 
         m_hot = np.sqrt(2 * h_h / k / t_f)
         eta_f_hot = 2* np.tanh(m_hot * l_f_h / 2) / m_hot / l_f_h
-        print('eta_f:'+str(eta_f_hot))
-
         outputs['eta_overall_hot'] = 1 - inputs['fin_area_ratio_hot'] * (1 - eta_f_hot)
 
     def compute_partials(self, inputs, J):
@@ -1164,9 +1162,33 @@ if __name__ == '__main__':
         sys.path.insert(0,os.getcwd())
         from openconcept.components.tests.test_heat_exchanger import OSFGeometryTestGroup
         prob = Problem(OSFGeometryTestGroup(num_nodes=1))
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['tol'] = 1e-7
+
+        prob.model.add_design_var('channel_width_hot',lower=1,upper=20)
+        prob.model.add_design_var('channel_height_hot',lower=1,upper=20)
+        prob.model.add_design_var('fin_length_hot',lower=6,upper=20)
+        prob.model.add_design_var('channel_width_cold',lower=1,upper=20)
+        prob.model.add_design_var('channel_height_cold',lower=1,upper=20)
+        prob.model.add_design_var('fin_length_cold',lower=6,upper=20)
+        prob.model.add_design_var('n_wide_cold',lower=6,upper=1000)
+        prob.model.add_design_var('n_long_cold',lower=3,upper=1000)
+        prob.model.add_design_var('n_tall',lower=3,upper=1000)
+        prob.model.add_design_var('mdot_cold',lower=0.01,upper=10)
+        prob.model.add_design_var('mdot_hot',lower=0.01,upper=10)
+
+
+        prob.model.add_constraint('dh_cold',lower=0.001)
+        prob.model.add_constraint('dh_hot',lower=0.001)
+        prob.model.add_constraint('delta_p_cold', lower=-150)
+        prob.model.add_constraint('heat_transfer', lower=10000.)
+        prob.model.add_constraint('T_out_hot', upper=55+273.15)
+
+        prob.model.add_objective('component_weight')
         prob.setup(check=True,force_alloc_complex=True)
         prob.run_model()
-        prob.check_partials(method='cs', compact_print=True)
+        # prob.check_partials(method='cs', compact_print=True)
+        prob.run_driver()
         prob.model.list_inputs()
         prob.model.list_outputs()
         check = prob.get_val('heat.heat_transfer')
