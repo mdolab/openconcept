@@ -73,7 +73,6 @@ def three_point_lagrange_integration(dqdt, dts, num_segments=1, num_intervals=2,
         # offset the sparse partials if not the first segment to make it work in OpenMDAO terms
         dt_partials_rowidxs = np.arange(i_seg * ndelta_seg, (i_seg + 1) * ndelta_seg)
         dt_partials_colidxs = np.zeros((ndelta_seg,), dtype=np.int32)
-        raise ValueError(str(dt_partials.data.shape)+' '+str(dt_partials_colidxs.shape)+' '+str(dt_partials_rowidxs.shape))
         partials_wrt_dts.append(sp.csr_matrix((dt_partials.data,
                                               (dt_partials_rowidxs, dt_partials_colidxs)),
                                                shape=(ndelta_tot, nn_tot)))
