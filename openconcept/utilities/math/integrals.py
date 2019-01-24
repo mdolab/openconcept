@@ -73,10 +73,9 @@ def three_point_lagrange_integration(dqdt, dts, num_segments=1, num_intervals=2,
         # offset the sparse partials if not the first segment to make it work in OpenMDAO terms
         dt_partials_rowidxs = np.arange(i_seg * ndelta_seg, (i_seg + 1) * ndelta_seg)
         dt_partials_colidxs = np.zeros((ndelta_seg,), dtype=np.int32)
-        partials_wrt_dts.append(sp.csr_matrix((dt_partials.data,
+        partials_wrt_dts.append(sp.csr_matrix((dt_partials,
                                               (dt_partials_rowidxs, dt_partials_colidxs)),
                                                shape=(ndelta_tot, nn_tot)))
-
     # now assemble the overall sparse block diagonal matrix to obtain the final result
     partials_wrt_dqdt = sp.block_diag(jacmats_list)
     delta_q = partials_wrt_dqdt.dot(dqdt)
