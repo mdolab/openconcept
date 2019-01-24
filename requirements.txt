@@ -4,6 +4,6 @@ coverage>=4.4
 pytest-cov
 scipy
 numpy
-openmdao==2.3.1
+openmdao
 six
 sphinx_rtd_theme
