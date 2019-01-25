@@ -5,6 +5,7 @@ from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
 from openconcept.components.heat_exchanger import OffsetStripFinGeometry, OffsetStripFinData, HydraulicDiameterReynoldsNumber, OutletTemperatures, PressureDrop
 from openconcept.components.heat_exchanger import NusseltFromColburnJ, ConvectiveCoefficient, FinEfficiency, UAOverall, NTUMethod, CrossFlowNTUEffectiveness, NTUEffectivenessActualHeatTransfer
+
 class OSFGeometryTestGroup(Group):
     """
     Test the offset strip fin geometry component
