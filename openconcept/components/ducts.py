@@ -1,7 +1,7 @@
 from __future__ import division
 import numpy as np
 from openmdao.api import ExplicitComponent, Problem, ImplicitComponent, NewtonSolver, DirectSolver, IndepVarComp
-from openmdao.api import Group, ScipyOptimizeDriver
+from openmdao.api import Group, ScipyOptimizeDriver, BoundsEnforceLS
 
 class TemperatureIsentropic(ExplicitComponent):
     """
@@ -398,7 +398,8 @@ class MachNumberDuct(ImplicitComponent):
         self.add_input('a', shape=(nn,), units='m/s')
         self.add_input('area', units='m**2')
         self.add_input('rho', shape=(nn,), units='kg/m**3')
-        self.add_output('M', shape=(nn,), upper=1.0)
+       # self.add_output('M', shape=(nn,), lower=0.0, upper=1.0)
+        self.add_output('M', shape=(nn,), lower=0.0)
         arange = np.arange(0, nn)
         self.declare_partials(['M'], ['mdot'], rows=arange, cols=arange, val=np.ones((nn, )))
         self.declare_partials(['M'], ['M', 'a', 'rho'], rows=arange, cols=arange)
@@ -413,21 +414,61 @@ class MachNumberDuct(ImplicitComponent):
         J['M','area'] = - outputs['M'] * inputs['a'] * inputs['rho']
         J['M','rho'] = - outputs['M'] * inputs['a'] * inputs['area']
 
-class DuctExitMachNumber(ExplicitComponent):
+class DuctExitPressureRatioImplicit(ImplicitComponent):
     """
-    Compute duct exit Mach number based on total pressure and ambient pressure
+    Compute duct exit pressure ratio based on total pressure and ambient pressure
 
     Inputs
     -------
     p_exit : float
         Exit static pressure (vector, Pa)
-    p_t : float
+    pt : float
         Total pressure (vector, Pa)
 
     Outputs
     -------
+    nozzle_pressure_ratio : float
+        Computed nozzle pressure ratio (vector, dimensionless)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (scalar, dimensionless)
+    """
+
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
+
+    def setup(self):
+        nn = self.options['num_nodes']
+        self.add_input('p_exit', shape=(nn,), units='Pa')
+        self.add_input('pt', shape=(nn,), units='Pa')
+        self.add_output('nozzle_pressure_ratio', shape=(nn,), upper=1.)
+        arange = np.arange(0, nn)
+        self.declare_partials(['nozzle_pressure_ratio'], ['nozzle_pressure_ratio'], rows=arange, cols=arange, val=np.ones((nn, )))
+        self.declare_partials(['nozzle_pressure_ratio'], ['p_exit','pt'], rows=arange, cols=arange)
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        residuals['nozzle_pressure_ratio'] = outputs['nozzle_pressure_ratio'] - inputs['p_exit'] / inputs['pt']
+
+    def linearize(self, inputs, outputs, J):
+        J['nozzle_pressure_ratio', 'p_exit'] = - 1 / inputs['pt']
+        J['nozzle_pressure_ratio', 'pt'] = inputs['p_exit'] / inputs['pt'] ** 2
+
+
+class DuctExitMachNumber(ExplicitComponent):
+    """
+    Compute duct exit Mach number based on nozzle pressure ratio
+
+    Inputs
+    -------
+    nozzle_pressure_ratio : float
+        Computed nozzle pressure ratio (vector, dimensionless)
+
+    Outputs
+    -------
     M : float
-        Mach number (vector, Pa)
+        Computed nozzle Mach number(vector, dimensionless)
 
     Options
     -------
@@ -444,16 +485,66 @@ class DuctExitMachNumber(ExplicitComponent):
     def setup(self):
         nn = self.options['num_nodes']
         gam = self.options['gamma']
-        self.add_input('p_exit', shape=(nn,),  units='Pa')
-        self.add_input('pt', shape=(nn,), units='Pa')
+        self.add_input('nozzle_pressure_ratio', shape=(nn,))
         self.add_output('M', shape=(nn,))
         self.declare_partials(['*'], ['*'], method='cs')
 
     def compute(self, inputs, outputs):
         nn = self.options['num_nodes']
         gam = self.options['gamma']
-        pstar = inputs['pt'] * (2/(gam+1))**(gam/(gam-1))
-        outputs['M'] = np.where(np.greater_equal(pstar, inputs['p_exit']), np.ones((nn,)), np.sqrt(((inputs['p_exit']/inputs['pt'])**((1-gam)/gam)-1)*2/(gam-1)))
+        critical_pressure_ratio =  (2/(gam+1))**(gam/(gam-1))
+        outputs['M'] = np.where(np.less_equal(inputs['nozzle_pressure_ratio'], critical_pressure_ratio), np.ones((nn,)), np.sqrt(((inputs['nozzle_pressure_ratio'])**((1-gam)/gam)-1)*2/(gam-1)))
+
+class NetForce(ExplicitComponent):
+    """
+    Compute net force based on inlet and outlet pressures and velocities
+
+    Inputs
+    -------
+    mdot : float
+        Mass flow rate (vector, kg/s)
+    Utrue_inf : float
+        Freestream true airspeed (vector, m/s)
+    p_inf : float
+        Static pressure in the free stream. (vector, Pa)
+    area_nozzle : float
+        Nozzle cross sectional area (vector, m**2)
+    p_nozzle : float
+        Static pressure at the nozzle. Equal to p_inf unless choked (vector, Pa)
+    rho_nozzle : float
+        Density at the nozzle (vector, kg/m**3)
+
+    Outputs
+    -------
+    F_net : float
+        Overall net force (positive is forward thrust) (vector, N)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (scalar, dimensionless)
+    """
+
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
+
+    def setup(self):
+        nn = self.options['num_nodes']
+        self.add_input('mdot', shape=(nn,), units='kg/s')
+        self.add_input('Utrue_inf', shape=(nn,), units='m/s')
+        self.add_input('p_inf', shape=(nn,), units='Pa')
+        self.add_input('area_nozzle', shape=(nn,), units='m**2')
+        self.add_input('p_nozzle', shape=(nn,), units='Pa')
+        self.add_input('rho_nozzle', shape=(nn,), units='kg/m**3')
+
+        self.add_output('F_net', shape=(nn,), units='N')
+        self.declare_partials(['*'], ['*'], method='cs')
+
+    def compute(self, inputs, outputs):
+        nn = self.options['num_nodes']
+        outputs['F_net'] = (inputs['mdot'] * (inputs['mdot'] / inputs['area_nozzle'] / inputs['rho_nozzle'] - inputs['Utrue_inf']) +
+                                              inputs['area_nozzle']*(inputs['p_nozzle']-inputs['p_inf']))
+
 
 class Inlet(Group):
     """This group takes in ambient flight conditions and computes total quantities for downstream use
@@ -563,7 +654,8 @@ class OutletNozzle(Group):
 
     def setup(self):
         nn = self.options['num_nodes']
-        self.add_subsystem('mach', DuctExitMachNumber(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('pressureratio', DuctExitPressureRatioImplicit(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('machimplicit', DuctExitMachNumber(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('temp', TemperatureIsentropic(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('pressure', PressureIsentropic(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('density', DensityIdealGas(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
@@ -583,7 +675,8 @@ class DuctTestGroup(Group):
         iv = self.add_subsystem('iv', IndepVarComp(), promotes_outputs=['cp'])
         iv.add_output('p_inf', val=37600.9*np.ones((nn,)), units='Pa')
         iv.add_output('T_inf', val=238.6*np.ones((nn,)), units='K')
-        iv.add_output('Utrue', val=300.7*np.ones((nn,)), units='kn')
+        #iv.add_output('Utrue', val=300.7*np.ones((nn,)), units='kn')
+        iv.add_output('Utrue', val=np.linspace(12,100,nn), units='kn')
         iv.add_output('cp', val=1002.93, units='J/kg/K')
 
         iv.add_output('area_1', val=60, units='inch**2')
@@ -595,10 +688,11 @@ class DuctTestGroup(Group):
         iv.add_output('heat_in_2', val=np.ones((nn,))*0., units='W')
 
         iv.add_output('area_3', val=286.918, units='inch**2')
-        iv.add_output('delta_p_3', val=np.ones((nn,))*-338.237, units='Pa')
+        #iv.add_output('delta_p_3', val=np.ones((nn,))*-338.237, units='Pa')
         iv.add_output('heat_in_3', val=np.ones((nn,))*30408.8, units='W')
+        iv.add_output('delta_p_3', val=np.ones((nn,))*0, units='Pa')
 
-        iv.add_output('nozzle_area', val=58, units='inch**2')
+        iv.add_output('nozzle_area', val=58*np.ones((nn,)), units='inch**2')
         iv.add_output('p_exit', val=37600.9*np.ones((nn,)), units='Pa')
 
 
@@ -645,9 +739,10 @@ class DuctWithHx(Group):
         nn = self.options['num_nodes']
 
         iv = self.add_subsystem('iv', IndepVarComp(), promotes_outputs=['cp'])
-        iv.add_output('p_inf', val=37600.9*np.ones((nn,)), units='Pa')
-        iv.add_output('T_inf', val=238.6*np.ones((nn,)), units='K')
-        iv.add_output('Utrue', val=np.linspace(35, 100, nn), units='kn')
+        iv.add_output('p_inf', val=37600.903*np.ones((nn,)), units='Pa')
+        iv.add_output('T_inf', val=238.62*np.ones((nn,)), units='K')
+        #iv.add_output('Utrue', val=300.9*np.ones((nn,)), units='kn')
+        iv.add_output('Utrue', val=np.linspace(10, 300, nn), units='kn')
         iv.add_output('cp', val=1002.93, units='J/kg/K')
 
         iv.add_output('area_1', val=60, units='inch**2')
@@ -659,11 +754,11 @@ class DuctWithHx(Group):
         iv.add_output('heat_in_2', val=np.ones((nn,))*0., units='W')
 
         iv.add_output('area_3', val=286.918, units='inch**2')
-        #iv.add_output('delta_p_3', val=np.ones((nn,))*-338.237, units='Pa')
-        #iv.add_output('heat_in_3', val=np.ones((nn,))*30408.8, units='W')
+        #iv.add_output('delta_p_3', val=np.ones((nn,))*0, units='Pa')
+        iv.add_output('heat_in_3', val=np.ones((nn,))*1, units='W')
 
         iv.add_output('nozzle_area', val=58*np.ones((nn,)), units='inch**2')
-        iv.add_output('p_exit', val=37600.9*np.ones((nn,)), units='Pa')
+        iv.add_output('p_exit', val=37600.903*np.ones((nn,)), units='Pa')
 
         self.add_subsystem('inlet', Inlet(num_nodes=nn))
         self.connect('iv.p_inf','inlet.p')
@@ -696,6 +791,7 @@ class DuctWithHx(Group):
         self.connect('iv.area_3','sta3.area')
         self.connect('hx.delta_p_cold','sta3.delta_p')
         self.connect('hx.heat_transfer','sta3.heat_in')
+        # self.connect('iv.heat_in_3','sta3.heat_in')
 
         self.add_subsystem('nozzle', OutletNozzle(num_nodes=nn), promotes_outputs=['mdot'])
         self.connect('iv.p_exit','nozzle.p_exit')
@@ -703,21 +799,31 @@ class DuctWithHx(Group):
         self.connect('sta3.Tt_out','nozzle.Tt')
         self.connect('iv.nozzle_area','nozzle.area')
 
+        self.add_subsystem('force', NetForce(num_nodes=nn), promotes_inputs=['mdot'])
+        self.connect('iv.p_inf','force.p_inf')
+        self.connect('iv.Utrue','force.Utrue_inf')
+        self.connect('nozzle.p','force.p_nozzle')
+        self.connect('nozzle.rho','force.rho_nozzle')
+        self.connect('iv.nozzle_area','force.area_nozzle')
+
+
 if __name__ == '__main__':
     # run this script from the root openconcept directory like so:
     # python .\openconcept\components\ducts.py
     import sys, os
     sys.path.insert(0,os.getcwd())
     from openconcept.components.heat_exchanger import HXTestGroup
-    nn=10
+    nn=25
     prob = Problem(DuctWithHx(num_nodes=nn))
     prob.model.options['assembled_jac_type'] = 'csc'
-    prob.model.nonlinear_solver=NewtonSolver()
+    prob.model.nonlinear_solver=NewtonSolver(iprint=2)
     prob.model.linear_solver = DirectSolver(assemble_jac=True)
     prob.model.nonlinear_solver.options['solve_subsystems'] = True
-    prob.model.nonlinear_solver.options['maxiter'] = 10
+    prob.model.nonlinear_solver.options['maxiter'] = 20
     prob.model.nonlinear_solver.options['atol'] = 1e-7
     prob.model.nonlinear_solver.options['rtol'] = 1e-7
+    prob.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar',print_bound_enforce=True)
+
     # prob.driver = ScipyOptimizeDriver()
     # prob.driver.options['tol'] = 1e-7
 
@@ -726,15 +832,23 @@ if __name__ == '__main__':
     # prob.model.add_objective('component_weight')
 
     prob.setup(check=True,force_alloc_complex=True)
-    prob['sta1.M'] = 0.2*np.ones((nn,))
-    prob['sta2.M'] = 0.2*np.ones((nn,))
-    prob['sta3.M'] = 0.2*np.ones((nn,))
-    prob.run_model()
-    # prob.check_partials(method='cs', compact_print=True)
-    # prob.run_driver()
-    prob.model.list_inputs(units=True, print_arrays=True)
-    prob.model.list_outputs(units=True,print_arrays=True)
+    prob['sta1.M'] = 0.3*np.ones((nn,))
+    prob['sta2.M'] = 0.3*np.ones((nn,))
+    prob['sta3.M'] = 0.3*np.ones((nn,))
+    prob['nozzle.nozzle_pressure_ratio'] = 0.9*np.ones((nn,))
 
+    prob.run_model()
+    #prob.check_partials(method='cs', compact_print=True)
+    # prob.run_driver()
+    # prob.model.list_inputs(units=True)
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.plot(prob['inlet.M'], prob['hx.heat_transfer'])
+    plt.figure()
+    plt.plot(prob['inlet.M'], prob['force.F_net'])
+    plt.show()
+    prob.model.list_outputs(units=True, print_arrays=True)
+    #prob.model.list_outputs(units=True, print_arrays=True, residuals=True, residuals_tol=1e-4)
 #     Mach 0.5
 #     p_inf = 5.454 psi
 #
