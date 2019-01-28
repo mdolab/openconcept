@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
-from openconcept.utilities.math.integrals import IntegrateQuantityEveryNode
+from openconcept.utilities.math.integrals import IntegrateQuantityEveryNode, BDFIntegrator
 
 class MultiPhaseIntegratorTestGroup(Group):
     """An OpenMDAO group to test the every-node integrator component
@@ -21,6 +21,8 @@ class MultiPhaseIntegratorTestGroup(Group):
         The units of the integral quantity q (NOT the rate)
     diff_units : str
         The units of the integrand (none by default)
+    integrator : str
+        Which integration scheme to use (default 'simpson')
     """
 
     def initialize(self):
@@ -28,19 +30,26 @@ class MultiPhaseIntegratorTestGroup(Group):
         self.options.declare('quantity_units',default=None, desc="Units of the quantity being differentiated")
         self.options.declare('diff_units',default=None, desc="Units of the differential")
         self.options.declare('num_intervals',default=5, desc="Number of Simpsons rule intervals per segment")
+        self.options.declare('integrator',default='simpson', desc="Which simpson integrator to use")
 
     def setup(self):
         segment_names = self.options['segment_names']
         quantity_units = self.options['quantity_units']
         diff_units = self.options['diff_units']
         n_int_per_seg = self.options['num_intervals']
+        integrator_option = self.options['integrator']
+
         if segment_names is None:
             nn_tot = (2*n_int_per_seg + 1)
         else:
             nn_tot = (2*n_int_per_seg + 1) * len(segment_names)
         iv = self.add_subsystem('iv', IndepVarComp())
+        if integrator_option == 'simpson':
+            IntegratorComponent = IntegrateQuantityEveryNode
+        elif integrator_option == 'bdf':
+            IntegratorComponent = BDFIntegrator
 
-        self.add_subsystem('integral', IntegrateQuantityEveryNode(segment_names=segment_names, quantity_units=quantity_units,
+        self.add_subsystem('integral', IntegratorComponent(segment_names=segment_names, quantity_units=quantity_units,
                                                          diff_units=diff_units, num_intervals=n_int_per_seg))
         if quantity_units is None and diff_units is None:
             rate_units = None
@@ -71,7 +80,7 @@ class IntegratorEveryNodeCommonTestCases(object):
     """
 
     def test_uniform_single_phase_no_units(self):
-        prob = Problem(MultiPhaseIntegratorTestGroup(num_intervals=self.num_intervals))
+        prob = Problem(MultiPhaseIntegratorTestGroup(num_intervals=self.num_intervals, integrator=self.integrator))
         prob.setup(check=True, force_alloc_complex=True)
         prob.run_model()
         n_int_per_seg = self.num_intervals
@@ -88,7 +97,7 @@ class IntegratorEveryNodeCommonTestCases(object):
         fprime = x
         f = x ** 2 / 2
 
-        prob = Problem(MultiPhaseIntegratorTestGroup(num_intervals=self.num_intervals))
+        prob = Problem(MultiPhaseIntegratorTestGroup(num_intervals=self.num_intervals, integrator=self.integrator))
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
         prob.run_model()
@@ -104,7 +113,7 @@ class IntegratorEveryNodeCommonTestCases(object):
         fprime = 4 * x **2 - 8*x + 5
         f = 4 * x ** 3 / 3 - 8 * x ** 2 / 2 + 5*x
 
-        prob = Problem(MultiPhaseIntegratorTestGroup(num_intervals=self.num_intervals))
+        prob = Problem(MultiPhaseIntegratorTestGroup(num_intervals=self.num_intervals, integrator=self.integrator))
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
         prob.run_model()
@@ -120,7 +129,7 @@ class IntegratorEveryNodeCommonTestCases(object):
         fprime = 4 * x **2 - 8*x + 5
         f = 4 * x ** 3 / 3 - 8 * x ** 2 / 2 + 5*x
 
-        prob = Problem(MultiPhaseIntegratorTestGroup(num_intervals=self.num_intervals,
+        prob = Problem(MultiPhaseIntegratorTestGroup(num_intervals=self.num_intervals, integrator=self.integrator,
                                                      quantity_units='kg', diff_units='s'))
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
@@ -137,7 +146,7 @@ class IntegratorEveryNodeCommonTestCases(object):
         fprime = 4 * x **2 - 8*x + 5
         f = 4 * x ** 3 / 3 - 8 * x ** 2 / 2 + 5*x
 
-        prob = Problem(MultiPhaseIntegratorTestGroup(num_intervals=self.num_intervals,
+        prob = Problem(MultiPhaseIntegratorTestGroup(num_intervals=self.num_intervals, integrator=self.integrator,
                                                      diff_units='s'))
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
@@ -157,7 +166,7 @@ class IntegratorEveryNodeCommonTestCases(object):
         fprime = 4 * x **2 - 8*x + 5
         f = 4 * x ** 3 / 3 - 8 * x ** 2 / 2 + 5*x
         prob = Problem(MultiPhaseIntegratorTestGroup(segment_names=['climb','cruise','descent'],
-                                                     num_intervals=self.num_intervals,
+                                                     num_intervals=self.num_intervals, integrator=self.integrator,
                                                      quantity_units='kg', diff_units='s'))
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
@@ -177,7 +186,7 @@ class IntegratorEveryNodeCommonTestCases(object):
         fprime = 4 * x **2 - 8*x + 5
         f = 4 * x ** 3 / 3 - 8 * x ** 2 / 2 + 5*x
         prob = Problem(MultiPhaseIntegratorTestGroup(segment_names=['climb','cruise','descent'],
-                                                     num_intervals=self.num_intervals,
+                                                     num_intervals=self.num_intervals, integrator=self.integrator,
                                                      quantity_units='kg', diff_units='s'))
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
@@ -201,7 +210,7 @@ class IntegratorEveryNodeCommonTestCases(object):
         fprime = 4 * x **2 - 8*x + 5
         f = 4 * x ** 3 / 3 - 8 * x ** 2 / 2 + 5*x + C
         prob = Problem(MultiPhaseIntegratorTestGroup(segment_names=['climb','cruise','descent'],
-                                                     num_intervals=self.num_intervals,
+                                                     num_intervals=self.num_intervals, integrator=self.integrator,
                                                      quantity_units='kg', diff_units='s'))
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
@@ -215,21 +224,42 @@ class IntegratorEveryNodeCommonTestCases(object):
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
-class IntegratorEveryNode5PtTestCases(unittest.TestCase, IntegratorEveryNodeCommonTestCases):
+class SimpsonIntegratorEveryNode5PtTestCases(unittest.TestCase, IntegratorEveryNodeCommonTestCases):
     """
     Only run the common test cases using second order accuracy because
     it cannot differentiate the quartic accurately
     """
     def __init__(self, *args, **kwargs):
         self.num_intervals = 5
-        super(IntegratorEveryNode5PtTestCases, self).__init__(*args, **kwargs)
+        self.integrator = 'simpson'
+        super(SimpsonIntegratorEveryNode5PtTestCases, self).__init__(*args, **kwargs)
 
-class IntegratorEveryNode3PtTestCases(unittest.TestCase, IntegratorEveryNodeCommonTestCases):
+class SimpsonIntegratorEveryNode3PtTestCases(unittest.TestCase, IntegratorEveryNodeCommonTestCases):
     """
     Only run the common test cases using second order accuracy because
     it cannot differentiate the quartic accurately
     """
     def __init__(self, *args, **kwargs):
         self.num_intervals = 3
-        super(IntegratorEveryNode3PtTestCases, self).__init__(*args, **kwargs)
+        self.integrator = 'simpson'
+        super(SimpsonIntegratorEveryNode3PtTestCases, self).__init__(*args, **kwargs)
 
+class BDFIntegratorEveryNode5PtTestCases(unittest.TestCase, IntegratorEveryNodeCommonTestCases):
+    """
+    Only run the common test cases using second order accuracy because
+    it cannot differentiate the quartic accurately
+    """
+    def __init__(self, *args, **kwargs):
+        self.num_intervals = 5
+        self.integrator = 'bdf'
+        super(BDFIntegratorEveryNode5PtTestCases, self).__init__(*args, **kwargs)
+
+class BDFIntegratorEveryNode3PtTestCases(unittest.TestCase, IntegratorEveryNodeCommonTestCases):
+    """
+    Only run the common test cases using second order accuracy because
+    it cannot differentiate the quartic accurately
+    """
+    def __init__(self, *args, **kwargs):
+        self.num_intervals = 3
+        self.integrator = 'bdf'
+        super(BDFIntegratorEveryNode3PtTestCases, self).__init__(*args, **kwargs)

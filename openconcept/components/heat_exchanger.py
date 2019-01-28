@@ -1211,6 +1211,80 @@ class HXTestGroup(Group):
         self.add_subsystem('t_out', OutletTemperatures(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('delta_p', PressureDrop(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
 
+class HXGroup(Group):
+    """
+    A heat exchanger model for use with the duct models
+    Note that there are many design variables defined as dvs which could be varied
+    in optimization.
+
+    Inputs
+    ------
+    mdot_cold : float
+        Mass flow rate of the cold side (air) (vector, kg/s)
+    T_in_cold : float
+        Inflow temperature of the cold side (air) (vector, K)
+    rho_cold : float
+        Inflow density of the cold side (air) (vector, kg/m**3)
+    mdot_hot : float
+        Mass flow rate of the hot die (liquid) (vector, kg/s)
+    T_in_hot : float
+        Inflow temperature of the hot side (liquid) (vector, kg/s)
+    rho_hot : float
+        Inflow density of the hot side (liquid) (vector, kg/m**3)
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points' )
+
+    def setup(self):
+        nn = self.options['num_nodes']
+
+        iv = self.add_subsystem('dv', IndepVarComp(), promotes_outputs=['*'])
+        iv.add_output('case_thickness', val=2.0, units='mm')
+        iv.add_output('fin_thickness', val=0.102, units='mm')
+        iv.add_output('plate_thickness', val=0.2, units='mm')
+        iv.add_output('material_k', val=190, units='W/m/K')
+        iv.add_output('material_rho', val=2700, units='kg/m**3')
+
+        #iv.add_output('mdot_cold', val=np.ones(nn)*1.5, units='kg/s')
+        #iv.add_output('rho_cold', val=np.ones(nn)*0.5, units='kg/m**3')
+        #iv.add_output('mdot_hot', val=0.075*np.ones(nn), units='kg/s')
+        #iv.add_output('rho_hot', val=np.ones(nn)*1020.2, units='kg/m**3')
+
+        #iv.add_output('T_in_cold', val=np.ones(nn)*45, units='degC')
+        #iv.add_output('T_in_hot', val=np.ones(nn)*90, units='degC')
+        iv.add_output('n_long_cold', val=3)
+        iv.add_output('n_wide_cold', val=430)
+        iv.add_output('n_tall', val=19)
+
+        iv.add_output('channel_height_cold', val=14, units='mm')
+        iv.add_output('channel_width_cold', val=1.35, units='mm')
+        iv.add_output('fin_length_cold', val=6, units='mm')
+        iv.add_output('cp_cold', val=1005, units='J/kg/K')
+        iv.add_output('k_cold', val=0.02596, units='W/m/K')
+        iv.add_output('mu_cold', val=1.789e-5, units='kg/m/s')
+
+        iv.add_output('channel_height_hot', val=1, units='mm')
+        iv.add_output('channel_width_hot', val=1, units='mm')
+        iv.add_output('fin_length_hot', val=6, units='mm')
+        iv.add_output('cp_hot', val=3801, units='J/kg/K')
+        iv.add_output('k_hot', val=0.405, units='W/m/K')
+        iv.add_output('mu_hot', val=1.68e-3, units='kg/m/s')
+
+
+
+        self.add_subsystem('osfgeometry', OffsetStripFinGeometry(), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('redh', HydraulicDiameterReynoldsNumber(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('osfdata', OffsetStripFinData(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('nusselt', NusseltFromColburnJ(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('convection', ConvectiveCoefficient(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('finefficiency', FinEfficiency(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('ua', UAOverall(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('ntu', NTUMethod(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('effectiveness', CrossFlowNTUEffectiveness(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('heat', NTUEffectivenessActualHeatTransfer(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('t_out', OutletTemperatures(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        self.add_subsystem('delta_p', PressureDrop(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+
 # if __name__ == '__main__':
 #         # run this script from the root openconcept directory like so:
 #         # python .\openconcept\components\heat_exchanger.py
