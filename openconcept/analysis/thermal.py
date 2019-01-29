@@ -8,7 +8,7 @@ import scipy.sparse as sp
 import sys, os
 sys.path.insert(0,os.getcwd())
 from openconcept.components.ducts import DuctWithHx
-from openconcept.utilities.math.integrals import BDFIntegrator as Integrator
+from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.math.derivatives import FirstDerivative
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp, VectorConcatenateComp, VectorSplitComp
 

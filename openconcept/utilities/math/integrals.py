@@ -118,10 +118,44 @@ def bdf3_cache_matrix(n,all_bdf=False):
     last_row = tri_mat.getrow(-1).todense()
     # but we need it in sparse format for openMDAO
     repeat_mat = sp.csc_matrix(np.tile(last_row, n).reshape(n,n))
-
     return tri_mat, repeat_mat
 
-def bdf3_integrator(q0, dqdt, dts, tri_mat, repeat_mat, partials=True):
+def simpson_cache_matrix(n):
+
+    # Simpsons rule defines the "deltas" between each segment as [B] dqdt as follows
+    # B is n-1 rows by n columns
+    # the structure of this is (1/12) * the following:
+    # 5 8 -1
+    # -1 8 5
+    #      5 8 -1
+    #      -1 8 5
+    #           5 8 -1
+    #           -1 8 5    and so on
+    # the row indices are basically 0 0 0 1 1 1 2 2 2 ....
+    jacmat_rowidx = np.repeat(np.arange((n-1)), 3)
+    # the column indices are 0 1 2 0 1 2 2 3 4 2 3 4 4 5 6 and so on
+    # so superimpose a 0 1 2 repeating pattern on a 0 0 0 0 0 0 2 2 2 2 2 2 2 repeating pattern
+    jacmat_colidx = np.repeat(np.arange(0, (n-1), 2), 6) + np.tile(np.arange(3), (n-1))
+    jacmat_data = np.tile(np.array([5, 8, -1, -1, 8, 5]) / 12, (n-1) // 2)
+    jacmat_base = sp.csr_matrix((jacmat_data, (jacmat_rowidx, jacmat_colidx)))
+    b = jacmat_base[:,1:]
+    bv = jacmat_base[:,0]
+
+    a = sp.diags([-1, 1],[-1, 0],shape=(n-1,n-1)).asformat('csc')
+
+    ia = sp.linalg.inv(a)
+    c = ia.dot(b)
+    cv = ia.dot(bv)
+    first_row_zeros = sp.csr_matrix(np.zeros((1,n-1)))
+    tri_mat = sp.bmat([[None, first_row_zeros],[cv, c]])
+
+    # we need to create a dense matrix of the last row repeated n times for multi-subinterval problems
+    last_row = tri_mat.getrow(-1).todense()
+    # but we need it in sparse format for openMDAO
+    repeat_mat = sp.csc_matrix(np.tile(last_row, n).reshape(n,n))
+    return tri_mat, repeat_mat
+
+def multistep_integrator(q0, dqdt, dts, tri_mat, repeat_mat, segment_names=None, segments_to_count=None, partials=True):
     """
     This implements the base block Jacobian of the BDF3 method.
     BDF3 is third order accurate and suitable for stiff systems.
@@ -136,14 +170,19 @@ def bdf3_integrator(q0, dqdt, dts, tri_mat, repeat_mat, partials=True):
         col_list = []
         for j in range(n_segments):
             dt = dts[j]
-            if i > j:
+            count_col = True
+            if segment_names is not None and segments_to_count is not None:
+                if segment_names[j] not in segments_to_count:
+                    # skip col IFF not counting this segment
+                    count_col = False
+            if i > j and count_col:
                 # repeat mat
                 col_list.append(repeat_mat*dt)
-            elif i == j:
+            elif i == j and count_col:
                 # diagonal
                 col_list.append(tri_mat*dt)
             else:
-                col_list.append(None)
+                col_list.append(sp.csr_matrix(([],([],[])),shape=(n,n)))
         row_list.append(col_list)
     dQdqdt = sp.bmat(row_list).asformat('csr')
     if not partials:
@@ -153,13 +192,18 @@ def bdf3_integrator(q0, dqdt, dts, tri_mat, repeat_mat, partials=True):
     # compute dQ / d dt for each segment
     dt_partials_list = []
     for j in range(n_segments):
+        count_col = True
+        if segment_names is not None and segments_to_count is not None:
+            if segment_names[j] not in segments_to_count:
+                # skip col IFF not counting this segment
+                count_col = False
         #jth segment
         row_list = []
         for i in range(n_segments):
             # ith row
-            if i > j:
+            if i > j and count_col:
                 row_list.append([repeat_mat])
-            elif i == j:
+            elif i == j and count_col:
                 row_list.append([tri_mat])
             else:
                 row_list.append([sp.csr_matrix(([],([],[])),shape=(n,n))])
@@ -468,6 +512,8 @@ class IntegrateQuantityEveryNode(ExplicitComponent):
         The units of the integrand (none by default)
     method : str
         Numerical method (default 'simpson', optionally 'trap')
+    final_only : bool
+        Returns only the final value q_final and none of the full state.
     """
 
     def initialize(self):
@@ -476,6 +522,7 @@ class IntegrateQuantityEveryNode(ExplicitComponent):
         self.options.declare('diff_units',default=None, desc="Units of the differential")
         self.options.declare('num_intervals',default=5, desc="Number of Simpsons rule intervals per segment")
         self.options.declare('method',default='simpson', desc="Numerical method to use.")
+        self.options.declare('final_only',default=False)
 
     def setup(self):
         segment_names = self.options['segment_names']
@@ -484,6 +531,8 @@ class IntegrateQuantityEveryNode(ExplicitComponent):
         n_int_per_seg = self.options['num_intervals']
         method = self.options['method']
         nn_seg = (n_int_per_seg*2 + 1)
+        final_only = self.options['final_only']
+
         if segment_names is None:
             n_segments = 1
         else:
@@ -517,22 +566,25 @@ class IntegrateQuantityEveryNode(ExplicitComponent):
 
         self.add_input('dqdt', val=0, units=rate_units, desc='Quantity to integrate',shape=(nn_tot,))
         self.add_input('q_initial', val=0, units=quantity_units, desc='Initial value')
-        self.add_output('q', units=quantity_units, desc='Integral of dqdt', shape=(nn_tot,))
-        self.add_output('q_final', units=quantity_units, desc='Final value of q')
+        if not final_only:
+            self.add_output('q', units=quantity_units, desc='Integral of dqdt', shape=(nn_tot,))
+            self.declare_partials(['q'], ['q_initial'], rows=np.arange(nn_tot), cols=np.zeros((nn_tot,)), val=np.ones((nn_tot,)))
 
-        self.declare_partials(['q'], ['q_initial'], rows=np.arange(nn_tot), cols=np.zeros((nn_tot,)), val=np.ones((nn_tot,)))
+        self.add_output('q_final', units=quantity_units, desc='Final value of q')
         self.declare_partials(['q_final'], ['q_initial'], val=1)
 
         dq_ddqdt_indices = dq_ddqdt.nonzero()
         dqfinal_ddqdt_indices = dq_ddqdt.getrow(-1).nonzero()
-        self.declare_partials(['q'], ['dqdt'], rows=dq_ddqdt_indices[0], cols=dq_ddqdt_indices[1])
+        if not final_only:
+            self.declare_partials(['q'], ['dqdt'], rows=dq_ddqdt_indices[0], cols=dq_ddqdt_indices[1])
         self.declare_partials(['q_final'], ['dqdt'], rows=dqfinal_ddqdt_indices[0], cols=dqfinal_ddqdt_indices[1]) # rows are zeros
 
         if segment_names is None:
             self.add_input('dt', units=diff_units, desc='Time step')
             dq_ddt = dq_dDelta.dot(dDelta_dts[0])
             dq_ddt_indices = dq_ddt.nonzero()
-            self.declare_partials(['q'], ['dt'], rows=dq_ddt_indices[0], cols=dq_ddt_indices[1])
+            if not final_only:
+                self.declare_partials(['q'], ['dt'], rows=dq_ddt_indices[0], cols=dq_ddt_indices[1])
             dqfinal_ddt_indices = dq_ddt.getrow(-1).nonzero()
             self.declare_partials(['q_final'], ['dt'], rows=dqfinal_ddt_indices[0], cols=dqfinal_ddt_indices[1])
         else:
@@ -540,7 +592,8 @@ class IntegrateQuantityEveryNode(ExplicitComponent):
                 self.add_input(segment_name +'|dt', units=diff_units, desc='Time step')
                 dq_ddt = dq_dDelta.dot(dDelta_dts[i_seg])
                 dq_ddt_indices = dq_ddt.nonzero()
-                self.declare_partials(['q'], [segment_name +'|dt'], rows=dq_ddt_indices[0], cols=dq_ddt_indices[1])
+                if not final_only:
+                    self.declare_partials(['q'], [segment_name +'|dt'], rows=dq_ddt_indices[0], cols=dq_ddt_indices[1])
                 dqfinal_ddt_indices = dq_ddt.getrow(-1).nonzero()
                 self.declare_partials(['q_final'], [segment_name +'|dt'], rows=dqfinal_ddt_indices[0], cols=dqfinal_ddt_indices[1])
 
@@ -548,6 +601,7 @@ class IntegrateQuantityEveryNode(ExplicitComponent):
         segment_names = self.options['segment_names']
         n_int_per_seg = self.options['num_intervals']
         method = self.options['method']
+        final_only = self.options['final_only']
         nn_seg = (n_int_per_seg*2 + 1)
         if segment_names is None:
             n_segments = 1
@@ -574,7 +628,8 @@ class IntegrateQuantityEveryNode(ExplicitComponent):
             for i in range(1,n_segments):
                 duplicate_row = cumsum[i*nn_seg-1]
                 cumsum = np.insert(cumsum,i*nn_seg,duplicate_row)
-        outputs['q'] = cumsum
+        if not final_only:
+            outputs['q'] = cumsum
         outputs['q_final'] = cumsum[-1]
 
     def compute_partials(self, inputs, J):
@@ -583,6 +638,7 @@ class IntegrateQuantityEveryNode(ExplicitComponent):
         diff_units = self.options['diff_units']
         n_int_per_seg = self.options['num_intervals']
         method = self.options['method']
+        final_only = self.options['final_only']
 
         nn_seg = (n_int_per_seg*2 + 1)
         if segment_names is None:
@@ -612,21 +668,23 @@ class IntegrateQuantityEveryNode(ExplicitComponent):
         dq_dDelta = integrator_partials_wrt_deltas(n_segments, n_int_per_seg)
 
         dq_ddqdt = dq_dDelta.dot(dDelta_ddqdt)
-
-        J['q','dqdt'] = dq_ddqdt.data
+        if not final_only:
+            J['q','dqdt'] = dq_ddqdt.data
         J['q_final', 'dqdt'] = dq_ddqdt.getrow(-1).data
 
         if segment_names is None:
             dq_ddt = dq_dDelta.dot(dDelta_dts[0])
-            J['q','dt'] = dq_ddt.data
+            if not final_only:
+                J['q','dt'] = dq_ddt.data
             J['q_final','dt'] = dq_ddt.getrow(-1).data
         else:
             for i_seg, segment_name in enumerate(segment_names):
                 dq_ddt = dq_dDelta.dot(dDelta_dts[i_seg])
-                J['q',segment_name+'|dt'] = dq_ddt.data
+                if not final_only:
+                    J['q',segment_name+'|dt'] = dq_ddt.data
                 J['q_final',segment_name+'|dt'] = dq_ddt.getrow(-1).data
 
-class BDFIntegrator(ExplicitComponent):
+class Integrator(ExplicitComponent):
     """
     This component integrates a vector using a BDF3 formulation
     with 2nd order startup.
@@ -656,6 +714,9 @@ class BDFIntegrator(ExplicitComponent):
     segment_names : list
         A list of str with the names of the individual segments
         By default, if no segment_names are provided, one segment will be assumed and segment|dt will just be named "dt"
+    segments_to_count : list
+        A list of str with the names of segments to be included in the integration.
+        By default, ALL segments will be included.
     num_intervals : int
         The number of Simpson intervals per segment
         The total number of points per segment is 2N + 1 where N = num_intervals
@@ -665,24 +726,38 @@ class BDFIntegrator(ExplicitComponent):
     diff_units : str
         The units of the integrand (none by default)
     method : str
-        Numerical method (default 'bdf3')
+        Numerical method (default 'bdf3'; alternatively, 'simpson)
+    zero_start : bool
+        If True, disables q_initial input (default False)
+    final_only : bool
+        If True, disables q output (q_final only) (default False)
     """
 
     def initialize(self):
         self.options.declare('segment_names', default=None, desc="Names of differentiation segments")
+        self.options.declare('segments_to_count', default=None, desc="Names of differentiation segments")
         self.options.declare('quantity_units',default=None, desc="Units of the quantity being differentiated")
         self.options.declare('diff_units',default=None, desc="Units of the differential")
         self.options.declare('num_intervals',default=5, desc="Number of Simpsons rule intervals per segment")
         self.options.declare('method',default='bdf3', desc="Numerical method to use.")
+        self.options.declare('zero_start',default=False)
+        self.options.declare('final_only',default=False)
 
     def setup(self):
         segment_names = self.options['segment_names']
+        segments_to_count = self.options['segments_to_count']
         quantity_units = self.options['quantity_units']
         diff_units = self.options['diff_units']
         n_int_per_seg = self.options['num_intervals']
         method = self.options['method']
+        zero_start = self.options['zero_start']
+        final_only = self.options['final_only']
         nn_seg = (n_int_per_seg*2 + 1)
-        self.bdf_tri_mat, self.bdf_repeat_mat = bdf3_cache_matrix(nn_seg)
+
+        if method == 'bdf3':
+            self.tri_mat, self.repeat_mat = bdf3_cache_matrix(nn_seg)
+        elif method == 'simpson':
+            self.tri_mat, self.repeat_mat = simpson_cache_matrix(nn_seg)
 
         if segment_names is None:
             n_segments = 1
@@ -703,16 +778,23 @@ class BDFIntegrator(ExplicitComponent):
         # get the partials of the delta quantities WRT the rates dDelta / drate
 
         self.add_input('dqdt', val=0, units=rate_units, desc='Quantity to integrate',shape=(nn_tot,))
-        self.add_input('q_initial', val=0, units=quantity_units, desc='Initial value')
-        self.add_output('q', units=quantity_units, desc='Integral of dqdt', shape=(nn_tot,))
         self.add_output('q_final', units=quantity_units, desc='Final value of q')
 
-        self.declare_partials(['q'], ['q_initial'], rows=np.arange(nn_tot), cols=np.zeros((nn_tot,)), val=np.ones((nn_tot,)))
-        self.declare_partials(['q_final'], ['q_initial'], val=1)
-        dQdrate, dQddtlist = bdf3_integrator(0, np.ones((nn_tot,)), np.ones((n_segments,)), self.bdf_tri_mat, self.bdf_repeat_mat, partials=True)
+        if not final_only:
+            self.add_output('q', units=quantity_units, desc='Integral of dqdt', shape=(nn_tot,))
+
+        if not zero_start:
+            self.add_input('q_initial', val=0, units=quantity_units, desc='Initial value')
+            if not final_only:
+                self.declare_partials(['q'], ['q_initial'], rows=np.arange(nn_tot), cols=np.zeros((nn_tot,)), val=np.ones((nn_tot,)))
+            self.declare_partials(['q_final'], ['q_initial'], val=1)
+
+        dQdrate, dQddtlist = multistep_integrator(0, np.ones((nn_tot,)), np.ones((n_segments,)), self.tri_mat, self.repeat_mat,
+                                                  segment_names=segment_names, segments_to_count=segments_to_count, partials=True)
         dQdrate_indices = dQdrate.nonzero()
         dQfdrate_indices = dQdrate.getrow(-1).nonzero()
-        self.declare_partials(['q'], ['dqdt'], rows=dQdrate_indices[0], cols=dQdrate_indices[1])
+        if not final_only:
+            self.declare_partials(['q'], ['dqdt'], rows=dQdrate_indices[0], cols=dQdrate_indices[1])
         self.declare_partials(['q_final'], ['dqdt'], rows=dQfdrate_indices[0], cols=dQfdrate_indices[1]) # rows are zeros
 
         if segment_names is None:
@@ -720,7 +802,8 @@ class BDFIntegrator(ExplicitComponent):
             dQddt_seg = dQddtlist[0]
             dQddt_indices = dQddt_seg.nonzero()
             dQfddt_indices = dQddt_seg.getrow(-1).nonzero()
-            self.declare_partials(['q'], ['dt'], rows=dQddt_indices[0], cols=dQddt_indices[1])
+            if not final_only:
+                self.declare_partials(['q'], ['dt'], rows=dQddt_indices[0], cols=dQddt_indices[1])
             self.declare_partials(['q_final'], ['dt'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
         else:
             for i_seg, segment_name in enumerate(segment_names):
@@ -728,13 +811,17 @@ class BDFIntegrator(ExplicitComponent):
                 dQddt_seg = dQddtlist[i_seg]
                 dQddt_indices = dQddt_seg.nonzero()
                 dQfddt_indices = dQddt_seg.getrow(-1).nonzero()
-                self.declare_partials(['q'], [segment_name +'|dt'], rows=dQddt_indices[0], cols=dQddt_indices[1])
+                if not final_only:
+                    self.declare_partials(['q'], [segment_name +'|dt'], rows=dQddt_indices[0], cols=dQddt_indices[1])
                 self.declare_partials(['q_final'], [segment_name +'|dt'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
 
     def compute(self, inputs, outputs):
         segment_names = self.options['segment_names']
         n_int_per_seg = self.options['num_intervals']
-        method = self.options['method']
+        segments_to_count = self.options['segments_to_count']
+        zero_start = self.options['zero_start']
+        final_only = self.options['final_only']
+
         nn_seg = (n_int_per_seg*2 + 1)
         if segment_names is None:
             n_segments = 1
@@ -745,8 +832,14 @@ class BDFIntegrator(ExplicitComponent):
             for i_seg, segment_name in enumerate(segment_names):
                 input_name = segment_name+'|dt'
                 dts.append(inputs[input_name][0])
-        Q = bdf3_integrator(inputs['q_initial'], inputs['dqdt'], dts, self.bdf_tri_mat, self.bdf_repeat_mat, partials=False)
-        outputs['q'] = Q
+        if zero_start:
+            q0 = 0
+        else:
+            q0 = inputs['q_initial']
+        Q = multistep_integrator(q0, inputs['dqdt'], dts, self.tri_mat, self.repeat_mat,
+                                 segment_names=segment_names, segments_to_count=segments_to_count, partials=False)
+        if not final_only:
+            outputs['q'] = Q
         outputs['q_final'] = Q[-1]
 
     def compute_partials(self, inputs, J):
@@ -754,7 +847,9 @@ class BDFIntegrator(ExplicitComponent):
         quantity_units = self.options['quantity_units']
         diff_units = self.options['diff_units']
         n_int_per_seg = self.options['num_intervals']
-        method = self.options['method']
+        segments_to_count = self.options['segments_to_count']
+        zero_start = self.options['zero_start']
+        final_only = self.options['final_only']
 
         nn_seg = (n_int_per_seg*2 + 1)
         if segment_names is None:
@@ -773,15 +868,23 @@ class BDFIntegrator(ExplicitComponent):
                 input_name = segment_name+'|dt'
                 dts.append(inputs[input_name][0])
 
-        dQdrate, dQddtlist = bdf3_integrator(inputs['q_initial'], inputs['dqdt'], dts, self.bdf_tri_mat, self.bdf_repeat_mat, partials=True)
+        if zero_start:
+            q0 = 0
+        else:
+            q0 = inputs['q_initial']
+        dQdrate, dQddtlist = multistep_integrator(q0, inputs['dqdt'], dts, self.tri_mat, self.repeat_mat,
+                                                  segment_names=segment_names, segments_to_count=segments_to_count, partials=True)
 
-        J['q','dqdt'] = dQdrate.data
+        if not final_only:
+            J['q','dqdt'] = dQdrate.data
         J['q_final', 'dqdt'] = dQdrate.getrow(-1).data
 
         if segment_names is None:
-            J['q','dt'] = dQddtlist[0].data
+            if not final_only:
+                J['q','dt'] = dQddtlist[0].data
             J['q_final','dt'] = dQddtlist[0].getrow(-1).data
         else:
             for i_seg, segment_name in enumerate(segment_names):
-                J['q',segment_name+'|dt'] = dQddtlist[i_seg].data
+                if not final_only:
+                    J['q',segment_name+'|dt'] = dQddtlist[i_seg].data
                 J['q_final',segment_name+'|dt'] = dQddtlist[i_seg].getrow(-1).data

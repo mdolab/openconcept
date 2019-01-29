@@ -1,13 +1,12 @@
 from __future__ import division
-from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, ImplicitComponent
+from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, ImplicitComponent, BalanceComp
 import numpy as np
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math.sum_comp import SumComp
 from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
-from openconcept.utilities.math.simpson_integration import simpson_integral, simpson_partials
-from openconcept.utilities.math.simpson_integration import simpson_integral_every_node
-from openconcept.utilities.math.simpson_integration import simpson_partials_every_node
+from openconcept.utilities.math.integrals import Integrator
+from openconcept.utilities.math import AddSubtractComp
 import scipy.sparse as sp
 import warnings
 
@@ -42,22 +41,22 @@ class MissionFlightConditions(ExplicitComponent):
     mission_segments : list
         The names of each mission segment. The number of segments
         will correspond to the length of the list
-    n_int_per_seg : int
-        Number of Simpson's rule intervals to use per mission segment.
-        The total number of points is 2 * n_int_per_seg + 1
+    nn_seg : int
+        Number of nodes per segment.
     """
 
     def initialize(self):
 
-        self.options.declare('n_int_per_seg', default=5,
-                             desc="Number of Simpson intervals to use per seg")
+        self.options.declare('nn_seg', default=11,
+                             desc="Number of analysis nodes per segment")
         self.options.declare('mission_segments', default=['climb', 'cruise', 'descent'])
 
     def setup(self):
-        n_int_per_seg = self.options['n_int_per_seg']
+        nn = self.options['nn_seg']
+        self.nn = nn
         mission_segment_names = self.options['mission_segments']
-        nn = (n_int_per_seg * 2 + 1)
         nn_tot = nn * len(mission_segment_names)
+        self.nn_tot = nn_tot
         n_mission_segments = len(mission_segment_names)
         last_seg_index = len(mission_segment_names) - 1
         for i, segment_name in enumerate(mission_segment_names):
@@ -71,11 +70,11 @@ class MissionFlightConditions(ExplicitComponent):
             self.add_output(segment_name+'|dt', units='s')
 
         self.add_output('fltcond|Ueas', units='m / s',
-                        desc='indicated airspeed at each analysis point', shape=(n_mission_segments * nn,))
+                        desc='indicated airspeed at each analysis point', shape=(nn_tot,))
         self.add_output('fltcond|h', units='m',
-                        desc='altitude at each analysis point', shape=(n_mission_segments * nn,))
+                        desc='altitude at each analysis point', shape=(nn_tot,))
         self.add_output('fltcond|vs', units='m / s',
-                        desc='vectorial representation of vertical speed', shape=(n_mission_segments * nn,))
+                        desc='vectorial representation of vertical speed', shape=(nn_tot,))
 
 
         for i, segment_name in enumerate(mission_segment_names):
@@ -123,11 +122,9 @@ class MissionFlightConditions(ExplicitComponent):
 
 
     def compute(self, inputs, outputs):
-
-        n_int_per_seg = self.options['n_int_per_seg']
         mission_segment_names = self.options['mission_segments']
-        nn = (n_int_per_seg * 2 + 1)
-        nn_tot = nn * len(mission_segment_names)
+        nn = self.nn
+        nn_tot = self.nn_tot
         last_seg_index = len(mission_segment_names) - 1
         altitude_vecs = []
         Ueas_vecs = []
@@ -153,10 +150,9 @@ class MissionFlightConditions(ExplicitComponent):
 
 
     def compute_partials(self, inputs, J):
-        n_int_per_seg = self.options['n_int_per_seg']
         mission_segment_names = self.options['mission_segments']
-        nn = (n_int_per_seg * 2 + 1)
-        nn_tot = nn * len(mission_segment_names)
+        nn = self.nn
+        nn_tot = self.nn_tot
         last_seg_index = len(mission_segment_names) - 1
         for i, segment_name in enumerate(mission_segment_names):
             seg_time = inputs[segment_name+'|time']
@@ -177,101 +173,6 @@ class MissionFlightConditions(ExplicitComponent):
                                                                                         np.ones(nn) * -1.0 / seg_time])
 
             J['fltcond|vs',segment_name+'|time'] = np.ones(nn) * -1.0 * (hf - h0) / seg_time ** 2
-
-class MissionComputeRange(ExplicitComponent):
-    """
-    Computes range over the ground during non-reserve mission segments
-
-    This is a helper function for the main mission analysis routine
-    and shouldn't be instantiated directly.
-
-    Inputs
-    ------
-    fltcond|groundspeed : float
-        True groundspeed for all mission phases (vector, m/s)
-    phase|dt : float
-        Timestep during the climb phase (scalar, s)
-
-    Outputs
-    -------
-    range : float
-        Distance over the ground during counted segments (scalar, m)
-
-
-    Options
-    -------
-    n_int_per_seg : int
-        Number of Simpson's rule intervals to use per mission segment.
-        The total number of points is 2 * n_int_per_seg + 1
-    mission_segments : list
-        The names of each mission segment. The number of segments
-        will correspond to the length of the list
-    range_segments : list
-        The list of mission segment names to include in the range computation
-    """
-    def initialize(self):
-        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-        self.options.declare('mission_segments', default=['climb', 'cruise', 'descent'])
-        self.options.declare('range_segments', default=['climb', 'cruise', 'descent'])
-
-    def setup(self):
-        n_int_per_seg = self.options['n_int_per_seg']
-        mission_segment_names = self.options['mission_segments']
-        segment_names_to_count = self.options['range_segments']
-
-        nn = (n_int_per_seg * 2 + 1)
-        nn_tot = nn * len(mission_segment_names)
-        n_mission_segments = len(mission_segment_names)
-        last_seg_index = len(mission_segment_names) - 1
-
-        self.add_input('fltcond|groundspeed', units='m/s',shape=(n_mission_segments*nn,))
-        self.add_output('range', units='m')
-        aranges = []
-        for i, segment_name in enumerate(mission_segment_names):
-            if segment_name in segment_names_to_count:
-                self.add_input(segment_name+'|dt', units='s')
-                self.declare_partials(['range'], [segment_name+'|dt'])
-                aranges.append(np.arange(i*nn, (i+1)*nn))
-        groundspeed_cols = np.concatenate(aranges)
-        self.declare_partials(['range'], ['fltcond|groundspeed'], rows=np.ones(nn*len(segment_names_to_count))*0, cols=groundspeed_cols)
-
-
-    def compute(self, inputs, outputs):
-        n_int_per_seg = self.options['n_int_per_seg']
-        mission_segment_names = self.options['mission_segments']
-        segment_names_to_count = self.options['range_segments']
-        nn = (n_int_per_seg * 2 + 1)
-
-        groundspeed = inputs['fltcond|groundspeed']
-        #compute distance traveled during climb and desc using Simpson's rule
-        simpsons_vec = np.ones(nn)
-        simpsons_vec[1:nn-1:2] = 4
-        simpsons_vec[2:nn-1:2] = 2
-        running_total = 0
-        for i, segment_name in enumerate(mission_segment_names):
-            if segment_name in segment_names_to_count:
-                dt_seg = inputs[segment_name+'|dt']
-                running_total += np.sum(simpsons_vec*groundspeed[i*nn:(i+1)*nn])*dt_seg/3
-        outputs['range'] = running_total
-
-    def compute_partials(self, inputs, J):
-
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        mission_segment_names = self.options['mission_segments']
-        segment_names_to_count = self.options['range_segments']
-
-        groundspeed = inputs['fltcond|groundspeed']
-        simpsons_vec = np.ones(nn)
-        simpsons_vec[1:nn-1:2] = 4
-        simpsons_vec[2:nn-1:2] = 2
-        partials_list = []
-        for i, segment_name in enumerate(mission_segment_names):
-            if segment_name in segment_names_to_count:
-                dt_seg = inputs[segment_name+'|dt']
-                J['range',segment_name+'|dt'] = np.sum(simpsons_vec*groundspeed[i*nn:(i+1)*nn])/3
-                partials_list.append(simpsons_vec * dt_seg / 3)
-        J['range','fltcond|groundspeed'] = np.concatenate(partials_list)
 
 class Groundspeeds(ExplicitComponent):
     """
@@ -336,129 +237,6 @@ class Groundspeeds(ExplicitComponent):
         J['fltcond|cosgamma','fltcond|vs'] = J['fltcond|groundspeed','fltcond|vs'] / inputs['fltcond|Utrue']
         J['fltcond|cosgamma','fltcond|Utrue'] = (J['fltcond|groundspeed','fltcond|Utrue'] * inputs['fltcond|Utrue'] - groundspeed) / inputs['fltcond|Utrue']**2
 
-class MissionSegmentEnergies(ExplicitComponent):
-    """
-    Integrates delta quantity between each analysis point
-
-    Takes n_segments * nn fuel flow and/or battery drain rates; produces n_segments * (nn - 1) delta quantities
-
-    Inputs
-    ------
-    fuel_flow : float
-        Fuel flow rate for all analysis points (vector, kg/s)
-        Note: only activated when 'track_fuel' = True
-    battery_load : float
-        Battery load for all analysis points (vector, kW)
-        Note: only activated when 'track_battery' = True
-    phase|dt : float
-        Timestep length during each mission phase (scalar, s)
-        Note: this represents the timestep for the Simpson subinterval, not the whole inteval
-
-    Outputs
-    -------
-    segment_fuel : float
-        Fuel burn increment between each analysis point (vector, kg)
-        Note: if the number of analysis points in one phase is `nn`, the number
-        of segment fuel burns is `nn - 1`
-        Note: only activated when 'track_fuel' = True
-
-    segment_battery_energy_used : float
-        Energy used  between each analysis point (vector, kW*s)
-        Note: if the number of analysis points in one phase is `nn`, the number
-        of segment energies is `nn - 1`
-        Note: only activated when 'track_battery' = True
-
-    Options
-    -------
-    n_int_per_seg : int
-        Number of Simpson's rule intervals to use per mission segment.
-        The total number of points is 2 * n_int_per_seg + 1
-    mission_segments : list
-        The list of mission segments to track
-    track_battery : boolean
-        Turn on to track battery energy
-    track_fuel : boolean
-        Turn on to track fuel consumption
-
-    """
-    def initialize(self):
-        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-        self.options.declare('mission_segments', default=['climb', 'cruise', 'descent'])
-        self.options.declare('track_battery', default=True)
-        self.options.declare('track_fuel', default=True)
-
-    def setup(self):
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        mission_segment_names = self.options['mission_segments']
-        n_segments = len(mission_segment_names)
-        track_fuel = self.options['track_fuel']
-        track_battery = self.options['track_battery']
-
-        #use dummy inputs for dt and q, just want the shapes
-        wrt_q, wrt_dt = simpson_partials_every_node(np.ones(n_segments),np.ones(n_segments * nn),n_segments=n_segments,n_simpson_intervals_per_segment=n_int_per_seg)
-
-        if track_fuel:
-            self.add_input('fuel_flow', units='kg/s',shape=(n_segments * nn,))
-            self.add_output('segment_fuel', units='kg',shape=(n_segments*(nn-1)))
-            self.declare_partials(['segment_fuel'], ['fuel_flow'], rows=wrt_q[0], cols=wrt_q[1])
-        if track_battery:
-            self.add_input('battery_load', units='kW',shape=(n_segments * nn,))
-            self.add_output('segment_battery_energy_used', units='kW*s',shape=(n_segments*(nn-1)))
-            self.declare_partials(['segment_battery_energy_used'], ['battery_load'], rows=wrt_q[0], cols=wrt_q[1])
-
-        for i, segment_name in enumerate(mission_segment_names):
-            self.add_input(segment_name+'|dt', units='s')
-            if track_fuel:
-                self.declare_partials(['segment_fuel'], [segment_name+'|dt'], rows=wrt_dt[0][i], cols=wrt_dt[1][i])
-            if track_battery:
-                self.declare_partials(['segment_battery_energy_used'], [segment_name+'|dt'], rows=wrt_dt[0][i], cols=wrt_dt[1][i])
-
-    def compute(self, inputs, outputs):
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        mission_segment_names = self.options['mission_segments']
-        n_segments = len(mission_segment_names)
-        track_fuel = self.options['track_fuel']
-        track_battery = self.options['track_battery']
-        dts = []
-        for i, segment_name in enumerate(mission_segment_names):
-            dts.append(inputs[segment_name+'|dt'])
-
-        if track_fuel:
-            ff = inputs['fuel_flow']
-            int_ff, delta_ff = simpson_integral_every_node(dts,ff,n_segments=n_segments,n_simpson_intervals_per_segment=n_int_per_seg)
-            outputs['segment_fuel'] = delta_ff
-        if track_battery:
-            load = inputs['battery_load']
-            int_load, delta_load = simpson_integral_every_node(dts,load,n_segments=n_segments,n_simpson_intervals_per_segment=n_int_per_seg)
-            outputs['segment_battery_energy_used'] = delta_load
-
-    def compute_partials(self, inputs, J):
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        mission_segment_names = self.options['mission_segments']
-        n_segments = len(mission_segment_names)
-        track_fuel = self.options['track_fuel']
-        track_battery = self.options['track_battery']
-
-        dts = []
-        for i, segment_name in enumerate(mission_segment_names):
-            dts.append(inputs[segment_name+'|dt'])
-
-        if track_fuel:
-            ff = inputs['fuel_flow']
-            wrt_q, wrt_dt = simpson_partials_every_node(dts,ff,n_segments=n_segments,n_simpson_intervals_per_segment=n_int_per_seg)
-            J['segment_fuel','fuel_flow'] = wrt_q[2]
-            for i, segment_name in enumerate(mission_segment_names):
-                J['segment_fuel',segment_name+'|dt'] =  wrt_dt[2][i]
-        if track_battery:
-            load = inputs['battery_load']
-            wrt_q, wrt_dt = simpson_partials_every_node(dts,load,n_segments=n_segments,n_simpson_intervals_per_segment=n_int_per_seg)
-            J['segment_battery_energy_used','battery_load'] = wrt_q[2]
-            for i, segment_name in enumerate(mission_segment_names):
-                J['segment_battery_energy_used',segment_name+'|dt'] =  wrt_dt[2][i]
-
 class MissionSegmentWeights(ExplicitComponent):
     """
     Computes aircraft weight at each analysis point including fuel burned
@@ -468,10 +246,8 @@ class MissionSegmentWeights(ExplicitComponent):
 
     Inputs
     ------
-    segment_fuel : float
-        Fuel burn increment between each analysis point (vector, kg)
-        Note: if the number of analysis points in one phase is `nn`, the number
-        of segment fuel burns is `nn - 1`
+    fuel_used : float
+        The total amount of fuel used at each point in the mission (vector, kg)
     weight_initial : float
         Weight immediately following takeoff (scalar, kg)
 
@@ -499,17 +275,11 @@ class MissionSegmentWeights(ExplicitComponent):
         nn = (n_int_per_seg*2 + 1)
         mission_segment_names = self.options['mission_segments']
         n_segments = len(mission_segment_names)
-        self.add_input('segment_fuel', units='kg',shape=(n_segments*(nn-1),))
+        self.add_input('fuel_used', units='kg',val=np.ones((n_segments* nn,)))
         self.add_input('weight_initial', units='kg')
         self.add_output('weight_vec', units='kg',shape=(n_segments * nn,))
 
-        jacmat = np.tril(np.ones((n_segments*(nn-1),n_segments*(nn-1))))
-        jacmat = np.insert(jacmat,0,np.zeros(n_segments*(nn-1)),axis=0)
-        for i in range(1,n_segments):
-            duplicate_row = jacmat[nn*i-1,:]
-            jacmat = np.insert(jacmat,nn*i,duplicate_row,axis=0)
-
-        self.declare_partials(['weight_vec'], ['segment_fuel'], val=sp.csr_matrix(jacmat))
+        self.declare_partials(['weight_vec'], ['fuel_used'], rows=range(n_segments * nn), cols=range(n_segments * nn), val=-np.ones(n_segments * nn))
         self.declare_partials(['weight_vec'], ['weight_initial'], rows=range(n_segments * nn), cols=np.zeros(n_segments * nn), val=np.ones(n_segments * nn))
 
     def compute(self, inputs, outputs):
@@ -519,12 +289,7 @@ class MissionSegmentWeights(ExplicitComponent):
         #first endpoint needs to be the takeoff weight; insert a zero to make them the same length
         mission_segment_names = self.options['mission_segments']
         n_segments = len(mission_segment_names)
-        segweights = np.insert(inputs['segment_fuel'],0,0)
-        weights = np.cumsum(segweights)
-        for i in range(1,n_segments):
-            duplicate_row = weights[i*nn-1]
-            weights = np.insert(weights,i*nn,duplicate_row)
-        outputs['weight_vec'] = np.ones(n_segments * nn)*inputs['weight_initial'] + weights
+        outputs['weight_vec'] = np.ones(n_segments * nn)*inputs['weight_initial'] - inputs['fuel_used']
 
 class MissionSegmentCL(ExplicitComponent):
     """
@@ -600,7 +365,7 @@ class MissionSegmentCL(ExplicitComponent):
         J['fltcond|CL','ac|geom|wing|S_ref'] = - inputs['fltcond|cosgamma']*g*inputs['weight_vec'] / inputs['fltcond|q'] / inputs['ac|geom|wing|S_ref']**2
         J['fltcond|CL','fltcond|cosgamma'] = g*inputs['weight_vec']/inputs['fltcond|q']/inputs['ac|geom|wing|S_ref']
 
-class ThrustSolver(ImplicitComponent):
+class ThrottleSetting(ImplicitComponent):
     """
     Computes force imbalance in the aircraft x axis. Enables Newton solve for throttle at steady flight.
 
@@ -663,21 +428,6 @@ class ThrustSolver(ImplicitComponent):
         g = 9.80665 #m/s^2
         J['throttle','weight_vec'] = -g*inputs['fltcond|singamma']
         J['throttle','fltcond|singamma'] = -g*inputs['weight_vec']
-
-class SolveCruiseTime(ImplicitComponent):
-    def setup(self):
-        self.add_input('design_range', units='m')
-        self.add_input('range', units='m')
-        self.add_output('cruise|time', units='s',lower=1.0)
-        self.declare_partials(['cruise|time'], ['range'])
-        self.declare_partials(['cruise|time'], ['design_range'])
-
-    def apply_nonlinear(self, inputs, outputs, residuals):
-        residuals['cruise|time'] = inputs['range'] - inputs['design_range']
-
-    def linearize(self, inputs, outputs, J):
-        J['cruise|time','range'] = 1.0
-        J['cruise|time','design_range'] = -1.0
 
 class ComputeDesignMissionResiduals(ExplicitComponent):
     """
@@ -769,7 +519,6 @@ class ComputeDesignMissionResiduals(ExplicitComponent):
                                               inputs['mission|total_fuel'] -
                                               inputs['OEW'] -
                                               inputs['payload'])
-
 
 class ComputeDesignMissionResidualsBattery(ComputeDesignMissionResiduals):
     """
@@ -868,7 +617,6 @@ class ComputeDesignMissionResidualsBattery(ComputeDesignMissionResiduals):
                                               inputs['OEW'] -
                                               inputs['payload'])
 
-
 class MissionAnalysis(Group):
     """This analysis group calculates energy/fuel consumption and feasibility for a given mission profile.
 
@@ -925,20 +673,17 @@ class MissionAnalysis(Group):
         range_segment_names = self.options['range_segments']
         n_segments = len(mission_segment_names)
         nn_tot = (2*n_int_per_seg+1)*n_segments
+        nn = 2*n_int_per_seg+1
         track_battery = self.options['track_battery']
         track_fuel = self.options['track_fuel']
         include_takeoff = self.options['include_takeoff']
 
-        dvlist = [['ac|aero|polar|CD0_cruise','CD0',0.005,None],
-                  ['ac|aero|polar|e','e',0.95,None]]
-        self.add_subsystem('dvs',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
-
         # time of cruise phase only is solved implicitly based on desired cruise range
-        self.add_subsystem('cruisetime',SolveCruiseTime(),
+        self.add_subsystem('cruisetime',BalanceComp(name='cruise|time',units='s',eq_units='m',rhs_name='range',lhs_name='design_range'),
                            promotes_inputs=['range','design_range'],promotes_outputs=['cruise|time'])
         # obtain a vector of flight conditions for the given mission profile
         # mission parameters (speeds, altitudes, times) will need to be connected in from above (except cruise time)
-        self.add_subsystem('conditions',MissionFlightConditions(n_int_per_seg=n_int_per_seg,
+        self.add_subsystem('conditions',MissionFlightConditions(nn_seg=nn,
                                                                 mission_segments=mission_segment_names),
                            promotes_inputs=['*'],
                            promotes_outputs=['*'])
@@ -962,34 +707,42 @@ class MissionAnalysis(Group):
         # Compute the speed over the ground based on true airspeed and flight path angle
         self.add_subsystem('gs',Groundspeeds(n_int_per_seg=n_int_per_seg),promotes_inputs=["fltcond|*"],promotes_outputs=["fltcond|groundspeed","fltcond|*"])
         # Compute the range
-        self.add_subsystem('rangecomp',MissionComputeRange(n_int_per_seg=n_int_per_seg,
-                                                                 mission_segments=mission_segment_names,
-                                                                 range_segments=range_segment_names),
-                                    promotes_inputs=["fltcond|groundspeed","*|dt"],promotes_outputs=["range"])
+        self.add_subsystem('rangecomp',Integrator(num_intervals=n_int_per_seg,
+                                                  quantity_units='m',
+                                                  diff_units='s',
+                                                  method='simpson',
+                                                  segment_names=mission_segment_names,
+                                                  segments_to_count=range_segment_names,
+                                                  zero_start=True),
+                                    promotes_inputs=[('dqdt',"fltcond|groundspeed"),"*|dt"],
+                                    promotes_outputs=[('q_final',"range"),('q',"distance")])
+        # integrate the fuel burn rate and battery use weight over time to get battery state and overall weights
+        if track_fuel:
+            self.add_subsystem('fuelburn',Integrator(num_intervals=n_int_per_seg, quantity_units='kg', diff_units='s',
+                                                     method='simpson',segment_names=mission_segment_names,zero_start=True),
+                                                     promotes_inputs=[('dqdt','fuel_flow'),'*|dt'],
+                                                     promotes_outputs=[('q','fuel_used'),('q_final','mission_total_fuel')])
+        self.add_subsystem('weights',MissionSegmentWeights(n_int_per_seg=n_int_per_seg,mission_segments=mission_segment_names),
+                                     promotes_inputs=['weight_initial','fuel_used'],promotes_outputs=['weight_vec'])
+        if track_battery:
+            self.add_subsystem('batteryuse',Integrator(num_intervals=n_int_per_seg, quantity_units='MJ', diff_units='s',
+                                                     method='simpson',segment_names=mission_segment_names,zero_start=True),
+                                                     promotes_inputs=[('dqdt','battery_load'),'*|dt'],
+                                                     promotes_outputs=[('q','battery_used'),('q_final','mission_total_battery')])
 
-
-
-        self.add_subsystem('energies',MissionSegmentEnergies(n_int_per_seg=n_int_per_seg,
-                                                             mission_segments=mission_segment_names,
-                                                             track_fuel = track_fuel,
-                                                             track_battery = track_battery),
-                           promotes_inputs=["*"],promotes_outputs=["*"])
-        self.add_subsystem('weights',MissionSegmentWeights(n_int_per_seg=n_int_per_seg,
-                                                           mission_segments=mission_segment_names),
-                           promotes_inputs=["segment_fuel","weight_initial"],promotes_outputs=["weight_vec"])
         self.add_subsystem('CLs',MissionSegmentCL(n_int_per_seg=n_int_per_seg,
                                                   mission_segments=mission_segment_names),
                            promotes_inputs=["weight_vec","fltcond|q",'fltcond|cosgamma',"ac|geom|*"],
                            promotes_outputs=["fltcond|CL"])
-        self.add_subsystem('drag',PolarDrag(num_nodes=nn_tot),promotes_inputs=["fltcond|q","fltcond|CL","ac|geom|*","CD0","e"],promotes_outputs=["drag"])
-        self.add_subsystem('thrustsolve',ThrustSolver(n_int_per_seg=n_int_per_seg,mission_segments=mission_segment_names),
+        self.add_subsystem('drag',PolarDrag(num_nodes=nn_tot),
+                                            promotes_inputs=["fltcond|q","fltcond|CL","ac|geom|*",
+                                                             ("CD0","ac|aero|polar|CD0_cruise"),
+                                                             ("e","ac|aero|polar|e")],
+                                            promotes_outputs=["drag"])
+        self.add_subsystem('throttle',ThrottleSetting(n_int_per_seg=n_int_per_seg,mission_segments=mission_segment_names),
                            promotes_inputs=["fltcond|singamma","drag","weight_vec","thrust"],
                            promotes_outputs=['throttle'])
-        totals = SumComp(axis=None)
-        totals.add_equation(output_name='mission_total_fuel',input_name='segment_fuel', units='kg',scaling_factor=-1,vec_size=nn_tot-3)
-        if track_battery:
-            totals.add_equation(output_name='mission_total_battery',input_name='segment_battery_energy_used', units='MJ',vec_size=nn_tot-3)
-        self.add_subsystem(name='totals',subsys=totals,promotes_inputs=['*'],promotes_outputs=['*'])
+
         if track_battery:
             self.add_subsystem(name='residuals', subsys=ComputeDesignMissionResidualsBattery(include_takeoff=include_takeoff),
                                promotes_inputs=['ac|weights*','payload','OEW'],
@@ -1003,46 +756,3 @@ class MissionAnalysis(Group):
         self.connect('mission_total_fuel','residuals.mission|total_fuel')
         # TODO residuals.takeoff|total_fuel needs an incoming connection
 
-
-class MissionTestGroup(Group):
-    """This computes pressure, temperature, and density for a given altitude at ISA condtions. Also true airspeed from equivalent ~ indicated airspeed
-    """
-    def initialize(self):
-        self.options.declare('n_int_per_seg', default=5,
-                             desc="Number of Simpson intervals to use per seg")
-    def setup(self):
-        n_int_per_seg = self.options['n_int_per_seg']
-        iv = self.add_subsystem('conditions', IndepVarComp(), promotes_outputs=['*'])
-        self.add_subsystem('mission', MissionFlightConditions(n_int_per_seg=n_int_per_seg, mission_segments=['climb','cruise','descent','divert']),
-                                                              promotes_inputs=['*'],
-                                                              promotes_outputs=['*'])
-        self.add_subsystem('distances', MissionComputeRange(n_int_per_seg=n_int_per_seg,
-                                                            mission_segments=['climb','cruise','descent','divert'],
-                                                            range_segments=['climb','cruise','descent']),
-                                                            promotes_inputs=['*|dt'])
-
-        iv.add_output('mission|climb|time', val=20*60, units='s')
-        iv.add_output('mission|climb|h0', val=0, units='m')
-        iv.add_output('mission|climb|Ueas',val=100, units='kn')
-        iv.add_output('mission|cruise|time', val=20*60, units='s')
-        iv.add_output('mission|cruise|h0', val=10, units='km')
-        iv.add_output('mission|cruise|Ueas',val=200, units='kn')
-        iv.add_output('mission|descent|time', val=20*60, units='s')
-        iv.add_output('mission|descent|h0', val=11, units='km')
-        iv.add_output('mission|descent|Ueas',val=100, units='kn')
-        iv.add_output('mission|divert|time', val=2*60, units='s')
-        iv.add_output('mission|divert|h0', val=0, units='km')
-        iv.add_output('mission|divert|Ueas',val=100, units='kn')
-        iv.add_output('mission|divert|hf',val=1500, units='m')
-
-        self.connect('fltcond|Ueas','distances.fltcond|groundspeed')
-if __name__ == "__main__":
-        prob = Problem(MissionTestGroup())
-        prob.setup(check=True)
-        prob.run_model()
-        #check conditions at sea level
-        print(prob['fltcond|Ueas'])
-        print(prob['fltcond|vs'])
-        print(prob['fltcond|h'])
-        print(prob['distances.mission|range'])
-        prob.check_partials(compact_print=True)

@@ -7,7 +7,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
-from openconcept.utilities.math.simpson_integration import simpson_integral, simpson_partials, simpson_integral_every_node, simpson_partials_every_node, IntegrateQuantity
+from openconcept.utilities.math.simpson_integration import IntegrateQuantity
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp, VectorConcatenateComp, VectorSplitComp
 from openconcept.analysis.aerodynamics import PolarDrag, Lift, StallSpeed
 from openconcept.utilities.dvlabel import DVLabel
@@ -231,7 +231,7 @@ class BalancedFieldLengthTakeoff(Group):
             self.connect('v0v1_battery.delta_quantity','total_battery.battery_v0v1')
             self.connect('v1vr_battery.delta_quantity','total_battery.battery_v1vr')
         if track_fuel:
-            self.add_subsystem('total_fuel',AddSubtractComp(output_name='total_fuel',input_names=['fuel_v0v1','fuel_v1vr'], units='kg',scaling_factors=[-1,-1]),promotes_outputs=["*"])
+            self.add_subsystem('total_fuel',AddSubtractComp(output_name='total_fuel',input_names=['fuel_v0v1','fuel_v1vr'], units='kg',scaling_factors=[1,1]),promotes_outputs=["*"])
             self.connect('v0v1_fuel.delta_quantity','total_fuel.fuel_v0v1')
             self.connect('v1vr_fuel.delta_quantity','total_fuel.fuel_v1vr')
             self.add_subsystem('climb_weight',AddSubtractComp(output_name='weight_after_takeoff',input_names=['weight','total_fuel'], units='kg',scaling_factors=[1,-1]),promotes_inputs=["*"],promotes_outputs=["*"])
