@@ -3,7 +3,7 @@ from openconcept.analysis.atmospherics.temperature_comp import TemperatureComp
 from openconcept.analysis.atmospherics.pressure_comp import PressureComp
 from openconcept.analysis.atmospherics.density_comp import DensityComp
 from openconcept.analysis.atmospherics.dynamic_pressure_comp import DynamicPressureComp
-from openconcept.analysis.atmospherics.true_airspeed import TrueAirspeedComp
+from openconcept.analysis.atmospherics.true_airspeed import TrueAirspeedComp, EquivalentAirspeedComp
 from openconcept.analysis.atmospherics.speedofsound_comp import SpeedOfSoundComp
 from openconcept.analysis.atmospherics.mach_number_comp import MachNumberComp
 import numpy as np
@@ -38,20 +38,28 @@ class ComputeAtmosphericProperties(Group):
     -------
     num_nodes : int
         Number of analysis points to run (sets vec length) (default 1)
+    true_airspeed_in : bool
+        Flip to true if input vector is Utrue, not Ueas.
+        If this is true, fltcond|Utrue will be an input and fltcond|Ueas will be an output.
     '''
 
     def initialize(self):
         self.options.declare('num_nodes',default=1,desc="Number of mission analysis points to run")
+        self.options.declare('true_airspeed_in',default=False,desc="Number of mission analysis points to run")
 
     def setup(self):
         nn = self.options['num_nodes']
+        tas_in = self.options['true_airspeed_in']
         self.add_subsystem('inputconv', InputConverter(num_nodes=nn),promotes_inputs=['*'])
         self.add_subsystem('temp', TemperatureComp(num_nodes=nn))
         self.add_subsystem('pressure',PressureComp(num_nodes=nn))
         self.add_subsystem('density',DensityComp(num_nodes=nn))
         self.add_subsystem('speedofsound',SpeedOfSoundComp(num_nodes=nn))
         self.add_subsystem('outputconv',OutputConverter(num_nodes=nn),promotes_outputs=['*'])
-        self.add_subsystem('trueairspeed',TrueAirspeedComp(num_nodes=nn),promotes_inputs=['*'],promotes_outputs=['*'])
+        if tas_in:
+            self.add_subsystem('equivair',EquivalentAirspeedComp(num_nodes=nn),promotes_inputs=['*'],promotes_outputs=['*'])
+        else:
+            self.add_subsystem('trueair',TrueAirspeedComp(num_nodes=nn),promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('dynamicpressure',DynamicPressureComp(num_nodes=nn),promotes_inputs=["*"],promotes_outputs=["*"])
         self.add_subsystem('machnumber',MachNumberComp(num_nodes=nn),promotes_inputs=["*"],promotes_outputs=["*"])
 
@@ -73,15 +81,11 @@ class InputConverter(ExplicitComponent):
     ------
     fltcond|h : float
         Altitude (vector, km)
-    fltcond|Ueas : float
-        Equivalent airspeed (vector, m/s)
 
     Outputs
     -------
     h_km : float
         Altitude in km to pass to the standard atmosphere modules (vector, unitless)
-    v_m_s : float
-        Airspeed in m/s to pass to the standard atmosphere modules (vector, unitless)
 
     Options
     -------
@@ -93,20 +97,14 @@ class InputConverter(ExplicitComponent):
     def setup(self):
         nn = self.options['num_nodes']
         self.add_input('fltcond|h', units='km', desc='Flight condition altitude',shape=(nn,))
-        self.add_input('fltcond|Ueas', units='m/s', desc='Flight condition airspeed (equivalent)', shape=(nn,))
-
         #outputs and partials
         self.add_output('h_km', desc='Height in kilometers with no units',shape=(nn,))
-        self.add_output('v_m_s', desc='Equivalent airspeed in m/s with no units',shape=(nn,))
         self.declare_partials('h_km','fltcond|h', rows=range(nn), cols=range(nn))
-        self.declare_partials('v_m_s','fltcond|Ueas', rows=range(nn), cols=range(nn))
     def compute(self, inputs, outputs):
         outputs['h_km'] = inputs['fltcond|h']
-        outputs['v_m_s'] = inputs['fltcond|Ueas']
     def compute_partials(self, inputs, J):
         nn = self.options['num_nodes']
         J['h_km','fltcond|h'] = np.ones(nn)
-        J['v_m_s','fltcond|Ueas'] = np.ones(nn)
 
 
 class OutputConverter(ExplicitComponent):

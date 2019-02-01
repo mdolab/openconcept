@@ -11,9 +11,9 @@ from openconcept.components.ducts import DuctWithHx
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.math.derivatives import FirstDerivative
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp, VectorConcatenateComp, VectorSplitComp
-
+from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
 method = 'simpson'
-n_int = 5
+n_int = 10
 dt = 800 / (2*n_int+1)
 
 class ThermalComponentWithMass(ImplicitComponent):
@@ -390,7 +390,6 @@ class CoolantReservoir(Group):
                             promotes_outputs=[('q','T_out')])
         self.connect('rate.dTdt','integratetemp.dqdt')
 
-
 class LiquidCoolantTestGroup(Group):
     """A component (heat producing) with thermal mass
     cooled by a cold plate.
@@ -414,26 +413,37 @@ class LiquidCoolantTestGroup(Group):
             has_thermal_mass = True
         else:
             nn_tot = self.options['num_nodes']
+            nn = int(nn_tot / 3)
             has_thermal_mass = False
 
         iv = self.add_subsystem('iv',IndepVarComp(), promotes_outputs=['*'])
         #iv.add_output('q_in', val=10*np.concatenate([np.ones((nn,)),0.5*np.ones((nn,)),0.2*np.ones((nn,))]), units='kW')
-        iv.add_output('q_in',val=10*np.ones((nn_tot,)), units='kW')
-        iv.add_output('T_in', val=40*np.ones((nn_tot,)), units='degC')
+        throttle_profile = np.concatenate([np.ones((nn,)), np.ones((nn,))*0.5, np.linspace(0.05,0.2,nn)])
+        iv.add_output('q_in',val=10*throttle_profile, units='kW')
+        #iv.add_output('T_in', val=40*np.ones((nn_tot,)), units='degC')
         iv.add_output('mdot_coolant', val=0.1*np.ones((nn_tot,)), units='kg/s')
         iv.add_output('rho_coolant', val=997*np.ones((nn_tot,)),units='kg/m**3')
         iv.add_output('motor_mass', val=50., units='kg')
-        iv.add_output('coolant_mass', val=0.01, units='kg')
-        iv.add_output('T_object_start', val=40, units='degC')
-        iv.add_output('T_coolant_start', val=39, units='degC')
-        print(dt)
+        iv.add_output('coolant_mass', val=10., units='kg')
+        iv.add_output('T_object_start', val=15, units='degC')
+        iv.add_output('T_coolant_start', val=15.1, units='degC')
         iv.add_output('climb|dt', val=dt, units='s')
-        iv.add_output('cruise|dt', val=dt, units='s')
+        iv.add_output('cruise|dt', val=3*dt, units='s')
         iv.add_output('descent|dt', val=dt, units='s')
         iv.add_output('channel_width', val=1, units='mm')
-        iv.add_output('channel_height', val=10, units='mm')
-        iv.add_output('channel_length', val=0.3, units='m')
+        iv.add_output('channel_height', val=20, units='mm')
+        iv.add_output('channel_length', val=0.2, units='m')
         iv.add_output('n_parallel', val=20)
+        Ueas = np.ones((nn_tot))*150
+        h = np.concatenate([np.linspace(0,25000,nn),np.linspace(25000,27000,nn),np.linspace(27000,0,nn)])
+        iv.add_output('fltcond|Ueas', val=Ueas, units='kn' )
+        iv.add_output('fltcond|h', val=h, units='ft')
+
+
+        self.add_subsystem('atmos',
+                           ComputeAtmosphericProperties(num_nodes=nn_tot),
+                           promotes_inputs=["fltcond|h",
+                                            "fltcond|Ueas"])
 
         if has_thermal_mass:
             lc_promotes = ['q_in',('mass','motor_mass'),'T_object_start','*|dt','channel_*','n_parallel']
@@ -448,6 +458,10 @@ class LiquidCoolantTestGroup(Group):
                                             promotes_inputs=lc_promotes)
         self.add_subsystem('duct',
                            DuctWithHx(num_nodes=nn_tot))
+
+        self.connect('atmos.fltcond|p','duct.p_inf')
+        self.connect('atmos.fltcond|T','duct.T_inf')
+        self.connect('atmos.fltcond|Utrue','duct.Utrue')
 
         self.connect('component.T_out','duct.T_in_hot')
         self.connect('rho_coolant','duct.rho_hot')
@@ -469,50 +483,63 @@ class LiquidCoolantTestGroup(Group):
 if __name__ == '__main__':
     # run this script from the root openconcept directory like so:
     # python .\openconcept\components\ducts.py
+    quasi_steady = False
     nn_tot = (2*n_int +1)*3
-    prob = Problem(LiquidCoolantTestGroup(quasi_steady=False, n_int_per_seg=n_int))
+    prob = Problem(LiquidCoolantTestGroup(quasi_steady=quasi_steady, num_nodes=nn_tot, n_int_per_seg=n_int))
     prob.model.options['assembled_jac_type'] = 'csc'
     prob.model.nonlinear_solver=NewtonSolver(iprint=2)
     prob.model.linear_solver = DirectSolver(assemble_jac=True)
     prob.model.nonlinear_solver.options['solve_subsystems'] = True
     prob.model.nonlinear_solver.options['maxiter'] = 20
-    prob.model.nonlinear_solver.options['atol'] = 1e-16
-    prob.model.nonlinear_solver.options['rtol'] = 1e-16
+    prob.model.nonlinear_solver.options['atol'] = 1e-8
+    prob.model.nonlinear_solver.options['rtol'] = 1e-8
     prob.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar',print_bound_enforce=True)
 
     prob.setup(check=True,force_alloc_complex=True)
 
     prob.run_model()
-    print(prob['duct.inlet.M'])
-    print(prob['component.T_object'])
-    np.save('bdf',prob['component.T_object'])
-    np.save('bdf',prob['component.T_out'] - prob['component.T_in'])
-    prob.check_partials(method='cs', compact_print=True)
+    #print(prob['duct.inlet.M'])
+    print(np.max(prob['component.T_object']-273.15))
+    print(np.max(-prob['duct.force.F_net']))
+
+    #prob.check_partials(method='cs', compact_print=True)
 
     #prob.model.list_outputs(units=True, print_arrays=True)
-
+    if quasi_steady:
+        np.save('quasi_steady',prob['component.T_object'])
 
     # prob.run_driver()
     # prob.model.list_inputs(units=True)
     nn_seg = 2*n_int + 1
-    t = np.concatenate([np.linspace(0,dt*nn_seg,nn_seg),np.linspace(dt*nn_seg,2*dt*nn_seg,nn_seg),np.linspace(2*dt*nn_seg,3*dt*nn_seg,nn_seg)])/60
+    t = np.concatenate([np.linspace(0,dt*nn_seg,nn_seg),np.linspace(dt*nn_seg,7*dt*nn_seg,nn_seg),np.linspace(7*dt*nn_seg,8*dt*nn_seg,nn_seg)])/60
     # #t = np.concatenate([np.linspace(0,30*n_int,n_int),np.linspace(30*(n_int+1),30*(2*n_int),n_int),np.linspace(30*(2*n_int+1),30*3*n_int,n_int)])/60
-
+    if not quasi_steady:
+        qs = np.load('quasi_steady.npy')
+    else:
+        qs = prob['component.T_object']
     import matplotlib.pyplot as plt
     plt.figure()
-    plt.plot(t, prob['component.T_object'] - 273.15, t, np.load('simpson.npy') - 273.15)
+    plt.plot(t, prob['component.T_object'] - 273.15)
     plt.xlabel('time (min)')
     plt.ylabel('motor temp (C)')
-    plt.figure()
-    plt.plot(prob['duct.inlet.M'], prob['component.T_object'] - 273.15)
-    plt.xlabel('Mach number')
-    plt.ylabel('steady state motor temp (C)')
-    plt.figure()
-    plt.plot(t, prob['duct.force.F_net'])
-    plt.xlabel('time (min)')
-    plt.ylabel('drag N')
-    plt.figure()
-    plt.plot(t, prob['component.T_out'] - prob['component.T_in'], t, np.load('simpsondelta.npy'))
-    plt.xlabel('time (min)')
-    plt.ylabel('delta_temp')
+    # plt.figure()
+    # plt.plot(prob['fltcond|h'], prob['component.T_object'] - 273.15, prob['fltcond|h'], qs - 273.15)
+    # plt.xlabel('altitude (ft)')
+    # plt.ylabel('motor temp (C)')
+    # plt.figure()
+    # plt.plot(t, prob['duct.inlet.M'])
+    # plt.xlabel('Mach number')
+    # plt.ylabel('steady state motor temp (C)')
+    # plt.figure()
+    # plt.plot(prob['duct.inlet.M'], prob['duct.force.F_net'])
+    # plt.xlabel('M_inf')
+    # plt.ylabel('drag N')
+    # plt.figure()
+    # plt.plot(prob['duct.inlet.M'], prob['duct.mdot']/prob['atmos.fltcond|rho']/prob.get_val('atmos.fltcond|Utrue',units='m/s')/prob.get_val('duct.area_nozzle',units='m**2'))
+    # plt.xlabel('M_inf')
+    # plt.ylabel('mdot / rho / U / A_nozzle')
+    # plt.figure()
+    # plt.plot(prob['duct.inlet.M'],prob['duct.nozzle.M'])
+    # plt.xlabel('M_inf')
+    # plt.ylabel('M_nozzle')
     plt.show()

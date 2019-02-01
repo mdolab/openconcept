@@ -144,9 +144,9 @@ class MissionFlightConditions(ExplicitComponent):
             vs_vecs.append(np.ones(nn)*vs)
             outputs[segment_name+'|dt'] = inputs[segment_name+'|time'] / (nn-1)
 
-        outputs['fltcond|h'] = np.concatenate(altitude_vecs)
-        outputs['fltcond|Ueas'] = np.concatenate(Ueas_vecs)
-        outputs['fltcond|vs'] = np.concatenate(vs_vecs)
+        outputs['fltcond|h'] = np.concatenate(altitude_vecs).flatten()
+        outputs['fltcond|Ueas'] = np.concatenate(Ueas_vecs).flatten()
+        outputs['fltcond|vs'] = np.concatenate(vs_vecs).flatten()
 
 
     def compute_partials(self, inputs, J):

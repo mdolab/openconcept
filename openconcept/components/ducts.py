@@ -752,9 +752,7 @@ class DuctWithHxOld(Group):
         iv.add_output('p_inf', val=37600.903*np.ones((nn,)), units='Pa')
         iv.add_output('T_inf', val=238.62*np.ones((nn,)), units='K')
         iv.add_output('Utrue', val=300.9*np.ones((nn,)), units='kn')
-#        iv.add_output('Utrue', val=154.89*np.ones((nn,)), units='m/s')
 
-        #iv.add_output('Utrue', val=np.ones((nn))*200, units='kn')
         iv.add_output('cp', val=1002.93, units='J/kg/K')
 
         iv.add_output('area_1', val=60, units='inch**2')
@@ -835,10 +833,10 @@ class DuctWithHx(Group):
     def setup(self):
         nn = self.options['num_nodes']
 
-        iv = self.add_subsystem('dv', IndepVarComp(), promotes_outputs=['cp','*_1','*_2','*_3','*_inf','Utrue','*_nozzle'])
-        iv.add_output('p_inf', val=37600.903*np.ones((nn,)), units='Pa')
-        iv.add_output('T_inf', val=238.62*np.ones((nn,)), units='K')
-        iv.add_output('Utrue', val=np.linspace(300,300,nn), units='kn')
+        iv = self.add_subsystem('dv', IndepVarComp(), promotes_outputs=['cp','*_1','*_2','*_3','*_nozzle'])
+        # iv.add_output('p_inf', val=37600.903*np.ones((nn,)), units='Pa')
+        # iv.add_output('T_inf', val=238.62*np.ones((nn,)), units='K')
+        # iv.add_output('Utrue', val=np.linspace(300,300,nn), units='kn')
         iv.add_output('cp', val=1002.93, units='J/kg/K')
 
         iv.add_output('area_1', val=60, units='inch**2')
@@ -846,12 +844,12 @@ class DuctWithHx(Group):
         iv.add_output('heat_in_1', val=np.zeros((nn,)), units='W')
         iv.add_output('pressure_recovery_1', val=np.ones((nn,)))
 
-        iv.add_output('area_2', val=286.918, units='inch**2')
+        #iv.add_output('area_2', val=286.918, units='inch**2')
         iv.add_output('delta_p_2', val=np.ones((nn,))*0., units='Pa')
         iv.add_output('heat_in_2', val=np.ones((nn,))*0., units='W')
         iv.add_output('pressure_recovery_2', val=np.ones((nn,)))
 
-        iv.add_output('area_3', val=286.918, units='inch**2')
+        #iv.add_output('area_3', val=286.918, units='inch**2')
         iv.add_output('pressure_recovery_3', val=np.ones((nn,)))
 
         iv.add_output('area_nozzle', val=58*np.ones((nn,)), units='inch**2')
@@ -888,7 +886,7 @@ class DuctWithHx(Group):
         self.connect('sta2.Tt_out','sta3.Tt_in')
         self.connect('hx.delta_p_cold','sta3.delta_p')
         self.connect('hx.heat_transfer','sta3.heat_in')
-
+        self.connect('hx.frontal_area',['area_2','area_3'])
         self.add_subsystem('nozzle', OutletNozzle(num_nodes=nn),
                                                   promotes_inputs=[('p_exit','p_inf'),('area','area_nozzle')],
                                                   promotes_outputs=['mdot'])

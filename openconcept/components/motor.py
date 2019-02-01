@@ -94,7 +94,6 @@ class SimpleMotor(ExplicitComponent):
         weight_base = self.options['weight_base']
         cost_inc = self.options['cost_inc']
         cost_base = self.options['cost_base']
-
         outputs['shaft_power_out'] = inputs['throttle'] * inputs['elec_power_rating'] * eta_m
         outputs['heat_out'] = inputs['throttle'] * inputs['elec_power_rating'] * (1 - eta_m)
         outputs['elec_load'] = inputs['throttle'] * inputs['elec_power_rating']

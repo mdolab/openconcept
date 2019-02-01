@@ -87,6 +87,44 @@ class TestElementMultiplyDivideCompNx1(unittest.TestCase):
         partials = self.p.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
 
+class TestElementMultiplyVectorScalar(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 5
+
+        self.p = Problem(model=Group())
+
+        ivc = IndepVarComp()
+        ivc.add_output(name='a', shape=(self.nn,))
+        ivc.add_output(name='b', val=3.0)
+
+        self.p.model.add_subsystem(name='ivc',
+                                   subsys=ivc,
+                                   promotes_outputs=['a', 'b'])
+
+        multi=self.p.model.add_subsystem(name='multiply_divide_comp',
+                                   subsys=ElementMultiplyDivideComp())
+        multi.add_equation('multdiv_output',['input_a','input_b'],vec_size=[self.nn, 1])
+
+        self.p.model.connect('a', 'multiply_divide_comp.input_a')
+        self.p.model.connect('b', 'multiply_divide_comp.input_b')
+
+        self.p.setup()
+
+        self.p['a'] = np.random.rand(self.nn,)
+
+        self.p.run_model()
+
+    def test_results(self):
+        a = self.p['a']
+        b = self.p['b']
+        out = self.p['multiply_divide_comp.multdiv_output']
+        expected = a * b
+        assert_rel_error(self, out, expected,1e-16)
+
+    def test_partials(self):
+        partials = self.p.check_partials(method='fd', out_stream=None)
+        assert_check_partials(partials)
 
 class TestElementMultiplyDivideCompNx3(unittest.TestCase):
 
