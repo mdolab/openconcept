@@ -100,8 +100,10 @@ class InputConverter(ExplicitComponent):
         #outputs and partials
         self.add_output('h_km', desc='Height in kilometers with no units',shape=(nn,))
         self.declare_partials('h_km','fltcond|h', rows=range(nn), cols=range(nn))
+
     def compute(self, inputs, outputs):
         outputs['h_km'] = inputs['fltcond|h']
+
     def compute_partials(self, inputs, J):
         nn = self.options['num_nodes']
         J['h_km','fltcond|h'] = np.ones(nn)

@@ -131,7 +131,6 @@ class ThrustCalc(ExplicitComponent):
         ct = np.zeros(nn)
         ct1 = inputs['ct_over_cp'] * cp
         ct2 = cp * inputs['eta_prop'] / j
-
         #if j <= jinterp_min:
         ct[static_idx] = ct1[static_idx]
         #if j > jinterp_min and < jinterp_max:
@@ -220,7 +219,7 @@ class PropCoefficients(ExplicitComponent):
 
         #outputs and partials
         self.add_output('cp', desc='Power coefficient', val=0.1*np.ones(nn), lower=np.zeros(nn),upper=np.ones(nn)*2.4)
-        self.add_output('J', desc='Advance ratio', val=0.2**np.ones(nn))
+        self.add_output('J', desc='Advance ratio', val=0.2**np.ones(nn), lower=1e-4*np.ones(nn), upper=4.0*np.ones(nn))
         self.add_output('prop_Vtip',desc='Propeller tip speed',shape=(nn,))
 
         self.declare_partials('cp','diameter')
@@ -236,8 +235,8 @@ class PropCoefficients(ExplicitComponent):
         outputs['cp'] = inputs['shaft_power_in']/inputs['fltcond|rho'] / (inputs['rpm']/60)**3 / inputs['diameter']**5
         #print('cp: '+str(outputs['cp']))
         outputs['J'] = 60. * inputs['fltcond|Utrue'] / inputs['rpm'] / inputs['diameter']
-        # print('U:'+str(inputs['fltcond|Utrue']))
-        # print('J: '+str(outputs['J']))
+        #print('U:'+str(inputs['fltcond|Utrue']))
+        #print('J: '+str(outputs['J']))
         outputs['prop_Vtip'] = inputs['rpm'] / 60 * np.pi * inputs['diameter']
 
     def compute_partials(self, inputs, J):

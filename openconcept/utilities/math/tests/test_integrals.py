@@ -32,6 +32,7 @@ class MultiPhaseIntegratorTestGroup(Group):
         self.options.declare('diff_units',default=None, desc="Units of the differential")
         self.options.declare('num_intervals',default=5, desc="Number of Simpsons rule intervals per segment")
         self.options.declare('integrator',default='simpson', desc="Which simpson integrator to use")
+        self.options.declare('time_setup',default='dt')
 
     def setup(self):
         segment_names = self.options['segment_names']
@@ -40,6 +41,7 @@ class MultiPhaseIntegratorTestGroup(Group):
         diff_units = self.options['diff_units']
         n_int_per_seg = self.options['num_intervals']
         integrator_option = self.options['integrator']
+        time_setup = self.options['time_setup']
 
         if segment_names is None:
             nn_tot = (2*n_int_per_seg + 1)
@@ -48,7 +50,7 @@ class MultiPhaseIntegratorTestGroup(Group):
         iv = self.add_subsystem('iv', IndepVarComp())
 
         self.add_subsystem('integral', Integrator(segment_names=segment_names, segments_to_count=segments_to_count, quantity_units=quantity_units,
-                                                         diff_units=diff_units, num_intervals=n_int_per_seg, method=integrator_option))
+                                                         diff_units=diff_units, num_intervals=n_int_per_seg, method=integrator_option, time_setup=time_setup))
         if quantity_units is None and diff_units is None:
             rate_units = None
         elif quantity_units is None:
@@ -65,8 +67,17 @@ class MultiPhaseIntegratorTestGroup(Group):
         self.connect('iv.initial_value', 'integral.q_initial')
 
         if segment_names is None:
-            iv.add_output('dt', val=1, units=diff_units)
-            self.connect('iv.dt', 'integral.dt')
+            if time_setup == 'dt':
+                iv.add_output('dt', val=1, units=diff_units)
+                self.connect('iv.dt', 'integral.dt')
+            elif time_setup == 'duration':
+                iv.add_output('duration', val=1*(nn_tot-1), units=diff_units)
+                self.connect('iv.duration', 'integral.duration')
+            elif time_setup == 'bounds':
+                iv.add_output('t_initial', val=2, units=diff_units)
+                iv.add_output('t_final', val=2 + 1*(nn_tot-1))
+                self.connect('iv.t_initial','integral.t_initial')
+                self.connect('iv.t_final','integral.t_final')
         else:
             for segment_name in segment_names:
                 iv.add_output(segment_name + '|dt', val=1, units=diff_units)
@@ -129,6 +140,40 @@ class IntegratorEveryNodeCommonTestCases(object):
 
         prob = Problem(MultiPhaseIntegratorTestGroup(num_intervals=self.num_intervals, integrator=self.integrator,
                                                      quantity_units='kg', diff_units='s'))
+        prob.setup(check=True, force_alloc_complex=True)
+        prob['iv.rate_to_integrate'] = fprime
+        prob.run_model()
+        assert_rel_error(self, prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
+        assert_rel_error(self, prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials, atol=1e-8, rtol=1e0)
+
+    def test_quadratic_duration(self):
+        n_int_per_seg = self.num_intervals
+        nn_tot = (n_int_per_seg*2 + 1)
+        x = np.linspace(0, nn_tot-1, nn_tot)
+        fprime = 4 * x **2 - 8*x + 5
+        f = 4 * x ** 3 / 3 - 8 * x ** 2 / 2 + 5*x
+
+        prob = Problem(MultiPhaseIntegratorTestGroup(num_intervals=self.num_intervals, integrator=self.integrator,
+                                                     quantity_units='kg', diff_units='s',time_setup='duration'))
+        prob.setup(check=True, force_alloc_complex=True)
+        prob['iv.rate_to_integrate'] = fprime
+        prob.run_model()
+        assert_rel_error(self, prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
+        assert_rel_error(self, prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials, atol=1e-8, rtol=1e0)
+
+    def test_quadratic_bounds(self):
+        n_int_per_seg = self.num_intervals
+        nn_tot = (n_int_per_seg*2 + 1)
+        x = np.linspace(0, nn_tot-1, nn_tot)
+        fprime = 4 * x **2 - 8*x + 5
+        f = 4 * x ** 3 / 3 - 8 * x ** 2 / 2 + 5*x
+
+        prob = Problem(MultiPhaseIntegratorTestGroup(num_intervals=self.num_intervals, integrator=self.integrator,
+                                                     quantity_units='kg', diff_units='s',time_setup='bounds'))
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
         prob.run_model()

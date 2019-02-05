@@ -731,6 +731,11 @@ class Integrator(ExplicitComponent):
         If True, disables q_initial input (default False)
     final_only : bool
         If True, disables q output (q_final only) (default False)
+    time_setup : str
+        Time configuration (default 'dt')
+        'dt' creates input 'dt'
+        'duration' creates input 'duration'
+        'bounds' creates inputs 't_initial', 't_final'
     """
 
     def initialize(self):
@@ -742,6 +747,9 @@ class Integrator(ExplicitComponent):
         self.options.declare('method',default='bdf3', desc="Numerical method to use.")
         self.options.declare('zero_start',default=False)
         self.options.declare('final_only',default=False)
+        self.options.declare('lower',default=-1e30)
+        self.options.declare('upper',default=1e30)
+        self.options.declare('time_setup',default='dt')
 
     def setup(self):
         segment_names = self.options['segment_names']
@@ -752,6 +760,7 @@ class Integrator(ExplicitComponent):
         method = self.options['method']
         zero_start = self.options['zero_start']
         final_only = self.options['final_only']
+        time_setup = self.options['time_setup']
         nn_seg = (n_int_per_seg*2 + 1)
 
         if method == 'bdf3':
@@ -778,10 +787,10 @@ class Integrator(ExplicitComponent):
         # get the partials of the delta quantities WRT the rates dDelta / drate
 
         self.add_input('dqdt', val=0, units=rate_units, desc='Quantity to integrate',shape=(nn_tot,))
-        self.add_output('q_final', units=quantity_units, desc='Final value of q')
+        self.add_output('q_final', units=quantity_units, desc='Final value of q',upper=self.options['upper'],lower=self.options['lower'])
 
         if not final_only:
-            self.add_output('q', units=quantity_units, desc='Integral of dqdt', shape=(nn_tot,))
+            self.add_output('q', units=quantity_units, desc='Integral of dqdt', shape=(nn_tot,),upper=self.options['upper'],lower=self.options['lower'])
 
         if not zero_start:
             self.add_input('q_initial', val=0, units=quantity_units, desc='Initial value')
@@ -798,14 +807,31 @@ class Integrator(ExplicitComponent):
         self.declare_partials(['q_final'], ['dqdt'], rows=dQfdrate_indices[0], cols=dQfdrate_indices[1]) # rows are zeros
 
         if segment_names is None:
-            self.add_input('dt', units=diff_units, desc='Time step')
             dQddt_seg = dQddtlist[0]
             dQddt_indices = dQddt_seg.nonzero()
             dQfddt_indices = dQddt_seg.getrow(-1).nonzero()
-            if not final_only:
-                self.declare_partials(['q'], ['dt'], rows=dQddt_indices[0], cols=dQddt_indices[1])
-            self.declare_partials(['q_final'], ['dt'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
+            if time_setup == 'dt':
+                self.add_input('dt', units=diff_units, desc='Time step')
+                if not final_only:
+                    self.declare_partials(['q'], ['dt'], rows=dQddt_indices[0], cols=dQddt_indices[1])
+                self.declare_partials(['q_final'], ['dt'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
+            elif time_setup == 'duration':
+                self.add_input('duration', units=diff_units, desc='Time duration')
+                if not final_only:
+                    self.declare_partials(['q'], ['duration'], rows=dQddt_indices[0], cols=dQddt_indices[1])
+                self.declare_partials(['q_final'], ['duration'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
+            elif time_setup == 'bounds':
+                self.add_input('t_initial', units=diff_units, desc='Initial time')
+                self.add_input('t_final', units=diff_units, desc='Initial time')
+                if not final_only:
+                    self.declare_partials(['q'], ['t_initial','t_final'], rows=dQddt_indices[0], cols=dQddt_indices[1])
+                self.declare_partials(['q_final'], ['t_initial','t_final'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
+            else:
+                raise ValueError('Only dt, duration, and bounds are allowable values of time_setup')
+
         else:
+            if time_setup != 'dt':
+                raise ValueError('dt is the only time_setup supported for multisegment integrations')
             for i_seg, segment_name in enumerate(segment_names):
                 self.add_input(segment_name +'|dt', units=diff_units, desc='Time step')
                 dQddt_seg = dQddtlist[i_seg]
@@ -821,11 +847,18 @@ class Integrator(ExplicitComponent):
         segments_to_count = self.options['segments_to_count']
         zero_start = self.options['zero_start']
         final_only = self.options['final_only']
+        time_setup=self.options['time_setup']
 
         nn_seg = (n_int_per_seg*2 + 1)
         if segment_names is None:
             n_segments = 1
-            dts = [inputs['dt'][0]]
+            if time_setup == 'dt':
+                dts = [inputs['dt'][0]]
+            elif time_setup == 'duration':
+                dts = [inputs['duration'][0]/(nn_seg-1)]
+            elif time_setup == 'bounds':
+                delta_t = inputs['t_final'] - inputs['t_initial']
+                dts = [delta_t[0]/(nn_seg-1)]
         else:
             n_segments = len(segment_names)
             dts = []
@@ -850,6 +883,7 @@ class Integrator(ExplicitComponent):
         segments_to_count = self.options['segments_to_count']
         zero_start = self.options['zero_start']
         final_only = self.options['final_only']
+        time_setup = self.options['time_setup']
 
         nn_seg = (n_int_per_seg*2 + 1)
         if segment_names is None:
@@ -860,7 +894,13 @@ class Integrator(ExplicitComponent):
 
         if segment_names is None:
             n_segments = 1
-            dts = [inputs['dt'][0]]
+            if time_setup == 'dt':
+                dts = [inputs['dt'][0]]
+            elif time_setup == 'duration':
+                dts = [inputs['duration'][0]/(nn_seg-1)]
+            elif time_setup == 'bounds':
+                delta_t = inputs['t_final'] - inputs['t_initial']
+                dts = [delta_t[0]/(nn_seg-1)]
         else:
             n_segments = len(segment_names)
             dts = []
@@ -880,9 +920,42 @@ class Integrator(ExplicitComponent):
         J['q_final', 'dqdt'] = dQdrate.getrow(-1).data
 
         if segment_names is None:
-            if not final_only:
-                J['q','dt'] = dQddtlist[0].data
-            J['q_final','dt'] = dQddtlist[0].getrow(-1).data
+            if time_setup == 'dt':
+                if not final_only:
+                    if len(dQddtlist[0].data) == 0:
+                        J['q','dt'] = np.zeros(J['q','dt'].shape)
+                    else:
+                        J['q','dt'] = dQddtlist[0].data
+                if len(dQddtlist[0].getrow(-1).data) == 0:
+                    J['q_final','dt'] = 0
+                else:
+                    J['q_final','dt'] = dQddtlist[0].getrow(-1).data
+
+            elif time_setup == 'duration':
+                if not final_only:
+                    if len(dQddtlist[0].data) == 0:
+                        J['q','duration'] = np.zeros(J['q','duration'].shape)
+                    else:
+                        J['q','duration'] = dQddtlist[0].data / (nn_seg - 1)
+                if len(dQddtlist[0].getrow(-1).data) == 0:
+                    J['q_final','duration'] = 0
+                else:
+                    J['q_final','duration'] = dQddtlist[0].getrow(-1).data / (nn_seg - 1)
+
+            elif time_setup == 'bounds':
+                if not final_only:
+                    if len(dQddtlist[0].data) == 0:
+                        J['q','t_initial'] = np.zeros(J['q','t_initial'].shape)
+                        J['q','t_final'] = np.zeros(J['q','t_final'].shape)
+                    else:
+                        J['q','t_initial'] = -dQddtlist[0].data / (nn_seg - 1)
+                        J['q','t_final'] = dQddtlist[0].data / (nn_seg - 1)
+                if len(dQddtlist[0].getrow(-1).data) == 0:
+                    J['q_final','t_initial'] = 0
+                    J['q_final','t_final'] = 0
+                else:
+                    J['q_final','t_initial'] = -dQddtlist[0].getrow(-1).data / (nn_seg - 1)
+                    J['q_final','t_final'] = dQddtlist[0].getrow(-1).data / (nn_seg - 1)
         else:
             for i_seg, segment_name in enumerate(segment_names):
                 if not final_only:
