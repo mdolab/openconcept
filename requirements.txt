@@ -7,3 +7,4 @@ numpy
 openmdao
 six
 sphinx_rtd_theme
+redbaron

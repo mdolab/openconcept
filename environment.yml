@@ -14,3 +14,4 @@ dependencies:
     - openmdao
     - six
     - sphinx_rtd_theme
+    - redbaron

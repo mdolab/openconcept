@@ -9,3 +9,4 @@ build/
 docs/_build
 docs/_srcdocs
 *_old.py
+*.npy
