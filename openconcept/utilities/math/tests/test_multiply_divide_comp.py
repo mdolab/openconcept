@@ -1,7 +1,7 @@
 from __future__ import print_function, division, absolute_import
 
 import unittest
-
+import pytest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp
@@ -250,6 +250,7 @@ class TestElementMultiplyDivideDivisionFirst(unittest.TestCase):
         expected = 1 / a / b * c
         assert_rel_error(self, out, expected,1e-15)
 
+    @pytest.mark.filterwarnings("ignore:Casting*")
     def test_partials(self):
         partials = self.p.check_partials(method='cs', out_stream=None)
         assert_check_partials(partials)

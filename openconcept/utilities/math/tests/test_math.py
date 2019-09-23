@@ -1,5 +1,6 @@
 from __future__ import division
 import unittest
+import pytest
 import numpy as np
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
@@ -329,6 +330,7 @@ class FirstDerivativeFourthOrderTestCases(unittest.TestCase, FirstDerivCommonTes
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e-8)
 
+    @pytest.mark.filterwarnings("ignore:You have specified*:UserWarning")
     def test_quartic_single_phase_qty_units_only(self):
         prob = Problem(FirstDerivativeTestGroup(order=self.order, quantity_units='m'))
         prob.setup(check=True, force_alloc_complex=True)

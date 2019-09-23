@@ -1,5 +1,6 @@
 from __future__ import division
 import unittest
+import pytest
 import numpy as np
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
@@ -165,6 +166,7 @@ class IntegratorEveryNodeCommonTestCases(object):
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
+    @pytest.mark.filterwarnings("ignore:Input*:UserWarning")
     def test_quadratic_bounds(self):
         n_int_per_seg = self.num_intervals
         nn_tot = (n_int_per_seg*2 + 1)

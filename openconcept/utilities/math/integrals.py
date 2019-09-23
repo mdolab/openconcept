@@ -115,7 +115,7 @@ def bdf3_cache_matrix(n,all_bdf=False):
     # the main lower triangular-ish matrix:
     tri_mat = sp.csc_matrix((C.data, (indices[0]+1, indices[1]+1)))
     # we need to create a dense matrix of the last row repeated n times for multi-subinterval problems
-    last_row = tri_mat.getrow(-1).todense()
+    last_row = tri_mat.getrow(-1).toarray()
     # but we need it in sparse format for openMDAO
     repeat_mat = sp.csc_matrix(np.tile(last_row, n).reshape(n,n))
     return tri_mat, repeat_mat
@@ -150,7 +150,7 @@ def simpson_cache_matrix(n):
     tri_mat = sp.bmat([[None, first_row_zeros],[cv, c]])
 
     # we need to create a dense matrix of the last row repeated n times for multi-subinterval problems
-    last_row = tri_mat.getrow(-1).todense()
+    last_row = tri_mat.getrow(-1).toarray()
     # but we need it in sparse format for openMDAO
     repeat_mat = sp.csc_matrix(np.tile(last_row, n).reshape(n,n))
     return tri_mat, repeat_mat
