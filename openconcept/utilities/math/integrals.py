@@ -763,10 +763,17 @@ class Integrator(ExplicitComponent):
         time_setup = self.options['time_setup']
         nn_seg = (n_int_per_seg*2 + 1)
 
-        if method == 'bdf3':
-            self.tri_mat, self.repeat_mat = bdf3_cache_matrix(nn_seg)
-        elif method == 'simpson':
-            self.tri_mat, self.repeat_mat = simpson_cache_matrix(nn_seg)
+        # branch logic here for the corner case of 0 segments
+        # so point analysis can be run without breaking everything
+        if nn_seg == 1:
+            single_point = True
+        else:
+            single_point = False
+        if not single_point:
+            if method == 'bdf3':
+                self.tri_mat, self.repeat_mat = bdf3_cache_matrix(nn_seg)
+            elif method == 'simpson':
+                self.tri_mat, self.repeat_mat = simpson_cache_matrix(nn_seg)
 
         if segment_names is None:
             n_segments = 1
@@ -798,48 +805,61 @@ class Integrator(ExplicitComponent):
                 self.declare_partials(['q'], ['q_initial'], rows=np.arange(nn_tot), cols=np.zeros((nn_tot,)), val=np.ones((nn_tot,)))
             self.declare_partials(['q_final'], ['q_initial'], val=1)
 
-        dQdrate, dQddtlist = multistep_integrator(0, np.ones((nn_tot,)), np.ones((n_segments,)), self.tri_mat, self.repeat_mat,
-                                                  segment_names=segment_names, segments_to_count=segments_to_count, partials=True)
-        dQdrate_indices = dQdrate.nonzero()
-        dQfdrate_indices = dQdrate.getrow(-1).nonzero()
-        if not final_only:
-            self.declare_partials(['q'], ['dqdt'], rows=dQdrate_indices[0], cols=dQdrate_indices[1])
-        self.declare_partials(['q_final'], ['dqdt'], rows=dQfdrate_indices[0], cols=dQfdrate_indices[1]) # rows are zeros
+        if not single_point:
+            # single point analysis has no dqdt dependency since the outputs are equal to the inputs
+            dQdrate, dQddtlist = multistep_integrator(0, np.ones((nn_tot,)), np.ones((n_segments,)), self.tri_mat, self.repeat_mat,
+                                                      segment_names=segment_names, segments_to_count=segments_to_count, partials=True)
+            dQdrate_indices = dQdrate.nonzero()
+            dQfdrate_indices = dQdrate.getrow(-1).nonzero()
+            if not final_only:
+                self.declare_partials(['q'], ['dqdt'], rows=dQdrate_indices[0], cols=dQdrate_indices[1])
+            self.declare_partials(['q_final'], ['dqdt'], rows=dQfdrate_indices[0], cols=dQfdrate_indices[1]) # rows are zeros
 
-        if segment_names is None:
-            dQddt_seg = dQddtlist[0]
-            dQddt_indices = dQddt_seg.nonzero()
-            dQfddt_indices = dQddt_seg.getrow(-1).nonzero()
+            if segment_names is None:
+                dQddt_seg = dQddtlist[0]
+                dQddt_indices = dQddt_seg.nonzero()
+                dQfddt_indices = dQddt_seg.getrow(-1).nonzero()
+                if time_setup == 'dt':
+                    self.add_input('dt', units=diff_units, desc='Time step')
+                    if not final_only:
+                        self.declare_partials(['q'], ['dt'], rows=dQddt_indices[0], cols=dQddt_indices[1])
+                    self.declare_partials(['q_final'], ['dt'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
+                elif time_setup == 'duration':
+                    self.add_input('duration', units=diff_units, desc='Time duration')
+                    if not final_only:
+                        self.declare_partials(['q'], ['duration'], rows=dQddt_indices[0], cols=dQddt_indices[1])
+                    self.declare_partials(['q_final'], ['duration'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
+                elif time_setup == 'bounds':
+                    self.add_input('t_initial', units=diff_units, desc='Initial time')
+                    self.add_input('t_final', units=diff_units, desc='Initial time')
+                    if not final_only:
+                        self.declare_partials(['q'], ['t_initial','t_final'], rows=dQddt_indices[0], cols=dQddt_indices[1])
+                    self.declare_partials(['q_final'], ['t_initial','t_final'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
+                else:
+                    raise ValueError('Only dt, duration, and bounds are allowable values of time_setup')
+
+            else:
+                if time_setup != 'dt':
+                    raise ValueError('dt is the only time_setup supported for multisegment integrations')
+                for i_seg, segment_name in enumerate(segment_names):
+                    self.add_input(segment_name +'|dt', units=diff_units, desc='Time step')
+                    dQddt_seg = dQddtlist[i_seg]
+                    dQddt_indices = dQddt_seg.nonzero()
+                    dQfddt_indices = dQddt_seg.getrow(-1).nonzero()
+                    if not final_only:
+                        self.declare_partials(['q'], [segment_name +'|dt'], rows=dQddt_indices[0], cols=dQddt_indices[1])
+                    self.declare_partials(['q_final'], [segment_name +'|dt'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
+
+        else:
             if time_setup == 'dt':
-                self.add_input('dt', units=diff_units, desc='Time step')
-                if not final_only:
-                    self.declare_partials(['q'], ['dt'], rows=dQddt_indices[0], cols=dQddt_indices[1])
-                self.declare_partials(['q_final'], ['dt'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
+                    self.add_input('dt', units=diff_units, desc='Time step')
             elif time_setup == 'duration':
                 self.add_input('duration', units=diff_units, desc='Time duration')
-                if not final_only:
-                    self.declare_partials(['q'], ['duration'], rows=dQddt_indices[0], cols=dQddt_indices[1])
-                self.declare_partials(['q_final'], ['duration'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
             elif time_setup == 'bounds':
                 self.add_input('t_initial', units=diff_units, desc='Initial time')
                 self.add_input('t_final', units=diff_units, desc='Initial time')
-                if not final_only:
-                    self.declare_partials(['q'], ['t_initial','t_final'], rows=dQddt_indices[0], cols=dQddt_indices[1])
-                self.declare_partials(['q_final'], ['t_initial','t_final'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
             else:
                 raise ValueError('Only dt, duration, and bounds are allowable values of time_setup')
-
-        else:
-            if time_setup != 'dt':
-                raise ValueError('dt is the only time_setup supported for multisegment integrations')
-            for i_seg, segment_name in enumerate(segment_names):
-                self.add_input(segment_name +'|dt', units=diff_units, desc='Time step')
-                dQddt_seg = dQddtlist[i_seg]
-                dQddt_indices = dQddt_seg.nonzero()
-                dQfddt_indices = dQddt_seg.getrow(-1).nonzero()
-                if not final_only:
-                    self.declare_partials(['q'], [segment_name +'|dt'], rows=dQddt_indices[0], cols=dQddt_indices[1])
-                self.declare_partials(['q_final'], [segment_name +'|dt'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
 
     def compute(self, inputs, outputs):
         segment_names = self.options['segment_names']
@@ -850,6 +870,11 @@ class Integrator(ExplicitComponent):
         time_setup=self.options['time_setup']
 
         nn_seg = (n_int_per_seg*2 + 1)
+        if nn_seg == 1:
+            single_point = True
+        else:
+            single_point = False
+
         if segment_names is None:
             n_segments = 1
             if time_setup == 'dt':
@@ -869,11 +894,19 @@ class Integrator(ExplicitComponent):
             q0 = 0
         else:
             q0 = inputs['q_initial']
-        Q = multistep_integrator(q0, inputs['dqdt'], dts, self.tri_mat, self.repeat_mat,
-                                 segment_names=segment_names, segments_to_count=segments_to_count, partials=False)
+        if not single_point:
+            Q = multistep_integrator(q0, inputs['dqdt'], dts, self.tri_mat, self.repeat_mat,
+                                     segment_names=segment_names, segments_to_count=segments_to_count, partials=False)
+        else:
+            # single point case, no change, no dependence on time
+            Q = q0
+
         if not final_only:
             outputs['q'] = Q
         outputs['q_final'] = Q[-1]
+
+
+
 
     def compute_partials(self, inputs, J):
         segment_names = self.options['segment_names']
@@ -886,78 +919,87 @@ class Integrator(ExplicitComponent):
         time_setup = self.options['time_setup']
 
         nn_seg = (n_int_per_seg*2 + 1)
-        if segment_names is None:
-            n_segments = 1
+        if nn_seg == 1:
+            single_point = True
         else:
-            n_segments = len(segment_names)
-        nn_tot = nn_seg * n_segments
+            single_point = False
+        if not single_point:
+            if segment_names is None:
+                n_segments = 1
+            else:
+                n_segments = len(segment_names)
+            nn_tot = nn_seg * n_segments
 
-        if segment_names is None:
-            n_segments = 1
-            if time_setup == 'dt':
-                dts = [inputs['dt'][0]]
-            elif time_setup == 'duration':
-                dts = [inputs['duration'][0]/(nn_seg-1)]
-            elif time_setup == 'bounds':
-                delta_t = inputs['t_final'] - inputs['t_initial']
-                dts = [delta_t[0]/(nn_seg-1)]
-        else:
-            n_segments = len(segment_names)
-            dts = []
-            for i_seg, segment_name in enumerate(segment_names):
-                input_name = segment_name+'|dt'
-                dts.append(inputs[input_name][0])
+            if segment_names is None:
+                n_segments = 1
+                if time_setup == 'dt':
+                    dts = [inputs['dt'][0]]
+                elif time_setup == 'duration':
+                    dts = [inputs['duration'][0]/(nn_seg-1)]
+                elif time_setup == 'bounds':
+                    delta_t = inputs['t_final'] - inputs['t_initial']
+                    dts = [delta_t[0]/(nn_seg-1)]
+            else:
+                n_segments = len(segment_names)
+                dts = []
+                for i_seg, segment_name in enumerate(segment_names):
+                    input_name = segment_name+'|dt'
+                    dts.append(inputs[input_name][0])
 
-        if zero_start:
-            q0 = 0
-        else:
-            q0 = inputs['q_initial']
-        dQdrate, dQddtlist = multistep_integrator(q0, inputs['dqdt'], dts, self.tri_mat, self.repeat_mat,
-                                                  segment_names=segment_names, segments_to_count=segments_to_count, partials=True)
+            if zero_start:
+                q0 = 0
+            else:
+                q0 = inputs['q_initial']
+            dQdrate, dQddtlist = multistep_integrator(q0, inputs['dqdt'], dts, self.tri_mat, self.repeat_mat,
+                                                      segment_names=segment_names, segments_to_count=segments_to_count, partials=True)
 
-        if not final_only:
-            J['q','dqdt'] = dQdrate.data
-        J['q_final', 'dqdt'] = dQdrate.getrow(-1).data
+            if not final_only:
+                J['q','dqdt'] = dQdrate.data
+            J['q_final', 'dqdt'] = dQdrate.getrow(-1).data
 
-        if segment_names is None:
-            if time_setup == 'dt':
-                if not final_only:
-                    if len(dQddtlist[0].data) == 0:
-                        J['q','dt'] = np.zeros(J['q','dt'].shape)
+            if segment_names is None:
+                if time_setup == 'dt':
+                    if not final_only:
+                        # if len(dQddtlist[0].data) == 0:
+                        #     J['q','dt'] = np.zeros(J['q','dt'].shape)
+                        # else:
+                        #     J['q','dt'] = dQddtlist[0].data
+                        J['q','dt'] = np.squeeze(dQddtlist[0].toarray()[1:])
+                    # if len(dQddtlist[0].getrow(-1).data) == 0:
+                    #     J['q_final','dt'] = 0
+                    # else:
+                    #     J['q_final','dt'] = dQddtlist[0].getrow(-1).data
+                    J['q_final','dt'] = np.squeeze(dQddtlist[0].getrow(-1).toarray())
+
+                elif time_setup == 'duration':
+                    if not final_only:
+                        # if len(dQddtlist[0].data) == 0:
+                        #     J['q','duration'] = np.zeros(J['q','duration'].shape)
+                        # else:
+                        #     J['q','duration'] = dQddtlist[0].data / (nn_seg - 1)
+                        J['q','duration'] = np.squeeze(dQddtlist[0].toarray()[1:] / (nn_seg - 1))
+                    # if len(dQddtlist[0].getrow(-1).data) == 0:
+                    #     J['q_final','duration'] = 0
+                    # else:
+                    #     J['q_final','duration'] = dQddtlist[0].getrow(-1).data / (nn_seg - 1)
+                    J['q_final','duration'] = np.squeeze(dQddtlist[0].getrow(-1).toarray() / (nn_seg - 1))
+
+                elif time_setup == 'bounds':
+                    if not final_only:
+                        if len(dQddtlist[0].data) == 0:
+                            J['q','t_initial'] = np.zeros(J['q','t_initial'].shape)
+                            J['q','t_final'] = np.zeros(J['q','t_final'].shape)
+                        else:
+                            J['q','t_initial'] = -dQddtlist[0].data / (nn_seg - 1)
+                            J['q','t_final'] = dQddtlist[0].data / (nn_seg - 1)
+                    if len(dQddtlist[0].getrow(-1).data) == 0:
+                        J['q_final','t_initial'] = 0
+                        J['q_final','t_final'] = 0
                     else:
-                        J['q','dt'] = dQddtlist[0].data
-                if len(dQddtlist[0].getrow(-1).data) == 0:
-                    J['q_final','dt'] = 0
-                else:
-                    J['q_final','dt'] = dQddtlist[0].getrow(-1).data
-
-            elif time_setup == 'duration':
-                if not final_only:
-                    if len(dQddtlist[0].data) == 0:
-                        J['q','duration'] = np.zeros(J['q','duration'].shape)
-                    else:
-                        J['q','duration'] = dQddtlist[0].data / (nn_seg - 1)
-                if len(dQddtlist[0].getrow(-1).data) == 0:
-                    J['q_final','duration'] = 0
-                else:
-                    J['q_final','duration'] = dQddtlist[0].getrow(-1).data / (nn_seg - 1)
-
-            elif time_setup == 'bounds':
-                if not final_only:
-                    if len(dQddtlist[0].data) == 0:
-                        J['q','t_initial'] = np.zeros(J['q','t_initial'].shape)
-                        J['q','t_final'] = np.zeros(J['q','t_final'].shape)
-                    else:
-                        J['q','t_initial'] = -dQddtlist[0].data / (nn_seg - 1)
-                        J['q','t_final'] = dQddtlist[0].data / (nn_seg - 1)
-                if len(dQddtlist[0].getrow(-1).data) == 0:
-                    J['q_final','t_initial'] = 0
-                    J['q_final','t_final'] = 0
-                else:
-                    J['q_final','t_initial'] = -dQddtlist[0].getrow(-1).data / (nn_seg - 1)
-                    J['q_final','t_final'] = dQddtlist[0].getrow(-1).data / (nn_seg - 1)
-        else:
-            for i_seg, segment_name in enumerate(segment_names):
-                if not final_only:
-                    J['q',segment_name+'|dt'] = dQddtlist[i_seg].data
-                J['q_final',segment_name+'|dt'] = dQddtlist[i_seg].getrow(-1).data
+                        J['q_final','t_initial'] = -dQddtlist[0].getrow(-1).data / (nn_seg - 1)
+                        J['q_final','t_final'] = dQddtlist[0].getrow(-1).data / (nn_seg - 1)
+            else:
+                for i_seg, segment_name in enumerate(segment_names):
+                    if not final_only:
+                        J['q',segment_name+'|dt'] = dQddtlist[i_seg].data
+                    J['q_final',segment_name+'|dt'] = dQddtlist[i_seg].getrow(-1).data

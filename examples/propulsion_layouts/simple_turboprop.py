@@ -2,7 +2,7 @@ from __future__ import division
 from openconcept.components.turboshaft import SimpleTurboshaft
 from openconcept.components.propeller import SimplePropeller
 from openconcept.utilities.dvlabel import DVLabel
-from openconcept.utilities.math import AddSubtractComp
+from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
 from openmdao.api import Group, IndepVarComp, ExplicitComponent
 
 class TurbopropPropulsionSystem(Group):
@@ -72,7 +72,7 @@ class TwinTurbopropPropulsionSystem(Group):
         self.add_subsystem('dvs',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
         nn = self.options['num_nodes']
         #introduce model components
-        self.add_subsystem('eng1',SimpleTurboshaft(num_nodes=nn,weight_inc=0.14/1000,weight_base=104))
+        self.add_subsystem('eng1',SimpleTurboshaft(num_nodes=nn,weight_inc=0.14/1000,weight_base=104),promotes_inputs=['throttle'])
         self.add_subsystem('prop1',SimplePropeller(num_nodes=nn,num_blades=4,design_J=2.2,design_cp=0.55),promotes_inputs=["fltcond|*"])
         self.add_subsystem('eng2',SimpleTurboshaft(num_nodes=nn,weight_inc=0.14/1000,weight_base=104))
         self.add_subsystem('prop2',SimplePropeller(num_nodes=nn,num_blades=4,design_J=2.2,design_cp=0.55),promotes_inputs=["fltcond|*"])
@@ -84,6 +84,13 @@ class TwinTurbopropPropulsionSystem(Group):
         self.connect('eng_rating','prop2.power_rating')
         self.connect('prop_diameter','prop1.diameter')
         self.connect('prop_diameter','prop2.diameter')
+
+        #propulsion models expect a high-level 'throttle' parameter and a 'propulsor_active' flag to set individual throttles
+        failedengine  = ElementMultiplyDivideComp()
+        failedengine.add_equation('eng2throttle',input_names=['throttle','propulsor_active'],vec_size=nn)
+        self.add_subsystem('failedengine', failedengine,
+                           promotes_inputs=['throttle', 'propulsor_active'])
+        self.connect('failedengine.eng2throttle','eng2.throttle')
 
 
         #connect components to each other

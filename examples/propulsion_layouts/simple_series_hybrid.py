@@ -4,11 +4,11 @@ from openconcept.components.motor import SimpleMotor
 from openconcept.components.splitter import PowerSplit
 from openconcept.components.generator import SimpleGenerator
 from openconcept.components.turboshaft import SimpleTurboshaft
-from openconcept.components.battery import SimpleBattery
+from openconcept.components.battery import SimpleBattery, SOCBattery
 from openconcept.components.propeller import SimplePropeller
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
 from openconcept.utilities.dvlabel import DVLabel
-from openconcept.utilities.math import AddSubtractComp
+from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
 
 from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, DirectSolver, NewtonSolver, ScipyKrylov
 
@@ -251,14 +251,22 @@ class TwinSeriesHybridElectricPropulsionSystem(Group):
         nn = self.options['num_nodes']
         e_b = self.options['specific_energy']
         #introduce model components
-        self.add_subsystem('motor1', SimpleMotor(efficiency=0.97,num_nodes=nn))
+        self.add_subsystem('motor1', SimpleMotor(efficiency=0.97,num_nodes=nn),promotes_inputs=['throttle'])
         self.add_subsystem('prop1',SimplePropeller(num_nodes=nn),promotes_inputs=["fltcond|*"])
         self.connect('motor1.shaft_power_out','prop1.shaft_power_in')
 
+        #propulsion models expect a high-level 'throttle' parameter and a 'propulsor_active' flag to set individual throttles
+        failedengine  = ElementMultiplyDivideComp()
+        failedengine.add_equation('motor2throttle',input_names=['throttle','propulsor_active'],vec_size=nn)
+        self.add_subsystem('failedmotor', failedengine,
+                           promotes_inputs=['throttle', 'propulsor_active'])
 
         self.add_subsystem('motor2', SimpleMotor(efficiency=0.97,num_nodes=nn))
         self.add_subsystem('prop2',SimplePropeller(num_nodes=nn),promotes_inputs=["fltcond|*"])
         self.connect('motor2.shaft_power_out','prop2.shaft_power_in')
+        self.connect('failedmotor.motor2throttle','motor2.throttle')
+
+
 
         addpower = AddSubtractComp(output_name='motors_elec_load',input_names=['motor1_elec_load','motor2_elec_load'], units='kW',vec_size=nn)
         addpower.add_equation(output_name='thrust',input_names=['prop1_thrust','prop2_thrust'], units='N',vec_size=nn)
@@ -276,12 +284,15 @@ class TwinSeriesHybridElectricPropulsionSystem(Group):
 
         self.connect('eng1.shaft_power_out','gen1.shaft_power_in')
 
-        self.add_subsystem('batt1',SimpleBattery(num_nodes=nn,specific_energy=e_b))
+        self.add_subsystem('batt1', SOCBattery(num_nodes=nn, specific_energy=e_b, efficiency=0.97),promotes_inputs=["duration"])
         self.connect('hybrid_split.power_out_A','batt1.elec_load')
-        self.add_subsystem('eng_gen_resid',AddSubtractComp(output_name='eng_gen_residual',input_names=['gen_power_available','gen_power_required'],vec_size=nn, units='kW',scaling_factors=[1,-1]))
+        # TODO set val= right number of nn
+        self.add_subsystem('eng_throttle_set',BalanceComp(name='eng_throttle', val=np.ones((nn,))*0.5, units=None, eq_units='kW', rhs_name='gen_power_required',lhs_name='gen_power_available'))
         #need to use the optimizer to drive hybrid_split.power_out_B to the same value as gen1.elec_power_out
-        self.connect('hybrid_split.power_out_B','eng_gen_resid.gen_power_required')
-        self.connect('gen1.elec_power_out','eng_gen_resid.gen_power_available')
+        self.connect('hybrid_split.power_out_B','eng_throttle_set.gen_power_required')
+        self.connect('gen1.elec_power_out','eng_throttle_set.gen_power_available')
+        self.connect('eng_throttle_set.eng_throttle','eng1.throttle')
+
         addweights = AddSubtractComp(output_name='motors_weight',input_names=['motor1_weight','motor2_weight'], units='kg')
         addweights.add_equation(output_name='propellers_weight',input_names=['prop1_weight','prop2_weight'], units='kg')
         self.add_subsystem('add_weights',subsys=addweights,promotes_inputs=['*'],promotes_outputs=['*'])
