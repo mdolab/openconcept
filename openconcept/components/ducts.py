@@ -4,7 +4,103 @@ from openmdao.api import ExplicitComponent, Problem, ImplicitComponent, NewtonSo
 from openmdao.api import Group, ScipyOptimizeDriver, BoundsEnforceLS
 import sys, os
 sys.path.insert(0,os.getcwd())
-from openconcept.components.heat_exchanger import HXGroup, HXTestGroup
+from openconcept.components.heat_exchanger import HXGroup
+from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
+
+class ExplicitIncompressibleDuct(ExplicitComponent):
+    """
+    This is a very approximate model of a duct at incompressible speeds.
+    Its advantage is low computational cost and improved convergence even at low speed.
+    It CANNOT model flow with heat addition so it will generally be a conservative estimate on the cooling drag.
+    Assumes the static pressure at the outlet duct = p_inf which may or may not be a good assumption.
+
+    Inputs
+    ------
+    fltcond|Utrue : float
+        True airspeed in the freestream (vector, m/s)
+    fltcond|rho : float
+        Density in the freestream (vector, kg/m**3)
+    area_nozzle : float
+        Cross-sectional area of the outlet nozzle (scalar, m**2)
+        Generally must be the narrowest portion of the duct for analysis to be valid
+    delta_p_hex : float
+        Pressure drop across the heat exchanger (vector, Pa)
+
+    Outputs
+    -------
+    mdot : float
+        Mass flow rate through the duct (vector, kg/s)
+    drag : float
+        Drag force on the duct positive rearwards (vector, N)
+
+    Options
+    -------
+    num_nodes : float
+        Number of analysis points to run
+    static_pressure_loss_factor : float
+        Delta p / local dynamic pressure to model inlet and nozzle losses (vector, dimensionless)
+        Default 0.00
+    gross_thrust_factor : float
+        Fraction of total gross thrust to recover (aka Cfg)
+        Accounts for duct losses, in particular nozzle losses
+        Default 0.98
+    """
+
+    def initialize(self):
+        self.options.declare('num_nodes',default=1)
+        self.options.declare('static_pressure_loss_factor',default=0.15)
+        self.options.declare('gross_thrust_factor',default=0.98)
+
+    def setup(self):
+        nn = self.options['num_nodes']
+        self.add_input('fltcond|Utrue', shape=(nn,),  units='m/s')
+        self.add_input('fltcond|rho', shape=(nn,),  units='kg/m**3')
+        self.add_input('area_nozzle',  units='m**2')
+        self.add_input('delta_p_hex',  shape=(nn,), units='Pa')
+
+        self.add_output('mdot', shape=(nn,),  units='kg/s')
+        self.add_output('drag', shape=(nn,), units='N')
+
+        # self.declare_partials(['drag','mdot'],['fltcond|Utrue','fltcond|rho','delta_p_hex'],rows=np.arange(nn),cols=np.arange(nn))
+        # self.declare_partials(['drag','mdot'],['area_nozzle'],rows=np.arange(nn),cols=np.zeros((nn,)))
+
+        self.declare_partials(['drag','mdot'],['fltcond|Utrue','fltcond|rho','delta_p_hex'],method='cs')
+        self.declare_partials(['drag','mdot'],['area_nozzle'],method='cs')
+
+    def compute(self, inputs, outputs):
+        static_pressure_loss_factor = self.options['static_pressure_loss_factor']
+        cfg = self.options['gross_thrust_factor']
+        # this is an absolute hack to prevent spurious NaNs during the Newton solve
+        interior = (inputs['fltcond|rho']**2 * inputs['fltcond|Utrue']**2 + 2*inputs['fltcond|rho']*inputs['delta_p_hex'])/(1+static_pressure_loss_factor)
+        interior[np.where(interior<0.0)]=1e-10
+        mdot = inputs['area_nozzle'] * np.sqrt(interior)
+        # if self.pathname.split('.')[1] == 'climb':
+        #     print('Nozzle area:'+str(inputs['area_nozzle']))
+        #     print('mdot:'+str(mdot))
+        #     print('delta_p_hex:'+str(inputs['delta_p_hex']))
+
+        outputs['mdot'] = mdot
+        outputs['drag'] = mdot * (inputs['fltcond|Utrue'] - cfg*mdot/inputs['area_nozzle']/inputs['fltcond|rho'])
+
+    # def compute_partials(self, inputs, J):
+    #     static_pressure_loss_factor = self.options['static_pressure_loss_factor']
+    #     # delta p is defined as NEGATIVE from the hex
+    #     interior = (inputs['fltcond|rho']**2 * inputs['fltcond|Utrue']**2 + 2*inputs['fltcond|rho']*inputs['delta_p_hex'])/(1+static_pressure_loss_factor)
+    #     interior[np.where(interior<0.0)]=1e-10
+    #     mdot = inputs['area_nozzle'] * np.sqrt(interior)
+    #     dmdotdrho = inputs['area_nozzle'] * interior ** (-1/2) * (inputs['fltcond|rho']*inputs['fltcond|U']**2+inputs['delta_p_hex'])
+    #     dmdotdU =
+    #     dmdotddeltap =
+    #     dmdotdA =
+
+    #     J['mdot','fltcond|rho'] = dmdotdrho
+    #     J['mdot','fltcond|Utrue'] = dmdotdU
+    #     J['mdot','delta_p_hex'] = dmdotddeltap
+    #     J['mdot','area_nozzle'] = dmdotdA
+    #     J['drag','fltcond|rho'] = (inputs['fltcond|Utrue'] - 2*mdot/inputs['area_nozzle']/inputs['fltcond|rho']) * dmdotdrho + mdot * (mdot/inputs['area_nozzle']/inputs['fltcond|rho']**2)
+    #     J['drag','fltcond|Utrue'] = (inputs['fltcond|Utrue'] - 2*mdot/inputs['area_nozzle']/inputs['fltcond|rho']) * dmdotdU + mdot
+    #     J['drag','delta_p_hex'] = (inputs['fltcond|Utrue'] - 2*mdot/inputs['area_nozzle']/inputs['fltcond|rho']) * dmdotddeltap
+    #     J['drag','area_nozzle'] = (inputs['fltcond|Utrue'] - 2*mdot/inputs['area_nozzle']/inputs['fltcond|rho']) * dmdotdA + mdot * (mdot/inputs['area_nozzle']**2/inputs['fltcond|rho'])
 
 class TemperatureIsentropic(ExplicitComponent):
     """
@@ -672,75 +768,9 @@ class OutletNozzle(Group):
         self.add_subsystem('speedsound', SpeedOfSound(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('massflow', MassFlow(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
 
-class DuctTestGroup(Group):
+class ImplicitCompressibleDuct(Group):
     """
-    Test the 'pycycle_lite' functionality
-    """
-    def initialize(self):
-        self.options.declare('num_nodes', default=1, desc='Number of analysis points' )
-
-    def setup(self):
-        nn = self.options['num_nodes']
-
-        iv = self.add_subsystem('iv', IndepVarComp(), promotes_outputs=['cp'])
-        iv.add_output('p_inf', val=37600.9*np.ones((nn,)), units='Pa')
-        iv.add_output('T_inf', val=238.6*np.ones((nn,)), units='K')
-        #iv.add_output('Utrue', val=300.7*np.ones((nn,)), units='kn')
-        iv.add_output('Utrue', val=np.linspace(12,100,nn), units='kn')
-        iv.add_output('cp', val=1002.93, units='J/kg/K')
-
-        iv.add_output('area_1', val=60, units='inch**2')
-        iv.add_output('delta_p_1', val=np.zeros((nn,)), units='Pa')
-        iv.add_output('heat_in_1', val=np.zeros((nn,)), units='W')
-
-        iv.add_output('area_2', val=286.918, units='inch**2')
-        iv.add_output('delta_p_2', val=np.ones((nn,))*0., units='Pa')
-        iv.add_output('heat_in_2', val=np.ones((nn,))*0., units='W')
-
-        iv.add_output('area_3', val=286.918, units='inch**2')
-        #iv.add_output('delta_p_3', val=np.ones((nn,))*-338.237, units='Pa')
-        iv.add_output('heat_in_3', val=np.ones((nn,))*30408.8, units='W')
-        iv.add_output('delta_p_3', val=np.ones((nn,))*0, units='Pa')
-
-        iv.add_output('nozzle_area', val=58*np.ones((nn,)), units='inch**2')
-        iv.add_output('p_exit', val=37600.9*np.ones((nn,)), units='Pa')
-
-
-        self.add_subsystem('inlet', Inlet(num_nodes=nn))
-        self.connect('iv.p_inf','inlet.p')
-        self.connect('iv.T_inf','inlet.T')
-        self.connect('iv.Utrue','inlet.Utrue')
-
-        self.add_subsystem('sta1', DuctStation(num_nodes=nn), promotes_inputs=['mdot','cp'])
-        self.connect('inlet.pt','sta1.pt_in')
-        self.connect('inlet.Tt','sta1.Tt_in')
-        self.connect('iv.area_1','sta1.area')
-        self.connect('iv.delta_p_1','sta1.delta_p')
-        self.connect('iv.heat_in_1','sta1.heat_in')
-
-        self.add_subsystem('sta2', DuctStation(num_nodes=nn), promotes_inputs=['mdot','cp'])
-        self.connect('sta1.pt_out','sta2.pt_in')
-        self.connect('sta1.Tt_out','sta2.Tt_in')
-        self.connect('iv.area_2','sta2.area')
-        self.connect('iv.delta_p_2','sta2.delta_p')
-        self.connect('iv.heat_in_2','sta2.heat_in')
-
-        self.add_subsystem('sta3', DuctStation(num_nodes=nn), promotes_inputs=['mdot','cp'])
-        self.connect('sta2.pt_out','sta3.pt_in')
-        self.connect('sta2.Tt_out','sta3.Tt_in')
-        self.connect('iv.area_3','sta3.area')
-        self.connect('iv.delta_p_3','sta3.delta_p')
-        self.connect('iv.heat_in_3','sta3.heat_in')
-
-        self.add_subsystem('nozzle', OutletNozzle(num_nodes=nn), promotes_outputs=['mdot'])
-        self.connect('iv.p_exit','nozzle.p_exit')
-        self.connect('sta3.pt_out','nozzle.pt')
-        self.connect('sta3.Tt_out','nozzle.Tt')
-        self.connect('iv.nozzle_area','nozzle.area')
-
-class DuctWithHxOld(Group):
-    """
-    Test the 'pycycle_lite' functionality with the heat exchanger
+    Ducted heat exchanger with compressible flow assumptions
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of analysis points' )
@@ -748,11 +778,7 @@ class DuctWithHxOld(Group):
     def setup(self):
         nn = self.options['num_nodes']
 
-        iv = self.add_subsystem('iv', IndepVarComp(), promotes_outputs=['cp'])
-        iv.add_output('p_inf', val=37600.903*np.ones((nn,)), units='Pa')
-        iv.add_output('T_inf', val=238.62*np.ones((nn,)), units='K')
-        iv.add_output('Utrue', val=300.9*np.ones((nn,)), units='kn')
-
+        iv = self.add_subsystem('dv', IndepVarComp(), promotes_outputs=['cp','*_1','*_2','*_3','*_nozzle','convergence_hack'])
         iv.add_output('cp', val=1002.93, units='J/kg/K')
 
         iv.add_output('area_1', val=60, units='inch**2')
@@ -760,99 +786,14 @@ class DuctWithHxOld(Group):
         iv.add_output('heat_in_1', val=np.zeros((nn,)), units='W')
         iv.add_output('pressure_recovery_1', val=np.ones((nn,)))
 
-        iv.add_output('area_2', val=286.918, units='inch**2')
-        iv.add_output('delta_p_2', val=np.zeros((nn,)), units='Pa')
-        iv.add_output('heat_in_2', val=np.zeros((nn,)), units='W')
-        iv.add_output('pressure_recovery_2', val=np.ones((nn,)))
-
-        iv.add_output('area_3', val=286.918, units='inch**2')
-        #iv.add_output('delta_p_3', val=np.ones((nn,))*0, units='Pa')
-        iv.add_output('heat_in_3', val=np.ones((nn,))*1, units='W')
-        iv.add_output('pressure_recovery_3', val=np.ones((nn,)))
-
-        iv.add_output('nozzle_area', val=58*np.ones((nn,)), units='inch**2')
-        iv.add_output('p_exit', val=37600.903*np.ones((nn,)), units='Pa')
-
-        self.add_subsystem('inlet', Inlet(num_nodes=nn))
-        self.connect('iv.p_inf','inlet.p')
-        self.connect('iv.T_inf','inlet.T')
-        self.connect('iv.Utrue','inlet.Utrue')
-
-        self.add_subsystem('sta1', DuctStation(num_nodes=nn), promotes_inputs=['mdot','cp'])
-        self.connect('inlet.pt','sta1.pt_in')
-        self.connect('inlet.Tt','sta1.Tt_in')
-        self.connect('iv.area_1','sta1.area')
-        self.connect('iv.delta_p_1','sta1.delta_p')
-        self.connect('iv.heat_in_1','sta1.heat_in')
-        self.connect('iv.pressure_recovery_1','sta1.factor_p')
-
-
-        self.add_subsystem('sta2', DuctStation(num_nodes=nn), promotes_inputs=['mdot','cp'])
-        self.connect('sta1.pt_out','sta2.pt_in')
-        self.connect('sta1.Tt_out','sta2.Tt_in')
-        self.connect('iv.area_2','sta2.area')
-        self.connect('iv.delta_p_2','sta2.delta_p')
-        self.connect('iv.heat_in_2','sta2.heat_in')
-        self.connect('iv.pressure_recovery_2','sta2.factor_p')
-
-        self.add_subsystem('hx', HXTestGroup(num_nodes=nn))
-        self.connect('mdot','hx.mdot_cold')
-        self.connect('sta2.T','hx.T_in_cold')
-        self.connect('sta2.rho','hx.rho_cold')
-        self.connect('cp','hx.cp_cold')
-
-        self.add_subsystem('sta3', DuctStation(num_nodes=nn), promotes_inputs=['mdot','cp'])
-        self.connect('sta2.pt_out','sta3.pt_in')
-        self.connect('sta2.Tt_out','sta3.Tt_in')
-        self.connect('iv.area_3','sta3.area')
-        self.connect('hx.delta_p_cold','sta3.delta_p')
-        self.connect('hx.heat_transfer','sta3.heat_in')
-        # self.connect('iv.heat_in_3','sta3.heat_in')
-        self.connect('iv.pressure_recovery_3','sta3.factor_p')
-
-        self.add_subsystem('nozzle', OutletNozzle(num_nodes=nn), promotes_outputs=['mdot'])
-        self.connect('iv.p_exit','nozzle.p_exit')
-        self.connect('sta3.pt_out','nozzle.pt')
-        self.connect('sta3.Tt_out','nozzle.Tt')
-        self.connect('iv.nozzle_area','nozzle.area')
-
-        self.add_subsystem('force', NetForce(num_nodes=nn), promotes_inputs=['mdot'])
-        self.connect('iv.p_inf','force.p_inf')
-        self.connect('iv.Utrue','force.Utrue_inf')
-        self.connect('nozzle.p','force.p_nozzle')
-        self.connect('nozzle.rho','force.rho_nozzle')
-        self.connect('iv.nozzle_area','force.area_nozzle')
-
-class DuctWithHx(Group):
-    """
-    Test the 'pycycle_lite' functionality with the heat exchanger
-    """
-    def initialize(self):
-        self.options.declare('num_nodes', default=1, desc='Number of analysis points' )
-
-    def setup(self):
-        nn = self.options['num_nodes']
-
-        iv = self.add_subsystem('dv', IndepVarComp(), promotes_outputs=['cp','*_1','*_2','*_3','*_nozzle'])
-        # iv.add_output('p_inf', val=37600.903*np.ones((nn,)), units='Pa')
-        # iv.add_output('T_inf', val=238.62*np.ones((nn,)), units='K')
-        # iv.add_output('Utrue', val=np.linspace(300,300,nn), units='kn')
-        iv.add_output('cp', val=1002.93, units='J/kg/K')
-
-        iv.add_output('area_1', val=60, units='inch**2')
-        iv.add_output('delta_p_1', val=np.zeros((nn,)), units='Pa')
-        iv.add_output('heat_in_1', val=np.zeros((nn,)), units='W')
-        iv.add_output('pressure_recovery_1', val=np.ones((nn,)))
-
-        #iv.add_output('area_2', val=286.918, units='inch**2')
         iv.add_output('delta_p_2', val=np.ones((nn,))*0., units='Pa')
         iv.add_output('heat_in_2', val=np.ones((nn,))*0., units='W')
         iv.add_output('pressure_recovery_2', val=np.ones((nn,)))
 
-        #iv.add_output('area_3', val=286.918, units='inch**2')
         iv.add_output('pressure_recovery_3', val=np.ones((nn,)))
 
         iv.add_output('area_nozzle', val=58*np.ones((nn,)), units='inch**2')
+        iv.add_output('convergence_hack', val=-40, units='Pa')
 
         self.add_subsystem('inlet', Inlet(num_nodes=nn),
                            promotes_inputs=[('p','p_inf'),('T','T_inf'),'Utrue'])
@@ -887,8 +828,9 @@ class DuctWithHx(Group):
         self.connect('hx.delta_p_cold','sta3.delta_p')
         self.connect('hx.heat_transfer','sta3.heat_in')
         self.connect('hx.frontal_area',['area_2','area_3'])
+        self.add_subsystem('pexit',AddSubtractComp(output_name='p_exit',input_names=['p_inf','convergence_hack'],vec_size=[nn,1],units='Pa'),promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('nozzle', OutletNozzle(num_nodes=nn),
-                                                  promotes_inputs=[('p_exit','p_inf'),('area','area_nozzle')],
+                                                  promotes_inputs=['p_exit',('area','area_nozzle')],
                                                   promotes_outputs=['mdot'])
         self.connect('sta3.pt_out','nozzle.pt')
         self.connect('sta3.Tt_out','nozzle.Tt')
@@ -897,49 +839,3 @@ class DuctWithHx(Group):
         self.connect('nozzle.p','force.p_nozzle')
         self.connect('nozzle.rho','force.rho_nozzle')
 
-
-if __name__ == '__main__':
-    # run this script from the root openconcept directory like so:
-    # python .\openconcept\components\ducts.py
-
-    nn=1
-    prob = Problem(DuctWithHxOld(num_nodes=nn))
-    prob.model.options['assembled_jac_type'] = 'csc'
-    prob.model.nonlinear_solver=NewtonSolver(iprint=2)
-    prob.model.linear_solver = DirectSolver(assemble_jac=True)
-    prob.model.nonlinear_solver.options['solve_subsystems'] = True
-    prob.model.nonlinear_solver.options['maxiter'] = 20
-    prob.model.nonlinear_solver.options['atol'] = 1e-7
-    prob.model.nonlinear_solver.options['rtol'] = 1e-7
-    prob.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar',print_bound_enforce=True)
-
-    # prob.driver = ScipyOptimizeDriver()
-    # prob.driver.options['tol'] = 1e-7
-
-    # prob.model.add_design_var('channel_width_hot',lower=1,upper=20)
-    # prob.model.add_constraint('T_out_hot', upper=55+273.15)
-    # prob.model.add_objective('component_weight')
-
-    prob.setup(check=True,force_alloc_complex=True)
-    prob['sta1.M'] = 0.3*np.ones((nn,))
-    prob['sta2.M'] = 0.3*np.ones((nn,))
-    prob['sta3.M'] = 0.3*np.ones((nn,))
-    prob['nozzle.nozzle_pressure_ratio'] = 0.9*np.ones((nn,))
-
-    prob.run_model()
-    #prob.check_partials(method='cs', compact_print=True)
-    # prob.run_driver()
-    # prob.model.list_inputs(units=True)
-    import matplotlib.pyplot as plt
-    plt.figure()
-    plt.plot(prob['inlet.M'], prob['hx.heat_transfer'])
-    plt.figure()
-    plt.plot(prob['inlet.M'], prob['mdot'])
-    plt.figure()
-    plt.plot(prob['inlet.M'], prob['force.F_net'])
-    plt.show()
-    prob.model.list_outputs(units=True, print_arrays=True)
-    #prob.model.list_outputs(units=True, print_arrays=True, residuals=True, residuals_tol=1e-4)
-#     Mach 0.5
-#     p_inf = 5.454 psi
-#

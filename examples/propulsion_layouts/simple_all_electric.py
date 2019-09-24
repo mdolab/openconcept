@@ -5,14 +5,16 @@ from openconcept.components.battery import SOCBattery
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math import AddSubtractComp
 from openmdao.api import Group, IndepVarComp, ExplicitComponent
-from openconcept.analysis.thermal import LiquidCooledComp, CoolantReservoir
-from openconcept.components.ducts import DuctWithHx, ExplicitIncompressibleDuct
+from openconcept.components.thermal import LiquidCooledComp, CoolantReservoir
+from openconcept.components.ducts import ImplicitCompressibleDuct, ExplicitIncompressibleDuct
 from openconcept.components.heat_exchanger import HXGroup
 
 import numpy as np
-class AllElectricPropulsionSystemCompressible(Group):
-    """This is an example model of the simplest possible electric propulsion system
+class AllElectricSinglePropulsionSystemWithThermal_Compressible(Group):
+    """This is an example model of the an electric propulsion system
         consisting of a constant-speed prop, motor, and battery.
+        Thermal management is provided using a compressible 1D duct
+        with heat exchanger.
 
         Inputs
         ------
@@ -80,7 +82,7 @@ class AllElectricPropulsionSystemCompressible(Group):
         self.connect('motor1.component_weight','motorheatsink.mass')
 
         self.add_subsystem('duct',
-                           DuctWithHx(num_nodes=nn),
+                           ImplicitCompressibleDuct(num_nodes=nn),
                            promotes_inputs=[('p_inf','fltcond|p'),('T_inf','fltcond|T'),('Utrue','fltcond|Utrue')])
 
         self.connect('motorheatsink.T_out','duct.T_in_hot')
@@ -93,9 +95,11 @@ class AllElectricPropulsionSystemCompressible(Group):
         self.connect('reservoir.T_out','motorheatsink.T_in')
         self.connect('mdot_coolant',['motorheatsink.mdot_coolant','duct.mdot_hot','reservoir.mdot_coolant'])
 
-class AllElectricPropulsionSystem(Group):
-    """This is an example model of the simplest possible electric propulsion system
+class AllElectricSinglePropulsionSystemWithThermal_Incompressible(Group):
+    """This is an example model of the an electric propulsion system
         consisting of a constant-speed prop, motor, and battery.
+        Thermal management is provided using a incompressible
+        approximation of a 1D duct with heat exchanger.
 
         Inputs
         ------

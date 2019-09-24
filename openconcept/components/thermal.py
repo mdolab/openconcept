@@ -1,4 +1,3 @@
-"""Analysis routines for simulating thermal management of aircraft components"""
 from __future__ import division
 from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, DirectSolver, BoundsEnforceLS
 from openmdao.api import ScipyOptimizeDriver, ExplicitComponent, ImplicitComponent
@@ -7,16 +6,17 @@ import numpy as np
 import scipy.sparse as sp
 import sys, os
 sys.path.insert(0,os.getcwd())
-from openconcept.components.ducts import DuctWithHx
+from openconcept.components.ducts import ImplicitCompressibleDuct
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.math.derivatives import FirstDerivative
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp, VectorConcatenateComp, VectorSplitComp
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
-method = 'simpson'
-n_int = 10
-dt = 800 / (2*n_int+1)
 
-class ThermalComponentWithMass(ImplicitComponent):
+
+"""Analysis routines for simulating thermal management of aircraft components"""
+
+
+class ThermalComponentWithMass(ExplicitComponent):
     """
     Computes thermal residual of a component with heating, cooling, and thermal mass
 
@@ -54,20 +54,21 @@ class ThermalComponentWithMass(ImplicitComponent):
         self.add_input('mass', units='kg')
         self.add_output('dTdt', units='K/s', shape=(nn_tot,))
 
-        self.declare_partials(['dTdt'], ['q_in'], rows=arange, cols=arange, val=np.ones((nn_tot,)))
-        self.declare_partials(['dTdt'], ['q_out'], rows=arange, cols=arange, val=-np.ones((nn_tot,)))
+        self.declare_partials(['dTdt'], ['q_in'], rows=arange, cols=arange)
+        self.declare_partials(['dTdt'], ['q_out'], rows=arange, cols=arange)
         self.declare_partials(['dTdt'], ['mass'], rows=arange, cols=np.zeros((nn_tot,)))
-        self.declare_partials(['dTdt'], ['dTdt'], rows=arange, cols=arange)
 
-    def apply_nonlinear(self, inputs, outputs, residuals):
+    def compute(self, inputs, outputs):
         spec_heat = self.options['specific_heat']
-        residuals['dTdt'] = inputs['q_in'] - inputs['q_out'] - inputs['mass']*outputs['dTdt']*spec_heat
+        outputs['dTdt'] = (inputs['q_in'] - inputs['q_out']) / inputs['mass'] / spec_heat
 
-    def linearize(self, inputs, outputs, J):
+    def compute_partials(self, inputs, J):
         nn_tot = self.options['num_nodes']
         spec_heat = self.options['specific_heat']
-        J['dTdt','mass'] = - outputs['dTdt']*spec_heat
-        J['dTdt','dTdt'] = - inputs['mass']*spec_heat*np.ones((nn_tot,))
+
+        J['dTdt','mass'] = - (inputs['q_in'] - inputs['q_out']) / inputs['mass']**2 / spec_heat
+        J['dTdt','q_in'] = 1 / inputs['mass'] / spec_heat
+        J['dTdt','q_out'] = - 1 / inputs['mass'] / spec_heat
 
 class CoolantReservoirRate(ExplicitComponent):
     """
@@ -254,15 +255,13 @@ class LiquidCooledComp(Group):
     mdot_coolant : float
         Coolant mass flow rate (vector, kg/s)
     T_in : float
-        Coolant inflow temperature (vector, K)
+        Instantaneous coolant inflow temperature (vector, K)
     mass : float
         Object mass (only required in thermal mass mode) (scalar, kg)
-    T_object_start : float
+    T_initial : float
         Initial temperature of the cold plate (only required in thermal mass mode) / object (scalar, K)
-    segment|dt : float
-        Time step of each mission segment (one for each segment) (scalar, s)
-        If a single segment is provided (by default) this variable will be called just 'dt'
-        only required in thermal mass mode
+    duration : float
+        Duration of mission segment, only required in unsteady mode
     channel_width : float
         Width of coolant channels (scalar, m)
     channel_height : float
@@ -275,8 +274,8 @@ class LiquidCooledComp(Group):
     Outputs
     -------
     T_out : float
-        Coolant outlet temperature (vector, K)
-    T_object : float
+        Instantaneous coolant outlet temperature (vector, K)
+    T: float
         Object temperature (vector, K)
 
     Options
@@ -285,53 +284,43 @@ class LiquidCooledComp(Group):
         Specific heat capacity of the object in J / kg / K (default 921 = aluminum)
     specific_heat_coolant : float
         Specific heat capacity of the coolant in J / kg / K (default 3801, glycol/water)
-    n_int_per_seg : int
-        Number of Simpson's rule intervals to use per mission segment.
-        The total number of points is 2 * n_int_per_seg + 1
-    mission_segments : list
-        The list of mission segments to track
-    has_thermal_mass : bool
+    num_nodes : int
+        Number of analysis points to run
+    quasi_steady : bool
         Whether or not to treat the component as having thermal mass
     """
 
     def initialize(self):
-        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-        self.options.declare('mission_segments', default=['climb','cruise','descent'])
         self.options.declare('specific_heat_object', default=921.0, desc='Specific heat in J/kg/K')
         self.options.declare('specific_heat_coolant', default=3801, desc='Specific heat in J/kg/K')
-        self.options.declare('has_thermal_mass', default=True, desc='Treat the component as quasi-steady or with thermal mass')
+        self.options.declare('quasi_steady', default=False, desc='Treat the component as quasi-steady or with thermal mass')
         self.options.declare('num_nodes', default=1, desc='Number of quasi-steady points to runs')
 
     def setup(self):
-        has_thermal_mass = self.options['has_thermal_mass']
-        if has_thermal_mass:
-            n_int_per_seg = self.options['n_int_per_seg']
-            nn = (n_int_per_seg*2 + 1)
-            mission_segment_names = self.options['mission_segments']
-            n_seg = len(mission_segment_names)
-            nn_tot = nn * n_seg
+        nn = self.options['num_nodes']
+        quasi_steady = self.options['quasi_steady']
+        if not quasi_steady:
             self.add_subsystem('base',
                                ThermalComponentWithMass(specific_heat=self.options['specific_heat_object'],
-                                                        num_nodes=nn_tot),
+                                                        num_nodes=nn),
                                                         promotes_inputs=['q_in', 'mass'])
             self.add_subsystem('integratetemp',
-                               Integrator(num_intervals=n_int_per_seg,
-                                                          segment_names=mission_segment_names,
-                                                          quantity_units='K',
-                                                          diff_units='s',
-                                                          method=method),
-                                promotes_inputs=['*|dt',('q_initial','T_object_start')],
-                                promotes_outputs=[('q','T_object')])
+                               Integrator(num_intervals=int((nn-1)/2),
+                                          quantity_units='K',
+                                          diff_units='s',
+                                          method='simpson',
+                                          time_setup='duration'),
+                                promotes_inputs=['duration',('q_initial','T_initial')],
+                                promotes_outputs=[('q','T'),('q_final','T_final')])
             self.connect('base.dTdt','integratetemp.dqdt')
         else:
-            nn_tot = self.options['num_nodes']
             self.add_subsystem('base',
-                               ThermalComponentMassless(num_nodes=nn_tot),
+                               ThermalComponentMassless(num_nodes=nn),
                                promotes_inputs=['q_in'],
-                               promotes_outputs=['T_object'])
+                               promotes_outputs=['T'])
         self.add_subsystem('hex',
-                           ConstantSurfaceTemperatureColdPlate_NTU(num_nodes=nn_tot, specific_heat=self.options['specific_heat_coolant']),
-                                                                   promotes_inputs=['T_in', ('T_surface','T_object'),'n_parallel','channel*','mdot_coolant'],
+                           ConstantSurfaceTemperatureColdPlate_NTU(num_nodes=nn, specific_heat=self.options['specific_heat_coolant']),
+                                                                   promotes_inputs=['T_in', ('T_surface','T'),'n_parallel','channel*','mdot_coolant'],
                                                                    promotes_outputs=['T_out'])
         self.connect('hex.q','base.q_out')
 
@@ -346,9 +335,9 @@ class CoolantReservoir(Group):
         Coolant inflow temperature (vector, K)
     mass : float
         Object mass (only required in thermal mass mode) (scalar, kg)
-    T_coolant_start : float
-        Initial temperature of the coolant (only required in thermal mass mode) / object (scalar, K)
-    segment|dt : float
+    T_initial : float
+        Initial temperature of the coolant reservoir(only required in thermal mass mode) / object (scalar, K)
+    duration : float
         Time step of each mission segment (one for each segment) (scalar, s)
         If a single segment is provided (by default) this variable will be called just 'dt'
         only required in thermal mass mode
@@ -360,34 +349,26 @@ class CoolantReservoir(Group):
 
     Options
     -------
-    n_int_per_seg : int
-        Number of Simpson's rule intervals to use per mission segment.
-        The total number of points is 2 * n_int_per_seg + 1
-    mission_segments : list
-        The list of mission segments to track
+    num_nodes : int
+        Number of analysis points to run
     """
 
     def initialize(self):
-        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-        self.options.declare('mission_segments', default=['climb','cruise','descent'])
+        self.options.declare('num_nodes',default=5)
 
     def setup(self):
-        n_int_per_seg = self.options['n_int_per_seg']
-        nn = (n_int_per_seg*2 + 1)
-        mission_segment_names = self.options['mission_segments']
-        n_seg = len(mission_segment_names)
-        nn_tot = nn * n_seg
+        nn = self.options['num_nodes']
         self.add_subsystem('rate',
-                           CoolantReservoirRate(num_nodes=nn_tot),
+                           CoolantReservoirRate(num_nodes=nn),
                            promotes_inputs=['T_in', 'T_out', 'mass', 'mdot_coolant'])
         self.add_subsystem('integratetemp',
-                           Integrator(num_intervals=n_int_per_seg,
-                                                      segment_names=mission_segment_names,
-                                                      quantity_units='K',
-                                                      diff_units='s',
-                                                      method=method),
-                            promotes_inputs=['*|dt',('q_initial','T_coolant_start')],
-                            promotes_outputs=[('q','T_out')])
+                           Integrator(num_intervals=int((nn-1)/2),
+                                      quantity_units='K',
+                                      diff_units='s',
+                                      method='simpson',
+                                      time_setup='duration'),
+                            promotes_inputs=['duration',('q_initial','T_initial')],
+                            promotes_outputs=[('q','T_out'),('q_final','T_final')])
         self.connect('rate.dTdt','integratetemp.dqdt')
 
 class LiquidCoolantTestGroup(Group):
@@ -396,68 +377,51 @@ class LiquidCoolantTestGroup(Group):
     """
 
     def initialize(self):
-        self.options.declare('n_int_per_seg',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-        self.options.declare('mission_segments', default=['climb','cruise','descent'])
+        self.options.declare('num_nodes',default=11)
         self.options.declare('quasi_steady', default=False, desc='Treat the component as quasi-steady or with thermal mass')
-        self.options.declare('num_nodes', default=1, desc='Number of quasi-steady points to runs')
 
     def setup(self):
         quasi_steady = self.options['quasi_steady']
-        n_int_per_seg = self.options['n_int_per_seg']
-        mission_segment_names = self.options['mission_segments']
-
-        if not quasi_steady:
-            nn = (n_int_per_seg*2 + 1)
-            n_seg = len(mission_segment_names)
-            nn_tot = nn * n_seg
-            has_thermal_mass = True
-        else:
-            nn_tot = self.options['num_nodes']
-            nn = int(nn_tot / 3)
-            has_thermal_mass = False
+        nn = self.options['num_nodes']
 
         iv = self.add_subsystem('iv',IndepVarComp(), promotes_outputs=['*'])
         #iv.add_output('q_in', val=10*np.concatenate([np.ones((nn,)),0.5*np.ones((nn,)),0.2*np.ones((nn,))]), units='kW')
-        throttle_profile = np.concatenate([np.ones((nn,)), np.ones((nn,))*0.5, np.linspace(0.05,0.2,nn)])
+        throttle_profile = np.ones((nn,))
         iv.add_output('q_in',val=10*throttle_profile, units='kW')
         #iv.add_output('T_in', val=40*np.ones((nn_tot,)), units='degC')
-        iv.add_output('mdot_coolant', val=0.1*np.ones((nn_tot,)), units='kg/s')
-        iv.add_output('rho_coolant', val=997*np.ones((nn_tot,)),units='kg/m**3')
+        iv.add_output('mdot_coolant', val=0.1*np.ones((nn,)), units='kg/s')
+        iv.add_output('rho_coolant', val=997*np.ones((nn,)),units='kg/m**3')
         iv.add_output('motor_mass', val=50., units='kg')
         iv.add_output('coolant_mass', val=10., units='kg')
-        iv.add_output('T_object_start', val=15, units='degC')
-        iv.add_output('T_coolant_start', val=15.1, units='degC')
-        iv.add_output('climb|dt', val=dt, units='s')
-        iv.add_output('cruise|dt', val=3*dt, units='s')
-        iv.add_output('descent|dt', val=dt, units='s')
+        iv.add_output('T_motor_initial', val=15, units='degC')
+        iv.add_output('T_res_initial', val=15.1, units='degC')
+        iv.add_output('duration', val=800, units='s')
         iv.add_output('channel_width', val=1, units='mm')
         iv.add_output('channel_height', val=20, units='mm')
         iv.add_output('channel_length', val=0.2, units='m')
         iv.add_output('n_parallel', val=20)
-        Ueas = np.ones((nn_tot))*150
-        h = np.concatenate([np.linspace(0,25000,nn),np.linspace(25000,27000,nn),np.linspace(27000,0,nn)])
+        Ueas = np.ones((nn))*150
+        h = np.concatenate([np.linspace(0,25000,nn)])
         iv.add_output('fltcond|Ueas', val=Ueas, units='kn' )
         iv.add_output('fltcond|h', val=h, units='ft')
 
 
         self.add_subsystem('atmos',
-                           ComputeAtmosphericProperties(num_nodes=nn_tot),
+                           ComputeAtmosphericProperties(num_nodes=nn),
                            promotes_inputs=["fltcond|h",
                                             "fltcond|Ueas"])
 
-        if has_thermal_mass:
-            lc_promotes = ['q_in',('mass','motor_mass'),'T_object_start','*|dt','channel_*','n_parallel']
+        if not quasi_steady:
+            lc_promotes = ['q_in',('mass','motor_mass'),'duration','channel_*','n_parallel']
         else:
             lc_promotes = ['q_in','channel_*','n_parallel']
 
         self.add_subsystem('component',
-                           LiquidCooledComp(n_int_per_seg=n_int_per_seg,
-                                            mission_segments=mission_segment_names,
-                                            has_thermal_mass=has_thermal_mass,
-                                            num_nodes=nn_tot),
+                           LiquidCooledComp(num_nodes=nn,
+                                            quasi_steady=quasi_steady),
                                             promotes_inputs=lc_promotes)
         self.add_subsystem('duct',
-                           DuctWithHx(num_nodes=nn_tot))
+                           ImplicitCompressibleDuct(num_nodes=nn))
 
         self.connect('atmos.fltcond|p','duct.p_inf')
         self.connect('atmos.fltcond|T','duct.T_inf')
@@ -470,12 +434,13 @@ class LiquidCoolantTestGroup(Group):
             self.connect('mdot_coolant',['component.mdot_coolant','duct.mdot_hot'])
         else:
             self.add_subsystem('reservoir',
-                               CoolantReservoir(n_int_per_seg=n_int_per_seg,
-                                                mission_segments=mission_segment_names),
-                                                promotes_inputs=['*|dt','T_coolant_start',('mass','coolant_mass')])
+                               CoolantReservoir(num_nodes=nn),
+                                                promotes_inputs=['duration',('mass','coolant_mass')])
             self.connect('duct.T_out_hot','reservoir.T_in')
             self.connect('reservoir.T_out','component.T_in')
             self.connect('mdot_coolant',['component.mdot_coolant','duct.mdot_hot','reservoir.mdot_coolant'])
+            self.connect('T_motor_initial','component.T_initial')
+            self.connect('T_res_initial','reservoir.T_initial')
 
 
 
@@ -484,8 +449,8 @@ if __name__ == '__main__':
     # run this script from the root openconcept directory like so:
     # python .\openconcept\components\ducts.py
     quasi_steady = False
-    nn_tot = (2*n_int +1)*3
-    prob = Problem(LiquidCoolantTestGroup(quasi_steady=quasi_steady, num_nodes=nn_tot, n_int_per_seg=n_int))
+    nn = 11
+    prob = Problem(LiquidCoolantTestGroup(quasi_steady=quasi_steady, num_nodes=nn))
     prob.model.options['assembled_jac_type'] = 'csc'
     prob.model.nonlinear_solver=NewtonSolver(iprint=2)
     prob.model.linear_solver = DirectSolver(assemble_jac=True)
@@ -499,47 +464,42 @@ if __name__ == '__main__':
 
     prob.run_model()
     #print(prob['duct.inlet.M'])
-    print(np.max(prob['component.T_object']-273.15))
+    print(np.max(prob['component.T']-273.15))
     print(np.max(-prob['duct.force.F_net']))
 
-    #prob.check_partials(method='cs', compact_print=True)
+    prob.check_partials(method='cs', compact_print=True)
 
     #prob.model.list_outputs(units=True, print_arrays=True)
     if quasi_steady:
-        np.save('quasi_steady',prob['component.T_object'])
+        np.save('quasi_steady',prob['component.T'])
 
     # prob.run_driver()
     # prob.model.list_inputs(units=True)
-    nn_seg = 2*n_int + 1
-    t = np.concatenate([np.linspace(0,dt*nn_seg,nn_seg),np.linspace(dt*nn_seg,7*dt*nn_seg,nn_seg),np.linspace(7*dt*nn_seg,8*dt*nn_seg,nn_seg)])/60
-    # #t = np.concatenate([np.linspace(0,30*n_int,n_int),np.linspace(30*(n_int+1),30*(2*n_int),n_int),np.linspace(30*(2*n_int+1),30*3*n_int,n_int)])/60
-    if not quasi_steady:
-        qs = np.load('quasi_steady.npy')
-    else:
-        qs = prob['component.T_object']
+    t = np.linspace(0,800,nn)/60
+
     import matplotlib.pyplot as plt
     plt.figure()
-    plt.plot(t, prob['component.T_object'] - 273.15)
+    plt.plot(t, prob['component.T'] - 273.15)
     plt.xlabel('time (min)')
     plt.ylabel('motor temp (C)')
-    # plt.figure()
-    # plt.plot(prob['fltcond|h'], prob['component.T_object'] - 273.15, prob['fltcond|h'], qs - 273.15)
-    # plt.xlabel('altitude (ft)')
-    # plt.ylabel('motor temp (C)')
-    # plt.figure()
-    # plt.plot(t, prob['duct.inlet.M'])
-    # plt.xlabel('Mach number')
-    # plt.ylabel('steady state motor temp (C)')
-    # plt.figure()
-    # plt.plot(prob['duct.inlet.M'], prob['duct.force.F_net'])
-    # plt.xlabel('M_inf')
-    # plt.ylabel('drag N')
-    # plt.figure()
-    # plt.plot(prob['duct.inlet.M'], prob['duct.mdot']/prob['atmos.fltcond|rho']/prob.get_val('atmos.fltcond|Utrue',units='m/s')/prob.get_val('duct.area_nozzle',units='m**2'))
-    # plt.xlabel('M_inf')
-    # plt.ylabel('mdot / rho / U / A_nozzle')
-    # plt.figure()
-    # plt.plot(prob['duct.inlet.M'],prob['duct.nozzle.M'])
-    # plt.xlabel('M_inf')
+    plt.figure()
+    plt.plot(prob['fltcond|h'], prob['component.T'] - 273.15)
+    plt.xlabel('altitude (ft)')
+    plt.ylabel('motor temp (C)')
+    plt.figure()
+    plt.plot(t, prob['duct.inlet.M'])
+    plt.xlabel('Mach number')
+    plt.ylabel('steady state motor temp (C)')
+    plt.figure()
+    plt.plot(prob['duct.inlet.M'], prob['duct.force.F_net'])
+    plt.xlabel('M_inf')
+    plt.ylabel('drag N')
+    plt.figure()
+    plt.plot(prob['duct.inlet.M'], prob['duct.mdot']/prob['atmos.fltcond|rho']/prob.get_val('atmos.fltcond|Utrue',units='m/s')/prob.get_val('duct.area_nozzle',units='m**2'))
+    plt.xlabel('M_inf')
+    plt.ylabel('mdot / rho / U / A_nozzle')
+    plt.figure()
+    plt.plot(prob['duct.inlet.M'],prob['duct.nozzle.M'])
+    plt.xlabel('M_inf')
     # plt.ylabel('M_nozzle')
     plt.show()

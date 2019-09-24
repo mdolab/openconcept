@@ -159,7 +159,7 @@ class SimpleBattery(ExplicitComponent):
         self.declare_partials('component_sizing_margin', 'battery_weight')
         self.declare_partials('component_sizing_margin', 'elec_load',
                               rows=range(nn), cols=range(nn))
-        self.declare_partials('max_energy', 'battery_weight')
+        self.declare_partials('max_energy', ['battery_weight','specific_energy'])
 
     def compute(self, inputs, outputs):
         eta_b = self.options['efficiency']
@@ -181,3 +181,4 @@ class SimpleBattery(ExplicitComponent):
         J['component_sizing_margin', 'battery_weight'] = - (inputs['elec_load'] /
                                                             (p_b * inputs['battery_weight'] ** 2))
         J['max_energy','battery_weight'] = e_b
+        J['max_energy', 'specific_energy'] = inputs['battery_weight']
