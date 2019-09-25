@@ -74,7 +74,6 @@ class SimpleMotor(ExplicitComponent):
         self.add_output('component_cost', units='USD', desc='Motor component cost')
         self.add_output('component_weight', units='kg', desc='Motor component weight')
         self.add_output('component_sizing_margin', desc='Fraction of rated power', shape=(nn,))
-        self.declare_partials(["*"], ["*"], dependent=False)
         self.declare_partials('shaft_power_out', 'elec_power_rating')
         self.declare_partials('shaft_power_out', 'throttle',
                               rows=range(nn), cols=range(nn))
