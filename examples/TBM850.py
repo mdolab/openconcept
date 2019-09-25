@@ -18,7 +18,6 @@ from examples.methods.costs_commuter import OperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from examples.aircraft_data.TBM850 import data as acdata
 from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis
-from openconcept.utilities.visualization import plot_trajectory
 
 
 
@@ -178,6 +177,7 @@ def run_tbm_analysis():
     return prob
 
 if __name__ == "__main__":
+    from openconcept.utilities.visualization import plot_trajectory
     # run the analysis
     prob = run_tbm_analysis()
 
