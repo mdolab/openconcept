@@ -6,6 +6,6 @@ scipy
 numpy
 openmdao
 six
-sphinx<2.0.0
+sphinx
 sphinx_rtd_theme
 redbaron

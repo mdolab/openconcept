@@ -1,4 +1,8 @@
-from matplotlib import pyplot as plt
+try:
+    from matplotlib import pyplot as plt
+except:
+    # don't want a matplotlib dependency on Travis/Appveyor
+    pass
 import numpy as np
 
 def plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases, x_label=None, y_labels=None,  marker='o', plot_title='Trajectory'):
