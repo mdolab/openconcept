@@ -86,31 +86,3 @@ def compute_temp_derivs(h_m, tropos_mask, strato_mask, smooth_mask):
     derivs += smooth_mask * (3*a*h_m**2 + 2*b*h_m + c)
 
     return derivs
-
-v_cl = 300 * 0.514444
-qc = 0.5 * 1.225 * v_cl ** 2
-
-def compute_M(M0, h_km):
-    h_m = h_km * 1e3
-
-    tropos_mask, strato_mask, smooth_mask = get_mask_arrays(h_m)
-    p_Pa = compute_pressures(h_m, tropos_mask, strato_mask, smooth_mask)
-
-    r = -20.
-    Mcl = np.sqrt(5) * np.sqrt((qc / p_Pa + 1) ** (2. / 7.) - 1)
-
-    M_max = np.minimum(Mcl, M0)
-
-    M = M_max + 1. / r \
-        * np.log(np.exp(r * (Mcl - M_max)) + np.exp(r * (M0 - M_max)))
-
-    return M
-
-def compute_h(M):
-    Ts = 288.16
-    a = 0.0065
-    P0 = 101325
-    g_aR = 5.2561
-
-    h_m = Ts / a * ( 1 - (qc/P0/( (M**2/5 + 1)**3.5 - 1 ))**(1/5.2561) )
-    return h_m

@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='openconcept',
-    version='0.2',
+    version='0.3.0',
     description="Open Aircraft Conceptual Design Tools",
     long_description="""OpenConcept is a set of analysis routines and components to aid
     in the conceptual design of aircraft with unconventional energy and propulsion architectures.

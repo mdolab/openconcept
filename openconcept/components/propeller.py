@@ -1,8 +1,8 @@
+from __future__ import division
 import numpy as np
 from openmdao.api import ExplicitComponent
 from openmdao.api import Group
-from .empirical_data.prop_maps import propeller_map_quadratic, propeller_map_Raymer, propeller_map_highpower, static_propeller_map_Raymer, static_propeller_map_highpower, propeller_map_scaled, propeller_map_constant_prop_efficiency
-
+from .empirical_data.prop_maps import propeller_map_Raymer, propeller_map_highpower, static_propeller_map_Raymer, static_propeller_map_highpower, propeller_map_scaled, propeller_map_constant_prop_efficiency
 
 class SimplePropeller(Group):
     """This propeller is representative of a constant-speed prop.
@@ -58,7 +58,6 @@ class SimplePropeller(Group):
             staticpropmap = static_propeller_map_Raymer(nn)
         if n_blades == 4:
             propmap = propeller_map_highpower(nn)
-            #propmap = propeller_map_scaled(nn,design_J=design_J,design_cp=design_cp)
             staticpropmap = static_propeller_map_highpower(nn)
         else:
             raise NotImplementedError('You will need to define a propeller map valid for this number of blades')
@@ -131,7 +130,6 @@ class ThrustCalc(ExplicitComponent):
         ct = np.zeros(nn)
         ct1 = inputs['ct_over_cp'] * cp
         ct2 = cp * inputs['eta_prop'] / j
-
         #if j <= jinterp_min:
         ct[static_idx] = ct1[static_idx]
         #if j > jinterp_min and < jinterp_max:
@@ -220,7 +218,7 @@ class PropCoefficients(ExplicitComponent):
 
         #outputs and partials
         self.add_output('cp', desc='Power coefficient', val=0.1*np.ones(nn), lower=np.zeros(nn),upper=np.ones(nn)*2.4)
-        self.add_output('J', desc='Advance ratio', val=0.2**np.ones(nn))
+        self.add_output('J', desc='Advance ratio', val=0.2**np.ones(nn), lower=1e-4*np.ones(nn), upper=4.0*np.ones(nn))
         self.add_output('prop_Vtip',desc='Propeller tip speed',shape=(nn,))
 
         self.declare_partials('cp','diameter')
@@ -236,8 +234,8 @@ class PropCoefficients(ExplicitComponent):
         outputs['cp'] = inputs['shaft_power_in']/inputs['fltcond|rho'] / (inputs['rpm']/60)**3 / inputs['diameter']**5
         #print('cp: '+str(outputs['cp']))
         outputs['J'] = 60. * inputs['fltcond|Utrue'] / inputs['rpm'] / inputs['diameter']
-        # print('U:'+str(inputs['fltcond|Utrue']))
-        # print('J: '+str(outputs['J']))
+        #print('U:'+str(inputs['fltcond|Utrue']))
+        #print('J: '+str(outputs['J']))
         outputs['prop_Vtip'] = inputs['rpm'] / 60 * np.pi * inputs['diameter']
 
     def compute_partials(self, inputs, J):

@@ -1,3 +1,4 @@
+from __future__ import division
 from openmdao.api import IndepVarComp
 import numpy as np
 import numbers

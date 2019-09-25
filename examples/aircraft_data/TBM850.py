@@ -1,12 +1,13 @@
 # DATA FOR TBM T80
 # Collected from various sources
 # including SOCATA pilot manual
+from __future__ import division
 
 data = dict()
 ac = dict()
 # ==AERO==================================
 aero = dict()
-aero['CLmax_flaps30']   = {'value' : 1.7}
+aero['CLmax_TO']   = {'value' : 1.7}
 
 polar = dict()
 polar['e']              = {'value' : 0.78}

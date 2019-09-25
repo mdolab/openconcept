@@ -32,7 +32,6 @@ class PressureComp(ExplicitComponent):
         num_points = self.options['num_nodes']
 
         h_m = inputs['h_km'] * 1e3
-
         self.tropos_mask, self.strato_mask, self.smooth_mask = get_mask_arrays(h_m)
         p_Pa = compute_pressures(h_m, self.tropos_mask, self.strato_mask, self.smooth_mask)
 

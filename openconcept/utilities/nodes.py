@@ -1,3 +1,6 @@
+from __future__ import division
+
+
 def compute_num_nodes(n_int_per_seg, mission_segments):
     n_segments = len(mission_segments)
     nn = (2*n_int_per_seg+1)

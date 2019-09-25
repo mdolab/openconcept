@@ -1,3 +1,4 @@
+from __future__ import division
 from openmdao.api import ExplicitComponent
 import numpy as np
 

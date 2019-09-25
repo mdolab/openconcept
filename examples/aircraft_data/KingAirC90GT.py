@@ -1,16 +1,17 @@
 # DATA FOR King Air C90GT
 # Collected from AOPA Pilot article
 # and rough photogrammetry
+from __future__ import division
 
 data = dict()
 ac = dict()
 # ==AERO==================================
 aero = dict()
-aero['CLmax_flaps30']   = {'value' : 1.52}
+aero['CLmax_TO']   = {'value' : 1.52}
 
 polar = dict()
 polar['e']              = {'value' : 0.80}
-polar['CD0_TO']         = {'value' : 0.029}
+polar['CD0_TO']         = {'value' : 0.040}
 polar['CD0_cruise']     = {'value' : 0.022}
 
 aero['polar'] = polar

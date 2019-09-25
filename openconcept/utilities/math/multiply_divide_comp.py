@@ -4,7 +4,7 @@ import collections
 import numpy as np
 from scipy import sparse as sp
 from six import string_types
-
+from collections import Iterable
 from openmdao.core.explicitcomponent import ExplicitComponent
 
 
@@ -29,6 +29,8 @@ class ElementMultiplyDivideComp(ExplicitComponent):
     Result is of shape (vec_size, n)
 
     All input vectors must be of the same shape, specified by the options 'vec_size' and 'length'.
+    Alternatively, a list of 'vec_size' can be provided where the entries are all either the same number, or 1.
+    This allows a vector quantity to be multiplied / divided by scalar(s).
     Use scaling factor -1 for subtraction.
 
     Attributes
@@ -52,6 +54,8 @@ class ElementMultiplyDivideComp(ExplicitComponent):
             Length of the first dimension of the input and output vectors
             (i.e number of rows, or vector length for a 1D vector)
             Default is 1
+            Alternatively, if a list, must be all same number, or 1.
+            e.g. [1, 9, 9, 9]. Must be same length as # of inputs
         length : int
             Length of the second dimension of the input and ouptut vectors (i.e. number of columns)
             Default is 1 which results in input/output vectors of size (vec_size,)
@@ -121,6 +125,8 @@ class ElementMultiplyDivideComp(ExplicitComponent):
             Length of the first dimension of the input and output vectors
             (i.e number of rows, or vector length for a 1D vector)
             Default is 1
+            Alternatively, if a list, must be all same number, or 1.
+            e.g. [1, 9, 9, 9]. Must be same length as # of inputs
         length : int
             Length of the second dimension of the input and ouptut vectors (i.e. number of columns)
             Default is 1 which results in input/output vectors of size (vec_size,)
@@ -194,19 +200,43 @@ class ElementMultiplyDivideComp(ExplicitComponent):
             if len(input_units) != len(input_names):
                 raise ValueError('Input units list needs to be same length as input names')
 
-            if length == 1:
-                shape = (vec_size,)
+            if isinstance(vec_size, Iterable):
+                # scalar - vector mutliplication
+                multi_vec_size = True
+                if len(vec_size) != len(input_names):
+                    raise ValueError('Inputs list needs to be same length as vec_sizes list')
+                vec_out_size = max(vec_size)
             else:
-                shape = (vec_size, length)
+                multi_vec_size = False
+                vec_out_size = vec_size
+
+
 
             output_units_assemble = []
 
             for i, input_name in enumerate(input_names):
+                if multi_vec_size:
+                    vec_in_size = vec_size[i]
+                else:
+                    vec_in_size = vec_size
+
+                if length == 1:
+                    shape = (vec_in_size,)
+                else:
+                    shape = (vec_in_size, length)
+
                 self.add_input(input_name, shape=shape, units=input_units[i],
                                desc=desc + '_inp_' + input_name)
+
+                if vec_in_size == 1:
+                    # scalar input
+                    col_vals = np.zeros(vec_out_size * length)
+                else:
+                    # vector input
+                    col_vals = np.arange(0, vec_out_size * length)
                 self.declare_partials([output_name], [input_name],
-                                      rows=np.arange(0, vec_size * length),
-                                      cols=np.arange(0, vec_size * length))
+                                      cols=col_vals,
+                                      rows=np.arange(0, vec_out_size * length))
                 # derive the units of the output vector from the inputs
                 if input_units[i] is not None:
                     if divide[i]:
@@ -222,8 +252,14 @@ class ElementMultiplyDivideComp(ExplicitComponent):
                     output_units = ''.join(output_units_assemble)
             if len(output_units_assemble) == 0:
                 output_units = None
+
+            if length == 1:
+                out_shape = (vec_out_size,)
+            else:
+                out_shape = (vec_out_size, length)
+
             super(ElementMultiplyDivideComp, self).add_output(output_name, val,
-                                                              shape=shape, units=output_units,
+                                                              shape=out_shape, units=output_units,
                                                               **kwargs)
 
     def compute(self, inputs, outputs):
@@ -245,10 +281,17 @@ class ElementMultiplyDivideComp(ExplicitComponent):
 
             if divide is None:
                 divide = [False for k in range(len(input_names))]
-            if length == 1:
-                shape = (vec_size,)
+
+            if isinstance(vec_size, Iterable):
+                # scalar - vector mutliplication
+                vec_out_size = max(vec_size)
             else:
-                shape = (vec_size, length)
+                vec_out_size = vec_size
+
+            if length == 1:
+                shape = (vec_out_size,)
+            else:
+                shape = (vec_out_size, length)
 
             if complexify:
                 temp = np.ones(shape, dtype=np.complex_)
@@ -269,12 +312,18 @@ class ElementMultiplyDivideComp(ExplicitComponent):
             if isinstance(input_names, string_types):
                 input_names = [input_names]
 
+            if isinstance(vec_size, Iterable):
+                # scalar - vector mutliplication
+                vec_out_size = max(vec_size)
+            else:
+                vec_out_size = vec_size
+
             if divide is None:
                 divide = [False for k in range(len(input_names))]
             if length == 1:
-                shape = (vec_size,)
+                shape = (vec_out_size,)
             else:
-                shape = (vec_size, length)
+                shape = (vec_out_size, length)
 
             for j, input_name in enumerate(input_names):
                 temp = np.ones(shape)

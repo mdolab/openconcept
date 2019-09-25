@@ -1,3 +1,4 @@
+from __future__ import division
 import numpy as np
 from openmdao.api import ExplicitComponent
 from openmdao.api import Group
@@ -25,7 +26,6 @@ class SimpleTurboshaft(ExplicitComponent):
         Shaft power produced by the engine (vector, W)
     fuel_flow : float
         Fuel flow consumed (vector, kg/s)
-        FUEL FLOW IS NEGATIVE!
     component_cost : float
         Nonrecurring cost of the component (scalar, USD)
     component_weight : float
@@ -108,7 +108,7 @@ class SimpleTurboshaft(ExplicitComponent):
         b = inputs['shaft_power_rating']
         c = a * b
         outputs['shaft_power_out'] = inputs['throttle'] * inputs['shaft_power_rating']
-        outputs['fuel_flow'] = -inputs['throttle'] * inputs['shaft_power_rating'] * psfc
+        outputs['fuel_flow'] = inputs['throttle'] * inputs['shaft_power_rating'] * psfc
         outputs['component_cost'] = inputs['shaft_power_rating'] * cost_inc + cost_base
         outputs['component_weight'] = inputs['shaft_power_rating'] * weight_inc + weight_base
         outputs['component_sizing_margin'] = inputs['throttle']
@@ -118,5 +118,5 @@ class SimpleTurboshaft(ExplicitComponent):
         psfc = self.options['psfc']
         J['shaft_power_out', 'throttle'] = inputs['shaft_power_rating'] * np.ones(nn)
         J['shaft_power_out', 'shaft_power_rating'] = inputs['throttle']
-        J['fuel_flow', 'throttle'] = -inputs['shaft_power_rating'] * psfc * np.ones(nn)
-        J['fuel_flow', 'shaft_power_rating'] = -inputs['throttle'] * psfc
+        J['fuel_flow', 'throttle'] = inputs['shaft_power_rating'] * psfc * np.ones(nn)
+        J['fuel_flow', 'shaft_power_rating'] = inputs['throttle'] * psfc

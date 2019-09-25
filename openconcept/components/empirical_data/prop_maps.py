@@ -1,4 +1,5 @@
 
+from __future__ import division
 import numpy as np
 from openmdao.api import Group, Problem, IndepVarComp, ExplicitComponent
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
@@ -76,7 +77,7 @@ def propeller_map_highpower(vec_size=1):
 
     data[:,0] = np.zeros(13)
     # Create regular grid interpolator instance
-    interp = MetaModelStructuredComp(method='cubic',extrapolate=False,vec_size=vec_size)
+    interp = MetaModelStructuredComp(method='cubic',extrapolate=True,vec_size=vec_size)
     interp.add_input('cp', 0.3, cp)
     interp.add_input('J', 1, J)
     interp.add_output('eta_prop', 0.8, data)
@@ -97,43 +98,9 @@ class ConstantPropEfficiency(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['eta_prop'] = 0.85
 
-
-
-
 def propeller_map_constant_prop_efficiency(vec_size=1):
     interp = ConstantPropEfficiency(vec_size=vec_size)
     return interp
-
-
-def propeller_map_quadratic(vec_size=1):
-    #enter three points in xyz array format:
-    #the center of the efficiency bucket (J, cp, eta)
-    #two more points (J, cp, eta)
-    #points = np.array([[2.2,0.18,0.93], [0.2,0.03,0.40], [0.2,0.7,0.02]])
-    points = np.array([[3.1,1.55,0.91], [0,0,0.3], [1.0,2.0,0.5]])
-    #solve a linear system for the constants in AJ^2+BJ+C*cp^2+D*cp+E = eta
-    #the first point meets the value and has zero gradient
-    #the second and third points meet value
-    vals = np.column_stack((points[:,0]**2,points[:,0],points[:,1]**2,points[:,1],np.ones((3,))))
-    vals = np.vstack((vals,np.array([2*points[0,0],1,0,0,0]),np.array([0,0,2*points[0,1],1,0])))
-    rhs = np.concatenate([points[:,2],np.zeros(2)])
-    coeffs = np.linalg.solve(vals,rhs)
-    Jvec = np.linspace(0,4.0,20)
-    cpvec = np.linspace(0,2.0,10)
-    J,cp=np.meshgrid(Jvec,cpvec)
-    eta = coeffs[0]*J**2+coeffs[1]*J+coeffs[2]*cp**2+coeffs[3]*cp+coeffs[4]
-    debug=False
-    if debug:
-        import matplotlib.pyplot as plt
-        CS = plt.contour(J,cp,eta)
-        plt.clabel(CS, inline=1, fontsize=10)
-        plt.show()
-    interp = MetaModelStructuredComp(method='cubic',extrapolate=False,vec_size=vec_size)
-    interp.add_input('cp', 0.3, cpvec)
-    interp.add_input('J', 1, Jvec)
-    interp.add_output('eta_prop', 0.8, eta)
-    return interp
-
 
 def static_propeller_map_Raymer(vec_size=1):
     #Data from Raymer for static thrust of 3-bladed propeller
@@ -153,22 +120,3 @@ def static_propeller_map_highpower(vec_size=1):
     interp.add_input('cp',0.15,cp)
     interp.add_output('ct_over_cp',1.5,factored_raymer_static_data)
     return interp
-
-if __name__ == "__main__":
-    interp = propeller_map()
-    #interp = static_propeller_map()
-    # Set up the OpenMDAO model
-    model = Group()
-    model.add_subsystem('comp', interp, promotes=["*"])
-    prob = Problem(model)
-    prob.setup()
-
-    # set inputs
-    prob['J'] = 1.75
-    prob['cp'] = 0.017714165222329097
-    prob.run_model()
-
-    computed = prob['eta_prop']
-    #computed = prob['ct_over_cp']
-    prob.check_partials(compact_print=True)
-    # we can verify all gradients by checking against finit-difference

@@ -113,65 +113,39 @@ def simpson_partials(dts, q, n_segments=1, n_simpson_intervals_per_segment=2,):
     wrt_dt = [rowidxs_wrt_dt, colidxs_wrt_dt, partials_wrt_dt]
     return wrt_q, wrt_dt
 
+def integrator_partials_wrt_deltas(num_segments, num_intervals):
+    """
+    This function computes partials of an integrated quantity with respect to the "delta quantity per interval"
+    in the context of openConcept's Simpson's rule approximated integration technique.
 
-def simpson_integral_every_node(dts,q,n_segments=1,n_simpson_intervals_per_segment=2):
-    """This method integrates a rate over time using Simpson's rule and assumes that q linearly changes within the Simpson subintervals.
-        Unlike the intervals above, this method returns a vector of length nn-1 instead of nn-1/2
-        A "segment" is defined as a portion of the quantity vector q with a constant delta t (or delta x, etc)
-        dts = list of doubles representing the time steps for each segment. This is the data timestep - the interval timestep is 2x this
-        q = the data to be integrated
-        n_segments = how many segments
-        n_simpson_intervals_per_segment = how many simpson intervals to use per segment. Each one requires 2*N+1 data points
+    Inputs
+    ------
+    num_segments : float
+        Number of mission segments to integrate (scalar)
+    num_intervals : float
+        Number of Simpson intervals per segment (scalar)
 
-        returns:
-        delta_q = amount of q accumulated during each interval (corresponds to the intervals between q, 2x as often as the simpson subintervals)
-        int_q = total amount of q accumulated during all phases
+    Outputs
+    -------
+    partial_q_wrt_deltas : float
+        A sparse (CSR) matrix representation of the partial derivatives of q
+        with respect to the delta quantity per half-interval
+        Dimension is nn * num_segments (rows) by (nn -1) * num_segments (cols)
+        where nn = (2 * num_intervals + 1)
 
     """
-    int_q, delta_q_2x = simpson_integral(dts,q,n_segments=n_segments,n_simpson_intervals_per_segment=n_simpson_intervals_per_segment)
-    delta_q = np.repeat(delta_q_2x,2)/2.0
-    return int_q, delta_q
-
-
-def simpson_partials_every_node(dts,q,n_segments=1,n_simpson_intervals_per_segment=2):
-    wrt_q_2x, wrt_dt_2x = simpson_partials(dts,q,n_segments=n_segments,n_simpson_intervals_per_segment=n_simpson_intervals_per_segment)
-    # since row 0 and 1, row 2 and 3, etc are identical, it's easiest to edit the row index and repeat the
-    n_int_seg = n_simpson_intervals_per_segment
-    n_int_tot = n_segments * n_int_seg
-    nn_seg = (n_simpson_intervals_per_segment * 2 + 1)
-    nn_tot = n_segments*nn_seg
-
-    #first let us take partial derivatives of the integral with respect to the states
-    #each row represents a value of the integrated vector. It will contain three values, so repeat it 3 times
-    #we want every other row, like so: [0,2,4,6...,1,3,5,7...]
-    rownos = np.concatenate([np.arange(0,2*n_int_tot-1,2),np.arange(1,2*n_int_tot,2)])
-    rowidx_wrt_q = np.repeat(rownos,3)
-    #We then append a second copy of the original row indices (since row 0 is identical to row 1 and so on)
-    colidx_wrt_q = np.tile(wrt_q_2x[1],2)
-    #recall that the partials are all /2 since we divided by two
-    partials_wrt_q = np.tile(wrt_q_2x[2],2) / 2
-
-    rowidxs_wrt_dt = []
-    colidxs_wrt_dt = []
-    partials_wrt_dt = []
-
-    for i in range(n_segments):
-        #there are now twice as many rows. we need to go from:
-        # rowidx = [0,1,2,3]
-        # to
-        # rowidx = [0,2,4,6,1,3,5,7]
-
-        rowidx_i = np.concatenate([wrt_dt_2x[0][i]*2, wrt_dt_2x[0][i]*2 + 1])
-        colidx_i = np.tile(wrt_dt_2x[1][i],2)
-        part_i = np.tile(wrt_dt_2x[2][i],2) / 2
-
-        rowidxs_wrt_dt.append(rowidx_i)
-        colidxs_wrt_dt.append(colidx_i)
-        partials_wrt_dt.append(part_i)
-
-    wrt_q = [rowidx_wrt_q, colidx_wrt_q, partials_wrt_q]
-    wrt_dt = [rowidxs_wrt_dt, colidxs_wrt_dt, partials_wrt_dt]
-    return wrt_q, wrt_dt
+    nn = num_intervals * 2 + 1
+    # the basic structure of the jacobian is lower triangular (all late values depend on all early ones)
+    jacmat = np.tril(np.ones((n_segments*(nn-1),n_segments*(nn-1))))
+    # the first entry of q has no dependence on the deltas so insert a row of zeros
+    jacmat = np.insert(jacmat,0,np.zeros(n_segments*(nn-1)),axis=0)
+    for i in range(1,n_segments):
+        # since the end of each segment is equal to the beginning of the next
+        # duplicate the jacobian row once at the end of each segment
+        duplicate_row = jacmat[nn*i-1,:]
+        jacmat = np.insert(jacmat,nn*i,duplicate_row,axis=0)
+    partials_q_wrt_deltas = sp.csr_matrix(jacmat)
+    return partials_q_wrt_deltas
 
 class IntegrateQuantity(ExplicitComponent):
     """This component integrates a first-order rate quantity vector over a differential with CONSTANT spacing using Simpson's 3rd order method.
@@ -244,25 +218,3 @@ class IntegrateQuantity(ExplicitComponent):
 
         J['delta_quantity','lower_limit'] = -dQddt / (nn-1)
         J['delta_quantity','upper_limit'] = dQddt / (nn-1)
-
-
-
-
-
-
-if __name__ == "__main__":
-    v1 = 2*np.sin(np.linspace(0,1,11)*np.pi)
-    v2 = np.sin(np.linspace(0,1,11)*np.pi)
-    q = np.concatenate([v1,v2])
-    int_q, delta_q = simpson_integral([np.pi/10,np.pi/10],q,n_segments=2,n_simpson_intervals_per_segment=5)
-    print(int_q)
-    print(delta_q)
-    int_q, delta_q_2x = simpson_integral_every_node([np.pi/10,np.pi/10],q,n_segments=2,n_simpson_intervals_per_segment=5)
-    print(delta_q_2x)
-    wrt_q, wrt_dt = simpson_partials([np.pi/10,np.pi/10],q,n_segments=2,n_simpson_intervals_per_segment=5)
-    wrt_q_2x, wrt_dt_2x = simpson_partials_every_node([np.pi/10,np.pi/10],q,n_segments=2,n_simpson_intervals_per_segment=5)
-
-    print(wrt_q)
-    print(wrt_q_2x)
-    print(wrt_dt)
-    print(wrt_dt_2x)
