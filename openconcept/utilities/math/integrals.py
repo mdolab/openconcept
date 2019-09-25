@@ -880,7 +880,10 @@ class Integrator(ExplicitComponent):
             if time_setup == 'dt':
                 dts = [inputs['dt'][0]]
             elif time_setup == 'duration':
-                dts = [inputs['duration'][0]/(nn_seg-1)]
+                if nn_seg == 1:
+                    dts = [inputs['duration'][0]]
+                else:
+                    dts = [inputs['duration'][0]/(nn_seg-1)]
             elif time_setup == 'bounds':
                 delta_t = inputs['t_final'] - inputs['t_initial']
                 dts = [delta_t[0]/(nn_seg-1)]

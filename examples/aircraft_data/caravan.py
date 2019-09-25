@@ -7,7 +7,7 @@ data = dict()
 ac = dict()
 # ==AERO==================================
 aero = dict()
-aero['CLmax_flaps30']   = {'value' : 2.25}
+aero['CLmax_TO']   = {'value' : 2.25}
 
 polar = dict()
 polar['e']              = {'value' : 0.8}

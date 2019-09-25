@@ -378,7 +378,7 @@ class MachNumberfromSpeed(ExplicitComponent):
         nn = self.options['num_nodes']
         self.add_input('a', shape=(nn,), units='m/s')
         self.add_input('Utrue', shape=(nn,), units='m/s')
-        self.add_output('M', shape=(nn,),  units='m/s')
+        self.add_output('M', shape=(nn,))
         self.declare_partials(['*'], ['*'], method='cs')
 
     def compute(self, inputs, outputs):

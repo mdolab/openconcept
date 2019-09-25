@@ -495,7 +495,7 @@ class GroundRollPhase(Group):
         Weight (mass, really) of the airplane at each point in time. (vector, kg)
     ac|geom|wing|S_ref
         Wing reference area (scalar, m**2)
-    ac|aero|CLmax_flaps30
+    ac|aero|CLmax_TO
         CLmax with flaps in max takeoff position (scalar, dimensionless)
     ac|weights|MTOW
         Maximum takeoff weight (scalar, kg)
@@ -541,7 +541,7 @@ class GroundRollPhase(Group):
         self.add_subsystem('acmodel',self.options['aircraft_model'](num_nodes=nn,flight_phase=self.options['flight_phase']),promotes_inputs=['*'],promotes_outputs=['*'])
 
         self.add_subsystem('lift',Lift(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
-        self.add_subsystem('stall',StallSpeed(),promotes_inputs=[('CLmax','ac|aero|CLmax_flaps30'),('weight','ac|weights|MTOW'),'ac|geom|wing|S_ref'],promotes_outputs=['*'])
+        self.add_subsystem('stall',StallSpeed(),promotes_inputs=[('CLmax','ac|aero|CLmax_TO'),('weight','ac|weights|MTOW'),'ac|geom|wing|S_ref'],promotes_outputs=['*'])
         self.add_subsystem('vrspeed',ElementMultiplyDivideComp(output_name='takeoff|vr',input_names=['Vstall_eas','vr_vstall_mult'],input_units=['m/s',None]),promotes_inputs=['*'],promotes_outputs=['*'])
 
 
@@ -640,7 +640,7 @@ class RotationPhase(Group):
         Weight (mass, really) of the airplane at each point in time. Generally will need to be integrated by Dymos as a state with a rate source (vector, kg)
     ac|geom|wing|S_ref
         Wing reference area (scalar, m**2)
-    ac|aero|CLmax_flaps30
+    ac|aero|CLmax_TO
         CLmax with flaps in max takeoff position (scalar, dimensionless)
     ac|weights|MTOW
         Maximum takeoff weight (scalar, kg)
@@ -664,7 +664,7 @@ class RotationPhase(Group):
 
         self.add_subsystem('atmos', ComputeAtmosphericProperties(num_nodes=nn, true_airspeed_in=True), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('gs',Groundspeeds(num_nodes=nn),promotes_inputs=['*'],promotes_outputs=['*'])
-        clcomp = self.add_subsystem('clcomp',ElementMultiplyDivideComp(output_name='fltcond|CL', input_names=['CL_rotate_mult','ac|aero|CLmax_flaps30'],
+        clcomp = self.add_subsystem('clcomp',ElementMultiplyDivideComp(output_name='fltcond|CL', input_names=['CL_rotate_mult','ac|aero|CLmax_TO'],
                                                                        vec_size=[nn,1], length=1),
                                     promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('acmodel',self.options['aircraft_model'](num_nodes=nn,flight_phase=self.options['flight_phase']),promotes_inputs=['*'],promotes_outputs=['*'])
@@ -744,7 +744,7 @@ class SteadyFlightPhase(Group):
         Weight (mass, really) of the airplane at each point in time. (vector, kg)
     ac|geom|wing|S_ref
         Wing reference area (scalar, m**2)
-    ac|aero|CLmax_flaps30
+    ac|aero|CLmax_TO
         CLmax with flaps in max takeoff position (scalar, dimensionless)
     ac|weights|MTOW
         Maximum takeoff weight (scalar, kg)
@@ -831,7 +831,7 @@ class ClimbAnglePhase(Group):
         Weight (mass, really) of the airplane at each point in time. Generally will need to be integrated by Dymos as a state with a rate source (vector, kg)
     ac|geom|wing|S_ref
         Wing reference area (scalar, m**2)
-    ac|aero|CLmax_flaps30
+    ac|aero|CLmax_TO
         CLmax with flaps in max takeoff position (scalar, dimensionless)
     ac|weights|MTOW
         Maximum takeoff weight (scalar, kg)
@@ -856,7 +856,7 @@ class ClimbAnglePhase(Group):
         elif flight_phase == 'EngineOutClimbAngle':
             ivcomp.add_output('propulsor_active',val=np.zeros((nn,)))
             ivcomp.add_output('throttle',val=np.ones((nn,)))
-        self.add_subsystem('stall',StallSpeed(),promotes_inputs=[('CLmax','ac|aero|CLmax_flaps30'),('weight','ac|weights|MTOW'),'ac|geom|wing|S_ref'],promotes_outputs=['*'])
+        self.add_subsystem('stall',StallSpeed(),promotes_inputs=[('CLmax','ac|aero|CLmax_TO'),('weight','ac|weights|MTOW'),'ac|geom|wing|S_ref'],promotes_outputs=['*'])
         self.add_subsystem('vrspeed',ElementMultiplyDivideComp(output_name='takeoff|v2',input_names=['Vstall_eas','v2_vstall_mult'],input_units=['m/s',None]),promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('atmos', ComputeAtmosphericProperties(num_nodes=nn, true_airspeed_in=False), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('clcomp',SteadyFlightCL(num_nodes=nn), promotes_inputs=[('weight','ac|weights|MTOW'),'fltcond|*','ac|*'],promotes_outputs=['*'])
@@ -1061,7 +1061,7 @@ class RobustRotationPhase(Group):
         Weight (mass, really) of the airplane at each point in time. Generally will need to be integrated by Dymos as a state with a rate source (vector, kg)
     ac|geom|wing|S_ref
         Wing reference area (scalar, m**2)
-    ac|aero|CLmax_flaps30
+    ac|aero|CLmax_TO
         CLmax with flaps in max takeoff position (scalar, dimensionless)
     ac|weights|MTOW
         Maximum takeoff weight (scalar, kg)
@@ -1098,7 +1098,7 @@ class RobustRotationPhase(Group):
         self.add_subsystem('altitudes',LinearInterpolator(num_nodes=nn, units='m'),promotes_inputs=[('start_val','h_initial')],promotes_outputs=[('vec','fltcond|h')])
         self.connect('h_obstacle','altitudes.end_val')
 
-        self.add_subsystem('stall',StallSpeed(),promotes_inputs=[('CLmax','ac|aero|CLmax_flaps30'),('weight','ac|weights|MTOW'),'ac|geom|wing|S_ref'],promotes_outputs=['*'])
+        self.add_subsystem('stall',StallSpeed(),promotes_inputs=[('CLmax','ac|aero|CLmax_TO'),('weight','ac|weights|MTOW'),'ac|geom|wing|S_ref'],promotes_outputs=['*'])
         self.add_subsystem('vrspeed',ElementMultiplyDivideComp(output_name='takeoff|vr',input_names=['Vstall_eas','vr_vstall_mult'],input_units=['m/s',None]),promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('v2speed',ElementMultiplyDivideComp(output_name='takeoff|v2',input_names=['Vstall_eas','v2_vstall_mult'],input_units=['m/s',None]),promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('speeds',LinearInterpolator(num_nodes=nn,units='kn'),promotes_inputs=[('start_val','takeoff|vr'),('end_val','takeoff|v2')],promotes_outputs=[('vec','fltcond|Ueas')])
