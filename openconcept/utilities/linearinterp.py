@@ -45,4 +45,4 @@ class LinearInterpolator(ExplicitComponent):
 
     def compute(self, inputs, outputs):
         nn = self.options['num_nodes']
-        outputs['vec'] = np.linspace(inputs['start_val'], inputs['end_val'], nn)
+        outputs['vec'] = np.linspace(inputs['start_val'], inputs['end_val'], nn).reshape((nn,))

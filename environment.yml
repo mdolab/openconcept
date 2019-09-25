@@ -3,7 +3,7 @@ dependencies:
   - numpy==1.14
   - scipy==1.0.1
   - networkx==2.1
-  - sphinx
+  - sphinx==1.8.2
   - nose
   - hdf5
   - h5py
