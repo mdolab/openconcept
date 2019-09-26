@@ -347,6 +347,7 @@ if generate_srcdocs:
     # openmdao way
     packages = ['analysis',
                 'analysis.atmospherics',
+                'analysis.performance',
                 'components',
                 'utilities',
                 'utilities.math']
