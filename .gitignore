@@ -9,7 +9,6 @@ build/
 docs/_build
 docs/_srcdocs
 *_old.py
-*.npy
 *hide*
 coloring.json
 coloring_files/total_coloring.pkl

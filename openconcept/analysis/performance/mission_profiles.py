@@ -1,4 +1,4 @@
-from openmdao.api import IndepVarComp, Group, BalanceComp
+from openmdao.api import IndepVarComp, Group, BalanceComp, ExecComp
 from openconcept.analysis.performance.solver_phases import BFLImplicitSolve, GroundRollPhase, RotationPhase, RobustRotationPhase, SteadyFlightPhase, ClimbAnglePhase
 
 class ThreePhaseMissionOnly(Group):
@@ -79,7 +79,7 @@ class ThreePhaseMissionOnly(Group):
 
             self.add_subsystem('descent',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='descent'),promotes_inputs=['ac|*'])
             # set the descent time so that the final altitude is sea level again
-            self.add_subsystem('descentdt',BalanceComp(name='duration',units='s',eq_units='m', val=120, upper=2000, lower=0,rhs_name='takeoff|h',lhs_name='fltcond|h_final'),promotes_inputs=['takeoff|h'])
+            self.add_subsystem('descentdt',BalanceComp(name='duration',units='s',eq_units='m', val=120, upper=8000, lower=0,rhs_name='takeoff|h',lhs_name='fltcond|h_final'),promotes_inputs=['takeoff|h'])
             self.connect('descent.range_final','cruisedt.range_final')
             self.connect('descent.fltcond|h_final','descentdt.fltcond|h_final')
             self.connect('descentdt.duration','descent.duration')
@@ -94,6 +94,142 @@ class ThreePhaseMissionOnly(Group):
                     from_phase = phases[i]
                     to_phase = phases[i+1]
                     self.connect(from_phase+'.'+state_name+'_final',to_phase+'.'+state_name+'_initial')
+
+class MissionWithReserve(Group):
+    """
+    This analysis group is set up to compute all the major parameters
+    of a fixed wing mission, including climb, cruise, and descent as well as Part 25 reserve fuel segments.
+    The 5% of block fuel is not accounted for here.
+
+    To use this analysis, pass in an aircraft model following OpenConcept interface.
+    Namely, the model should consume the following:
+    - flight conditions (fltcond|q/rho/p/T/Utrue/Ueas/...)
+    - aircraft design parameters (ac|*)
+    - lift coefficient (fltcond|CL; either solved from steady flight or assumed during ground roll)
+    - throttle
+    - propulsor_failed (value 0 when failed, 1 when not failed)
+
+    and produce top-level outputs:
+    - thrust
+    - drag
+    - weight
+
+    the following parameters need to either be defined as design variables or
+    given as top-level analysis outputs from the airplane model:
+    - ac|geom|S_ref
+    - ac|aero|CL_max_flaps30
+    - ac|weights|MTOW
+
+
+    Inputs
+    ------
+    ac|* : various
+        All relevant airplane design variables to pass to the airplane model
+    takeoff|h : float
+        Takeoff obstacle clearance height (default 50 ft)
+    cruise|h0 : float
+        Initial cruise altitude (default 28000 ft)
+    payload : float
+        Mission payload (default 1000 lbm)
+    mission_range : float
+        Design range (deault 1250 NM)
+
+    Options
+    -------
+    aircraft_model : class
+        An aircraft model class with the standard OpenConcept interfaces promoted correctly
+    num_nodes : int
+        Number of analysis points per segment. Higher is more accurate but more expensive
+    extra_states : tuple
+        Any extra integrated states to connect across the model.
+        Format is ('state_var_name', ('segments','to','connect','across'))
+    """
+
+    def initialize(self):
+        self.options.declare('num_nodes', default=9, desc="Number of points per segment. Needs to be 2N + 1 due to simpson's rule")
+        self.options.declare('aircraft_model', default=None, desc="OpenConcept-compliant airplane model")
+        self.options.declare('extra_states', default=None, desc="Extra states to connect across mission phases")
+
+    def setup(self):
+            nn = self.options['num_nodes']
+            acmodelclass = self.options['aircraft_model']
+
+            mp = self.add_subsystem('missionparams',IndepVarComp(),promotes_outputs=['*'])
+            mp.add_output('takeoff|h',val=0.,units='ft')
+            mp.add_output('cruise|h0',val=28000.,units='ft')
+            mp.add_output('mission_range',val=1250.,units='NM')
+            mp.add_output('reserve_range',val=200., units='NM')
+            mp.add_output('reserve|h0', val=25000., units='ft')
+            mp.add_output('loiter|h0', val=1500., units='ft')
+            mp.add_output('loiter_duration', val=30.*60., units='s')
+            mp.add_output('payload',val=1000.,units='lbm')
+
+            # add the climb, cruise, and descent segments
+            self.add_subsystem('climb',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='climb'),promotes_inputs=['ac|*'])
+            # set the climb time such that the specified initial cruise altitude is exactly reached
+            self.add_subsystem('climbdt',BalanceComp(name='duration',units='s',eq_units='m',val=120,upper=2000,lower=0,rhs_name='cruise|h0',lhs_name='fltcond|h_final'),promotes_inputs=['cruise|h0'])
+            self.connect('climb.fltcond|h_final','climbdt.fltcond|h_final')
+            self.connect('climbdt.duration','climb.duration')
+
+            self.add_subsystem('cruise',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='cruise'),promotes_inputs=['ac|*'])
+            # set the cruise time such that the desired design range is flown by the end of the mission
+            self.add_subsystem('cruisedt',BalanceComp(name='duration',units='s',eq_units='m',val=120, upper=25000, lower=0,rhs_name='mission_range',lhs_name='range_final'),promotes_inputs=['mission_range'])
+            self.connect('cruisedt.duration','cruise.duration')
+
+            self.add_subsystem('descent',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='descent'),promotes_inputs=['ac|*'])
+            # set the descent time so that the final altitude is sea level again
+            self.add_subsystem('descentdt',BalanceComp(name='duration',units='s',eq_units='m', val=120, upper=8000, lower=0,rhs_name='takeoff|h',lhs_name='fltcond|h_final'),promotes_inputs=['takeoff|h'])
+            self.connect('descent.range_final','cruisedt.range_final')
+            self.connect('descent.fltcond|h_final','descentdt.fltcond|h_final')
+            self.connect('descentdt.duration','descent.duration')
+
+            # add the climb, cruise, and descent segments for the reserve mission
+            self.add_subsystem('reserve_climb',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='reserve_climb'),promotes_inputs=['ac|*'])
+            # set the climb time such that the specified initial cruise altitude is exactly reached
+            self.add_subsystem('reserve_climbdt',BalanceComp(name='duration',units='s',eq_units='m',val=120,upper=2000,lower=0,rhs_name='reserve|h0',lhs_name='fltcond|h_final'),promotes_inputs=['reserve|h0'])
+            self.connect('reserve_climb.fltcond|h_final','reserve_climbdt.fltcond|h_final')
+            self.connect('reserve_climbdt.duration','reserve_climb.duration')
+
+            self.add_subsystem('reserve_cruise',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='reserve_cruise'),promotes_inputs=['ac|*'])
+            # set the reserve_cruise time such that the desired design range is flown by the end of the mission
+            self.add_subsystem('reserve_cruisedt',BalanceComp(name='duration',units='s',eq_units='m',val=120, upper=25000, lower=0,rhs_name='reserve_range',lhs_name='range_final'),promotes_inputs=['reserve_range'])
+            self.connect('reserve_cruisedt.duration','reserve_cruise.duration')
+
+            self.add_subsystem('reserve_descent',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='reserve_descent'),promotes_inputs=['ac|*'])
+            # set the reserve_descent time so that the final altitude is sea level again
+            self.add_subsystem('reserve_descentdt',BalanceComp(name='duration',units='s',eq_units='m', val=120, upper=8000, lower=0,rhs_name='takeoff|h',lhs_name='fltcond|h_final'),promotes_inputs=['takeoff|h'])
+            self.connect('reserve_descent.fltcond|h_final','reserve_descentdt.fltcond|h_final')
+            self.connect('reserve_descentdt.duration','reserve_descent.duration')
+
+            reserverange = ExecComp('reserverange=rangef-rangeo',
+                                    reserverange={'value': 100., 'units': 'NM'},
+                                    rangeo={'value': 0., 'units': 'NM'},
+                                    rangef={'value': 100., 'units': 'NM'})
+            self.add_subsystem('resrange', reserverange)
+            self.connect('descent.range_final', 'resrange.rangeo')
+            self.connect('reserve_descent.range_final', 'resrange.rangef')
+            self.connect('resrange.reserverange','reserve_cruisedt.range_final')
+            # self.connect('reserve_descent.range_final', 'reserve_cruisedt.range_final')
+
+            self.add_subsystem('loiter',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='loiter'),promotes_inputs=['ac|*'])
+            self.connect('loiter|h0','loiter.fltcond|h_initial')
+            self.connect('loiter_duration','loiter.duration')
+
+
+
+
+            # connect range, fuel burn, and altitude from the end of each segment to the beginning of the next, in order
+
+            extra_states = self.options['extra_states']
+            for extra_state in extra_states:
+                state_name = extra_state[0]
+                phases = extra_state[1]
+                for i in range(len(phases) - 1):
+                    from_phase = phases[i]
+                    to_phase = phases[i+1]
+                    self.connect(from_phase+'.'+state_name+'_final',to_phase+'.'+state_name+'_initial')
+
+
 
 class FullMissionAnalysis(Group):
     """
