@@ -55,7 +55,7 @@ class SimpleEngine(ExplicitComponent):
         self.add_input('T_h', units='K', shape=(nn_tot,), val=600.)
         self.add_input('T_c', units='K', shape=(nn_tot,), val=400.)
         self.add_input('Wdot', units='W', shape=(nn_tot,), val=1000.)
-        self.add_input('COP', units=None, val=0.4)
+        self.add_input('eff_factor', units=None, val=0.4)
 
         self.add_output('q_h', units='W', shape=(nn_tot,))
         self.add_output('q_c', units='W', shape=(nn_tot,))
@@ -65,15 +65,15 @@ class SimpleEngine(ExplicitComponent):
         self.declare_partials(['q_c'], ['T_h', 'T_c', 'Wdot'], rows=arange, cols=arange)
         self.declare_partials(['eta_thermal'], ['T_h', 'T_c'], rows=arange, cols=arange)
 
-        self.declare_partials(['q_h'], ['COP'], rows=arange, cols=np.zeros((nn_tot,)))
-        self.declare_partials(['q_c'], ['COP'], rows=arange, cols=np.zeros((nn_tot,)))
-        self.declare_partials(['eta_thermal'], ['COP'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(['q_h'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(['q_c'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(['eta_thermal'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
 
     def compute(self, inputs, outputs):
         # compute carnot efficiency
         # 1 - Tc/Th
         eta_carnot = 1 - inputs['T_c'] / inputs['T_h']
-        eta_thermal = inputs['COP'] * eta_carnot
+        eta_thermal = inputs['eff_factor'] * eta_carnot
         outputs['eta_thermal'] = eta_thermal
         # compute the heats
         outputs['q_h'] = inputs['Wdot'] / eta_thermal
@@ -81,21 +81,21 @@ class SimpleEngine(ExplicitComponent):
 
     def compute_partials(self, inputs, J):
         eta_carnot = 1 - inputs['T_c'] / inputs['T_h']
-        eta_thermal = inputs['COP'] * eta_carnot
+        eta_thermal = inputs['eff_factor'] * eta_carnot
 
-        J['eta_thermal', 'T_h'] = inputs['COP'] * inputs['T_c'] / inputs['T_h'] ** 2
-        J['eta_thermal', 'T_c'] = inputs['COP'] * (-1 / inputs['T_h'])
-        J['eta_thermal', 'COP'] = eta_carnot
+        J['eta_thermal', 'T_h'] = inputs['eff_factor'] * inputs['T_c'] / inputs['T_h'] ** 2
+        J['eta_thermal', 'T_c'] = inputs['eff_factor'] * (-1 / inputs['T_h'])
+        J['eta_thermal', 'eff_factor'] = eta_carnot
 
-        J['q_h', 'T_h'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['COP'] * inputs['T_c'] / inputs['T_h'] ** 2)
-        J['q_h', 'T_c'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['COP'] * (-1 / inputs['T_h']))
+        J['q_h', 'T_h'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['eff_factor'] * inputs['T_c'] / inputs['T_h'] ** 2)
+        J['q_h', 'T_c'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['eff_factor'] * (-1 / inputs['T_h']))
         J['q_h', 'Wdot'] = 1 / eta_thermal
-        J['q_h', 'COP'] = - inputs['Wdot'] / eta_thermal ** 2 * (eta_carnot)
+        J['q_h', 'eff_factor'] = - inputs['Wdot'] / eta_thermal ** 2 * (eta_carnot)
 
-        J['q_c', 'T_h'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['COP'] * inputs['T_c'] / inputs['T_h'] ** 2)
-        J['q_c', 'T_c'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['COP'] * (-1 / inputs['T_h']))
+        J['q_c', 'T_h'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['eff_factor'] * inputs['T_c'] / inputs['T_h'] ** 2)
+        J['q_c', 'T_c'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['eff_factor'] * (-1 / inputs['T_h']))
         J['q_c', 'Wdot'] = (1 / eta_thermal - 1)
-        J['q_c', 'COP'] = - inputs['Wdot'] / eta_thermal ** 2 * (eta_carnot)
+        J['q_c', 'eff_factor'] = - inputs['Wdot'] / eta_thermal ** 2 * (eta_carnot)
 
 
 class ThermalComponentWithMass(ExplicitComponent):
