@@ -15,6 +15,88 @@ from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosph
 
 """Analysis routines for simulating thermal management of aircraft components"""
 
+class SimpleEngine(ExplicitComponent):
+    """
+    Convert heat to work based on an assumed fraction of the
+    Carnot efficiency. 
+
+    Inputs
+    ------
+    T_h : float
+        Temperature of the hot heat input (vector, K)
+    T_c : float
+        Temperature of the cold heat input (vector, K)
+    Wdot : float
+        Work generation rate (vector, W)
+    COP : float
+        Percentage of the Carnot efficiency (scalar, dimensionless)
+
+    Outputs
+    -------
+    q_h : float
+        Heat extracted from the hot side (vector, W)
+    q_c : float
+        Waste heat sent to cold side (vector, W)
+    eta_thermal : float
+        Overall thermal efficiency (vector, dimensionless)
+
+    Options
+    -------
+    num_nodes : float
+        The number of analysis points to run
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1)
+
+    def setup(self):
+        nn_tot = self.options['num_nodes']
+        arange = np.arange(0, nn_tot)
+
+        self.add_input('T_h', units='K', shape=(nn_tot,), val=600.)
+        self.add_input('T_c', units='K', shape=(nn_tot,), val=400.)
+        self.add_input('Wdot', units='W', shape=(nn_tot,), val=1000.)
+        self.add_input('COP', units=None, val=0.4)
+
+        self.add_output('q_h', units='W', shape=(nn_tot,))
+        self.add_output('q_c', units='W', shape=(nn_tot,))
+        self.add_output('eta_thermal', units=None, shape=(nn_tot,))
+
+        self.declare_partials(['q_h'], ['T_h', 'T_c', 'Wdot'], rows=arange, cols=arange)
+        self.declare_partials(['q_c'], ['T_h', 'T_c', 'Wdot'], rows=arange, cols=arange)
+        self.declare_partials(['eta_thermal'], ['T_h', 'T_c'], rows=arange, cols=arange)
+
+        self.declare_partials(['q_h'], ['COP'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(['q_c'], ['COP'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(['eta_thermal'], ['COP'], rows=arange, cols=np.zeros((nn_tot,)))
+
+    def compute(self, inputs, outputs):
+        # compute carnot efficiency
+        # 1 - Tc/Th
+        eta_carnot = 1 - inputs['T_c'] / inputs['T_h']
+        eta_thermal = inputs['COP'] * eta_carnot
+        outputs['eta_thermal'] = eta_thermal
+        # compute the heats
+        outputs['q_h'] = inputs['Wdot'] / eta_thermal
+        outputs['q_c'] = inputs['Wdot'] / eta_thermal - inputs['Wdot'] 
+
+    def compute_partials(self, inputs, J):
+        eta_carnot = 1 - inputs['T_c'] / inputs['T_h']
+        eta_thermal = inputs['COP'] * eta_carnot
+
+        J['eta_thermal', 'T_h'] = inputs['COP'] * inputs['T_c'] / inputs['T_h'] ** 2
+        J['eta_thermal', 'T_c'] = inputs['COP'] * (-1 / inputs['T_h'])
+        J['eta_thermal', 'COP'] = eta_carnot
+
+        J['q_h', 'T_h'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['COP'] * inputs['T_c'] / inputs['T_h'] ** 2)
+        J['q_h', 'T_c'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['COP'] * (-1 / inputs['T_h']))
+        J['q_h', 'Wdot'] = 1 / eta_thermal
+        J['q_h', 'COP'] = - inputs['Wdot'] / eta_thermal ** 2 * (eta_carnot)
+
+        J['q_c', 'T_h'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['COP'] * inputs['T_c'] / inputs['T_h'] ** 2)
+        J['q_c', 'T_c'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['COP'] * (-1 / inputs['T_h']))
+        J['q_c', 'Wdot'] = (1 / eta_thermal - 1)
+        J['q_c', 'COP'] = - inputs['Wdot'] / eta_thermal ** 2 * (eta_carnot)
+
 
 class ThermalComponentWithMass(ExplicitComponent):
     """
