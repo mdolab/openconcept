@@ -28,7 +28,7 @@ class SimpleEngine(ExplicitComponent):
         Temperature of the cold heat input (vector, K)
     Wdot : float
         Work generation rate (vector, W)
-    COP : float
+    eff_factor : float
         Percentage of the Carnot efficiency (scalar, dimensionless)
 
     Outputs
@@ -96,6 +96,103 @@ class SimpleEngine(ExplicitComponent):
         J['q_c', 'T_c'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['eff_factor'] * (-1 / inputs['T_h']))
         J['q_c', 'Wdot'] = (1 / eta_thermal - 1)
         J['q_c', 'eff_factor'] = - inputs['Wdot'] / eta_thermal ** 2 * (eta_carnot)
+
+class SimpleHeatPump(ExplicitComponent):
+    """
+    Pumps heat from cold source to hot sink with work input
+    based on assumed fraction of Carnot efficiency.
+
+    Inputs
+    ------
+    T_h : float
+        Temperature of the hot heat input (vector, K)
+    T_c : float
+        Temperature of the cold heat input (vector, K)
+    Wdot : float
+        Work usage rate (vector, W)
+    eff_factor : float
+        Percentage of the Carnot efficiency (scalar, dimensionless)
+    
+    Outputs
+    -------
+    q_c : float
+        Heat extracted from the cold side (vector, W)
+    q_h : float
+        Heat sent to hot side (vector, W)
+    COP_heating : float
+        Heating coefficient of performance, heat added to hot side
+        divded by work used (vector, dimensionless)
+    COP_cooling : float
+        Cooling coefficient of performance, heat removed from cold side
+        divided by work used (vector, dimensionless)
+
+    Options
+    -------
+    num_nodes : float
+        The number of analysis points to run
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1)
+    
+    def setup(self):
+        nn_tot = self.options['num_nodes']
+        arange = np.arange(0, nn_tot)
+
+        self.add_input('T_h', units='K', shape=(nn_tot,), val=600.)
+        self.add_input('T_c', units='K', shape=(nn_tot,), val=400.)
+        self.add_input('Wdot', units='W', shape=(nn_tot,), val=1000.)
+        self.add_input('eff_factor', units=None, val=0.4)
+
+        self.add_output('q_c', units='W', shape=(nn_tot,))
+        self.add_output('q_h', units='W', shape=(nn_tot,))
+        self.add_output('COP_heating', units=None, shape=(nn_tot,))
+        self.add_output('COP_cooling', units=None, shape=(nn_tot,))
+
+        self.declare_partials(['q_c'], ['T_h', 'T_c', 'Wdot'], rows=arange, cols=arange)
+        self.declare_partials(['q_h'], ['T_h', 'T_c', 'Wdot'], rows=arange, cols=arange)
+        self.declare_partials(['COP_heating'], ['T_h', 'T_c'], rows=arange, cols=arange)
+        self.declare_partials(['COP_cooling'], ['T_h', 'T_c'], rows=arange, cols=arange)
+
+        self.declare_partials(['q_c'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(['q_h'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(['COP_heating'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(['COP_cooling'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
+    
+    def compute(self, inputs, outputs):
+        # Coefficients of performance
+        COP_cooling = inputs['eff_factor'] * inputs['T_c'] / (inputs['T_h'] - inputs['T_c'])
+        COP_heating = inputs['eff_factor'] * inputs['T_h'] / (inputs['T_h'] - inputs['T_c'])
+        outputs['COP_cooling'] = COP_cooling
+        outputs['COP_heating'] = COP_heating
+
+        # Heat transfer
+        outputs['q_c'] = COP_cooling * inputs['Wdot']
+        outputs['q_h'] = COP_heating * inputs['Wdot']
+    
+    def compute_partials(self, inputs, J):
+        # Assign inputs to variables for readability
+        T_h = inputs['T_h']
+        T_c = inputs['T_c']
+        Wdot = inputs['Wdot']
+        eff_factor = inputs['eff_factor']
+
+        J['COP_heating', 'T_h'] = - eff_factor * T_c / (T_h - T_c) ** 2
+        J['COP_heating', 'T_c'] = eff_factor * T_h / (T_h - T_c) ** 2
+        J['COP_heating', 'eff_factor'] = T_h / (T_h - T_c)
+
+        J['COP_cooling', 'T_h'] = - eff_factor * T_c / (T_h - T_c) ** 2
+        J['COP_cooling', 'T_c'] = eff_factor * T_h / (T_h - T_c) ** 2
+        J['COP_cooling', 'eff_factor'] = T_c / (T_h - T_c)
+
+        J['q_c', 'T_h'] = - eff_factor * Wdot * T_c / (T_h - T_c) ** 2
+        J['q_c', 'T_c'] = eff_factor * Wdot * T_h / (T_h - T_c) ** 2
+        J['q_c', 'Wdot'] = eff_factor * T_c / (T_h - T_c)
+        J['q_c', 'eff_factor'] = Wdot * T_c / (T_h - T_c)
+
+        J['q_h', 'T_h'] = - eff_factor * Wdot * T_c / (T_h - T_c) ** 2
+        J['q_h', 'T_c'] = eff_factor * Wdot * T_h / (T_h - T_c) ** 2
+        J['q_h', 'Wdot'] = eff_factor * T_h / (T_h - T_c)
+        J['q_h', 'eff_factor'] = Wdot * T_h / (T_h - T_c)
 
 
 class ThermalComponentWithMass(ExplicitComponent):
