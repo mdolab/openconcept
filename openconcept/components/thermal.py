@@ -119,9 +119,6 @@ class SimpleHeatPump(ExplicitComponent):
         Heat extracted from the cold side (vector, W)
     q_h : float
         Heat sent to hot side (vector, W)
-    COP_heating : float
-        Heating coefficient of performance, heat added to hot side
-        divded by work used (vector, dimensionless)
     COP_cooling : float
         Cooling coefficient of performance, heat removed from cold side
         divided by work used (vector, dimensionless)
@@ -145,29 +142,24 @@ class SimpleHeatPump(ExplicitComponent):
 
         self.add_output('q_c', units='W', shape=(nn_tot,))
         self.add_output('q_h', units='W', shape=(nn_tot,))
-        self.add_output('COP_heating', units=None, shape=(nn_tot,))
         self.add_output('COP_cooling', units=None, shape=(nn_tot,))
 
         self.declare_partials(['q_c'], ['T_h', 'T_c', 'Wdot'], rows=arange, cols=arange)
         self.declare_partials(['q_h'], ['T_h', 'T_c', 'Wdot'], rows=arange, cols=arange)
-        self.declare_partials(['COP_heating'], ['T_h', 'T_c'], rows=arange, cols=arange)
         self.declare_partials(['COP_cooling'], ['T_h', 'T_c'], rows=arange, cols=arange)
 
         self.declare_partials(['q_c'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
         self.declare_partials(['q_h'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
-        self.declare_partials(['COP_heating'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
         self.declare_partials(['COP_cooling'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
     
     def compute(self, inputs, outputs):
-        # Coefficients of performance
+        # Cooling coefficient of performance
         COP_cooling = inputs['eff_factor'] * inputs['T_c'] / (inputs['T_h'] - inputs['T_c'])
-        COP_heating = inputs['eff_factor'] * inputs['T_h'] / (inputs['T_h'] - inputs['T_c'])
         outputs['COP_cooling'] = COP_cooling
-        outputs['COP_heating'] = COP_heating
 
         # Heat transfer
         outputs['q_c'] = COP_cooling * inputs['Wdot']
-        outputs['q_h'] = COP_heating * inputs['Wdot']
+        outputs['q_h'] = (1 + COP_cooling) * inputs['Wdot']
     
     def compute_partials(self, inputs, J):
         # Assign inputs to variables for readability
@@ -175,10 +167,6 @@ class SimpleHeatPump(ExplicitComponent):
         T_c = inputs['T_c']
         Wdot = inputs['Wdot']
         eff_factor = inputs['eff_factor']
-
-        J['COP_heating', 'T_h'] = - eff_factor * T_c / (T_h - T_c) ** 2
-        J['COP_heating', 'T_c'] = eff_factor * T_h / (T_h - T_c) ** 2
-        J['COP_heating', 'eff_factor'] = T_h / (T_h - T_c)
 
         J['COP_cooling', 'T_h'] = - eff_factor * T_c / (T_h - T_c) ** 2
         J['COP_cooling', 'T_c'] = eff_factor * T_h / (T_h - T_c) ** 2
@@ -191,8 +179,8 @@ class SimpleHeatPump(ExplicitComponent):
 
         J['q_h', 'T_h'] = - eff_factor * Wdot * T_c / (T_h - T_c) ** 2
         J['q_h', 'T_c'] = eff_factor * Wdot * T_h / (T_h - T_c) ** 2
-        J['q_h', 'Wdot'] = eff_factor * T_h / (T_h - T_c)
-        J['q_h', 'eff_factor'] = Wdot * T_h / (T_h - T_c)
+        J['q_h', 'Wdot'] = 1 + eff_factor * T_c / (T_h - T_c)
+        J['q_h', 'eff_factor'] = Wdot * T_c / (T_h - T_c)
 
 
 class ThermalComponentWithMass(ExplicitComponent):
