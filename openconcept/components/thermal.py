@@ -1,5 +1,5 @@
 from __future__ import division
-from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, DirectSolver, BoundsEnforceLS
+from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, NewtonSolver, DirectSolver, BoundsEnforceLS
 from openmdao.api import ScipyOptimizeDriver, ExplicitComponent, ImplicitComponent
 
 import numpy as np
@@ -7,6 +7,7 @@ import scipy.sparse as sp
 import sys, os
 sys.path.insert(0,os.getcwd())
 from openconcept.components.ducts import ImplicitCompressibleDuct
+from openconcept.components.motor import SimpleMotor
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.math.derivatives import FirstDerivative
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp, VectorConcatenateComp, VectorSplitComp
@@ -129,7 +130,7 @@ class SimpleHeatPump(ExplicitComponent):
         The number of analysis points to run
     """
     def initialize(self):
-        self.options.declare('num_nodes', default=1)
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points to run')
     
     def setup(self):
         nn_tot = self.options['num_nodes']
@@ -182,6 +183,93 @@ class SimpleHeatPump(ExplicitComponent):
         J['q_h', 'Wdot'] = 1 + eff_factor * T_c / (T_h - T_c)
         J['q_h', 'eff_factor'] = Wdot * T_c / (T_h - T_c)
 
+class SimpleTMS(Group):
+    """
+    Models a simple thermal management system cooling an electric motor
+    with a heat pump (refrigerator). The refrigerator is balanced to consume
+    an amount of power such that all the heat out of the motor is removed by
+    the refrigerator.
+
+    Inputs
+    ------
+    throttle : float
+        Motor power control setting. Should be [0, 1]. (vector, dimensionless)
+    motor_elec_power_rating: float
+        Motor electric (not mech) design power. (scalar, W)
+    
+    Outputs
+    -------
+    shaft_power_out : float
+        Shaft power output from motor (vector, W)
+    motor_elec_load : float
+        Electrical load consumed by motor (vector, W)
+    component_cost : float
+        Nonrecurring cost of the component (scalar, USD)
+    component_weight : float
+        Weight of the component (scalar, kg)
+    component_sizing_margin : float
+        Equal to 1 when producing full rated power (vector, dimensionless)
+    q_h : float
+        Heat sent to hot side of refrigerator (vector, W)
+    COP_cooling : float
+        Cooling coefficient of performance of refrigerator, heat removed from motor
+        divided by work used (vector, dimensionless)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (sets vec length; default 1)
+    motor_efficiency : float
+        Motor shaft power efficiency. Sensible range 0.0 to 1.0 (default 0.93, same as magni500)
+    motor_weight_inc : float
+        Motor weight per unit rated power (default 2.411e-4, same as magni500, kg/W)
+    motor_weight_base : float
+        Motor base weight (default 0, kg)
+    motor_cost_inc : float
+        Motor cost per unit rated power (default 0.134228, USD/W)
+    motor_cost_base : float
+        Motor base cost (default 1 USD) B
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points to run')
+        self.options.declare('motor_efficiency', default=0.93, desc='Motor efficiency (dimensionless)')
+        self.options.declare('motor_weight_inc', default=135./560e3, desc='Motor kg/W')
+        self.options.declare('motor_weight_base', default=0., desc='Motor base weight kg')
+        self.options.declare('motor_cost_inc', default=100./745., desc='Motor cost per watt $/W')
+        self.options.declare('motor_cost_base', default=1., desc='Motor cost base $')
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+        # Add the electric motor, heat pump, heat balance, and motor/heat sink temps to the Group
+        self.add_subsystem('motor', SimpleMotor(num_nodes=nn,
+                                                efficiency=self.options['motor_efficiency'],
+                                                weight_inc=self.options['motor_weight_inc'],
+                                                weight_base=self.options['motor_weight_base'],
+                                                cost_inc=self.options['motor_cost_inc'],
+                                                cost_base=self.options['motor_cost_base']),
+                            promotes_inputs=['throttle', ('elec_power_rating', 'motor_elec_power_rating')],
+                            promotes_outputs=['shaft_power_out', ('elec_load', 'motor_elec_load'), 'component_cost',
+                                              'component_weight', 'component_sizing_margin'])
+
+        self.add_subsystem('refrigerator', SimpleHeatPump(num_nodes=nn),
+                           promotes_outputs=['q_h', 'COP_cooling'])
+
+        self.add_subsystem('heat_bal', BalanceComp(name='Wdot', units='W', eq_units = 'W', val=np.ones(nn), 
+                                                   lhs_name='refrigerator_heat_in', rhs_name='motor_heat_out'))
+        
+        temps = self.add_subsystem('temps', IndepVarComp())
+        temps.add_output('motor', val=20., shape=(nn,), units='degC')
+        temps.add_output('heat_sink', val=100., shape=(nn,), units='degC')
+
+        # Connect the electric motor and refrigerator to the heat balance so it solves for
+        # refrigerator work required to remove heat generated by motor
+        self.connect('motor.heat_out', 'heat_bal.motor_heat_out')
+        self.connect('refrigerator.q_c', 'heat_bal.refrigerator_heat_in')
+        self.connect('heat_bal.Wdot', 'refrigerator.Wdot')
+
+        # Connect the motor and heat sink temperatures to the refrigerator cold and hot sides, respectively
+        self.connect('temps.motor', 'refrigerator.T_c')
+        self.connect('temps.heat_sink', 'refrigerator.T_h')
 
 class ThermalComponentWithMass(ExplicitComponent):
     """

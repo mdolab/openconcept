@@ -2,16 +2,16 @@ from __future__ import division
 import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
-from openmdao.api import Problem
-from openconcept.components.thermal import SimpleEngine, SimpleHeatPump
+from openmdao.api import Problem, NewtonSolver, DirectSolver
+import openconcept.components.thermal as thermal
 
 class SimpleEngineTestCase(unittest.TestCase):
     """
-    unittest test case for the SimpleEngine component
+    Test the SimpleEngine component
     """
     def test_default_settings(self):
         nn = 11
-        prob = Problem(SimpleEngine(num_nodes=nn))
+        prob = Problem(thermal.SimpleEngine(num_nodes=nn))
         prob.setup(check=True, force_alloc_complex=True)
         prob.run_model()
         assert_near_equal(prob['eta_thermal'], np.ones(nn)*2./15.)
@@ -27,7 +27,7 @@ class SimpleEngineTestCase(unittest.TestCase):
         T_c = np.array([300., 400., 500.])
         Wdot = np.array([1000., 500., 250.])
         eff_factor = 0.8
-        prob = Problem(SimpleEngine(num_nodes=nn))
+        prob = Problem(thermal.SimpleEngine(num_nodes=nn))
         prob.setup(check=True, force_alloc_complex=True)
         prob['T_h'] = T_h
         prob['T_c'] = T_c
@@ -43,11 +43,11 @@ class SimpleEngineTestCase(unittest.TestCase):
 
 class SimpleHeatPumpTestCase(unittest.TestCase):
     """
-    unittest test case for the SimpleHeatPump component
+    Test the SimpleHeatPump component
     """
     def test_default_settings(self):
         nn = 11
-        prob = Problem(SimpleHeatPump(num_nodes=nn))
+        prob = Problem(thermal.SimpleHeatPump(num_nodes=nn))
         prob.setup(check=True, force_alloc_complex=True)
         prob.run_model()
         assert_near_equal(prob['COP_cooling'], np.ones(nn)*0.8)
@@ -63,7 +63,7 @@ class SimpleHeatPumpTestCase(unittest.TestCase):
         T_c = np.array([300., 400., 500.])
         Wdot = np.array([1000., 500., 250.])
         eff_factor = 0.1
-        prob = Problem(SimpleHeatPump(num_nodes=nn))
+        prob = Problem(thermal.SimpleHeatPump(num_nodes=nn))
         prob.setup(check=True, force_alloc_complex=True)
         prob['T_h'] = T_h
         prob['T_c'] = T_c
@@ -76,3 +76,66 @@ class SimpleHeatPumpTestCase(unittest.TestCase):
 
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
+
+class SimpleTMSTestCase(unittest.TestCase):
+    """
+    Test the convergence of the SimpleTMS Group
+    """
+    def test_default_settings(self):
+        # Set up the SimpleTMS problem with default values
+        prob = Problem()
+        prob.model = thermal.SimpleTMS()
+        prob.model.linear_solver = DirectSolver()
+        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver.options['solve_subsystems'] = True
+        prob.setup()
+        prob.run_model()
+
+        # Check that the solvers properly converged the BalanceComp so
+        # the heat produced by the motor equals the heat extracted
+        # by the refrigerator
+        q_fridge = prob['refrigerator.q_c']
+        q_motor = prob['motor.heat_out']
+        relative_error_met = (q_fridge - q_motor)/q_motor < 1e-9
+        self.assertTrue(relative_error_met.all())
+    
+    def test_vectorized(self):
+        # Set up the SimpleTMS problem with 11 evaluation points
+        nn = 11
+        prob = Problem()
+        prob.model = thermal.SimpleTMS(num_nodes=nn)
+        prob.model.linear_solver = DirectSolver()
+        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver.options['solve_subsystems'] = True
+        prob.setup()
+        prob.set_val('throttle', np.linspace(0.01, 0.99, nn), units=None)
+        prob.set_val('motor_elec_power_rating', 6., units='MW')
+        prob.run_model()
+
+        # Check that the solvers properly converged the BalanceComp so
+        # the heat produced by the motor equals the heat extracted
+        # by the refrigerator
+        q_fridge = prob['refrigerator.q_c']
+        q_motor = prob['motor.heat_out']
+        relative_error_met = (q_fridge - q_motor)/q_motor < 1e-9
+        self.assertTrue(relative_error_met.all())
+    
+    def test_zero_throttle(self):
+        # Set up the SimpleTMS problem with throttle at zero
+        prob = Problem()
+        prob.model = thermal.SimpleTMS()
+        prob.model.linear_solver = DirectSolver()
+        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver.options['solve_subsystems'] = True
+        prob.setup()
+        prob.set_val('throttle', 0.)
+        prob.set_val('motor_elec_power_rating', 10., units='kW')
+        prob.run_model()
+
+        # Check that the solvers properly converged the BalanceComp so
+        # the heat produced by the motor equals the heat extracted
+        # by the refrigerator (they should both be zero)
+        q_fridge = prob['refrigerator.q_c']
+        q_motor = prob['motor.heat_out']
+        self.assertAlmostEqual(q_fridge, 0.)
+        self.assertAlmostEqual(q_motor, 0.)
