@@ -77,14 +77,14 @@ class SimpleHeatPumpTestCase(unittest.TestCase):
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
-class SimpleTMSTestCase(unittest.TestCase):
+class NonphysicalTMSTestCase(unittest.TestCase):
     """
-    Test the convergence of the SimpleTMS Group
+    Test the convergence of the NonphysicalTMS Group
     """
     def test_default_settings(self):
-        # Set up the SimpleTMS problem with default values
+        # Set up the NonphysicalTMS problem with default values
         prob = Problem()
-        prob.model = thermal.SimpleTMS()
+        prob.model = thermal.NonphysicalTMS()
         prob.model.linear_solver = DirectSolver()
         prob.model.nonlinear_solver = NewtonSolver()
         prob.model.nonlinear_solver.options['solve_subsystems'] = True
@@ -100,10 +100,10 @@ class SimpleTMSTestCase(unittest.TestCase):
         self.assertTrue(relative_error_met.all())
     
     def test_vectorized(self):
-        # Set up the SimpleTMS problem with 11 evaluation points
+        # Set up the NonphysicalTMS problem with 11 evaluation points
         nn = 11
         prob = Problem()
-        prob.model = thermal.SimpleTMS(num_nodes=nn)
+        prob.model = thermal.NonphysicalTMS(num_nodes=nn)
         prob.model.linear_solver = DirectSolver()
         prob.model.nonlinear_solver = NewtonSolver()
         prob.model.nonlinear_solver.options['solve_subsystems'] = True
@@ -121,9 +121,9 @@ class SimpleTMSTestCase(unittest.TestCase):
         self.assertTrue(relative_error_met.all())
     
     def test_zero_throttle(self):
-        # Set up the SimpleTMS problem with throttle at zero
+        # Set up the NonphysicalTMS problem with throttle at zero
         prob = Problem()
-        prob.model = thermal.SimpleTMS()
+        prob.model = thermal.NonphysicalTMS()
         prob.model.linear_solver = DirectSolver()
         prob.model.nonlinear_solver = NewtonSolver()
         prob.model.nonlinear_solver.options['solve_subsystems'] = True
