@@ -289,8 +289,6 @@ class SimpleTMS(Group):
         Motor electric (not mech) design power. (scalar, W)
     duration : float
         Duration of mission segment, only required in unsteady mode. (scalar, sec)
-    mdot_coolant : float
-        Coolant mass flow rate in cold plates (vector, kg/s)
     channel_width_motor : float
         Width of coolant channels in motor's cold plate (scalar, m)
     channel_height_motor : float
@@ -328,6 +326,8 @@ class SimpleTMS(Group):
         Temperature of the motor (vector, K)
     motor_T_final : float
         Final temperature of the motor (scalar, K)
+    mdot_coolant : float
+        Coolant mass flow rate in cold plates (vector, kg/s)
     q_h : float
         Heat sent to hot side of refrigerator (vector, W)
     COP_cooling : float
@@ -397,7 +397,7 @@ class SimpleTMS(Group):
                            ThermalComponentWithMass(num_nodes=nn,
                                                     specific_heat=self.options['motor_specific_heat']))
 
-        ivc = self.add_subsystem('ivc', IndepVarComp())
+        ivc = self.add_subsystem('ivc', IndepVarComp(), promotes_outputs=['mdot_coolant'])
         ivc.add_output('motor_T_init', val=self.options['motor_T_init'], units='K')
 
         self.add_subsystem('motor_temp_integrator', Integrator(num_intervals=int((nn-1)/2),
@@ -416,7 +416,7 @@ class SimpleTMS(Group):
                                                                    nusselt=self.options['coolant_nusselt'],
                                                                    specific_heat=self.options['coolant_specific_heat']),
                             promotes_inputs=[('channel_width', 'channel_width_motor'), ('channel_height', 'channel_height_motor'),
-                                             ('channel_length', 'channel_length_motor'), ('n_parallel', 'n_parallel_motor')])
+                                             ('channel_length', 'channel_length_motor'), ('n_parallel', 'n_parallel_motor'), 'mdot_coolant'])
         
         self.add_subsystem('refrigerator_cold_plate',
                            ConstantSurfaceTemperatureColdPlate_NTU(num_nodes=nn,
@@ -425,10 +425,7 @@ class SimpleTMS(Group):
                                                                    nusselt=self.options['coolant_nusselt'],
                                                                    specific_heat=self.options['coolant_specific_heat']),
                             promotes_inputs=[('channel_width', 'channel_width_refrig'), ('channel_height', 'channel_height_refrig'),
-                                             ('channel_length', 'channel_length_refrig'), ('n_parallel', 'n_parallel_refrig')])
-
-        self.add_subsystem('coolant_flow', ExecComp('mdot_out = mdot_in', mdot_out={'units':'kg/s', 'shape':(nn,)},
-                           mdot_in={'units':'kg/s', 'shape':(nn,)}), promotes_inputs=[('mdot_in', 'mdot_coolant')])
+                                             ('channel_length', 'channel_length_refrig'), ('n_parallel', 'n_parallel_refrig'), 'mdot_coolant'])
         
 
         self.add_subsystem('refrigerator', SimpleHeatPump(num_nodes=nn), promotes_inputs=['Wdot', 'eff_factor'],
@@ -445,8 +442,7 @@ class SimpleTMS(Group):
         # Connect the two cold plates to each other
         self.connect('motor_cold_plate.T_out', 'refrigerator_cold_plate.T_in')
         self.connect('refrigerator_cold_plate.T_out', 'motor_cold_plate.T_in')
-        self.connect('coolant_flow.mdot_out', 'motor_cold_plate.mdot_coolant')
-        self.connect('coolant_flow.mdot_out', 'refrigerator_cold_plate.mdot_coolant')
+        ivc.add_output('mdot_coolant', shape=(nn,), units='kg/s')
 
         # Use a BalanceComp to set the surface temperature of the cold plate such that the heat extracted from
         # the coolant equals the heat in on the cold side of the refrigerator
