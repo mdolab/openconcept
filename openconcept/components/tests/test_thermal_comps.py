@@ -52,7 +52,7 @@ class SimpleHeatPumpTestCase(unittest.TestCase):
         prob.run_model()
         assert_near_equal(prob['COP_cooling'], np.ones(nn)*0.8)
         assert_near_equal(prob['q_h'], np.ones(nn)*1800.)
-        assert_near_equal(prob['q_c'], np.ones(nn)*800.)
+        assert_near_equal(prob['q_c'], np.ones(nn)*(-800.))
 
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -72,19 +72,19 @@ class SimpleHeatPumpTestCase(unittest.TestCase):
         prob.run_model()
         assert_near_equal(prob['COP_cooling'], np.array([0.3, 2./15., 0.1]))
         assert_near_equal(prob['q_h'], np.array([1300., 1000./15.+500., 275.]))
-        assert_near_equal(prob['q_c'], np.array([300., 1000./15., 25.]))
+        assert_near_equal(prob['q_c'], np.array([-300., -1000./15., -25.]))
 
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
-class NonphysicalTMSTestCase(unittest.TestCase):
+class SimpleTMSTestCase(unittest.TestCase):
     """
     Test the convergence of the NonphysicalTMS Group
     """
     def test_default_settings(self):
-        # Set up the NonphysicalTMS problem with default values
+        # Set up the SimpleTMS problem with default values
         prob = Problem()
-        prob.model = thermal.NonphysicalTMS()
+        prob.model = thermal.SimpleTMS()
         prob.model.linear_solver = DirectSolver()
         prob.model.nonlinear_solver = NewtonSolver()
         prob.model.nonlinear_solver.options['solve_subsystems'] = True
@@ -92,18 +92,18 @@ class NonphysicalTMSTestCase(unittest.TestCase):
         prob.run_model()
 
         # Check that the solvers properly converged the BalanceComp so
-        # the heat produced by the motor equals the heat extracted
+        # the heat taken by the cold plate equals the heat extracted
         # by the refrigerator
         q_fridge = prob['refrigerator.q_c']
-        q_motor = prob['motor.heat_out']
-        relative_error_met = (q_fridge - q_motor)/q_motor < 1e-9
+        q_plate = prob['refrigerator_cold_plate.q']
+        relative_error_met = (q_fridge - q_plate)/q_plate < 1e-9
         self.assertTrue(relative_error_met.all())
     
     def test_vectorized(self):
-        # Set up the NonphysicalTMS problem with 11 evaluation points
+        # Set up the SimpleTMS problem with 11 evaluation points
         nn = 11
         prob = Problem()
-        prob.model = thermal.NonphysicalTMS(num_nodes=nn)
+        prob.model = thermal.SimpleTMS(num_nodes=nn)
         prob.model.linear_solver = DirectSolver()
         prob.model.nonlinear_solver = NewtonSolver()
         prob.model.nonlinear_solver.options['solve_subsystems'] = True
@@ -113,29 +113,31 @@ class NonphysicalTMSTestCase(unittest.TestCase):
         prob.run_model()
 
         # Check that the solvers properly converged the BalanceComp so
-        # the heat produced by the motor equals the heat extracted
+        # the heat taken by the cold plate equals the heat extracted
         # by the refrigerator
         q_fridge = prob['refrigerator.q_c']
-        q_motor = prob['motor.heat_out']
-        relative_error_met = (q_fridge - q_motor)/q_motor < 1e-9
+        q_plate = prob['refrigerator_cold_plate.q']
+        relative_error_met = (q_fridge - q_plate)/q_plate < 1e-9
         self.assertTrue(relative_error_met.all())
     
-    def test_zero_throttle(self):
-        # Set up the NonphysicalTMS problem with throttle at zero
+    def test_zero_work(self):
+        # Set up the SimpleTMS problem with throttle at zero
         prob = Problem()
-        prob.model = thermal.NonphysicalTMS()
+        prob.model = thermal.SimpleTMS()
         prob.model.linear_solver = DirectSolver()
         prob.model.nonlinear_solver = NewtonSolver()
         prob.model.nonlinear_solver.options['solve_subsystems'] = True
         prob.setup()
-        prob.set_val('throttle', 0.)
+        prob.set_val('Wdot', 0.)
         prob.set_val('motor_elec_power_rating', 10., units='kW')
         prob.run_model()
 
         # Check that the solvers properly converged the BalanceComp so
-        # the heat produced by the motor equals the heat extracted
-        # by the refrigerator (they should both be zero)
+        # the heat taken by the cold plate equals the heat extracted
+        # by the refrigerator
         q_fridge = prob['refrigerator.q_c']
-        q_motor = prob['motor.heat_out']
-        self.assertAlmostEqual(q_fridge, 0.)
-        self.assertAlmostEqual(q_motor, 0.)
+        q_plate = prob['refrigerator_cold_plate.q']
+        fridge_abs_error_met = np.abs(q_fridge) < 1e-9
+        plate_abs_error_met = np.abs(q_plate) < 1e-9
+        self.assertTrue(fridge_abs_error_met.all())
+        self.assertTrue(plate_abs_error_met.all())

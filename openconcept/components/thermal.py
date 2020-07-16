@@ -159,7 +159,7 @@ class SimpleHeatPump(ExplicitComponent):
         outputs['COP_cooling'] = COP_cooling
 
         # Heat transfer
-        outputs['q_c'] = COP_cooling * inputs['Wdot']
+        outputs['q_c'] = - COP_cooling * inputs['Wdot']
         outputs['q_h'] = (1 + COP_cooling) * inputs['Wdot']
     
     def compute_partials(self, inputs, J):
@@ -173,106 +173,15 @@ class SimpleHeatPump(ExplicitComponent):
         J['COP_cooling', 'T_c'] = eff_factor * T_h / (T_h - T_c) ** 2
         J['COP_cooling', 'eff_factor'] = T_c / (T_h - T_c)
 
-        J['q_c', 'T_h'] = - eff_factor * Wdot * T_c / (T_h - T_c) ** 2
-        J['q_c', 'T_c'] = eff_factor * Wdot * T_h / (T_h - T_c) ** 2
-        J['q_c', 'Wdot'] = eff_factor * T_c / (T_h - T_c)
-        J['q_c', 'eff_factor'] = Wdot * T_c / (T_h - T_c)
+        J['q_c', 'T_h'] = eff_factor * Wdot * T_c / (T_h - T_c) ** 2
+        J['q_c', 'T_c'] = - eff_factor * Wdot * T_h / (T_h - T_c) ** 2
+        J['q_c', 'Wdot'] = - eff_factor * T_c / (T_h - T_c)
+        J['q_c', 'eff_factor'] = - Wdot * T_c / (T_h - T_c)
 
         J['q_h', 'T_h'] = - eff_factor * Wdot * T_c / (T_h - T_c) ** 2
         J['q_h', 'T_c'] = eff_factor * Wdot * T_h / (T_h - T_c) ** 2
         J['q_h', 'Wdot'] = 1 + eff_factor * T_c / (T_h - T_c)
         J['q_h', 'eff_factor'] = Wdot * T_c / (T_h - T_c)
-
-class NonphysicalTMS(Group):
-    """
-    Models a thermal management system (TMS) cooling an electric motor
-    with a heat pump (refrigerator). The refrigerator is balanced to consume
-    an amount of power such that all the heat out of the motor is removed by
-    the refrigerator. The electric motor and heat sink are modeled as constant
-    temperature, which is an oversimplification. See SimpleTMS for more
-    physically accurate model of a TMS.
-
-    Inputs
-    ------
-    throttle : float
-        Motor power control setting. Should be [0, 1]. (vector, dimensionless)
-    motor_elec_power_rating: float
-        Motor electric (not mech) design power. (scalar, W)
-    
-    Outputs
-    -------
-    shaft_power_out : float
-        Shaft power output from motor (vector, W)
-    motor_elec_load : float
-        Electrical load consumed by motor (vector, W)
-    motor_cost : float
-        Nonrecurring cost of the motor (scalar, USD)
-    motor_weight : float
-        Weight of the motor (scalar, kg)
-    motor_sizing_margin : float
-        Equal to 1 when producing full rated power (vector, dimensionless)
-    q_h : float
-        Heat sent to hot side of refrigerator (vector, W)
-    COP_cooling : float
-        Cooling coefficient of performance of refrigerator, heat removed from motor
-        divided by work used (vector, dimensionless)
-
-    Options
-    -------
-    num_nodes : int
-        Number of analysis points to run (sets vec length; default 1)
-    motor_efficiency : float
-        Motor shaft power efficiency. Sensible range 0.0 to 1.0 (default 0.93, same as magni500)
-    motor_weight_inc : float
-        Motor weight per unit rated power (default 2.411e-4, same as magni500, kg/W)
-    motor_weight_base : float
-        Motor base weight (default 0, kg)
-    motor_cost_inc : float
-        Motor cost per unit rated power (default 0.134228, USD/W)
-    motor_cost_base : float
-        Motor base cost (default 1 USD) B
-    """
-    def initialize(self):
-        self.options.declare('num_nodes', default=1, desc='Number of analysis points to run')
-        self.options.declare('motor_efficiency', default=0.93, desc='Motor efficiency (dimensionless)')
-        self.options.declare('motor_weight_inc', default=135./560e3, desc='Motor kg/W')
-        self.options.declare('motor_weight_base', default=0., desc='Motor base weight kg')
-        self.options.declare('motor_cost_inc', default=100./745., desc='Motor cost per watt $/W')
-        self.options.declare('motor_cost_base', default=1., desc='Motor cost base $')
-    
-    def setup(self):
-        nn = self.options['num_nodes']
-        # Add the electric motor, heat pump, heat balance, and motor/heat sink temps to the Group
-        self.add_subsystem('motor', SimpleMotor(num_nodes=nn,
-                                                efficiency=self.options['motor_efficiency'],
-                                                weight_inc=self.options['motor_weight_inc'],
-                                                weight_base=self.options['motor_weight_base'],
-                                                cost_inc=self.options['motor_cost_inc'],
-                                                cost_base=self.options['motor_cost_base']),
-                            promotes_inputs=['throttle', ('elec_power_rating', 'motor_elec_power_rating')],
-                            promotes_outputs=['shaft_power_out', ('elec_load', 'motor_elec_load'),
-                                              ('component_cost', 'motor_cost'), ('component_weight', 'motor_weight'),
-                                              ('component_sizing_margin', 'motor_sizing_margin')])
-
-        self.add_subsystem('refrigerator', SimpleHeatPump(num_nodes=nn),
-                           promotes_outputs=['q_h', 'COP_cooling'])
-
-        self.add_subsystem('heat_bal', BalanceComp(name='Wdot', units='W', eq_units = 'W', val=np.ones(nn), 
-                                                   lhs_name='refrigerator_heat_in', rhs_name='motor_heat_out'))
-        
-        temps = self.add_subsystem('temps', IndepVarComp())
-        temps.add_output('motor', val=20., shape=(nn,), units='degC')
-        temps.add_output('heat_sink', val=100., shape=(nn,), units='degC')
-
-        # Connect the electric motor and refrigerator to the heat balance so it solves for
-        # refrigerator work required to remove heat generated by motor
-        self.connect('motor.heat_out', 'heat_bal.motor_heat_out')
-        self.connect('refrigerator.q_c', 'heat_bal.refrigerator_heat_in')
-        self.connect('heat_bal.Wdot', 'refrigerator.Wdot')
-
-        # Connect the motor and heat sink temperatures to the refrigerator cold and hot sides, respectively
-        self.connect('temps.motor', 'refrigerator.T_c')
-        self.connect('temps.heat_sink', 'refrigerator.T_h')
 
 class SimpleTMS(Group):
     """
@@ -449,20 +358,15 @@ class SimpleTMS(Group):
         self.add_subsystem('refrigerator_plate_bal',
                            BalanceComp(name='T_surface', units='K', eq_units='W', val=np.ones(nn),
                                        lhs_name='plate_q_out', rhs_name='refrigerator_q_c'))
-        self.add_subsystem('negator', ExecComp('q_neg = -q', q={'units' : 'W', 'shape':(nn,)},
-                           q_neg={'units' : 'W', 'shape':(nn,)}))
 
-        self.connect('refrigerator_cold_plate.q', 'negator.q')
-        self.connect('negator.q_neg', 'refrigerator_plate_bal.plate_q_out')
+        self.connect('refrigerator_cold_plate.q', 'refrigerator_plate_bal.plate_q_out')
         self.connect('refrigerator.q_c', 'refrigerator_plate_bal.refrigerator_q_c')
         self.connect('refrigerator_plate_bal.T_surface', 'refrigerator_cold_plate.T_surface')
         self.connect('refrigerator_plate_bal.T_surface', 'refrigerator.T_c')
 
         # Set the heat sink temperature to be constant and connect it to the heat pump
         ivc.add_output('heat_sink_T', val=self.options['heat_sink_T'], units='K', shape=(nn,))
-        self.connect('ivc.heat_sink_T', 'refrigerator.T_h')
-
-        
+        self.connect('ivc.heat_sink_T', 'refrigerator.T_h')        
 
 class ThermalComponentWithMass(ExplicitComponent):
     """
