@@ -1,7 +1,7 @@
 pytest>=3.6
 python-coveralls
 coverage>=4.4
-pytest-cov
+pytest-cov==2.6
 scipy
 numpy
 openmdao
