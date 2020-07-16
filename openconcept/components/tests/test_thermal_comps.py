@@ -79,7 +79,7 @@ class SimpleHeatPumpTestCase(unittest.TestCase):
 
 class SimpleTMSTestCase(unittest.TestCase):
     """
-    Test the convergence of the NonphysicalTMS Group
+    Test the convergence of the SimpleTMS Group
     """
     def test_default_settings(self):
         # Set up the SimpleTMS problem with default values
