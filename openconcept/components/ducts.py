@@ -682,8 +682,8 @@ class Inlet(Group):
         self.add_subsystem('mach',MachNumberfromSpeed(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('freestreamtotaltemperature',TotalTemperatureIsentropic(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('freestreamtotalpressure',TotalPressureIsentropic(num_nodes=nn), promotes_inputs=['*'])
-        self.add_subsystem('inlet_recovery', ExecComp('eta_ram=1.0 - 0.00*tanh(10*M)', vectorize=True, eta_ram=np.ones((nn,)), M=0.1*np.ones((nn,))), promotes_inputs=['M'])
-        self.add_subsystem('totalpressure', ExecComp('pt=pt_in * eta_ram', pt={'units':'Pa','value':np.ones((nn,))}, pt_in={'units':'Pa','value':np.ones((nn,))}, eta_ram=np.ones((nn,)), vectorize=True), promotes_outputs=['pt'])
+        self.add_subsystem('inlet_recovery', ExecComp('eta_ram=1.0 - 0.00*tanh(10*M)', has_diag_partials=True, eta_ram=np.ones((nn,)), M=0.1*np.ones((nn,))), promotes_inputs=['M'])
+        self.add_subsystem('totalpressure', ExecComp('pt=pt_in * eta_ram', pt={'units':'Pa','value':np.ones((nn,))}, pt_in={'units':'Pa','value':np.ones((nn,))}, eta_ram=np.ones((nn,)), has_diag_partials=True), promotes_outputs=['pt'])
         self.connect('freestreamtotalpressure.pt','totalpressure.pt_in')
         self.connect('inlet_recovery.eta_ram','totalpressure.eta_ram')
 

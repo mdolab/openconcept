@@ -50,7 +50,8 @@ Getting Started
 ------------
 Dependencies
 ------------
-This toolkit requires the use of OpenMDAO 2.3.0 or later.
+This toolkit requires the use of OpenMDAO 3.0.0 or later due to backward-incompatible changes.
+However, 2.8+ can be used with very minor keyword argument changes to OpenMDAO components
 
 ---------------
 Please Cite Us!

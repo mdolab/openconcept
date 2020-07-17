@@ -237,19 +237,21 @@ class TwinSeriesHybridElectricPropulsionSystem(Group):
     """
     def initialize(self):
         self.options.declare('num_nodes',default=1,desc="Number of mission analysis points to run")
-        self.options.declare('specific_energy',default=300,desc="Battery spec energy in Wh/kg")
 
 
     def setup(self):
+        nn = self.options['num_nodes']
+
         #define design variables that are independent of flight condition or control states
         dvlist = [['ac|propulsion|engine|rating','eng_rating',260.0,'kW'],
                     ['ac|propulsion|propeller|diameter','prop_diameter',2.5,'m'],
                     ['ac|propulsion|motor|rating','motor_rating',240.0,'kW'],
                     ['ac|propulsion|generator|rating','gen_rating',250.0,'kW'],
-                    ['ac|weights|W_battery','batt_weight',2000,'kg']]
+                    ['ac|weights|W_battery','batt_weight',2000,'kg'],
+                    ['ac|propulsion|battery|specific_energy','specific_energy',300,'W*h/kg']
+                    ]
+
         self.add_subsystem('dvs',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
-        nn = self.options['num_nodes']
-        e_b = self.options['specific_energy']
         #introduce model components
         self.add_subsystem('motor1', SimpleMotor(efficiency=0.97,num_nodes=nn),promotes_inputs=['throttle'])
         self.add_subsystem('prop1',SimplePropeller(num_nodes=nn),promotes_inputs=["fltcond|*"])
@@ -284,7 +286,7 @@ class TwinSeriesHybridElectricPropulsionSystem(Group):
 
         self.connect('eng1.shaft_power_out','gen1.shaft_power_in')
 
-        self.add_subsystem('batt1', SOCBattery(num_nodes=nn, specific_energy=e_b, efficiency=0.97),promotes_inputs=["duration"])
+        self.add_subsystem('batt1', SOCBattery(num_nodes=nn, efficiency=0.97),promotes_inputs=["duration", "specific_energy"])
         self.connect('hybrid_split.power_out_A','batt1.elec_load')
         # TODO set val= right number of nn
         self.add_subsystem('eng_throttle_set',BalanceComp(name='eng_throttle', val=np.ones((nn,))*0.5, units=None, eq_units='kW', rhs_name='gen_power_required',lhs_name='gen_power_available'))
