@@ -22,8 +22,6 @@ from openconcept.analysis.performance.mission_profiles import FullMissionAnalysi
 from openconcept.utilities.linearinterp import LinearInterpolator
 from openconcept.utilities.visualization import plot_trajectory
 
-spec_energy = 300
-
 class AugmentedFBObjective(ExplicitComponent):
     def setup(self):
         self.add_input('fuel_burn', units='kg')
@@ -210,10 +208,8 @@ class ElectricTwinAnalysisGroup(Group):
         self.connect('T_batt_initial','v0v1.propmodel.batteryheatsink.T_initial')
 
 def configure_problem():
-    num_nodes=11
     prob = Problem()
     prob.model= ElectricTwinAnalysisGroup()
-
     prob.model.nonlinear_solver=NewtonSolver(iprint=1)
     prob.model.options['assembled_jac_type'] = 'csc'
     prob.model.linear_solver = DirectSolver(assemble_jac=True)
@@ -221,11 +217,9 @@ def configure_problem():
     prob.model.nonlinear_solver.options['maxiter'] = 10
     prob.model.nonlinear_solver.options['atol'] = 1e-8
     prob.model.nonlinear_solver.options['rtol'] = 1e-8
-    
     return prob
 
-def set_guesses(prob, num_nodes, design_range, spec_energy):
-    num_nodes = num_nodes
+def set_values(prob, num_nodes, design_range, spec_energy):
     # set some (required) mission parameters. Each pahse needs a vertical and air-speed
     # the entire mission needs a cruise altitude and range
     prob.set_val('climb.fltcond|vs', np.ones((num_nodes,))*1500, units='ft/min')
@@ -237,13 +231,14 @@ def set_guesses(prob, num_nodes, design_range, spec_energy):
 
     prob.set_val('cruise|h0',29000,units='ft')
     prob.set_val('mission_range',design_range,units='NM')
-    prob.set_val('ac|propulsion|battery|specific_energy',spec_energy,units='W*h/kg')
     prob.set_val('payload',1000,units='lb')
+    prob.set_val('ac|propulsion|battery|specific_energy', spec_energy, units='W*h/kg')
 
     # (optional) guesses for takeoff speeds may help with convergence
     prob.set_val('v0v1.fltcond|Utrue',np.ones((num_nodes))*50,units='kn')
     prob.set_val('v1vr.fltcond|Utrue',np.ones((num_nodes))*85,units='kn')
     prob.set_val('v1v0.fltcond|Utrue',np.ones((num_nodes))*85,units='kn')
+
     # set some airplane-specific values
     prob['analysis.cruise.acmodel.OEW.const.structural_fudge'] = 2.0
     prob['ac|propulsion|propeller|diameter'] = 2.2
@@ -253,7 +248,7 @@ def run_hybrid_twin_thermal_analysis(plots=False):
     prob = configure_problem()
     prob.setup(check=False)
     prob['cruise.hybridization'] = 0.05778372636876463
-    set_guesses(prob, 11, 500, 450)
+    set_values(prob, 11, 500, 450)
     prob.run_model()
     if plots:
         show_outputs(prob)
@@ -315,6 +310,7 @@ def show_outputs(prob):
 if __name__ == "__main__":
     # for run type choose choose optimization, comp_sizing, or analysis
     run_type = 'example'
+    num_nodes = 11
 
     if run_type == 'example':
         # runs a default analysis-only mission (no optimization)
@@ -407,9 +403,7 @@ if __name__ == "__main__":
                         prob.model.add_constraint('descent.propmodel.batt1.SOC_final',lower=0.0)
                         prob.model.add_objective('descent.fuel_used_final')
 
-
                     prob.driver = ScipyOptimizeDriver()
-                    #prob.driver.options['tol'] = 1e-13
                     if write_logs:
                         filename_to_save = 'case_'+str(spec_energy)+'_'+str(design_range)+'.sql'
                         if os.path.isfile(filename_to_save):
@@ -427,7 +421,7 @@ if __name__ == "__main__":
                         prob.driver.recording_options['record_desvars'] = True
 
                     prob.setup(check=False)
-                    set_guesses(prob, 11, design_range, spec_energy)
+                    set_values(prob, num_nodes, design_range, spec_energy)
 
                     if last_successful_opt is not None:
                         cr = CaseReader(last_successful_opt)
