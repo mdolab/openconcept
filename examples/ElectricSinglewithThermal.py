@@ -46,7 +46,7 @@ class ElectricTBM850Model(Group):
         propulsion_promotes_inputs = ["fltcond|*", "ac|propulsion|*",
                                       "throttle", "ac|weights|*", "duration"]
 
-        self.add_subsystem('propmodel', AllElectricSinglePropulsionSystemWithThermal_Compressible(num_nodes=nn),
+        self.add_subsystem('propmodel', AllElectricSinglePropulsionSystemWithThermal_Incompressible(num_nodes=nn),
                            promotes_inputs=propulsion_promotes_inputs,
                            promotes_outputs=propulsion_promotes_outputs)
         self.connect('prop1rpm', 'propmodel.prop1.rpm')
@@ -150,7 +150,7 @@ if __name__ == "__main__":
     prob.model.add_constraint('descent.propmodel.batt1.SOC_final',lower=0.0)
     prob.model.add_objective('mission_range',scaler=-1.0)
     prob.driver = ScipyOptimizeDriver()
-    prob.driver.options['dynamic_simul_derivs'] = True
+    # prob.driver.options['declare_coloring'] = True
 
     prob.setup(check=True,mode='fwd')
     # set some (required) mission parameters. Each pahse needs a vertical and air-speed
@@ -172,7 +172,7 @@ if __name__ == "__main__":
     prob.set_val('v1vr.fltcond|Utrue',np.ones((num_nodes))*85,units='kn')
     prob.set_val('v1v0.fltcond|Utrue',np.ones((num_nodes))*85,units='kn')
 
-    prob.run_driver()
+    prob.run_model()
 
      # print some outputs
     vars_list = ['ac|weights|MTOW','descent.propmodel.batt1.SOC_final','rotate.range_final']
@@ -201,7 +201,7 @@ if __name__ == "__main__":
         phases = ['v0v1', 'v1vr', 'rotate', 'v1v0']
         plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels,
-                        plot_title='TBM850 Takeoff')
+                        plot_title='Elec Single Takeoff')
 
         x_var = 'range'
         x_unit = 'NM'
@@ -209,5 +209,5 @@ if __name__ == "__main__":
         phases = ['climb', 'cruise', 'descent']
         plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels, marker='-',
-                        plot_title='TBM850 Mission Profile')
+                        plot_title='Elec Single Mission Profile')
 
