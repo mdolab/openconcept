@@ -18,7 +18,6 @@ from examples.methods.costs_commuter import OperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from examples.aircraft_data.caravan import data as acdata
 from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis
-from openconcept.utilities.visualization import plot_trajectory
 
 class CaravanAirplaneModel(Group):
     """
@@ -134,8 +133,7 @@ class CaravanAnalysisGroup(Group):
                                                           extra_states=extra_states_tuple),
                                       promotes_inputs=['*'], promotes_outputs=['*'])
 
-
-if __name__ == "__main__":
+def run_caravan_analysis():
     # Set up OpenMDAO to analyze the airplane
     num_nodes = 11
     prob = Problem()
@@ -175,11 +173,17 @@ if __name__ == "__main__":
     prob['rotate.throttle'] = np.ones((num_nodes))
 
     prob.run_model()
+    return prob
+
+if __name__ == "__main__":
+    from openconcept.utilities.visualization import plot_trajectory
+    # run the analysis
+    prob = run_caravan_analysis()
 
     # print some outputs
-    vars_list = ['ac|weights|MTOW','climb.OEW','descent.fuel_used_final','rotate.range_final']
+    vars_list = ['ac|weights|MTOW','climb.OEW','descent.fuel_used_final','v1vr.range_final']
     units = ['lb','lb','lb','ft']
-    nice_print_names = ['MTOW', 'OEW', 'Fuel used', 'TOFL (over 35ft obstacle)']
+    nice_print_names = ['MTOW', 'OEW', 'Fuel used', 'TOFL ground roll']
     print("=======================================================================")
     for i, thing in enumerate(vars_list):
         print(nice_print_names[i]+': '+str(prob.get_val(thing,units=units[i])[0])+' '+units[i])
