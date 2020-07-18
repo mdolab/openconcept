@@ -148,6 +148,7 @@ def configure_problem():
     prob.driver = ScipyOptimizeDriver()
     return prob
 
+
 def set_values(prob, num_nodes):
     # set some (required) mission parameters. Each pahse needs a vertical and air-speed
     # the entire mission needs a cruise altitude and range
@@ -170,6 +171,7 @@ def set_values(prob, num_nodes):
 
 def show_outputs(prob):
     # print some outputs
+
     vars_list = ['ac|weights|MTOW','descent.propmodel.batt1.SOC_final','rotate.range_final']
     units = ['lb', None, 'ft']
     nice_print_names = ['MTOW', 'Final battery state of charge','TOFL (over 35ft obstacle)']
@@ -218,5 +220,6 @@ def run_electricsingle_analysis(plots=False):
     
 if __name__ == "__main__":
     run_electricsingle_analysis(plots=True)
+
 
     

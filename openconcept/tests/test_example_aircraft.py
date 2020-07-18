@@ -10,6 +10,7 @@ from examples.Caravan import run_caravan_analysis
 from examples.KingAirC90GT import run_kingair_analysis
 from examples.ElectricSinglewithThermal import run_electricsingle_analysis
 
+
 class TBMAnalysisTestCase(unittest.TestCase):
     def setUp(self):
         self.prob = run_tbm_analysis()
