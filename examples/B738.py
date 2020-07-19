@@ -75,8 +75,7 @@ class B738AirplaneModel(Group):
 
         # airplanes which consume fuel will need to integrate
         # fuel usage across the mission and subtract it from TOW
-        nn_simpson = int((nn - 1) / 2)
-        self.add_subsystem('intfuel', Integrator(num_intervals=nn_simpson, method='simpson',
+        self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson',
                                                  quantity_units='kg', diff_units='s',
                                                  time_setup='duration'),
                            promotes_inputs=[('dqdt', 'fuel_flow'), 'duration',

@@ -80,8 +80,8 @@ class SOCBattery(Group):
 
         self.add_subsystem('divider',ElementMultiplyDivideComp(output_name='dSOCdt',input_names=['elec_load','max_energy'],vec_size=[nn,1],scaling_factor=-1,divide=[False,True],input_units=['W','kJ']),
                            promotes_inputs=['*'],promotes_outputs=['*'])
-        nn_simpson = int((nn-1)/2)
-        self.add_subsystem('intload',Integrator(num_intervals=nn_simpson, method='simpson', quantity_units=None, diff_units='s', time_setup='duration'),
+        
+        self.add_subsystem('intload',Integrator(num_nodes=nn, method='simpson', quantity_units=None, diff_units='s', time_setup='duration'),
                                                 promotes_inputs=[('q_initial','batt_SOC_initial'),'duration',('dqdt','dSOCdt')],
                                                 promotes_outputs=[('q','SOC'),('q_final','SOC_final')])
 

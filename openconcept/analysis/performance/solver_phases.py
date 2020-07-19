@@ -546,13 +546,13 @@ class GroundRollPhase(Group):
 
 
         self.add_subsystem('haccel',HorizontalAcceleration(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
-        nn_simpson = int((nn-1)/2)
+        
         if flight_phase == 'v1v0':
             #unfortunately need to shoot backwards to avoid negative airspeeds
             #reverse the order of the accelerations so the last one is first (and make them negative)
             self.add_subsystem('flipaccel', FlipVectorComp(num_nodes=nn, units='m/s**2', negative=True), promotes_inputs=[('vec_in','accel_horiz')])
             #integrate the timesteps in reverse from near zero speed.
-            self.add_subsystem('intvelocity',Integrator(num_intervals=nn_simpson, method='simpson', quantity_units='m/s', diff_units='s',time_setup='duration', lower=1.5),
+            self.add_subsystem('intvelocity',Integrator(num_nodes=nn, method='simpson', quantity_units='m/s', diff_units='s',time_setup='duration', lower=1.5),
                                                         promotes_inputs=['duration',('q_initial','zero_speed')],promotes_outputs=[('q_final','fltcond|Utrue_initial')])
             self.connect('flipaccel.vec_out','intvelocity.dqdt')
             #flip the result of the reverse integration again so the flight condition is forward and consistent with everythign else
@@ -563,7 +563,7 @@ class GroundRollPhase(Group):
                                        promotes_inputs=['*'],promotes_outputs=['duration'])
         else:
             # forward shooting for these acceleration segmentes
-            self.add_subsystem('intvelocity',Integrator(num_intervals=nn_simpson, method='simpson', quantity_units='m/s', diff_units='s', time_setup='duration', lower=1.5),
+            self.add_subsystem('intvelocity',Integrator(num_nodes=nn, method='simpson', quantity_units='m/s', diff_units='s', time_setup='duration', lower=1.5),
                                                         promotes_inputs=[('dqdt','accel_horiz'),'duration',('q_initial','fltcond|Utrue_initial')],promotes_outputs=[('q','fltcond|Utrue'),('q_final','fltcond|Utrue_final')])
             if flight_phase == 'v0v1':
                 self.connect('zero_speed','fltcond|Utrue_initial')
@@ -574,10 +574,10 @@ class GroundRollPhase(Group):
                                promotes_inputs=['*'],promotes_outputs=['duration'])
 
         if zero_start:
-            self.add_subsystem('intrange',Integrator(num_intervals=nn_simpson, method='simpson', quantity_units='m', diff_units='s',zero_start=zero_start, time_setup='duration'),
+            self.add_subsystem('intrange',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s',zero_start=zero_start, time_setup='duration'),
                                                         promotes_inputs=[('dqdt','fltcond|groundspeed'),'duration'],promotes_outputs=[('q','range'),('q_final','range_final')])
         else:
-            self.add_subsystem('intrange',Integrator(num_intervals=nn_simpson, method='simpson', quantity_units='m', diff_units='s',zero_start=zero_start, time_setup='duration'),
+            self.add_subsystem('intrange',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s',zero_start=zero_start, time_setup='duration'),
                                                     promotes_inputs=[('dqdt','fltcond|groundspeed'),'duration',('q_initial','range_initial')],promotes_outputs=[('q','range'),('q_final','range_final')])
 
 class RotationPhase(Group):
@@ -673,17 +673,17 @@ class RotationPhase(Group):
         self.add_subsystem('lift',Lift(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('haccel',HorizontalAcceleration(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('vaccel',VerticalAcceleration(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
-        nn_simpson = int((nn-1)/2)
+        
         # TODO always starts from zero altitude
         self.add_subsystem('clear_obstacle',BalanceComp(name='duration',units='s',val=1,eq_units='m',rhs_name='fltcond|h_final',lhs_name='h_obs',lower=0.1,upper=15),
                        promotes_inputs=['*'],promotes_outputs=['duration'])
-        self.add_subsystem('intvelocity',Integrator(num_intervals=nn_simpson, method='simpson', quantity_units='m/s', diff_units='s',time_setup='duration',lower=0.1),
+        self.add_subsystem('intvelocity',Integrator(num_nodes=nn, method='simpson', quantity_units='m/s', diff_units='s',time_setup='duration',lower=0.1),
                                                     promotes_inputs=[('dqdt','accel_horiz'),'duration',('q_initial','fltcond|Utrue_initial')],promotes_outputs=[('q','fltcond|Utrue'),('q_final','fltcond|Utrue_final')])
-        self.add_subsystem('intrange',Integrator(num_intervals=nn_simpson, method='simpson', quantity_units='m', diff_units='s', time_setup='duration'),
+        self.add_subsystem('intrange',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration'),
                                                     promotes_inputs=[('dqdt','fltcond|groundspeed'),'duration',('q_initial','range_initial')],promotes_outputs=[('q','range'),('q_final','range_final')])
-        self.add_subsystem('intvs',Integrator(num_intervals=nn_simpson, method='simpson', quantity_units='m/s', diff_units='s', time_setup='duration',zero_start=True),
+        self.add_subsystem('intvs',Integrator(num_nodes=nn, method='simpson', quantity_units='m/s', diff_units='s', time_setup='duration',zero_start=True),
                                                     promotes_inputs=[('dqdt','accel_vert'),'duration'],promotes_outputs=[('q','fltcond|vs'),('q_final','fltcond|vs_final')])
-        self.add_subsystem('inth',Integrator(num_intervals=nn_simpson, method='simpson', quantity_units='m', diff_units='s', time_setup='duration',zero_start=True),
+        self.add_subsystem('inth',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration',zero_start=True),
                                                     promotes_inputs=[('dqdt','fltcond|vs'),'duration'],promotes_outputs=[('q','fltcond|h'),('q_final','fltcond|h_final')])
 
 class SteadyFlightPhase(Group):
@@ -762,8 +762,8 @@ class SteadyFlightPhase(Group):
         ivcomp.add_output('fltcond|Ueas',val=np.ones((nn,))*90, units='m/s')
         ivcomp.add_output('fltcond|vs',val=np.ones((nn,))*1, units='m/s')
         ivcomp.add_output('zero_accel',val=np.zeros((nn,)),units='m/s**2')
-        nn_simpson = int((nn-1)/2)
-        self.add_subsystem('inth',Integrator(num_intervals=nn_simpson, method='simpson', quantity_units='m', diff_units='s', time_setup='duration'),
+        
+        self.add_subsystem('inth',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration'),
                                                     promotes_inputs=[('dqdt','fltcond|vs'),'duration',('q_initial','fltcond|h_initial')],promotes_outputs=[('q','fltcond|h'),('q_final','fltcond|h_final')])
         self.add_subsystem('atmos', ComputeAtmosphericProperties(num_nodes=nn, true_airspeed_in=False), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('gs',Groundspeeds(num_nodes=nn),promotes_inputs=['*'],promotes_outputs=['*'])
@@ -773,7 +773,7 @@ class SteadyFlightPhase(Group):
         self.add_subsystem('lift',Lift(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('haccel',HorizontalAcceleration(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
 
-        self.add_subsystem('intrange',Integrator(num_intervals=nn_simpson, method='simpson', quantity_units='m', diff_units='s', time_setup='duration'),
+        self.add_subsystem('intrange',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration'),
                                                     promotes_inputs=[('dqdt','fltcond|groundspeed'),'duration',('q_initial','range_initial')],promotes_outputs=[('q','range'),('q_final','range_final')])
 
 

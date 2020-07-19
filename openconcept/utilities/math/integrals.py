@@ -472,218 +472,6 @@ def integrator_partials_wrt_deltas(num_segments, num_intervals):
     partials_q_wrt_deltas = sp.csr_matrix(jacmat)
     return partials_q_wrt_deltas
 
-class IntegrateQuantityEveryNode(ExplicitComponent):
-    """
-    This component integrates a vector using a 3rd order Lagrange polynomial
-    equivalent to Simpson's rule, but with quadrature between every subinterval
-
-    Inputs
-    ------
-    dqdt : float
-        The vector quantity to integrate.
-        Length of the vector = (2 * num_intervals + 1) * num_segments
-    segment|dt : float
-        The timestep of "segment" (scalar)
-        1 per segment
-    q_initial : float
-        Starting value of the quantity (scalar)
-
-    Outputs
-    -------
-    q : float
-        The vector quantity corresponding integral of dqdt over time
-        Will have units  'rate_units' / 'diff_units'
-    q_final : float
-        The final value of the vector (scalar)
-        Useful for connecting the end of one integrator to beginning of another
-
-    Options
-    -------
-    segment_names : list
-        A list of str with the names of the individual segments
-        By default, if no segment_names are provided, one segment will be assumed and segment|dt will just be named "dt"
-    num_intervals : int
-        The number of Simpson intervals per segment
-        The total number of points per segment is 2N + 1 where N = num_intervals
-        The total length of the vector q is n_segments x (2N + 1)
-    quantity_units : str
-        The units of quantity being integrated (not the rate)
-    diff_units : str
-        The units of the integrand (none by default)
-    method : str
-        Numerical method (default 'simpson', optionally 'trap')
-    final_only : bool
-        Returns only the final value q_final and none of the full state.
-    """
-
-    def initialize(self):
-        self.options.declare('segment_names', default=None, desc="Names of differentiation segments")
-        self.options.declare('quantity_units',default=None, desc="Units of the quantity being differentiated")
-        self.options.declare('diff_units',default=None, desc="Units of the differential")
-        self.options.declare('num_intervals',default=5, desc="Number of Simpsons rule intervals per segment")
-        self.options.declare('method',default='simpson', desc="Numerical method to use.")
-        self.options.declare('final_only',default=False)
-
-    def setup(self):
-        segment_names = self.options['segment_names']
-        quantity_units = self.options['quantity_units']
-        diff_units = self.options['diff_units']
-        n_int_per_seg = self.options['num_intervals']
-        method = self.options['method']
-        nn_seg = (n_int_per_seg*2 + 1)
-        final_only = self.options['final_only']
-
-        if segment_names is None:
-            n_segments = 1
-        else:
-            n_segments = len(segment_names)
-        nn_tot = nn_seg * n_segments
-
-        if quantity_units is None and diff_units is None:
-            rate_units = None
-        elif quantity_units is None:
-            rate_units = '(' + diff_units +')** -1'
-        elif diff_units is None:
-            rate_units = quantity_units
-            warnings.warn('You have specified a integral with respect to a unitless integrand. Be aware of this.')
-        else:
-            rate_units = '('+quantity_units+') / (' + diff_units +')'
-        # the output of this function is of length nn - 1. NO partial for first row (initial value)
-        # get the partials of the delta quantities WRT the rates dDelta / drate
-        if method == "simpson":
-            delta_q, dDelta_ddqdt, dDelta_dts = three_point_lagrange_integration(np.ones((nn_tot,)), np.ones((n_segments, )),
-                                                                                 num_segments=n_segments, num_intervals=n_int_per_seg)
-        elif method == "trap":
-            delta_q, dDelta_ddqdt, dDelta_dts = trapezoid_integration(np.ones((nn_tot,)), np.ones((n_segments, )),
-                                                                      num_segments=n_segments, num_intervals=n_int_per_seg)
-        elif method == "backward_euler":
-            delta_q, dDelta_ddqdt, dDelta_dts = backward_euler(np.ones((nn_tot,)), np.ones((n_segments, )),
-                                                                      num_segments=n_segments, num_intervals=n_int_per_seg)
-        dq_dDelta = integrator_partials_wrt_deltas(n_segments, n_int_per_seg)
-        # we need the partial of q with respect to the rates
-        # which is dq / dDelta * dDelta / d{parameter}
-        dq_ddqdt = dq_dDelta.dot(dDelta_ddqdt)
-
-        self.add_input('dqdt', val=0, units=rate_units, desc='Quantity to integrate',shape=(nn_tot,))
-        self.add_input('q_initial', val=0, units=quantity_units, desc='Initial value')
-        if not final_only:
-            self.add_output('q', units=quantity_units, desc='Integral of dqdt', shape=(nn_tot,))
-            self.declare_partials(['q'], ['q_initial'], rows=np.arange(nn_tot), cols=np.zeros((nn_tot,)), val=np.ones((nn_tot,)))
-
-        self.add_output('q_final', units=quantity_units, desc='Final value of q')
-        self.declare_partials(['q_final'], ['q_initial'], val=1)
-
-        dq_ddqdt_indices = dq_ddqdt.nonzero()
-        dqfinal_ddqdt_indices = dq_ddqdt.getrow(-1).nonzero()
-        if not final_only:
-            self.declare_partials(['q'], ['dqdt'], rows=dq_ddqdt_indices[0], cols=dq_ddqdt_indices[1])
-        self.declare_partials(['q_final'], ['dqdt'], rows=dqfinal_ddqdt_indices[0], cols=dqfinal_ddqdt_indices[1]) # rows are zeros
-
-        if segment_names is None:
-            self.add_input('dt', units=diff_units, desc='Time step')
-            dq_ddt = dq_dDelta.dot(dDelta_dts[0])
-            dq_ddt_indices = dq_ddt.nonzero()
-            if not final_only:
-                self.declare_partials(['q'], ['dt'], rows=dq_ddt_indices[0], cols=dq_ddt_indices[1])
-            dqfinal_ddt_indices = dq_ddt.getrow(-1).nonzero()
-            self.declare_partials(['q_final'], ['dt'], rows=dqfinal_ddt_indices[0], cols=dqfinal_ddt_indices[1])
-        else:
-            for i_seg, segment_name in enumerate(segment_names):
-                self.add_input(segment_name +'|dt', units=diff_units, desc='Time step')
-                dq_ddt = dq_dDelta.dot(dDelta_dts[i_seg])
-                dq_ddt_indices = dq_ddt.nonzero()
-                if not final_only:
-                    self.declare_partials(['q'], [segment_name +'|dt'], rows=dq_ddt_indices[0], cols=dq_ddt_indices[1])
-                dqfinal_ddt_indices = dq_ddt.getrow(-1).nonzero()
-                self.declare_partials(['q_final'], [segment_name +'|dt'], rows=dqfinal_ddt_indices[0], cols=dqfinal_ddt_indices[1])
-
-    def compute(self, inputs, outputs):
-        segment_names = self.options['segment_names']
-        n_int_per_seg = self.options['num_intervals']
-        method = self.options['method']
-        final_only = self.options['final_only']
-        nn_seg = (n_int_per_seg*2 + 1)
-        if segment_names is None:
-            n_segments = 1
-            dts = [inputs['dt'][0]]
-        else:
-            n_segments = len(segment_names)
-            dts = []
-            for i_seg, segment_name in enumerate(segment_names):
-                input_name = segment_name+'|dt'
-                dts.append(inputs[input_name][0])
-        if method == 'simpson':
-            delta_q, dDelta_ddqdt, dDelta_dts = three_point_lagrange_integration(inputs['dqdt'], dts,
-                                                                                 num_segments=n_segments, num_intervals=n_int_per_seg)
-        elif method == 'trap':
-            delta_q, dDelta_ddqdt, dDelta_dts = trapezoid_integration(inputs['dqdt'], dts,
-                                                                      num_segments=n_segments, num_intervals=n_int_per_seg)
-        elif method == "backward_euler":
-            delta_q, dDelta_ddqdt, dDelta_dts = backward_euler(inputs['dqdt'], dts,
-                                                                      num_segments=n_segments, num_intervals=n_int_per_seg)
-        cumsum = np.cumsum(delta_q)
-        cumsum = np.insert(cumsum, 0, 0)
-        cumsum = cumsum + inputs['q_initial']
-        if n_segments > 1:
-            for i in range(1,n_segments):
-                duplicate_row = cumsum[i*nn_seg-1]
-                cumsum = np.insert(cumsum,i*nn_seg,duplicate_row)
-        if not final_only:
-            outputs['q'] = cumsum
-        outputs['q_final'] = cumsum[-1]
-
-    def compute_partials(self, inputs, J):
-        segment_names = self.options['segment_names']
-        quantity_units = self.options['quantity_units']
-        diff_units = self.options['diff_units']
-        n_int_per_seg = self.options['num_intervals']
-        method = self.options['method']
-        final_only = self.options['final_only']
-
-        nn_seg = (n_int_per_seg*2 + 1)
-        if segment_names is None:
-            n_segments = 1
-        else:
-            n_segments = len(segment_names)
-        nn_tot = nn_seg * n_segments
-
-        if segment_names is None:
-            n_segments = 1
-            dts = [inputs['dt'][0]]
-        else:
-            n_segments = len(segment_names)
-            dts = []
-            for i_seg, segment_name in enumerate(segment_names):
-                input_name = segment_name+'|dt'
-                dts.append(inputs[input_name][0])
-        if method == 'simpson':
-            delta_q, dDelta_ddqdt, dDelta_dts = three_point_lagrange_integration(inputs['dqdt'], dts,
-                                                                         num_segments=n_segments, num_intervals=n_int_per_seg)
-        elif method == 'trap':
-            delta_q, dDelta_ddqdt, dDelta_dts = trapezoid_integration(inputs['dqdt'], dts,
-                                                                      num_segments=n_segments, num_intervals=n_int_per_seg)
-        elif method == "backward_euler":
-            delta_q, dDelta_ddqdt, dDelta_dts = backward_euler(inputs['dqdt'], dts,
-                                                                      num_segments=n_segments, num_intervals=n_int_per_seg)
-        dq_dDelta = integrator_partials_wrt_deltas(n_segments, n_int_per_seg)
-
-        dq_ddqdt = dq_dDelta.dot(dDelta_ddqdt)
-        if not final_only:
-            J['q','dqdt'] = dq_ddqdt.data
-        J['q_final', 'dqdt'] = dq_ddqdt.getrow(-1).data
-
-        if segment_names is None:
-            dq_ddt = dq_dDelta.dot(dDelta_dts[0])
-            if not final_only:
-                J['q','dt'] = dq_ddt.data
-            J['q_final','dt'] = dq_ddt.getrow(-1).data
-        else:
-            for i_seg, segment_name in enumerate(segment_names):
-                dq_ddt = dq_dDelta.dot(dDelta_dts[i_seg])
-                if not final_only:
-                    J['q',segment_name+'|dt'] = dq_ddt.data
-                J['q_final',segment_name+'|dt'] = dq_ddt.getrow(-1).data
-
 class Integrator(ExplicitComponent):
     """
     This component integrates a vector using a BDF3 formulation
@@ -717,14 +505,15 @@ class Integrator(ExplicitComponent):
     segments_to_count : list
         A list of str with the names of segments to be included in the integration.
         By default, ALL segments will be included.
-    num_intervals : int
-        The number of Simpson intervals per segment
-        The total number of points per segment is 2N + 1 where N = num_intervals
+    num_nodes : int
+        num_nodes = 2N + 1 where N = num_intervals
         The total length of the vector q is n_segments x (2N + 1)
     quantity_units : str
         The units of quantity being integrated (not the rate)
     diff_units : str
         The units of the integrand (none by default)
+    rate_units : str
+        The units of the rate being integrated
     method : str
         Numerical method (default 'bdf3'; alternatively, 'simpson)
     zero_start : bool
@@ -743,7 +532,8 @@ class Integrator(ExplicitComponent):
         self.options.declare('segments_to_count', default=None, desc="Names of differentiation segments")
         self.options.declare('quantity_units',default=None, desc="Units of the quantity being differentiated")
         self.options.declare('diff_units',default=None, desc="Units of the differential")
-        self.options.declare('num_intervals',default=5, desc="Number of Simpsons rule intervals per segment")
+        self.options.declare('rate_units',default=None, desc="Units of the rate being integrated")
+        self.options.declare('num_nodes',default=11, desc="Analysis points per segment")
         self.options.declare('method',default='bdf3', desc="Numerical method to use.")
         self.options.declare('zero_start',default=False)
         self.options.declare('final_only',default=False)
@@ -756,30 +546,35 @@ class Integrator(ExplicitComponent):
         segments_to_count = self.options['segments_to_count']
         quantity_units = self.options['quantity_units']
         diff_units = self.options['diff_units']
-        n_int_per_seg = self.options['num_intervals']
+        num_nodes = self.options['num_nodes']
         method = self.options['method']
         zero_start = self.options['zero_start']
         final_only = self.options['final_only']
         time_setup = self.options['time_setup']
-        nn_seg = (n_int_per_seg*2 + 1)
+
+        # check to make sure num nodes is OK
+        if (num_nodes - 1) % 2 > 0:
+            raise ValueError('num_nodes must be odd')
 
         # branch logic here for the corner case of 0 segments
         # so point analysis can be run without breaking everything
-        if nn_seg == 1:
+        if num_nodes == 1:
             single_point = True
         else:
             single_point = False
         if not single_point:
             if method == 'bdf3':
-                self.tri_mat, self.repeat_mat = bdf3_cache_matrix(nn_seg)
+                self.tri_mat, self.repeat_mat = bdf3_cache_matrix(num_nodes)
             elif method == 'simpson':
-                self.tri_mat, self.repeat_mat = simpson_cache_matrix(nn_seg)
+                self.tri_mat, self.repeat_mat = simpson_cache_matrix(num_nodes)
 
         if segment_names is None:
             n_segments = 1
         else:
             n_segments = len(segment_names)
-        nn_tot = nn_seg * n_segments
+        nn_tot = num_nodes * n_segments
+
+        # TODO enable specifying rate units
 
         if quantity_units is None and diff_units is None:
             rate_units = None
@@ -863,14 +658,13 @@ class Integrator(ExplicitComponent):
 
     def compute(self, inputs, outputs):
         segment_names = self.options['segment_names']
-        n_int_per_seg = self.options['num_intervals']
+        num_nodes = self.options['num_nodes']
         segments_to_count = self.options['segments_to_count']
         zero_start = self.options['zero_start']
         final_only = self.options['final_only']
         time_setup=self.options['time_setup']
 
-        nn_seg = (n_int_per_seg*2 + 1)
-        if nn_seg == 1:
+        if num_nodes == 1:
             single_point = True
         else:
             single_point = False
@@ -880,13 +674,13 @@ class Integrator(ExplicitComponent):
             if time_setup == 'dt':
                 dts = [inputs['dt'][0]]
             elif time_setup == 'duration':
-                if nn_seg == 1:
+                if num_nodes == 1:
                     dts = [inputs['duration'][0]]
                 else:
-                    dts = [inputs['duration'][0]/(nn_seg-1)]
+                    dts = [inputs['duration'][0]/(num_nodes-1)]
             elif time_setup == 'bounds':
                 delta_t = inputs['t_final'] - inputs['t_initial']
-                dts = [delta_t[0]/(nn_seg-1)]
+                dts = [delta_t[0]/(num_nodes-1)]
         else:
             n_segments = len(segment_names)
             dts = []
@@ -915,14 +709,13 @@ class Integrator(ExplicitComponent):
         segment_names = self.options['segment_names']
         quantity_units = self.options['quantity_units']
         diff_units = self.options['diff_units']
-        n_int_per_seg = self.options['num_intervals']
+        num_nodes = self.options['num_nodes']
         segments_to_count = self.options['segments_to_count']
         zero_start = self.options['zero_start']
         final_only = self.options['final_only']
         time_setup = self.options['time_setup']
 
-        nn_seg = (n_int_per_seg*2 + 1)
-        if nn_seg == 1:
+        if num_nodes == 1:
             single_point = True
         else:
             single_point = False
@@ -931,17 +724,17 @@ class Integrator(ExplicitComponent):
                 n_segments = 1
             else:
                 n_segments = len(segment_names)
-            nn_tot = nn_seg * n_segments
+            nn_tot = num_nodes * n_segments
 
             if segment_names is None:
                 n_segments = 1
                 if time_setup == 'dt':
                     dts = [inputs['dt'][0]]
                 elif time_setup == 'duration':
-                    dts = [inputs['duration'][0]/(nn_seg-1)]
+                    dts = [inputs['duration'][0]/(num_nodes-1)]
                 elif time_setup == 'bounds':
                     delta_t = inputs['t_final'] - inputs['t_initial']
-                    dts = [delta_t[0]/(nn_seg-1)]
+                    dts = [delta_t[0]/(num_nodes-1)]
             else:
                 n_segments = len(segment_names)
                 dts = []
@@ -979,13 +772,13 @@ class Integrator(ExplicitComponent):
                         # if len(dQddtlist[0].data) == 0:
                         #     J['q','duration'] = np.zeros(J['q','duration'].shape)
                         # else:
-                        #     J['q','duration'] = dQddtlist[0].data / (nn_seg - 1)
-                        J['q','duration'] = np.squeeze(dQddtlist[0].toarray()[1:] / (nn_seg - 1))
+                        #     J['q','duration'] = dQddtlist[0].data / (num_nodes - 1)
+                        J['q','duration'] = np.squeeze(dQddtlist[0].toarray()[1:] / (num_nodes - 1))
                     # if len(dQddtlist[0].getrow(-1).data) == 0:
                     #     J['q_final','duration'] = 0
                     # else:
-                    #     J['q_final','duration'] = dQddtlist[0].getrow(-1).data / (nn_seg - 1)
-                    J['q_final','duration'] = np.squeeze(dQddtlist[0].getrow(-1).toarray() / (nn_seg - 1))
+                    #     J['q_final','duration'] = dQddtlist[0].getrow(-1).data / (num_nodes - 1)
+                    J['q_final','duration'] = np.squeeze(dQddtlist[0].getrow(-1).toarray() / (num_nodes - 1))
 
                 elif time_setup == 'bounds':
                     if not final_only:
@@ -993,14 +786,14 @@ class Integrator(ExplicitComponent):
                             J['q','t_initial'] = np.zeros(J['q','t_initial'].shape)
                             J['q','t_final'] = np.zeros(J['q','t_final'].shape)
                         else:
-                            J['q','t_initial'] = -dQddtlist[0].data / (nn_seg - 1)
-                            J['q','t_final'] = dQddtlist[0].data / (nn_seg - 1)
+                            J['q','t_initial'] = -dQddtlist[0].data / (num_nodes - 1)
+                            J['q','t_final'] = dQddtlist[0].data / (num_nodes - 1)
                     if len(dQddtlist[0].getrow(-1).data) == 0:
                         J['q_final','t_initial'] = 0
                         J['q_final','t_final'] = 0
                     else:
-                        J['q_final','t_initial'] = -dQddtlist[0].getrow(-1).data / (nn_seg - 1)
-                        J['q_final','t_final'] = dQddtlist[0].getrow(-1).data / (nn_seg - 1)
+                        J['q_final','t_initial'] = -dQddtlist[0].getrow(-1).data / (num_nodes - 1)
+                        J['q_final','t_final'] = dQddtlist[0].getrow(-1).data / (num_nodes - 1)
             else:
                 for i_seg, segment_name in enumerate(segment_names):
                     if not final_only:
