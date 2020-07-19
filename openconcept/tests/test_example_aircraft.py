@@ -1,8 +1,10 @@
+
 from __future__ import division
 import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
+from examples.B738 import run_738_analysis
 from examples.TBM850 import run_tbm_analysis
 from examples.HybridTwin_thermal import run_hybrid_twin_thermal_analysis
 from examples.HybridTwin import run_hybrid_twin_analysis
@@ -78,3 +80,14 @@ class ElectricSingleTestCase(unittest.TestCase):
         assert_rel_error(self, prob.get_val('rotate.range_final', units='ft'), 2419.111568458725, tolerance=1e-5)
         assert_rel_error(self, prob.get_val('descent.propmodel.batt1.SOC')[-1], 0.1663373102614198, tolerance=1e-5)
         assert_rel_error(self, prob.get_val('descent.propmodel.motorheatsink.T', units='degC')[-1], 14.918329533221709, tolerance=1e-5)
+
+class B738TestCase(unittest.TestCase):
+    def setUp(self):
+        self.prob = run_738_analysis()
+    
+    def test_values_B738(self):
+        prob = self.prob
+        # block fuel
+        assert_rel_error(self, prob.get_val('descent.fuel_used_final', units='lbm'), 28688.32933661591, tolerance=2e-5)
+        # total fuel
+        assert_rel_error(self, prob.get_val('loiter.fuel_used_final', units='lbm'), 34555.31347454542, tolerance=2e-5)
