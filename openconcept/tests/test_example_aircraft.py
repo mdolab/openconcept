@@ -88,6 +88,6 @@ class B738TestCase(unittest.TestCase):
     def test_values_B738(self):
         prob = self.prob
         # block fuel
-        assert_rel_error(self, prob.get_val('descent.fuel_used_final', units='lbm'), 28688.32933661591, tolerance=1e-5)
+        assert_rel_error(self, prob.get_val('descent.fuel_used_final', units='lbm'), 28688.32933661591, tolerance=2e-5)
         # total fuel
-        assert_rel_error(self, prob.get_val('loiter.fuel_used_final', units='lbm'), 34555.31347454542, tolerance=1e-5)
+        assert_rel_error(self, prob.get_val('loiter.fuel_used_final', units='lbm'), 34555.31347454542, tolerance=2e-5)
