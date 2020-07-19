@@ -14,3 +14,6 @@ coloring.json
 coloring_files/total_coloring.pkl
 .pytest_cache/
 *.sql
+*.pkl
+*openmdao_checks.out
+*egg-info/
