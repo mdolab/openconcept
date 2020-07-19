@@ -32,7 +32,7 @@ Automatically-generated documentation is available at (https://openconcept.readt
 
 ### Requirements
 
-This toolkit requires the use of OpenMDAO 2.3.0 or later and will evolve rapidly as general utilities are moved from OpenConcept into the main OpenMDAO repository. OpenMDAO requires a late numpy and scipy.
+This toolkit requires the use of OpenMDAO 3.0.0 or later (2.8+ will work with minor arg changes) and will evolve rapidly as general utilities are moved from OpenConcept into the main OpenMDAO repository. OpenMDAO requires a late numpy and scipy.
 
 ## Citation
 

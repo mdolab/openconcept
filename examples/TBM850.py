@@ -19,8 +19,6 @@ from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from examples.aircraft_data.TBM850 import data as acdata
 from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis
 
-
-
 class TBM850AirplaneModel(Group):
     """
     A custom model specific to the TBM 850 airplane
@@ -66,7 +64,7 @@ class TBM850AirplaneModel(Group):
         self.connect('propmodel.prop1.component_weight', 'W_propeller')
         self.connect('propmodel.eng1.component_weight', 'W_engine')
 
-                # airplanes which consume fuel will need to integrate
+        # airplanes which consume fuel will need to integrate
         # fuel usage across the mission and subtract it from TOW
         nn_simpson = int((nn - 1) / 2)
         self.add_subsystem('intfuel', Integrator(num_intervals=nn_simpson, method='simpson',

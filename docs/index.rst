@@ -41,20 +41,17 @@ Accurate, efficient derivatives enable the use of Newton nonlinear equation solu
 Getting Started
 ---------------
 1. Clone the repo to disk (`git clone https://github.com/mdolab/openconcept`)
-2. Navigate to the root openconcept folder
-3. Run `python setup.py install` to install the package
-4. Navigate to the `examples` folder
-5. Run `python TBM850.py` to test OpenConcept on a single-engine turboprop aircraft (the TBM 850)
-6. Look at the `examples/aircraft data/TBM850.py` folder to play with the assumptions / config / geometry and see the effects on the output result
+2. If you use Anaconda, create a virtual environment using the environment.yml file (`conda env create environment.yml`) and then activate it using `conda activate openconcept`. 
+3. If you wish to install OpenConcept in your Python distribution, run `python setup.py install`.
+4. Run `python examples\TBM850.py` to test OpenConcept on a single-engine turboprop aircraft (the TBM 850)
+5. Look at the `examples\aircraft data\TBM850.py` folder to play with the assumptions / config / geometry and see the effects on the output result
 
-`examples/HybridTwin.py` is set up to do MDO in a grid of specific energies and design ranges and save the results to disk.
-Visualization utilities will be added soon (to produce contour plots as shown in this Readme)
 
 ------------
 Dependencies
 ------------
-This toolkit requires the use of OpenMDAO 2.3.0 or later and will evolve rapidly as general utilities are moved from OpenConcept into the main OpenMDAO repository.
-OpenMDAO requires a late numpy and scipy.
+This toolkit requires the use of OpenMDAO 3.0.0 or later due to backward-incompatible changes.
+However, 2.8+ can be used with very minor keyword argument changes to OpenMDAO components
 
 ---------------
 Please Cite Us!
