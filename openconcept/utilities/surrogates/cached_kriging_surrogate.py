@@ -1,5 +1,14 @@
+from __future__ import division
 import openmdao.api as om 
 import pickle
+import numpy as np
+import scipy.linalg as linalg
+from scipy.optimize import minimize
+
+from openmdao.surrogate_models.surrogate_model import SurrogateModel
+
+MACHINE_EPSILON = np.finfo(np.double).eps
+
 
 class KrigingSurrogate(om.KrigingSurrogate):
 
