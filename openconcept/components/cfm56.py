@@ -2,7 +2,6 @@ from __future__ import division
 import numpy as np
 import openmdao.api as om
 import openconcept
-import matplotlib.pyplot as plt
 from openconcept.utilities.surrogates.cached_kriging_surrogate import KrigingSurrogate
 
 def CFM56(num_nodes=1, plot=False):
@@ -69,6 +68,7 @@ def CFM56(num_nodes=1, plot=False):
     comp.options['default_surrogate'] = KrigingSurrogate(lapack_driver='gesvd', cache_trained_model=True)
 
     if plot:
+        import matplotlib.pyplot as plt
         prob = om.Problem()
         prob.model.add_subsystem('comp', comp)
         prob.setup()
