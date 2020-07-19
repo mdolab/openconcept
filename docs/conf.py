@@ -15,10 +15,13 @@
 import os
 import sys
 import subprocess
+import openmdao
 
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('..'))
-sys.path.insert(0, os.path.abspath('./_exts'))
+# sphinx build needs to be able to find the openmdao embed_code plugin
+# so we add it to the path
+sys.path.insert(0, os.path.abspath(openmdao.__path__[0]+r'/docs/_exts'))
 
 
 def generate_src_docs(dir, top, packages):
@@ -196,6 +199,7 @@ release = openconcept.__version__ + ' alpha'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
+
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
@@ -347,6 +351,7 @@ if generate_srcdocs:
     # openmdao way
     packages = ['analysis',
                 'analysis.atmospherics',
+                'analysis.performance',
                 'components',
                 'utilities',
                 'utilities.math']

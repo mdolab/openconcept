@@ -13,7 +13,7 @@ from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dvlabel import DVLabel
-from methods.weights_twin_hybrid import TwinSeriesHybridEmptyWeight
+from examples.methods.weights_twin_hybrid import TwinSeriesHybridEmptyWeight
 from examples.propulsion_layouts.simple_series_hybrid import TwinSeriesHybridElectricPropulsionSystem
 from examples.methods.costs_commuter import OperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
@@ -21,8 +21,6 @@ from examples.aircraft_data.KingAirC90GT import data as acdata
 from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis
 from openconcept.utilities.linearinterp import LinearInterpolator
 from openconcept.utilities.visualization import plot_trajectory
-
-spec_energy = 300
 
 class AugmentedFBObjective(ExplicitComponent):
     def setup(self):
@@ -67,8 +65,7 @@ class SeriesHybridTwinModel(Group):
                                       "ac|weights*", 'duration']
 
         self.add_subsystem('propmodel',
-                           TwinSeriesHybridElectricPropulsionSystem(num_nodes=nn,
-                                                                    specific_energy=spec_energy),
+                           TwinSeriesHybridElectricPropulsionSystem(num_nodes=nn),
                            promotes_inputs=propulsion_promotes_inputs,
                            promotes_outputs=propulsion_promotes_outputs)
         self.connect('proprpm', ['propmodel.prop1.rpm', 'propmodel.prop2.rpm'])
@@ -104,9 +101,6 @@ class SeriesHybridTwinModel(Group):
                                                      scaling_factors=[1, -1]),
                            promotes_inputs=['*'],
                            promotes_outputs=['weight'])
-
-
-
 
 class ElectricTwinAnalysisGroup(Group):
     """This is an example of a balanced field takeoff and three-phase mission analysis.
@@ -147,6 +141,7 @@ class ElectricTwinAnalysisGroup(Group):
         dv_comp.add_output_from_dict('ac|propulsion|propeller|diameter')
         dv_comp.add_output_from_dict('ac|propulsion|generator|rating')
         dv_comp.add_output_from_dict('ac|propulsion|motor|rating')
+        dv_comp.add_output('ac|propulsion|battery|specific_energy',val=300,units='W*h/kg')
 
         dv_comp.add_output_from_dict('ac|num_passengers_max')
         dv_comp.add_output_from_dict('ac|q_cruise')
@@ -182,153 +177,54 @@ class ElectricTwinAnalysisGroup(Group):
         self.connect('ac|weights|MTOW','aug_obj.ac|weights|MTOW')
         self.connect('descent.fuel_used_final','aug_obj.fuel_burn')
 
-if __name__ == "__main__":
-    num_nodes=11
+def configure_problem():
+    prob = Problem()
+    prob.model= ElectricTwinAnalysisGroup()
+    prob.model.nonlinear_solver=NewtonSolver(iprint=1)
+    prob.model.options['assembled_jac_type'] = 'csc'
+    prob.model.linear_solver = DirectSolver(assemble_jac=True)
+    prob.model.nonlinear_solver.options['solve_subsystems'] = True
+    prob.model.nonlinear_solver.options['maxiter'] = 10
+    prob.model.nonlinear_solver.options['atol'] = 1e-7
+    prob.model.nonlinear_solver.options['rtol'] = 1e-7
+    return prob
 
-    #design_ranges = [300,350,400,450,500,550,600,650,700]
-    #specific_energies = [250,300,350,400,450,500,550,600,650,700,750,800]
-    design_ranges = [500]
-    specific_energies = [450]
+def set_values(prob, num_nodes, design_range, spec_energy): 
+    # set some (required) mission parameters. Each pahse needs a vertical and air-speed
+    # the entire mission needs a cruise altitude and range
+    prob.set_val('climb.fltcond|vs', np.ones((num_nodes,))*1500, units='ft/min')
+    prob.set_val('climb.fltcond|Ueas', np.ones((num_nodes,))*124, units='kn')
+    prob.set_val('cruise.fltcond|vs', np.ones((num_nodes,))*0.01, units='ft/min')
+    prob.set_val('cruise.fltcond|Ueas', np.ones((num_nodes,))*170, units='kn')
+    prob.set_val('descent.fltcond|vs', np.ones((num_nodes,))*(-600), units='ft/min')
+    prob.set_val('descent.fltcond|Ueas', np.ones((num_nodes,))*140, units='kn')
 
-    write_logs = False
+    prob.set_val('cruise|h0',29000,units='ft')
+    prob.set_val('mission_range',design_range,units='NM')
+    prob.set_val('payload',1000,units='lb')
+    prob.set_val('ac|propulsion|battery|specific_energy', spec_energy, units='W*h/kg')
 
-    if write_logs:
-        logging.basicConfig(filename='opt.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
-    for design_range in design_ranges:
-        for this_spec_energy in specific_energies:
-            try:
-                prob = Problem()
-                prob.model= ElectricTwinAnalysisGroup()
+    # (optional) guesses for takeoff speeds may help with convergence
+    prob.set_val('v0v1.fltcond|Utrue',np.ones((num_nodes))*50,units='kn')
+    prob.set_val('v1vr.fltcond|Utrue',np.ones((num_nodes))*85,units='kn')
+    prob.set_val('v1v0.fltcond|Utrue',np.ones((num_nodes))*85,units='kn')
 
+    # set some airplane-specific values
+    prob['analysis.cruise.acmodel.OEW.const.structural_fudge'] = 2.0
+    prob['ac|propulsion|propeller|diameter'] = 2.2
+    prob['ac|propulsion|engine|rating'] = 1117.2
 
-                prob.model.nonlinear_solver=NewtonSolver(iprint=1)
-                prob.model.options['assembled_jac_type'] = 'csc'
-                prob.model.linear_solver = DirectSolver(assemble_jac=True)
-                prob.model.nonlinear_solver.options['solve_subsystems'] = True
-                prob.model.nonlinear_solver.options['maxiter'] = 10
-                prob.model.nonlinear_solver.options['atol'] = 1e-7
-                prob.model.nonlinear_solver.options['rtol'] = 1e-7
-                # prob.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar',print_bound_enforce=False)
-
-                spec_energy = this_spec_energy
-
-                run_type = 'optimization'
-                if run_type == 'optimization':
-                    print('======Performing Multidisciplinary Design Optimization===========')
-                    prob.model.add_design_var('ac|weights|MTOW', lower=4000, upper=5700)
-                    prob.model.add_design_var('ac|geom|wing|S_ref',lower=15,upper=40)
-                    prob.model.add_design_var('ac|propulsion|engine|rating',lower=1,upper=3000)
-                    prob.model.add_design_var('ac|propulsion|motor|rating',lower=450,upper=3000)
-                    prob.model.add_design_var('ac|propulsion|generator|rating',lower=1,upper=3000)
-                    prob.model.add_design_var('ac|weights|W_battery',lower=20,upper=2250)
-                    prob.model.add_design_var('ac|weights|W_fuel_max',lower=500,upper=3000)
-                    prob.model.add_design_var('cruise.hybridization', lower=0.001, upper=0.999)
-                    prob.model.add_design_var('climb.hybridization', lower=0.001, upper=0.999)
-                    prob.model.add_design_var('descent.hybridization', lower=0.01, upper=1.0)
-
-                    prob.model.add_constraint('margins.MTOW_margin',lower=0.0)
-    #                 prob.model.add_constraint('design_mission.residuals.fuel_capacity_margin',lower=0.0)
-
-                    prob.model.add_constraint('rotate.range_final',upper=1357)
-                    prob.model.add_constraint('v0v1.Vstall_eas',upper=42.0)
-                    prob.model.add_constraint('descent.propmodel.batt1.SOC_final',lower=0.0)
-                    prob.model.add_constraint('climb.throttle',upper=1.05*np.ones(num_nodes))
-                    prob.model.add_constraint('climb.propmodel.eng1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('climb.propmodel.gen1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('climb.propmodel.batt1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('cruise.propmodel.eng1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('cruise.propmodel.gen1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('cruise.propmodel.batt1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('descent.propmodel.eng1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('descent.propmodel.gen1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('descent.propmodel.batt1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('v0v1.propmodel.batt1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('engineoutclimb.gamma',lower=0.02)
-                    prob.model.add_objective('mixed_objective') # TODO add this objective
-
-                elif run_type == 'comp_sizing':
-                    print('======Performing Component Sizing Optimization===========')
-                    prob.model.add_design_var('ac|propulsion|engine|rating',lower=1,upper=3000)
-                    prob.model.add_design_var('ac|propulsion|motor|rating',lower=1,upper=3000)
-                    prob.model.add_design_var('ac|propulsion|generator|rating',lower=1,upper=3000)
-                    prob.model.add_design_var('ac|weights|W_battery',lower=20,upper=2250)
-                    prob.model.add_design_var('cruise.hybridization', lower=0.01, upper=0.5)
-
-                    prob.model.add_constraint('margins.MTOW_margin',equals=0.0) # TODO implement
-                    prob.model.add_constraint('rotate.range_final',upper=1357) # TODO check units
-                    prob.model.add_constraint('descent.propmodel.batt1.SOC_final',lower=0.0)
-                    prob.model.add_constraint('v0v1.propmodel.eng1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('v0v1.propmodel.gen1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('v0v1.propmodel.batt1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('climb.propmodel.eng1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('climb.propmodel.gen1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('climb.propmodel.batt1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
-                    prob.model.add_constraint('climb.throttle',upper=1.05*np.ones(num_nodes))
-                    prob.model.add_objective('fuel_burn')
-
-
-
-                else:
-                    print('======Analyzing Fuel Burn for Given Mision============')
-                    prob.model.add_design_var('cruise.hybridization', lower=0.01, upper=0.5)
-                    prob.model.add_constraint('descent.propmodel.batt1.SOC_final',lower=0.0)
-                    prob.model.add_objective('descent.fuel_used_final')
-
-
-                prob.driver = ScipyOptimizeDriver()
-                prob.driver.options['dynamic_simul_derivs'] = True
-                #prob.driver.options['tol'] = 1e-13
-                if write_logs:
-                    filename_to_save = 'case_'+str(spec_energy)+'_'+str(design_range)+'.sql'
-                    if os.path.isfile(filename_to_save):
-                        print('Skipping '+filename_to_save)
-                        continue
-                    recorder = SqliteRecorder(filename_to_save)
-                    prob.driver.add_recorder(recorder)
-                    prob.driver.recording_options['includes'] = []
-                    prob.driver.recording_options['record_objectives'] = True
-                    prob.driver.recording_options['record_constraints'] = True
-                    prob.driver.recording_options['record_desvars'] = True
-
-                prob.setup(check=False)
-                # set some (required) mission parameters. Each pahse needs a vertical and air-speed
-                # the entire mission needs a cruise altitude and range
-                prob.set_val('climb.fltcond|vs', np.ones((num_nodes,))*1500, units='ft/min')
-                prob.set_val('climb.fltcond|Ueas', np.ones((num_nodes,))*124, units='kn')
-                prob.set_val('cruise.fltcond|vs', np.ones((num_nodes,))*0.01, units='ft/min')
-                prob.set_val('cruise.fltcond|Ueas', np.ones((num_nodes,))*170, units='kn')
-                prob.set_val('descent.fltcond|vs', np.ones((num_nodes,))*(-600), units='ft/min')
-                prob.set_val('descent.fltcond|Ueas', np.ones((num_nodes,))*140, units='kn')
-
-                prob.set_val('cruise|h0',29000,units='ft')
-                prob.set_val('mission_range',design_range,units='NM')
-                prob.set_val('payload',1000,units='lb')
-
-                # (optional) guesses for takeoff speeds may help with convergence
-                prob.set_val('v0v1.fltcond|Utrue',np.ones((num_nodes))*50,units='kn')
-                prob.set_val('v1vr.fltcond|Utrue',np.ones((num_nodes))*85,units='kn')
-                prob.set_val('v1v0.fltcond|Utrue',np.ones((num_nodes))*85,units='kn')
-
-                # set some airplane-specific values
-                prob['analysis.cruise.acmodel.OEW.const.structural_fudge'] = 2.0
-                prob['ac|propulsion|propeller|diameter'] = 2.2
-                prob['ac|propulsion|engine|rating'] = 1117.2
-
-                run_flag = prob.run_driver()
-                if run_flag:
-                    raise ValueError('Opt failed')
-
-            except BaseException as e:
-                if write_logs:
-                    logging.error('Optimization '+filename_to_save+' failed because '+repr(e))
-                prob.cleanup()
-                try:
-                    os.rename(filename_to_save, filename_to_save.split('.sql')[0]+'_failed.sql')
-                except WindowsError as we:
-                    if write_logs:
-                        logging.error('Error renaming file: '+repr(we))
-                    os.remove(filename_to_save)
-
+def run_hybrid_twin_analysis(plots=False):
+    prob = configure_problem()
+    prob.setup(check=False)
+    prob['cruise.hybridization'] = 0.05840626452293813
+    set_values(prob, 11, 500, 450)
+    prob.run_model()
+    if plots:
+        show_outputs(prob)
+    return prob
+    
+def show_outputs(prob):
     # print some outputs
     vars_list = ['ac|weights|MTOW','climb.OEW','descent.fuel_used_final',
                  'rotate.range_final','descent.propmodel.batt1.SOC_final','cruise.hybridization',
@@ -370,3 +266,120 @@ if __name__ == "__main__":
         plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels, marker='-',
                         plot_title='Full Mission Profile')
+
+if __name__ == "__main__":
+    # for run type choose choose optimization, comp_sizing, or analysis
+    run_type = 'example'
+    num_nodes = 11
+
+    if run_type == 'example':
+        # runs a default analysis-only mission (no optimization)
+        run_hybrid_twin_analysis(plots=True)
+
+    else:
+        # can run a sweep of design range and spec energy (not tested)
+        #design_ranges = [300,350,400,450,500,550,600,650,700]
+        #specific_energies = [250,300,350,400,450,500,550,600,650,700,750,800]
+
+        #or a single point
+        design_ranges = [500]
+        specific_energies = [450]
+
+        write_logs = False
+        if write_logs:
+            logging.basicConfig(filename='opt.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
+        # run a sweep of cases at various specific energies and ranges
+        for design_range in design_ranges:
+            for this_spec_energy in specific_energies:
+                try:
+                    prob = configure_problem()
+                    spec_energy = this_spec_energy
+                    if run_type == 'optimization':
+                        print('======Performing Multidisciplinary Design Optimization===========')
+                        prob.model.add_design_var('ac|weights|MTOW', lower=4000, upper=5700)
+                        prob.model.add_design_var('ac|geom|wing|S_ref',lower=15,upper=40)
+                        prob.model.add_design_var('ac|propulsion|engine|rating',lower=1,upper=3000)
+                        prob.model.add_design_var('ac|propulsion|motor|rating',lower=450,upper=3000)
+                        prob.model.add_design_var('ac|propulsion|generator|rating',lower=1,upper=3000)
+                        prob.model.add_design_var('ac|weights|W_battery',lower=20,upper=2250)
+                        prob.model.add_design_var('ac|weights|W_fuel_max',lower=500,upper=3000)
+                        prob.model.add_design_var('cruise.hybridization', lower=0.001, upper=0.999)
+                        prob.model.add_design_var('climb.hybridization', lower=0.001, upper=0.999)
+                        prob.model.add_design_var('descent.hybridization', lower=0.01, upper=1.0)
+
+                        prob.model.add_constraint('margins.MTOW_margin',lower=0.0)
+                        prob.model.add_constraint('rotate.range_final',upper=1357)
+                        prob.model.add_constraint('v0v1.Vstall_eas',upper=42.0)
+                        prob.model.add_constraint('descent.propmodel.batt1.SOC_final',lower=0.0)
+                        prob.model.add_constraint('climb.throttle',upper=1.05*np.ones(num_nodes))
+                        prob.model.add_constraint('climb.propmodel.eng1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('climb.propmodel.gen1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('climb.propmodel.batt1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('cruise.propmodel.eng1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('cruise.propmodel.gen1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('cruise.propmodel.batt1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('descent.propmodel.eng1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('descent.propmodel.gen1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('descent.propmodel.batt1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('v0v1.propmodel.batt1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('engineoutclimb.gamma',lower=0.02)
+                        prob.model.add_objective('mixed_objective') # TODO add this objective
+
+                    elif run_type == 'comp_sizing':
+                        print('======Performing Component Sizing Optimization===========')
+                        prob.model.add_design_var('ac|propulsion|engine|rating',lower=1,upper=3000)
+                        prob.model.add_design_var('ac|propulsion|motor|rating',lower=1,upper=3000)
+                        prob.model.add_design_var('ac|propulsion|generator|rating',lower=1,upper=3000)
+                        prob.model.add_design_var('ac|weights|W_battery',lower=20,upper=2250)
+                        prob.model.add_design_var('cruise.hybridization', lower=0.01, upper=0.5)
+
+                        prob.model.add_constraint('margins.MTOW_margin',equals=0.0) # TODO implement
+                        prob.model.add_constraint('rotate.range_final',upper=1357) # TODO check units
+                        prob.model.add_constraint('descent.propmodel.batt1.SOC_final',lower=0.0)
+                        prob.model.add_constraint('v0v1.propmodel.eng1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('v0v1.propmodel.gen1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('v0v1.propmodel.batt1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('climb.propmodel.eng1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('climb.propmodel.gen1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('climb.propmodel.batt1.component_sizing_margin',upper=1.0*np.ones(num_nodes))
+                        prob.model.add_constraint('climb.throttle',upper=1.05*np.ones(num_nodes))
+                        prob.model.add_objective('fuel_burn')
+
+                    else:
+                        print('======Analyzing Fuel Burn for Given Mision============')
+                        prob.model.add_design_var('cruise.hybridization', lower=0.01, upper=0.5)
+                        prob.model.add_constraint('descent.propmodel.batt1.SOC_final',lower=0.0)
+                        prob.model.add_objective('descent.fuel_used_final')
+
+                    prob.driver = ScipyOptimizeDriver()
+                    if write_logs:
+                        filename_to_save = 'case_'+str(spec_energy)+'_'+str(design_range)+'.sql'
+                        if os.path.isfile(filename_to_save):
+                            print('Skipping '+filename_to_save)
+                            continue
+                        recorder = SqliteRecorder(filename_to_save)
+                        prob.driver.add_recorder(recorder)
+                        prob.driver.recording_options['includes'] = []
+                        prob.driver.recording_options['record_objectives'] = True
+                        prob.driver.recording_options['record_constraints'] = True
+                        prob.driver.recording_options['record_desvars'] = True
+
+                    prob.setup(check=False)
+                    set_values(prob, num_nodes, design_range, spec_energy)
+
+                    run_flag = prob.run_driver()
+                    if run_flag:
+                        raise ValueError('Opt failed')
+
+                except BaseException as e:
+                    if write_logs:
+                        logging.error('Optimization '+filename_to_save+' failed because '+repr(e))
+                    prob.cleanup()
+                    try:
+                        os.rename(filename_to_save, filename_to_save.split('.sql')[0]+'_failed.sql')
+                    except WindowsError as we:
+                        if write_logs:
+                            logging.error('Error renaming file: '+repr(we))
+                        os.remove(filename_to_save)
+
+        show_outputs(prob)

@@ -21,7 +21,7 @@ def propeller_map_Raymer(vec_size=1):
                             [0.035,0.085,0.16,0.22,0.28,0.35,0.41,0.52,0.605,0.69,0.74,0.775,0.8,0.82],
                             [0.03,0.06,0.13,0.19,0.24,0.31,0.35,0.46,0.52,0.63,0.71,0.75,0.78,0.8]])
     # Create regular grid interpolator instance
-    interp = MetaModelStructuredComp(method='cubic',extrapolate=True,vec_size=vec_size)
+    interp = MetaModelStructuredComp(method='scipy_cubic',extrapolate=True,vec_size=vec_size)
     interp.add_input('cp', 0.3, cp)
     interp.add_input('J', 1, J)
     interp.add_output('eta_prop', 0.8, raymer_data)
@@ -41,7 +41,7 @@ def propeller_map_scaled(vec_size=1,design_J=2.2,design_cp=0.2):
                             [0.07,0.15,0.29,0.36,0.45,0.65,0.73,0.77,0.83,0.85,0.87,0.875,0.88,0.895],
                             [0.05,0.12,0.25,0.32,0.38,0.50,0.61,0.72,0.77,0.79,0.83,0.85,0.86,0.865]])
     # Create regular grid interpolator instance
-    interp = MetaModelStructuredComp(method='cubic',extrapolate=True,vec_size=vec_size)
+    interp = MetaModelStructuredComp(method='scipy_cubic',extrapolate=True,vec_size=vec_size)
     interp.add_input('cp', 0.3, cp)
     interp.add_input('J', 1, J)
     interp.add_output('eta_prop', 0.8, raymer_data)
@@ -77,7 +77,7 @@ def propeller_map_highpower(vec_size=1):
 
     data[:,0] = np.zeros(13)
     # Create regular grid interpolator instance
-    interp = MetaModelStructuredComp(method='cubic',extrapolate=True,vec_size=vec_size)
+    interp = MetaModelStructuredComp(method='scipy_cubic',extrapolate=True,vec_size=vec_size)
     interp.add_input('cp', 0.3, cp)
     interp.add_input('J', 1, J)
     interp.add_output('eta_prop', 0.8, data)
@@ -106,7 +106,7 @@ def static_propeller_map_Raymer(vec_size=1):
     #Data from Raymer for static thrust of 3-bladed propeller
     cp = np.linspace(0.0,0.60,25)
     raymer_static_data = np.array([2.5,3.0,2.55,2.0,1.85,1.5,1.25,1.05,0.95,0.86,0.79,0.70,0.62,0.53,0.45,0.38,0.32,0.28,0.24,0.21,0.18,0.16,0.14,0.12,0.10])
-    interp = MetaModelStructuredComp(method='cubic',extrapolate=True,vec_size=vec_size)
+    interp = MetaModelStructuredComp(method='scipy_cubic',extrapolate=True,vec_size=vec_size)
     interp.add_input('cp',0.15,cp)
     interp.add_output('ct_over_cp',1.5,raymer_static_data)
     return interp
@@ -116,7 +116,7 @@ def static_propeller_map_highpower(vec_size=1):
     cp = np.linspace(0.0,1.0,41)
     factored_raymer_static_data = np.array([2.5,3.0,2.55,2.0,1.85,1.5,1.25,1.05,0.95,0.86,0.79,0.70,0.62,0.53,0.45,0.38,0.32,0.28,0.24,0.21,0.18,0.16,0.14,0.12,0.10,0.09,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08,0.08])
     factored_raymer_static_data[6:] = factored_raymer_static_data[6:]*1.2
-    interp = MetaModelStructuredComp(method='cubic',extrapolate=True,vec_size=vec_size)
+    interp = MetaModelStructuredComp(method='scipy_cubic',extrapolate=True,vec_size=vec_size)
     interp.add_input('cp',0.15,cp)
     interp.add_output('ct_over_cp',1.5,factored_raymer_static_data)
     return interp

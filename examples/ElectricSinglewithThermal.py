@@ -46,7 +46,7 @@ class ElectricTBM850Model(Group):
         propulsion_promotes_inputs = ["fltcond|*", "ac|propulsion|*",
                                       "throttle", "ac|weights|*", "duration"]
 
-        self.add_subsystem('propmodel', AllElectricSinglePropulsionSystemWithThermal_Compressible(num_nodes=nn),
+        self.add_subsystem('propmodel', AllElectricSinglePropulsionSystemWithThermal_Incompressible(num_nodes=nn),
                            promotes_inputs=propulsion_promotes_inputs,
                            promotes_outputs=propulsion_promotes_outputs)
         self.connect('prop1rpm', 'propmodel.prop1.rpm')
@@ -130,12 +130,9 @@ class ElectricTBMAnalysisGroup(Group):
         self.connect('T_motor_initial','v0v1.propmodel.motorheatsink.T_initial')
         self.connect('T_res_initial','v0v1.propmodel.reservoir.T_initial')
 
-
-if __name__ == "__main__":
-    num_nodes=11
+def configure_problem():
     prob = Problem()
     prob.model= ElectricTBMAnalysisGroup()
-
 
     prob.model.nonlinear_solver=NewtonSolver(iprint=2)
     prob.model.options['assembled_jac_type'] = 'csc'
@@ -145,14 +142,14 @@ if __name__ == "__main__":
     prob.model.nonlinear_solver.options['atol'] = 1e-8
     prob.model.nonlinear_solver.options['rtol'] = 1e-8
     prob.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar',print_bound_enforce=False)
-
     prob.model.add_design_var('mission_range',lower=100,upper=300,scaler=1e-2)
     prob.model.add_constraint('descent.propmodel.batt1.SOC_final',lower=0.0)
     prob.model.add_objective('mission_range',scaler=-1.0)
     prob.driver = ScipyOptimizeDriver()
-    prob.driver.options['dynamic_simul_derivs'] = True
+    return prob
 
-    prob.setup(check=True,mode='fwd')
+
+def set_values(prob, num_nodes):
     # set some (required) mission parameters. Each pahse needs a vertical and air-speed
     # the entire mission needs a cruise altitude and range
     prob.set_val('rotate.fltcond|Utrue',np.ones((num_nodes))*80,units='kn')
@@ -172,9 +169,9 @@ if __name__ == "__main__":
     prob.set_val('v1vr.fltcond|Utrue',np.ones((num_nodes))*85,units='kn')
     prob.set_val('v1v0.fltcond|Utrue',np.ones((num_nodes))*85,units='kn')
 
-    prob.run_driver()
+def show_outputs(prob):
+    # print some outputs
 
-     # print some outputs
     vars_list = ['ac|weights|MTOW','descent.propmodel.batt1.SOC_final','rotate.range_final']
     units = ['lb', None, 'ft']
     nice_print_names = ['MTOW', 'Final battery state of charge','TOFL (over 35ft obstacle)']
@@ -201,7 +198,7 @@ if __name__ == "__main__":
         phases = ['v0v1', 'v1vr', 'rotate', 'v1v0']
         plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels,
-                        plot_title='TBM850 Takeoff')
+                        plot_title='Elec Single Takeoff')
 
         x_var = 'range'
         x_unit = 'NM'
@@ -209,5 +206,20 @@ if __name__ == "__main__":
         phases = ['climb', 'cruise', 'descent']
         plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels, marker='-',
-                        plot_title='TBM850 Mission Profile')
+                        plot_title='Elec Single Mission Profile')
 
+def run_electricsingle_analysis(plots=False):
+    num_nodes = 11
+    prob = configure_problem()
+    prob.setup(check=True,mode='fwd')
+    set_values(prob, num_nodes)
+    prob.run_model()
+    if plots:
+        show_outputs(prob)
+    return prob
+    
+if __name__ == "__main__":
+    run_electricsingle_analysis(plots=True)
+
+
+    
