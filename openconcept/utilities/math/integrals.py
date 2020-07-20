@@ -2,6 +2,7 @@ from __future__ import division
 import numpy as np
 import scipy.sparse as sp
 from openmdao.api import ExplicitComponent
+import warnings
 
 def bdf3_cache_matrix(n,all_bdf=False):
     """
@@ -471,6 +472,316 @@ def integrator_partials_wrt_deltas(num_segments, num_intervals):
         jacmat = np.insert(jacmat,nn*i,duplicate_row,axis=0)
     partials_q_wrt_deltas = sp.csr_matrix(jacmat)
     return partials_q_wrt_deltas
+
+class NewIntegrator(ExplicitComponent):
+    """
+    Integrates rate variables implicitly.
+    Add new integrated quantities by using the add_integrand method.
+    "q" inputs here are illustrative only.
+
+    Inputs
+    ------
+    duration : float
+        The duration of the integration interval (can also use dt) (scalar)
+    dq_dt : float
+        Rate to integrate (vector)
+    q_initial : float
+        Starting value of quantity (scalar)
+    
+    Outputs
+    -------
+    q : float
+        The vector quantity corresponding integral of dqdt over time
+        Will have units  'rate_units' / 'diff_units'
+    q_final : float
+        The final value of the vector (scalar)
+        Useful for connecting the end of one integrator to beginning of another
+
+    Options
+    -------
+    num_nodes : int
+        num_nodes = 2N + 1 where N = num_intervals
+        The total length of the vector q is 2N + 1
+    diff_units : str
+        The units of the integrand (none by default)
+    method : str
+        Numerical method (default 'bdf3'; alternatively, 'simpson)
+    time_setup : str
+        Time configuration (default 'dt')
+        'dt' creates input 'dt'
+        'duration' creates input 'duration'
+        'bounds' creates inputs 't_initial', 't_final'
+    """
+    def __init__(self, **kwargs):
+        super(NewIntegrator, self).__init__(**kwargs)
+        self._state_vars = {}
+        num_nodes = self.options['num_nodes']
+        method = self.options['method']
+
+        # check to make sure num nodes is OK
+        if (num_nodes - 1) % 2 > 0:
+            raise ValueError('num_nodes must be odd')
+        
+        if num_nodes > 1:
+            if method == 'bdf3':
+                self.tri_mat, self.repeat_mat = bdf3_cache_matrix(num_nodes)
+            elif method == 'simpson':
+                self.tri_mat, self.repeat_mat = simpson_cache_matrix(num_nodes)
+
+    def initialize(self):
+        self.options.declare('diff_units',default=None, desc="Units of the differential")
+        self.options.declare('num_nodes',default=11, desc="Analysis points per segment")
+        self.options.declare('method',default='bdf3', desc="Numerical method to use.")
+        self.options.declare('time_setup',default='dt')
+
+    def add_integrand(self, name, rate_name=None, start_name=None, end_name=None,
+                      units=None, rate_units=None, zero_start=False, final_only=False, lower=-1e30, upper=1e30):
+            """
+            Add a new integrated variable q = integrate(dqdt) + q0
+            This will add an output with the integrated quantity, an output with the final value,
+            an input with the rate source, and an input for the initial quantity.
+
+            Parameters
+            ----------
+            name : str
+                The name of the integrated variable to be created.
+            rate_name : str
+                The name of the input rate (default name"_rate")
+            start_name  : str
+                The name of the initial value input (default value name"_initial")
+            end_name : str
+                The name of the end value output (default value name"_final")
+            units : str or None
+                Units for the integrated quantity (or inferred automatically from rate_units)
+            rate_units : str or None
+                Units of the rate (can be inferred automatically from units)
+            zero_start : bool
+                If true, eliminates start value input and always begins from zero (default False)
+            final_only : bool
+                If true, only integrates final quantity, not all the intermediate points (default False)
+            upper : float
+                Upper bound on integrated quantity
+            lower : float
+                Lower bound on integrated quantity
+            """
+
+            num_nodes = self.options['num_nodes']
+            diff_units = self.options['diff_units']
+            time_setup = self.options['time_setup']
+            # check to make sure num nodes is OK
+            if (num_nodes - 1) % 2 > 0:
+                raise ValueError('num_nodes must be odd')
+
+            if units and rate_units:
+                raise ValueError('Specify either quantity units or rate units, but not both')
+            if units:
+                # infer rate units from diff units and quantity units
+                if not diff_units:
+                    rate_units = units
+                    warnings.warn('You have specified a integral with respect to a unitless integrand. Be aware of this.')
+                else:
+                    rate_units = '('+units+') / (' + diff_units +')'
+            elif rate_units:
+                # infer quantity units from rate units and diff units
+                if not diff_units:
+                    units = rate_units
+                    warnings.warn('You have specified a integral with respect to a unitless integrand. Be aware of this.')
+                else:
+                    units = '('+rate_units+') * (' + diff_units + ')'
+            elif diff_units:
+                # neither quantity nor rate units specified
+                rate_units = '(' + diff_units +')** -1'
+
+            if not rate_name:
+                rate_name = name + '_rate'
+            if not start_name:
+                start_name = name + '_initial'
+            if not end_name:
+                end_name = name + '_final'
+
+            options = {'name': name,
+                        'rate_name': rate_name,
+                        'start_name': start_name,
+                        'end_name': end_name,
+                        'units': units,
+                        'rate_units': rate_units,
+                        'zero_start': zero_start,
+                        'final_only': final_only,
+                        'upper': upper,
+                        'lower': lower}
+
+            # TODO maybe later can pass kwargs
+            self._state_vars[name] = options
+            self.add_input(rate_name, val=0, shape=(num_nodes), units=rate_units)
+            self.add_output(end_name, units=units, upper=options['upper'],lower=options['lower'])
+            if not final_only:
+                self.add_output(name, shape=(num_nodes), units=units, upper=options['upper'],lower=options['lower'])
+            if not zero_start:
+                self.add_input(start_name, val=0, units=units)
+                if not final_only:
+                    self.declare_partials([name], [start_name], rows=np.arange(num_nodes), cols=np.zeros((num_nodes,)), val=np.ones((num_nodes,)))
+                self.declare_partials([end_name], [start_name], val=1)
+
+            # set up sparse partial structure
+            if num_nodes > 1:
+                # single point analysis has no dqdt dependency since the outputs are equal to the inputs
+                dQdrate, dQddtlist = multistep_integrator(0, np.ones((num_nodes,)), np.ones((1,)), self.tri_mat, self.repeat_mat,
+                                                        segment_names=None, segments_to_count=None, partials=True)
+                dQdrate_indices = dQdrate.nonzero()
+                dQfdrate_indices = dQdrate.getrow(-1).nonzero()
+                if not final_only:
+                    self.declare_partials([name], [rate_name], rows=dQdrate_indices[0], cols=dQdrate_indices[1])
+                self.declare_partials([end_name], [rate_name], rows=dQfdrate_indices[0], cols=dQfdrate_indices[1]) # rows are zeros
+
+                dQddt_seg = dQddtlist[0]
+                dQddt_indices = dQddt_seg.nonzero()
+                dQfddt_indices = dQddt_seg.getrow(-1).nonzero()
+
+                if time_setup == 'dt':
+                    if not final_only:
+                        self.declare_partials([name], ['dt'], rows=dQddt_indices[0], cols=dQddt_indices[1])
+                    self.declare_partials([end_name], ['dt'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
+                elif time_setup == 'duration':
+                    if not final_only:
+                        self.declare_partials([name], ['duration'], rows=dQddt_indices[0], cols=dQddt_indices[1])
+                    self.declare_partials([end_name], ['duration'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
+                elif time_setup == 'bounds':
+                    if not final_only:
+                        self.declare_partials([name], ['t_initial','t_final'], rows=dQddt_indices[0], cols=dQddt_indices[1])
+                    self.declare_partials([end_name], ['t_initial','t_final'], rows=dQfddt_indices[0], cols=dQfddt_indices[1])
+                else:
+                    raise ValueError('Only dt, duration, and bounds are allowable values of time_setup')
+
+
+    def setup(self):
+        diff_units = self.options['diff_units']
+        num_nodes = self.options['num_nodes']
+        method = self.options['method']
+        time_setup = self.options['time_setup']
+
+        # check to make sure num nodes is OK
+        if (num_nodes - 1) % 2 > 0:
+            raise ValueError('num_nodes must be odd')
+
+        # branch logic here for the corner case of 0 segments
+        # so point analysis can be run without breaking everything
+        if num_nodes == 1:
+            single_point = True
+        else:
+            single_point = False
+        if not single_point:
+            if method == 'bdf3':
+                self.tri_mat, self.repeat_mat = bdf3_cache_matrix(num_nodes)
+            elif method == 'simpson':
+                self.tri_mat, self.repeat_mat = simpson_cache_matrix(num_nodes)
+
+        if time_setup == 'dt':
+            self.add_input('dt', units=diff_units, desc='Time step')
+        elif time_setup == 'duration':
+            self.add_input('duration', units=diff_units, desc='Time duration')
+        elif time_setup == 'bounds':
+            self.add_input('t_initial', units=diff_units, desc='Initial time')
+            self.add_input('t_final', units=diff_units, desc='Initial time')
+        else:
+            raise ValueError('Only dt, duration, and bounds are allowable values of time_setup')
+
+
+    def compute(self, inputs, outputs):
+        num_nodes = self.options['num_nodes']
+        time_setup=self.options['time_setup']
+
+        if num_nodes == 1:
+            single_point = True
+        else:
+            single_point = False
+
+        if time_setup == 'dt':
+            dts = [inputs['dt'][0]]
+        elif time_setup == 'duration':
+            if num_nodes == 1:
+                dts = [inputs['duration'][0]]
+            else:
+                dts = [inputs['duration'][0]/(num_nodes-1)]
+        elif time_setup == 'bounds':
+            delta_t = inputs['t_final'] - inputs['t_initial']
+            dts = [delta_t[0]/(num_nodes-1)]
+        
+        for name, options in self._state_vars.items():
+            if options['zero_start']:
+                q0 = 0
+            else:
+                q0 = inputs[options['start_name']]
+            if not single_point:
+                Q = multistep_integrator(q0, inputs[options['rate_name']], dts, self.tri_mat, self.repeat_mat,
+                                        segment_names=None, segments_to_count=None, partials=False)
+            else:
+                # single point case, no change, no dependence on time
+                Q = q0
+
+            if not options['final_only']:
+                outputs[options['name']] = Q
+            outputs[options['end_name']] = Q[-1]
+
+    def compute_partials(self, inputs, J):
+        num_nodes = self.options['num_nodes']
+        time_setup = self.options['time_setup']
+
+        if num_nodes == 1:
+            single_point = True
+        else:
+            single_point = False
+        if not single_point:
+            if time_setup == 'dt':
+                dts = [inputs['dt'][0]]
+            elif time_setup == 'duration':
+                dts = [inputs['duration'][0]/(num_nodes-1)]
+            elif time_setup == 'bounds':
+                delta_t = inputs['t_final'] - inputs['t_initial']
+                dts = [delta_t[0]/(num_nodes-1)]
+                
+            for name, options in self._state_vars.items():
+                start_name = options['start_name']
+                end_name = options['end_name']
+                qty_name = options['name']
+                rate_name = options['rate_name']
+                final_only = options['final_only']
+                if options['zero_start']:
+                    q0 = 0
+                else:
+                    q0 = inputs[start_name]
+                dQdrate, dQddtlist = multistep_integrator(q0, inputs[rate_name], dts, self.tri_mat, self.repeat_mat,
+                                                        segment_names=None, segments_to_count=None, partials=True)
+
+                if not final_only:
+                    J[qty_name, rate_name] = dQdrate.data
+                J[end_name, rate_name] = dQdrate.getrow(-1).data
+
+                if time_setup == 'dt':
+                    if not final_only:
+                        J[qty_name, 'dt'] = np.squeeze(dQddtlist[0].toarray()[1:])
+                    J[end_name, 'dt'] = np.squeeze(dQddtlist[0].getrow(-1).toarray())
+
+                elif time_setup == 'duration':
+                    if not final_only:
+                        J[qty_name, 'duration'] = np.squeeze(dQddtlist[0].toarray()[1:] / (num_nodes - 1))
+                    J[end_name, 'duration'] = np.squeeze(dQddtlist[0].getrow(-1).toarray() / (num_nodes - 1))
+
+                elif time_setup == 'bounds':
+                    if not final_only:
+                        if len(dQddtlist[0].data) == 0:
+                            J[qty_name, 't_initial'] = np.zeros(J[qty_name, 't_initial'].shape)
+                            J[qty_name, 't_final'] = np.zeros(J[qty_name, 't_final'].shape)
+                        else:
+                            J[qty_name, 't_initial'] = -dQddtlist[0].data / (num_nodes - 1)
+                            J[qty_name, 't_final'] = dQddtlist[0].data / (num_nodes - 1)
+                    if len(dQddtlist[0].getrow(-1).data) == 0:
+                        J[end_name, 't_initial'] = 0
+                        J[end_name, 't_final'] = 0
+                    else:
+                        J[end_name, 't_initial'] = -dQddtlist[0].getrow(-1).data / (num_nodes - 1)
+                        J[end_name, 't_final'] = dQddtlist[0].getrow(-1).data / (num_nodes - 1)
+
+
 
 class Integrator(ExplicitComponent):
     """
