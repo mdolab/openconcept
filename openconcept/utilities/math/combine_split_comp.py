@@ -1,6 +1,6 @@
 """Definition of the Vector Combiner/Splitter Component."""
 
-import collections
+from collections.abc import Iterable
 import numpy as np
 from scipy import sparse as sp
 from six import string_types
@@ -57,14 +57,14 @@ class VectorConcatenateComp(ExplicitComponent):
         self._add_systems = []
 
         if isinstance(output_name, string_types):
-            if (not isinstance(input_names, collections.Iterable) or
-                    not isinstance(vec_sizes, collections.Iterable)):
+            if (not isinstance(input_names, Iterable) or
+                    not isinstance(vec_sizes, Iterable)):
                 raise ValueError('User must provide list of input name(s)'
                                  'and list of vec_sizes for each input')
 
             self._add_systems.append((output_name, input_names, vec_sizes, length, val,
                                       kwargs))
-        elif isinstance(output_name, collections.Iterable):
+        elif isinstance(output_name, Iterable):
             raise NotImplementedError('Declaring multiple relations '
                                       'on initiation is not implemented.'
                                       'Use a string to name a single addition relationship or use '
@@ -140,8 +140,8 @@ class VectorConcatenateComp(ExplicitComponent):
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
                   'res_ref': res_ref}
 
-        if (not isinstance(input_names, collections.Iterable) or
-                not isinstance(vec_sizes, collections.Iterable)):
+        if (not isinstance(input_names, Iterable) or
+                not isinstance(vec_sizes, Iterable)):
             raise ValueError('User must provide list of input name(s)'
                              'and list of vec_sizes for each input')
 
@@ -279,14 +279,14 @@ class VectorSplitComp(ExplicitComponent):
         self._add_systems = []
 
         if isinstance(input_name, string_types):
-            if (not isinstance(output_names, collections.Iterable) or
-                    not isinstance(vec_sizes, collections.Iterable)):
+            if (not isinstance(output_names, Iterable) or
+                    not isinstance(vec_sizes, Iterable)):
                 raise ValueError('User must provide list of output name(s)'
                                  'and list of vec_sizes for each input')
 
             self._add_systems.append((output_names, input_name, vec_sizes, length, val,
                                       kwargs))
-        elif isinstance(input_name, collections.Iterable):
+        elif isinstance(input_name, Iterable):
             raise NotImplementedError('Declaring multiple relations '
                                       'on initiation is not implemented.'
                                       'Use a string to name a single addition relationship or use '
@@ -362,8 +362,8 @@ class VectorSplitComp(ExplicitComponent):
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
                   'res_ref': res_ref}
 
-        if (not isinstance(output_names, collections.Iterable) or
-                not isinstance(vec_sizes, collections.Iterable)):
+        if (not isinstance(output_names, Iterable) or
+                not isinstance(vec_sizes, Iterable)):
             raise ValueError('User must provide list of output name(s)'
                              'and list of vec_sizes for each input')
 

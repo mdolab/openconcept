@@ -1,10 +1,9 @@
 """Definition of the Element Multiply Component."""
 
-import collections
 import numpy as np
 from scipy import sparse as sp
 from six import string_types
-from collections import Iterable
+from collections.abc import Iterable
 from openmdao.core.explicitcomponent import ExplicitComponent
 
 
@@ -84,7 +83,7 @@ class ElementMultiplyDivideComp(ExplicitComponent):
         if isinstance(output_name, string_types):
             self._add_systems.append((output_name, input_names, vec_size, length, val,
                                       scaling_factor, divide, input_units, kwargs))
-        elif isinstance(output_name, collections.Iterable):
+        elif isinstance(output_name, Iterable):
             raise NotImplementedError('Declaring multiple systems '
                                       'on initiation is not implemented.'
                                       'Use a string to name a single addition relationship or use '

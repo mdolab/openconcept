@@ -2,7 +2,7 @@ from __future__ import division
 import unittest
 import pytest
 import numpy as np
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
 from openconcept.utilities.math.integrals import Integrator
 
@@ -74,7 +74,7 @@ class MultiPhaseIntegratorTestGroup(Group):
                 self.connect('iv.duration', 'integral.duration')
             elif time_setup == 'bounds':
                 iv.add_output('t_initial', val=2, units=diff_units)
-                iv.add_output('t_final', val=2 + 1*(nn_tot-1))
+                iv.add_output('t_final', val=2 + 1*(nn_tot-1), units=diff_units)
                 self.connect('iv.t_initial','integral.t_initial')
                 self.connect('iv.t_final','integral.t_final')
         else:
@@ -93,8 +93,8 @@ class IntegratorEveryNodeCommonTestCases(object):
         prob.run_model()
         num_nodes = self.num_nodes
         nn_tot = num_nodes
-        assert_rel_error(self, prob['integral.q'], np.linspace(0, nn_tot-1, nn_tot), tolerance=1e-14)
-        assert_rel_error(self, prob.get_val('integral.q_final', units=None), nn_tot-1, tolerance=1e-14)
+        assert_near_equal(prob['integral.q'], np.linspace(0, nn_tot-1, nn_tot), tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units=None), nn_tot-1, tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
@@ -109,8 +109,8 @@ class IntegratorEveryNodeCommonTestCases(object):
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
         prob.run_model()
-        assert_rel_error(self, prob['integral.q'], f, tolerance=1e-14)
-        assert_rel_error(self, prob.get_val('integral.q_final', units=None), f[-1], tolerance=1e-14)
+        assert_near_equal(prob['integral.q'], f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units=None), f[-1], tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
@@ -125,8 +125,8 @@ class IntegratorEveryNodeCommonTestCases(object):
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
         prob.run_model()
-        assert_rel_error(self, prob['integral.q'], f, tolerance=1e-14)
-        assert_rel_error(self, prob.get_val('integral.q_final', units=None), f[-1], tolerance=1e-14)
+        assert_near_equal(prob['integral.q'], f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units=None), f[-1], tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
@@ -142,8 +142,8 @@ class IntegratorEveryNodeCommonTestCases(object):
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
         prob.run_model()
-        assert_rel_error(self, prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
-        assert_rel_error(self, prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
@@ -159,8 +159,8 @@ class IntegratorEveryNodeCommonTestCases(object):
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
         prob.run_model()
-        assert_rel_error(self, prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
-        assert_rel_error(self, prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
@@ -177,8 +177,8 @@ class IntegratorEveryNodeCommonTestCases(object):
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
         prob.run_model()
-        assert_rel_error(self, prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
-        assert_rel_error(self, prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
@@ -194,8 +194,8 @@ class IntegratorEveryNodeCommonTestCases(object):
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
         prob.run_model()
-        assert_rel_error(self, prob.get_val('integral.q', units=None), f, tolerance=1e-14)
-        assert_rel_error(self, prob.get_val('integral.q_final', units=None), f[-1], tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q', units=None), f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units=None), f[-1], tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
@@ -214,8 +214,8 @@ class IntegratorEveryNodeCommonTestCases(object):
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
         prob.run_model()
-        assert_rel_error(self, prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
-        assert_rel_error(self, prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
@@ -235,8 +235,8 @@ class IntegratorEveryNodeCommonTestCases(object):
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
         prob.run_model()
-        assert_rel_error(self, prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
-        assert_rel_error(self, prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
@@ -259,8 +259,8 @@ class IntegratorEveryNodeCommonTestCases(object):
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
         prob.run_model()
-        assert_rel_error(self, prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
-        assert_rel_error(self, prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
@@ -282,8 +282,8 @@ class IntegratorEveryNodeCommonTestCases(object):
         prob['iv.cruise|dt'] = 2
         prob['iv.descent|dt'] = 3
         prob.run_model()
-        assert_rel_error(self, prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
-        assert_rel_error(self, prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
@@ -307,8 +307,8 @@ class IntegratorEveryNodeCommonTestCases(object):
         prob['iv.descent|dt'] = 3
         prob['iv.initial_value'] = C
         prob.run_model()
-        assert_rel_error(self, prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
-        assert_rel_error(self, prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 

@@ -1,6 +1,6 @@
 """Definition of the Element Summation Component."""
 
-import collections
+from collections.abc import Iterable
 import numpy as np
 from scipy import sparse as sp
 from six import string_types
@@ -72,7 +72,7 @@ class SumComp(ExplicitComponent):
         if isinstance(output_name, string_types):
             self._add_systems.append((output_name, input_name, vec_size, length, val,
                                       scaling_factor, kwargs))
-        elif isinstance(output_name, collections.Iterable):
+        elif isinstance(output_name, Iterable):
             raise NotImplementedError('Declaring multiple systems '
                                       'on initiation is not implemented.'
                                       'Use a string to name a single addition relationship or use '
