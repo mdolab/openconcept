@@ -71,7 +71,7 @@ class ElectricTBMAnalysisGroup(Group):
     def setup(self):
         nn = 11
 
-        dv_comp = self.add_subsystem('dv_comp',DictIndepVarComp(acdata,seperator='|'),promotes_outputs=["*"])
+        dv_comp = self.add_subsystem('dv_comp',DictIndepVarComp(acdata),promotes_outputs=["*"])
         #eventually replace the following aerodynamic parameters with an analysis module (maybe OpenAeroStruct)
         dv_comp.add_output_from_dict('ac|aero|CLmax_TO')
         dv_comp.add_output_from_dict('ac|aero|polar|e')
