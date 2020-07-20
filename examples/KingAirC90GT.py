@@ -136,8 +136,8 @@ class KingAirAnalysisGroup(Group):
                                       promotes_inputs=['*'], promotes_outputs=['*'])
 
 
-if __name__ == "__main__":
-    num_nodes = 11
+
+def configure_problem():
     prob = Problem()
     prob.model = KingAirAnalysisGroup()
     prob.model.nonlinear_solver = NewtonSolver(iprint=2)
@@ -147,9 +147,44 @@ if __name__ == "__main__":
     prob.model.nonlinear_solver.options['maxiter'] = 10
     prob.model.nonlinear_solver.options['atol'] = 1e-6
     prob.model.nonlinear_solver.options['rtol'] = 1e-6
-    prob.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=True)
-    prob.setup(check=True, mode='fwd')
+    # prob.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
+    return prob
 
+def show_outputs(prob):
+    # print some outputs
+    vars_list = ['ac|weights|MTOW','climb.OEW','descent.fuel_used_final','rotate.range_final']
+    units = ['lb','lb','lb','ft']
+    nice_print_names = ['MTOW', 'OEW', 'Fuel used', 'TOFL (over 35ft obstacle)']
+    print("=======================================================================")
+    for i, thing in enumerate(vars_list):
+        print(nice_print_names[i]+': '+str(prob.get_val(thing,units=units[i])[0])+' '+units[i])
+
+    # plot some stuff
+    plots = True
+    if plots:
+        x_var = 'range'
+        x_unit = 'ft'
+        y_vars = ['fltcond|Ueas', 'fltcond|h']
+        y_units = ['kn', 'ft']
+        x_label = 'Distance (ft)'
+        y_labels = ['Veas airspeed (knots)', 'Altitude (ft)']
+        phases = ['v0v1', 'v1vr', 'rotate', 'v1v0']
+        plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
+                        x_label=x_label, y_labels=y_labels,
+                        plot_title='King Air Takeoff')
+
+        x_var = 'range'
+        x_unit = 'NM'
+        y_vars = ['fltcond|h','fltcond|Ueas','fuel_used','throttle','fltcond|vs']
+        y_units = ['ft','kn','lbm',None,'ft/min']
+        x_label = 'Range (nmi)'
+        y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)']
+        phases = ['climb', 'cruise', 'descent']
+        plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
+                        x_label=x_label, y_labels=y_labels, marker='-',
+                        plot_title='King Air Mission Profile')
+
+def set_values(prob, num_nodes):
     # set some (required) mission parameters. Each pahse needs a vertical and air-speed
     # the entire mission needs a cruise altitude and range
     prob.set_val('climb.fltcond|vs', np.ones((num_nodes,))*1500, units='ft/min')
@@ -174,38 +209,17 @@ if __name__ == "__main__":
     prob['v1vr.throttle'] = np.ones((num_nodes)) * 0.75
     prob['rotate.throttle'] = np.ones((num_nodes)) * 0.75
 
+def run_kingair_analysis(plots=False):
+    num_nodes = 11
+    prob = configure_problem()
+    prob.setup(check=True, mode='fwd')
+    set_values(prob, num_nodes)
     prob.run_model()
-
-    # print some outputs
-    vars_list = ['ac|weights|MTOW','climb.OEW','descent.fuel_used_final','rotate.range_final']
-    units = ['lb','lb','lb','ft']
-    nice_print_names = ['MTOW', 'OEW', 'Fuel used', 'TOFL (over 35ft obstacle)']
-    print("=======================================================================")
-    for i, thing in enumerate(vars_list):
-        print(nice_print_names[i]+': '+str(prob.get_val(thing,units=units[i])[0])+' '+units[i])
-
-    # plot some stuff
-    plots = True
     if plots:
-        x_var = 'range'
-        x_unit = 'ft'
-        y_vars = ['fltcond|Ueas', 'fltcond|h']
-        y_units = ['kn', 'ft']
-        x_label = 'Distance (ft)'
-        y_labels = ['Veas airspeed (knots)', 'Altitude (ft)']
-        phases = ['v0v1', 'v1vr', 'rotate', 'v1v0']
-        plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
-                        x_label=x_label, y_labels=y_labels,
-                        plot_title='Caravan Takeoff')
+        show_outputs(prob)
+    return prob
 
-        x_var = 'range'
-        x_unit = 'NM'
-        y_vars = ['fltcond|h','fltcond|Ueas','fuel_used','throttle','fltcond|vs']
-        y_units = ['ft','kn','lbm',None,'ft/min']
-        x_label = 'Range (nmi)'
-        y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)']
-        phases = ['climb', 'cruise', 'descent']
-        plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
-                        x_label=x_label, y_labels=y_labels, marker='-',
-                        plot_title='Caravan Mission Profile')
+
+if __name__ == "__main__":
+    run_kingair_analysis(plots=True)
 

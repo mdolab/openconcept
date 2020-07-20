@@ -89,7 +89,6 @@ class B738AirplaneModel(Group):
                            promotes_inputs=['*'],
                            promotes_outputs=['weight'])
 
-
 class B738AnalysisGroup(Group):
     """This is an example of a three-phase mission analysis.
     """
@@ -140,8 +139,6 @@ class B738AnalysisGroup(Group):
         extra_states_tuple.append(('range', ['descent', 'reserve_climb']))
         extra_states_tuple.append(('range', ['reserve_descent', 'loiter']))
 
-        print(extra_states_tuple)
-
         # Run a full mission analysis including takeoff, reserve_, cruise,reserve_ and descereserve_nt
         analysis = self.add_subsystem('analysis',
                                       MissionWithReserve(num_nodes=nn,
@@ -149,10 +146,7 @@ class B738AnalysisGroup(Group):
                                                           extra_states=extra_states_tuple),
                                       promotes_inputs=['*'], promotes_outputs=['*'])
 
-
-if __name__ == "__main__":
-    # Set up OpenMDAO to analyze the airplane
-    num_nodes = 11
+def configure_problem():
     prob = Problem()
     prob.model = B738AnalysisGroup()
     prob.model.nonlinear_solver = NewtonSolver(iprint=2,solve_subsystems=True)
@@ -163,8 +157,9 @@ if __name__ == "__main__":
     prob.model.nonlinear_solver.options['atol'] = 1e-6
     prob.model.nonlinear_solver.options['rtol'] = 1e-6
     prob.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
-    prob.setup(check=True, mode='fwd')
+    return prob
 
+def set_values(prob, num_nodes):
     # set some (required) mission parameters. Each pahse needs a vertical and air-speed
     # the entire mission needs a cruise altitude and range
     prob.set_val('climb.fltcond|vs', np.linspace(2300.,  600.,num_nodes), units='ft/min')
@@ -185,8 +180,7 @@ if __name__ == "__main__":
     prob.set_val('reserve|h0',15000.,units='ft')
     prob.set_val('mission_range',2050,units='NM')
 
-    prob.run_model()
-
+def show_outputs(prob):
     # print some outputs
     vars_list = ['descent.fuel_used_final','loiter.fuel_used_final']
     units = ['lb','lb']
@@ -208,7 +202,18 @@ if __name__ == "__main__":
         plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels, marker='-',
                         plot_title='737-800 Mission Profile')
-    prob.model.list_outputs(residuals=True)
+    # prob.model.list_outputs()
 
-    #28808 block fuel
-    #1440 reserve
+def run_738_analysis(plots=False):
+    num_nodes = 11
+    prob = configure_problem()
+    prob.setup(check=True, mode='fwd')
+    set_values(prob, num_nodes)
+    prob.run_model()
+    if plots:
+        show_outputs(prob)
+    return prob
+
+
+if __name__ == "__main__":
+    run_738_analysis(plots=True)    
