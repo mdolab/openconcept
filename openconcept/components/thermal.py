@@ -309,7 +309,7 @@ class SimpleTMS(Group):
         ivc = self.add_subsystem('ivc', IndepVarComp(), promotes_outputs=['mdot_coolant'])
         ivc.add_output('motor_T_init', val=self.options['motor_T_init'], units='K')
 
-        self.add_subsystem('motor_temp_integrator', Integrator(num_intervals=int((nn-1)/2),
+        self.add_subsystem('motor_temp_integrator', Integrator(num_nodes=nn,
                                                                quantity_units='K',
                                                                diff_units='s',
                                                                method='simpson',
