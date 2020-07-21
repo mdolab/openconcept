@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
 from openconcept.analysis.aerodynamics import PolarDrag, Lift, StallSpeed
 
@@ -31,8 +31,8 @@ class VectorDragTestCase(unittest.TestCase):
     def test_drag_vectorial(self):
         drag_cl0 = 0.5*1.225*70**2 * 30 *(0.02 + 0**2 / np.pi / 0.8 / 15)
         drag_cl1p5 = 0.5*1.225*70**2 * 30 *(0.02 + 1.5**2 / np.pi / 0.8 / 15)
-        assert_rel_error(self, self.prob['drag'][0], drag_cl0, tolerance=1e-8)
-        assert_rel_error(self, self.prob['drag'][-1], drag_cl1p5, tolerance=1e-8)
+        assert_near_equal(self.prob['drag'][0], drag_cl0, tolerance=1e-8)
+        assert_near_equal(self.prob['drag'][-1], drag_cl1p5, tolerance=1e-8)
 
 
     def test_partials(self):
@@ -47,7 +47,7 @@ class ScalarDragTestCase(unittest.TestCase):
 
     def test_drag_scalar(self):
         drag_cl0 = 0.5*1.225*70**2 * 30 *(0.02 + 0**2 / np.pi / 0.8 / 15)
-        assert_rel_error(self, self.prob['drag'], drag_cl0, tolerance=1e-8)
+        assert_near_equal(self.prob['drag'], drag_cl0, tolerance=1e-8)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -77,8 +77,8 @@ class VectorLiftTestCase(unittest.TestCase):
     def test_lift_vectorial(self):
         lift_cl0 = 0
         lift_cl1p5 = 0.5*1.225*70**2 * 30 * 1.5
-        assert_rel_error(self, self.prob['lift'][-1], lift_cl0, tolerance=1e-8)
-        assert_rel_error(self, self.prob['lift'][0], lift_cl1p5, tolerance=1e-8)
+        assert_near_equal(self.prob['lift'][-1], lift_cl0, tolerance=1e-8)
+        assert_near_equal(self.prob['lift'][0], lift_cl1p5, tolerance=1e-8)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -92,7 +92,7 @@ class ScalarLiftTestCase(unittest.TestCase):
 
     def test_lift_scalar(self):
         lift_cl1p5 = 0.5*1.225*70**2 * 30 * 1.5
-        assert_rel_error(self, self.prob['lift'], lift_cl1p5, tolerance=1e-8)
+        assert_near_equal(self.prob['lift'], lift_cl1p5, tolerance=1e-8)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -119,7 +119,7 @@ class StallSpeedTestCase(unittest.TestCase):
 
     def test_stall_speed(self):
         vstall = np.sqrt(2 * 1000 * 9.80665 / 1.225 / 30 / 2.5)
-        assert_rel_error(self, self.prob['Vstall_eas'], vstall, tolerance=1e-8)
+        assert_near_equal(self.prob['Vstall_eas'], vstall, tolerance=1e-8)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)

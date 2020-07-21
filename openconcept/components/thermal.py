@@ -657,7 +657,7 @@ class LiquidCooledComp(Group):
                                                         num_nodes=nn),
                                                         promotes_inputs=['q_in', 'mass'])
             self.add_subsystem('integratetemp',
-                               Integrator(num_intervals=int((nn-1)/2),
+                               Integrator(num_nodes=nn,
                                           quantity_units='K',
                                           diff_units='s',
                                           method='simpson',
@@ -714,7 +714,7 @@ class CoolantReservoir(Group):
                            CoolantReservoirRate(num_nodes=nn),
                            promotes_inputs=['T_in', 'T_out', 'mass', 'mdot_coolant'])
         self.add_subsystem('integratetemp',
-                           Integrator(num_intervals=int((nn-1)/2),
+                           Integrator(num_nodes=nn,
                                       quantity_units='K',
                                       diff_units='s',
                                       method='simpson',

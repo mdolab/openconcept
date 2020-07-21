@@ -7,7 +7,7 @@ import numpy as np
 from openmdao.api import Problem, Group, IndepVarComp
 #from openmdao.components.sum_comp import SumComp
 from openconcept.utilities.math.sum_comp import SumComp
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 class TestSummation1x1(unittest.TestCase):
     # this test case is nonsensical but should still pass
@@ -37,7 +37,7 @@ class TestSummation1x1(unittest.TestCase):
         a = self.p['a']
         out = self.p['sum_comp.sum_output']
         expected = np.sum(a, axis=0)
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='cs', out_stream=None)
@@ -71,7 +71,7 @@ class TestSummation1x1AxisNone(unittest.TestCase):
         a = self.p['a']
         out = self.p['sum_comp.sum_output']
         expected = np.sum(a, axis=None)
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='cs', out_stream=None)
@@ -104,7 +104,7 @@ class TestSummationNx1(unittest.TestCase):
         a = self.p['a']
         out = self.p['sum_comp.sum_output']
         expected = np.sum(a, axis=0)
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='cs', out_stream=None)
@@ -137,7 +137,7 @@ class TestSummationNx1AxisNone(unittest.TestCase):
         a = self.p['a']
         out = self.p['sum_comp.sum_output']
         expected = np.sum(a, axis=None)
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='cs', out_stream=None)
@@ -173,7 +173,7 @@ class TestSummationNx3(unittest.TestCase):
         out = self.p['sum_comp.sum_output']
         expected = self.sf*np.sum(a, axis=0)
         expected = expected.reshape((1,self.length))
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='cs', out_stream=None)
@@ -209,7 +209,7 @@ class TestSummationNx3Axis1(unittest.TestCase):
         out = self.p['sum_comp.sum_output']
         expected = self.sf*np.sum(a, axis=1)
         expected = expected.reshape((self.nn,))
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='cs', out_stream=None)
@@ -245,7 +245,7 @@ class TestSummationNx3AxisNone(unittest.TestCase):
         out = self.p['sum_comp.sum_output']
         expected = self.sf*np.sum(a, axis=None)
         expected = expected.reshape((1,))
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='cs', out_stream=None)
@@ -290,8 +290,8 @@ class TestSummationNx3UnitsMultipleSystems(unittest.TestCase):
         expected_1 = expected_1.reshape((1,self.length))
         expected_2 = np.sum(b, axis=0) * 1000
         expected_2 = expected_2.reshape((1,self.length))
-        assert_rel_error(self, out_1, expected_1,1e-15)
-        assert_rel_error(self, out_2, expected_2,1e-15)
+        assert_near_equal(out_1, expected_1,1e-15)
+        assert_near_equal(out_2, expected_2,1e-15)
 
     def test_partials(self):
         partials = self.p.check_partials(method='cs', out_stream=None)
@@ -346,7 +346,7 @@ class TestSummationNx3OnInit(unittest.TestCase):
         out = self.p['sum_comp.sum_output']
         expected = np.sum(a, axis=0)
         expected = expected.reshape((1,self.length))
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='cs', out_stream=None)
@@ -361,7 +361,7 @@ class TestForDocs(unittest.TestCase):
         import numpy as np
         #from openmdao.api import Problem, Group, IndepVarComp
         from openconcept.utilities.math.sum_comp import SumComp
-        from openmdao.utils.assert_utils import assert_rel_error
+        from openmdao.utils.assert_utils import assert_near_equal
 
         n = 10
         length = 1
@@ -393,7 +393,7 @@ class TestForDocs(unittest.TestCase):
         # Verify the results
         expected_i = np.sum(p['fuel_burn_by_seg'],axis=0)
         expected_i = expected_i.reshape((1,))
-        assert_rel_error(self, p.get_val('totalfuelcomp.total_fuel', units='kg'), expected_i)
+        assert_near_equal(p.get_val('totalfuelcomp.total_fuel', units='kg'), expected_i)
 
 
 if __name__ == '__main__':

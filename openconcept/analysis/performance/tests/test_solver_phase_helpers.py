@@ -1,7 +1,7 @@
 from __future__ import division
 import unittest
 import numpy as np
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
 from openconcept.analysis.performance.solver_phases import ClimbAngleComp, FlipVectorComp, Groundspeeds, HorizontalAcceleration, VerticalAcceleration, SteadyFlightCL, TakeoffTransition
 
@@ -30,12 +30,12 @@ class ClimbAngleTestCase_Scalar(unittest.TestCase):
         self.prob.run_model()
 
     def test_level_flight(self):
-        assert_rel_error(self, self.prob['gamma'][0],0,tolerance=1e-10)
+        assert_near_equal(self.prob['gamma'][0],0,tolerance=1e-10)
 
     def test_climb_flight(self):
         self.prob['thrust'] = np.ones((1,))*1200
         self.prob.run_model()
-        assert_rel_error(self, self.prob['gamma'][0], np.arcsin(200 / 1000 / g), tolerance=1e-10)
+        assert_near_equal(self.prob['gamma'][0], np.arcsin(200 / 1000 / g), tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -67,7 +67,7 @@ class FlipVectorCompTestCase_Vector(unittest.TestCase):
         self.prob.run_model()
 
     def test_flip_vec_order(self):
-        assert_rel_error(self, self.prob['vec_out'], np.linspace(100, 0, 11), tolerance=1e-10)
+        assert_near_equal(self.prob['vec_out'], np.linspace(100, 0, 11), tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -80,7 +80,7 @@ class FlipVectorCompTestCase_Scalar(unittest.TestCase):
         self.prob.run_model()
 
     def test_flip_vec_order(self):
-        assert_rel_error(self, self.prob['vec_out'], np.zeros((1,)), tolerance=1e-10)
+        assert_near_equal(self.prob['vec_out'], np.zeros((1,)), tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -93,7 +93,7 @@ class FlipVectorCompTestCase_Negative(unittest.TestCase):
         self.prob.run_model()
 
     def test_flip_vec_order(self):
-        assert_rel_error(self, self.prob['vec_out'], np.linspace(-100, 0, 11), tolerance=1e-10)
+        assert_near_equal(self.prob['vec_out'], np.linspace(-100, 0, 11), tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -121,15 +121,15 @@ class GroundspeedsTestCase(unittest.TestCase):
         self.prob.run_model()
 
     def test_level_flight(self):
-        assert_rel_error(self, self.prob['fltcond|groundspeed'][0],50,tolerance=1e-10)
-        assert_rel_error(self, self.prob['fltcond|cosgamma'][0],1.,tolerance=1e-10)
-        assert_rel_error(self, self.prob['fltcond|singamma'][0],0.,tolerance=1e-10)
+        assert_near_equal(self.prob['fltcond|groundspeed'][0],50,tolerance=1e-10)
+        assert_near_equal(self.prob['fltcond|cosgamma'][0],1.,tolerance=1e-10)
+        assert_near_equal(self.prob['fltcond|singamma'][0],0.,tolerance=1e-10)
 
     def test_climb_flight(self):
         gs = np.sqrt(50**2 - 3**2)
-        assert_rel_error(self, self.prob['fltcond|groundspeed'][-1],gs,tolerance=1e-10)
-        assert_rel_error(self, self.prob['fltcond|cosgamma'][-1],gs/50.,tolerance=1e-10)
-        assert_rel_error(self, self.prob['fltcond|singamma'][-1],3./50.,tolerance=1e-10)
+        assert_near_equal(self.prob['fltcond|groundspeed'][-1],gs,tolerance=1e-10)
+        assert_near_equal(self.prob['fltcond|cosgamma'][-1],gs/50.,tolerance=1e-10)
+        assert_near_equal(self.prob['fltcond|singamma'][-1],3./50.,tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -159,7 +159,7 @@ class HorizontalAccelerationTestCase_SteadyLevel(unittest.TestCase):
         self.prob.run_model()
 
     def test_steady_level_flights(self):
-        assert_rel_error(self, self.prob['accel_horiz'], np.zeros((9,)), tolerance=1e-10)
+        assert_near_equal(self.prob['accel_horiz'], np.zeros((9,)), tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -174,7 +174,7 @@ class HorizontalAccelerationTestCase_SteadyClimb(unittest.TestCase):
         self.prob.run_model()
 
     def test_steady_climb_flights(self):
-        assert_rel_error(self, self.prob['accel_horiz'], np.zeros((9,)), tolerance=1e-10)
+        assert_near_equal(self.prob['accel_horiz'], np.zeros((9,)), tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -189,7 +189,7 @@ class HorizontalAccelerationTestCase_SteadyClimb(unittest.TestCase):
         self.prob.run_model()
 
     def test_steady_climb_flights(self):
-        assert_rel_error(self, self.prob['accel_horiz'], np.zeros((9,)), tolerance=1e-10)
+        assert_near_equal(self.prob['accel_horiz'], np.zeros((9,)), tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -214,7 +214,7 @@ class HorizontalAccelerationTestCase_UnsteadyRunwayAccel(unittest.TestCase):
         brakeforce = 0.03 * (weight-lift)
         slopeforce = weight * singamma
         accel_horz_actual = (thrust - drag - brakeforce - slopeforce) / mass
-        assert_rel_error(self, self.prob['accel_horiz'][0], accel_horz_actual, tolerance=1e-10)
+        assert_near_equal(self.prob['accel_horiz'][0], accel_horz_actual, tolerance=1e-10)
 
     def test_accel_with_braking_and_lift(self):
         drag = 50.0
@@ -226,7 +226,7 @@ class HorizontalAccelerationTestCase_UnsteadyRunwayAccel(unittest.TestCase):
         brakeforce = 0.03 * (weight-lift)
         slopeforce = weight * singamma
         accel_horz_actual = (thrust - drag - brakeforce - slopeforce) / mass
-        assert_rel_error(self, self.prob['accel_horiz'][4], accel_horz_actual, tolerance=1e-10)
+        assert_near_equal(self.prob['accel_horiz'][4], accel_horz_actual, tolerance=1e-10)
 
     def test_accel_lift_exceeds_weight(self):
         drag = 50.0
@@ -238,7 +238,7 @@ class HorizontalAccelerationTestCase_UnsteadyRunwayAccel(unittest.TestCase):
         brakeforce = 0.0
         slopeforce = weight * singamma
         accel_horz_actual = (thrust - drag - brakeforce - slopeforce) / mass
-        assert_rel_error(self, self.prob['accel_horiz'][-1], accel_horz_actual, tolerance=1e-10)
+        assert_near_equal(self.prob['accel_horiz'][-1], accel_horz_actual, tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -268,7 +268,7 @@ class VerticalAccelerationTestCase_SteadyLevel(unittest.TestCase):
         self.prob.run_model()
 
     def test_steady_level_flights(self):
-        assert_rel_error(self, self.prob['accel_vert'], np.zeros((9,)), tolerance=1e-10)
+        assert_near_equal(self.prob['accel_vert'], np.zeros((9,)), tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -285,7 +285,7 @@ class VerticalAccelerationTestCase_SteadyClimbing(unittest.TestCase):
         self.prob.run_model()
 
     def test_steady_climbing_flight(self):
-        assert_rel_error(self, self.prob['accel_vert'], np.zeros((9,)), tolerance=1e-10)
+        assert_near_equal(self.prob['accel_vert'], np.zeros((9,)), tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -299,7 +299,7 @@ class VerticalAccelerationTestCase_UnsteadyPullUp(unittest.TestCase):
         self.prob.run_model()
 
     def test_unsteady_pullup(self):
-        assert_rel_error(self, self.prob['accel_vert'], (100./100.)*np.ones((9,)), tolerance=1e-10)
+        assert_near_equal(self.prob['accel_vert'], (100./100.)*np.ones((9,)), tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -327,7 +327,7 @@ class SteadyFlightCLTestCase_Level(unittest.TestCase):
         self.prob.run_model()
 
     def test_steady_level_flights(self):
-        assert_rel_error(self, self.prob['fltcond|CL'], np.ones((9,))*100*g/1000./10./1.0, tolerance=1e-10)
+        assert_near_equal(self.prob['fltcond|CL'], np.ones((9,))*100*g/1000./10./1.0, tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -341,7 +341,7 @@ class SteadyFlightCLTestCase_Climb(unittest.TestCase):
         self.prob.run_model()
 
     def test_steady_level_flights(self):
-        assert_rel_error(self, self.prob['fltcond|CL'], np.ones((9,))*100*g/1000./10.*0.98, tolerance=1e-10)
+        assert_near_equal(self.prob['fltcond|CL'], np.ones((9,))*100*g/1000./10.*0.98, tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
