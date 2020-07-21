@@ -88,8 +88,7 @@ class SeriesHybridTwinModel(Group):
         self.connect('propmodel.eng1.component_weight', 'W_engine')
         self.connect('propmodel.gen1.component_weight', 'W_generator')
         self.connect('propmodel.motors_weight', 'W_motors')
-        nn_simpson = int((nn - 1) / 2)
-        self.add_subsystem('intfuel', Integrator(num_intervals=nn_simpson, method='simpson',
+        self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson',
                                                  quantity_units='kg', diff_units='s',
                                                  time_setup='duration'),
                            promotes_inputs=[('dqdt', 'fuel_flow'), 'duration',
@@ -110,7 +109,7 @@ class ElectricTwinAnalysisGroup(Group):
         nn = 11
 
         # Define a bunch of design varaiables and airplane-specific parameters
-        dv_comp = self.add_subsystem('dv_comp', DictIndepVarComp(acdata, seperator='|'),
+        dv_comp = self.add_subsystem('dv_comp',  DictIndepVarComp(acdata),
                                      promotes_outputs=["*"])
         dv_comp.add_output_from_dict('ac|aero|CLmax_TO')
         dv_comp.add_output_from_dict('ac|aero|polar|e')

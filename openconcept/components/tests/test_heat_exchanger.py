@@ -1,7 +1,7 @@
 from __future__ import division
 import unittest
 import numpy as np
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
 from openconcept.components.heat_exchanger import OffsetStripFinGeometry, OffsetStripFinData, HydraulicDiameterReynoldsNumber, OutletTemperatures, PressureDrop
 from openconcept.components.heat_exchanger import NusseltFromColburnJ, ConvectiveCoefficient, FinEfficiency, UAOverall, NTUMethod, CrossFlowNTUEffectiveness, NTUEffectivenessActualHeatTransfer
@@ -70,11 +70,11 @@ class OSFGeometryTestCase(unittest.TestCase):
         prob = Problem(OSFGeometryTestGroup(num_nodes=1))
         prob.setup(check=True,force_alloc_complex=True)
         prob.run_model()
-        assert_rel_error(self, prob['osfgeometry.dh_cold'], 0.002462541, tolerance=1e-6)
-        assert_rel_error(self, prob['heat_transfer'], 10020.13126, tolerance=1e-6 )
-        assert_rel_error(self, prob['delta_p_cold'], -131.9862069, tolerance=1e-6 )
-        assert_rel_error(self, prob['delta_p_hot'], -9112.282754, tolerance=1e-6 )
-        assert_rel_error(self, prob['component_weight'], 1.147605, tolerance=1e-5 )
+        assert_near_equal(prob['osfgeometry.dh_cold'], 0.002462541, tolerance=1e-6)
+        assert_near_equal(prob['heat_transfer'], 10020.13126, tolerance=1e-6 )
+        assert_near_equal(prob['delta_p_cold'], -131.9862069, tolerance=1e-6 )
+        assert_near_equal(prob['delta_p_hot'], -9112.282754, tolerance=1e-6 )
+        assert_near_equal(prob['component_weight'], 1.147605, tolerance=1e-5 )
 
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -89,10 +89,10 @@ class OSFGeometryTestCase(unittest.TestCase):
     #                                     cost_base=0))
     #     prob.setup(check=True,force_alloc_complex=True)
     #     prob.run_model()
-    #     assert_rel_error(self, prob.get_val('battery.heat_out', units='kW'), np.ones(10)*100*0.05, tolerance=1e-15)
-    #     assert_rel_error(self, prob['battery.component_sizing_margin'], np.ones(10)/3, tolerance=1e-15)
-    #     assert_rel_error(self, prob['battery.component_cost'], 10000, tolerance=1e-15)
-    #     assert_rel_error(self, prob.get_val('battery.max_energy', units='W*h'), 500*100, tolerance=1e-15)
+    #     assert_near_equal(prob.get_val('battery.heat_out', units='kW'), np.ones(10)*100*0.05, tolerance=1e-15)
+    #     assert_near_equal(prob['battery.component_sizing_margin'], np.ones(10)/3, tolerance=1e-15)
+    #     assert_near_equal(prob['battery.component_cost'], 10000, tolerance=1e-15)
+    #     assert_near_equal(prob.get_val('battery.max_energy', units='W*h'), 500*100, tolerance=1e-15)
 
     #     partials = prob.check_partials(method='cs',compact_print=True)
     #     assert_check_partials(partials)

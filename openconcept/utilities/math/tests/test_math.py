@@ -2,7 +2,7 @@ from __future__ import division
 import unittest
 import pytest
 import numpy as np
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
 from openconcept.utilities.math.simpson_integration import IntegrateQuantity
 from openconcept.utilities.math.derivatives import FirstDerivative
@@ -29,7 +29,7 @@ class SimpsonTestCase(unittest.TestCase):
         prob = Problem(SimpsonTestGroup(n_simp_intervals=1))
         prob.setup(check=True)
         prob.run_model()
-        assert_rel_error(self,prob['delta_quantity'],1.,tolerance=1e-15)
+        assert_near_equal(prob['delta_quantity'],1.,tolerance=1e-15)
         partials = prob.check_partials(method='fd',compact_print=True)
         assert_check_partials(partials)
 
@@ -37,7 +37,7 @@ class SimpsonTestCase(unittest.TestCase):
         prob = Problem(SimpsonTestGroup(n_simp_intervals=5))
         prob.setup(check=True)
         prob.run_model()
-        assert_rel_error(self,prob['delta_quantity'],1.,tolerance=1e-15)
+        assert_near_equal(prob['delta_quantity'],1.,tolerance=1e-15)
         partials = prob.check_partials(method='fd',compact_print=True)
         assert_check_partials(partials)
 
@@ -46,14 +46,14 @@ class SimpsonTestCase(unittest.TestCase):
         prob.setup(check=False)
         prob['iv.end_pt'] = 2
         prob.run_model()
-        assert_rel_error(self,prob['delta_quantity'],2.,tolerance=1e-15)
+        assert_near_equal(prob['delta_quantity'],2.,tolerance=1e-15)
 
     def test_function_level(self):
         prob = Problem(SimpsonTestGroup(n_simp_intervals=5))
         prob.setup(check=False)
         prob['iv.function'] = 3*np.ones(2*5+1)
         prob.run_model()
-        assert_rel_error(self,prob['delta_quantity'],3.,tolerance=1e-15)
+        assert_near_equal(prob['delta_quantity'],3.,tolerance=1e-15)
 
     def test_trig_function_approx(self):
         prob = Problem(SimpsonTestGroup(n_simp_intervals=5))
@@ -62,7 +62,7 @@ class SimpsonTestCase(unittest.TestCase):
         prob['iv.end_pt'] = np.pi
         prob['iv.function'] = np.sin(x)
         prob.run_model()
-        assert_rel_error(self,prob['delta_quantity'],2.,tolerance=1e-4)
+        assert_near_equal(prob['delta_quantity'],2.,tolerance=1e-4)
         partials = prob.check_partials(method='fd',compact_print=True)
         assert_check_partials(partials)
 
@@ -72,7 +72,7 @@ class SimpsonTestCase(unittest.TestCase):
         x = np.linspace(0,1,2*5+1)
         prob['iv.function'] = x**3-2*x**2+2.5*x-4
         prob.run_model()
-        assert_rel_error(self,prob['delta_quantity'],-3.1666666666666666666666666666666666666,tolerance=1e-16)
+        assert_near_equal(prob['delta_quantity'],-3.1666666666666666666666666666666666666,tolerance=1e-16)
         partials = prob.check_partials(method='fd',compact_print=True)
         assert_check_partials(partials)
 
@@ -139,7 +139,7 @@ class FirstDerivCommonTestCases(object):
         prob.run_model()
         n_int_per_seg = 5
         nn_tot = (n_int_per_seg*2 + 1)
-        assert_rel_error(self, prob['derivative.dqdt'], np.zeros((nn_tot,)),tolerance=1e-14)
+        assert_near_equal(prob['derivative.dqdt'], np.zeros((nn_tot,)),tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e2)
 
@@ -151,7 +151,7 @@ class FirstDerivCommonTestCases(object):
         prob['iv.quant_to_diff'] = np.linspace(0,1,nn_tot)
         prob['iv.dt'] = 1 / (nn_tot - 1)
         prob.run_model()
-        assert_rel_error(self, prob['derivative.dqdt'], np.ones((nn_tot,)),tolerance=1e-15)
+        assert_near_equal(prob['derivative.dqdt'], np.ones((nn_tot,)),tolerance=1e-15)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e2)
 
@@ -166,7 +166,7 @@ class FirstDerivCommonTestCases(object):
         prob['iv.quant_to_diff'] = f_test
         prob['iv.dt'] = 2 / (nn_tot - 1)
         prob.run_model()
-        assert_rel_error(self, prob['derivative.dqdt'], fp_exact, tolerance=1e-14)
+        assert_near_equal(prob['derivative.dqdt'], fp_exact, tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e-8)
 
@@ -181,7 +181,7 @@ class FirstDerivCommonTestCases(object):
         prob['iv.quant_to_diff'] = f_test
         prob['iv.dt'] = 2 / (nn_tot - 1)
         prob.run_model()
-        assert_rel_error(self, prob.get_val('derivative.dqdt','m/s'), fp_exact, tolerance=1e-14)
+        assert_near_equal(prob.get_val('derivative.dqdt','m/s'), fp_exact, tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e-8)
 
@@ -196,7 +196,7 @@ class FirstDerivCommonTestCases(object):
         prob['iv.quant_to_diff'] = f_test
         prob['iv.dt'] = 2 / (nn_tot - 1)
         prob.run_model()
-        assert_rel_error(self, prob.get_val('derivative.dqdt','s ** -1'), fp_exact, tolerance=1e-14)
+        assert_near_equal(prob.get_val('derivative.dqdt','s ** -1'), fp_exact, tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e-8)
 
@@ -211,7 +211,7 @@ class FirstDerivCommonTestCases(object):
         prob['iv.quant_to_diff'] = f_test
         prob['iv.cruise|dt'] = 2 / (nn_tot - 1)
         prob.run_model()
-        assert_rel_error(self, prob.get_val('derivative.dqdt','m/s'), fp_exact, tolerance=1e-14)
+        assert_near_equal(prob.get_val('derivative.dqdt','m/s'), fp_exact, tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e-8)
 
@@ -230,7 +230,7 @@ class FirstDerivCommonTestCases(object):
         prob['iv.cruise|dt'] = 1 / (nn_seg - 1)
         prob['iv.descent|dt'] = 3 / (nn_seg - 1)
         prob.run_model()
-        assert_rel_error(self, prob.get_val('derivative.dqdt','m/s'), fp_exact, tolerance=1e-12)
+        assert_near_equal(prob.get_val('derivative.dqdt','m/s'), fp_exact, tolerance=1e-12)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-6, rtol=1e-6)
 
@@ -249,7 +249,7 @@ class FirstDerivCommonTestCases(object):
         prob['iv.cruise|dt'] = 1 / (nn_seg - 1)
         prob['iv.descent|dt'] = 3 / (nn_seg - 1)
         prob.run_model()
-        assert_rel_error(self, prob.get_val('derivative.dqdt','m/s'), fp_exact, tolerance=1e-12)
+        assert_near_equal(prob.get_val('derivative.dqdt','m/s'), fp_exact, tolerance=1e-12)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-6, rtol=1e-6)
 
@@ -281,7 +281,7 @@ class FirstDerivativeFourthOrderTestCases(unittest.TestCase, FirstDerivCommonTes
         prob['iv.quant_to_diff'] = f_test
         prob['iv.dt'] = 2 / (nn_tot - 1)
         prob.run_model()
-        assert_rel_error(self, prob['derivative.dqdt'], fp_exact, tolerance=1e-14)
+        assert_near_equal(prob['derivative.dqdt'], fp_exact, tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e-8)
 
@@ -296,7 +296,7 @@ class FirstDerivativeFourthOrderTestCases(unittest.TestCase, FirstDerivCommonTes
         prob['iv.quant_to_diff'] = f_test
         prob['iv.dt'] = 2 / (nn_tot - 1)
         prob.run_model()
-        assert_rel_error(self, prob['derivative.dqdt'], fp_exact, tolerance=1e-14)
+        assert_near_equal(prob['derivative.dqdt'], fp_exact, tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-6, rtol=1e-6)
 
@@ -311,7 +311,7 @@ class FirstDerivativeFourthOrderTestCases(unittest.TestCase, FirstDerivCommonTes
         prob['iv.quant_to_diff'] = f_test
         prob['iv.dt'] = 2 / (nn_tot - 1)
         prob.run_model()
-        assert_rel_error(self, prob.get_val('derivative.dqdt',units='m/s'), fp_exact, tolerance=1e-14)
+        assert_near_equal(prob.get_val('derivative.dqdt',units='m/s'), fp_exact, tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e-8)
 
@@ -326,7 +326,7 @@ class FirstDerivativeFourthOrderTestCases(unittest.TestCase, FirstDerivCommonTes
         prob['iv.quant_to_diff'] = f_test
         prob['iv.dt'] = 2 / (nn_tot - 1)
         prob.run_model()
-        assert_rel_error(self, prob.get_val('derivative.dqdt',units='s ** -1'), fp_exact, tolerance=1e-14)
+        assert_near_equal(prob.get_val('derivative.dqdt',units='s ** -1'), fp_exact, tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e-8)
 
@@ -342,7 +342,7 @@ class FirstDerivativeFourthOrderTestCases(unittest.TestCase, FirstDerivCommonTes
         prob['iv.quant_to_diff'] = f_test
         prob['iv.dt'] = 2 / (nn_tot - 1)
         prob.run_model()
-        assert_rel_error(self, prob.get_val('derivative.dqdt',units='m'), fp_exact, tolerance=1e-14)
+        assert_near_equal(prob.get_val('derivative.dqdt',units='m'), fp_exact, tolerance=1e-14)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e-8)
 

@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp
 from openconcept.utilities.dvlabel import DVLabel
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 class TestBasic(unittest.TestCase):
 
@@ -38,8 +38,8 @@ class TestBasic(unittest.TestCase):
         b_in = self.p['b_to_be_renamed']
         a_out = self.p['a']
         b_out = self.p['b']
-        assert_rel_error(self, a_in, a_out,1e-16)
-        assert_rel_error(self, b_in, b_out,1e-16)
+        assert_near_equal(a_in, a_out,1e-16)
+        assert_near_equal(b_in, b_out,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -75,8 +75,8 @@ class TestUnits(unittest.TestCase):
         b_in = self.p['b_to_be_renamed']
         a_out = self.p['a']
         b_out = self.p['b']
-        assert_rel_error(self, a_in, a_out,1e-16)
-        assert_rel_error(self, b_in*2.20462, b_out,1e-5)
+        assert_near_equal(a_in, a_out,1e-16)
+        assert_near_equal(b_in*2.20462, b_out,1e-5)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -111,8 +111,8 @@ class TestScalars(unittest.TestCase):
         b_in = self.p['b_to_be_renamed']
         a_out = self.p['a']
         b_out = self.p['b']
-        assert_rel_error(self, a_in, a_out,1e-16)
-        assert_rel_error(self, b_in*2.20462, b_out,1e-5)
+        assert_near_equal(a_in, a_out,1e-16)
+        assert_near_equal(b_in*2.20462, b_out,1e-5)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)

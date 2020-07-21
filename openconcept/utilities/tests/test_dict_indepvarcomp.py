@@ -7,7 +7,7 @@ import numpy as np
 from openmdao.api import Problem, Group
 #from openmdao.components.add_subtract_comp import AddSubtractComp
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 # Test data to load
 # aero data =============================
@@ -56,20 +56,20 @@ class TestOne(unittest.TestCase):
         b = self.p['b']
         out = self.p['geom|S_ref']
         expected = 20
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_units(self):
         out = self.p.get_val('geom|S_ref', units='m**2')
         expected = 20 * 0.3048**2
-        assert_rel_error(self, out, expected,1e-4)
+        assert_near_equal(out, expected,1e-4)
 
     def test_twodeep(self):
         out = self.p.get_val('aero|CLmax|flaps30')
         expected = 1.7
-        assert_rel_error(self, out, expected,1e-4)
+        assert_near_equal(out, expected,1e-4)
         out = self.p.get_val('aero|CLmax|flaps10')
         expected = 1.5
-        assert_rel_error(self, out, expected,1e-4)
+        assert_near_equal(out, expected,1e-4)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -123,7 +123,7 @@ class TestAddNonexistentVar(unittest.TestCase):
 #         b = self.p['b']
 #         out = self.p['add_subtract_comp.adder_output']
 #         expected = a + b
-#         assert_rel_error(self, out, expected,1e-16)
+#         assert_near_equal(out, expected,1e-16)
 
 #     def test_partials(self):
 #         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -164,7 +164,7 @@ class TestAddNonexistentVar(unittest.TestCase):
 #         b = self.p['b']
 #         out = self.p['add_subtract_comp.adder_output']
 #         expected = a + b
-#         assert_rel_error(self, out, expected,1e-16)
+#         assert_near_equal(out, expected,1e-16)
 
 #     def test_partials(self):
 #         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -208,7 +208,7 @@ class TestAddNonexistentVar(unittest.TestCase):
 #         c = self.p['c']
 #         out = self.p['add_subtract_comp.adder_output']
 #         expected = a + b + c
-#         assert_rel_error(self, out, expected,1e-16)
+#         assert_near_equal(out, expected,1e-16)
 
 #     def test_partials(self):
 #         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -252,7 +252,7 @@ class TestAddNonexistentVar(unittest.TestCase):
 #         c = self.p['c']
 #         out = self.p['add_subtract_comp.adder_output']
 #         expected = 2*a + b - c
-#         assert_rel_error(self, out, expected,1e-16)
+#         assert_near_equal(out, expected,1e-16)
 
 #     def test_partials(self):
 #         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -297,7 +297,7 @@ class TestAddNonexistentVar(unittest.TestCase):
 #         out = self.p['add_subtract_comp.adder_output']
 #         m_to_ft = 3.280839895
 #         expected = a + b*m_to_ft + c*m_to_ft
-#         assert_rel_error(self, out, expected,1e-8)
+#         assert_near_equal(out, expected,1e-8)
 
 #     def test_partials(self):
 #         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -339,7 +339,7 @@ class TestAddNonexistentVar(unittest.TestCase):
 #         import numpy as np
 #         #from openmdao.api import Problem, Group, IndepVarComp
 #         from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
-#         from openmdao.utils.assert_utils import assert_rel_error
+#         from openmdao.utils.assert_utils import assert_near_equal
 
 #         n = 3
 
@@ -381,7 +381,7 @@ class TestAddNonexistentVar(unittest.TestCase):
 
 #         # Verify the results
 #         expected_i = np.array([[100, 200, 300], [0, -1, -2]]).T
-#         assert_rel_error(self, p.get_val('totalforcecomp.total_force', units='kN'), expected_i)
+#         assert_near_equal(p.get_val('totalforcecomp.total_force', units='kN'), expected_i)
 
 
 if __name__ == '__main__':
