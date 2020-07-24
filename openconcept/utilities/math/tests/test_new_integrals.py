@@ -31,6 +31,8 @@ class IntegratorTestGroup(Group):
         self.options.declare('second_integrand',default=False)
         self.options.declare('zero_start', default=False)
         self.options.declare('final_only', default=False)
+        self.options.declare('test_auto_names', default=False)
+        self.options.declare('val', default=0.0)
 
     def setup(self):
         quantity_units = self.options['quantity_units']
@@ -42,14 +44,20 @@ class IntegratorTestGroup(Group):
         second_integrand = self.options['second_integrand']
         zero_start = self.options['zero_start']
         final_only = self.options['final_only']
+        test_auto_names = self.options['test_auto_names']
+        val = self.options['val']
         num_nodes = num_nodes
 
         iv = self.add_subsystem('iv', IndepVarComp())
         integ = NewIntegrator(diff_units=diff_units, num_nodes=num_nodes, method=integrator_option, 
                               time_setup=time_setup)
-        integ.add_integrand('q', rate_name='dqdt', start_name='q_initial', end_name='q_final',
-                            units=quantity_units, rate_units=rate_units, zero_start=zero_start,
-                            final_only=final_only)
+        if not test_auto_names:
+            integ.add_integrand('q', rate_name='dqdt', start_name='q_initial', end_name='q_final',
+                                units=quantity_units, rate_units=rate_units, zero_start=zero_start,
+                                final_only=final_only, val=val)
+        else:
+            integ.add_integrand('q', units=quantity_units, rate_units=rate_units, zero_start=zero_start,
+                                final_only=final_only)
         if second_integrand:
             integ.add_integrand('q2', rate_name='dq2dt', start_name='q2_initial', end_name='q2_final', units='kJ')
             iv.add_output('rate_to_integrate_2', val=np.ones((num_nodes,)), units='kW')
@@ -80,7 +88,10 @@ class IntegratorTestGroup(Group):
         iv.add_output('rate_to_integrate', val=np.ones((num_nodes,)), units=rate_units)
         iv.add_output('initial_value', val=0, units=quantity_units)
 
-        self.connect('iv.rate_to_integrate','integral.dqdt')
+        if not test_auto_names:
+            self.connect('iv.rate_to_integrate','integral.dqdt')
+        else:
+            self.connect('iv.rate_to_integrate','integral.q_rate')
         if not zero_start:
             self.connect('iv.initial_value', 'integral.q_initial')
 
@@ -136,6 +147,38 @@ class IntegratorCommonTestCases(object):
         f = 4 * x ** 3 / 3 - 8 * x ** 2 / 2 + 5*x
 
         prob = Problem(IntegratorTestGroup(num_nodes=self.num_nodes, integrator=self.integrator))
+        prob.setup(check=True, force_alloc_complex=True)
+        prob['iv.rate_to_integrate'] = fprime
+        prob.run_model()
+        assert_near_equal(prob['integral.q'], f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units=None), f[-1], tolerance=1e-14)
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials, atol=1e-8, rtol=1e0)
+
+    def test_machine_zero_rate(self):
+        num_nodes = self.num_nodes
+        nn_tot = num_nodes
+        x = np.linspace(0, nn_tot-1, nn_tot)
+        fprime = 0.0 * x
+        f = 0.0 * x
+
+        prob = Problem(IntegratorTestGroup(num_nodes=self.num_nodes, integrator=self.integrator))
+        prob.setup(check=True, force_alloc_complex=True)
+        prob['iv.rate_to_integrate'] = fprime
+        prob.run_model()
+        assert_near_equal(prob['integral.q'], f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units=None), f[-1], tolerance=1e-14)
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials, atol=1e-8, rtol=1e0)
+
+    def test_auto_names(self):
+        num_nodes = self.num_nodes
+        nn_tot = num_nodes
+        x = np.linspace(0, nn_tot-1, nn_tot)
+        fprime = 4 * x **2 - 8*x + 5
+        f = 4 * x ** 3 / 3 - 8 * x ** 2 / 2 + 5*x
+
+        prob = Problem(IntegratorTestGroup(test_auto_names=True, num_nodes=self.num_nodes, integrator=self.integrator))
         prob.setup(check=True, force_alloc_complex=True)
         prob['iv.rate_to_integrate'] = fprime
         prob.run_model()
@@ -307,6 +350,23 @@ class IntegratorCommonTestCases(object):
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
+    def test_machine_zero_bounds(self):
+        num_nodes = self.num_nodes
+        nn_tot = num_nodes
+        x = np.linspace(0, nn_tot-1, nn_tot)
+        fprime = 0.0 * x
+        f = 0.0*x
+
+        prob = Problem(IntegratorTestGroup(num_nodes=self.num_nodes, integrator=self.integrator,
+                                                     quantity_units='kg', diff_units='s',time_setup='bounds'))
+        prob.setup(check=True, force_alloc_complex=True)
+        prob['iv.rate_to_integrate'] = fprime
+        prob.run_model()
+        assert_near_equal(prob.get_val('integral.q', units='kg'), f, tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units='kg'), f[-1], tolerance=1e-14)
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials, atol=1e-8, rtol=1e0)
+
     def test_quadratic_no_rate_units(self):
         num_nodes = self.num_nodes
         nn_tot = num_nodes
@@ -390,3 +450,39 @@ class EdgeCaseTestCases(unittest.TestCase):
             
         msg = ('num_nodes is ' +str(num_nodes) + ' and must be odd')
         self.assertEqual(str(cm.exception), msg)
+
+    def test_default_value_scalar(self):
+        num_nodes = self.num_nodes = 11
+        nn_tot = num_nodes
+        x = np.linspace(0, nn_tot-1, nn_tot)
+        fprime = 4 * x **2 - 8*x + 5
+        f = 4 * x ** 3 / 3 - 8 * x ** 2 / 2 + 5*x
+
+        prob = Problem(IntegratorTestGroup(num_nodes=self.num_nodes, integrator='simpson',
+                                                     quantity_units='kg', diff_units='s',time_setup='duration',
+                                                     val=5.0))
+        prob.setup(check=True, force_alloc_complex=True)
+        prob['iv.rate_to_integrate'] = fprime
+        # DO NOT RUN THE MODEL
+        assert_near_equal(prob.get_val('integral.q', units='kg'), 5.0*np.ones((num_nodes,)), tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units='kg'), 5.0, tolerance=1e-14)
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials, atol=1e-8, rtol=1e0)
+
+    def test_default_value_vector(self):
+        num_nodes = self.num_nodes = 11
+        nn_tot = num_nodes
+        x = np.linspace(0, nn_tot-1, nn_tot)
+        fprime = 4 * x **2 - 8*x + 5
+        f = 4 * x ** 3 / 3 - 8 * x ** 2 / 2 + 5*x
+
+        prob = Problem(IntegratorTestGroup(num_nodes=self.num_nodes, integrator='simpson',
+                                                     quantity_units='kg', diff_units='s',time_setup='duration',
+                                                     val=5.0*np.linspace(0.0, 1.0, num_nodes)))
+        prob.setup(check=True, force_alloc_complex=True)
+        prob['iv.rate_to_integrate'] = fprime
+        # DO NOT RUN THE MODEL
+        assert_near_equal(prob.get_val('integral.q', units='kg'), 5.0*np.linspace(0.0, 1.0, num_nodes), tolerance=1e-14)
+        assert_near_equal(prob.get_val('integral.q_final', units='kg'), 5.0, tolerance=1e-14)
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials, atol=1e-8, rtol=1e0)
