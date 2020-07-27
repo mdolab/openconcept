@@ -13,6 +13,41 @@ from openconcept.utilities.math.derivatives import FirstDerivative
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp, VectorConcatenateComp, VectorSplitComp
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
 
+# Define sigmoid function and its derivative for later use
+def sigmoid(x):
+    """
+    Logistic sigmoid function f(x) = 1/(1 + exp(-x))
+
+    Inputs
+    ------
+    x : float
+        Input value, any shape
+    
+    Outputs
+    -------
+    f : float
+        Sigmoid function evaluated at x, same shape as x
+    """
+    f = 1 / (1 + np.exp(-x))
+    return f
+
+def sigmoid_deriv(x):
+    """
+    Derivative of logistic sigmoid function w.r.t. x
+
+    Inputs
+    ------
+    x : float
+        Input value, any shape
+    
+    Outputs
+    -------
+    df : float
+        Sigmoid derivitive w.r.t. x evaluated at x, same shape as x
+    """
+    df = np.exp(-x) / (np.exp(-x) + 1)**2
+    return df
+
 
 """Analysis routines for simulating thermal management of aircraft components"""
 
@@ -43,7 +78,7 @@ class SimpleEngine(ExplicitComponent):
 
     Options
     -------
-    num_nodes : float
+    num_nodes : int
         The number of analysis points to run
     """
     def initialize(self):
@@ -126,7 +161,7 @@ class SimpleHeatPump(ExplicitComponent):
 
     Options
     -------
-    num_nodes : float
+    num_nodes : int
         The number of analysis points to run
     """
     def initialize(self):
@@ -154,8 +189,9 @@ class SimpleHeatPump(ExplicitComponent):
         self.declare_partials(['COP_cooling'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
     
     def compute(self, inputs, outputs):
-        # Cooling coefficient of performance
-        COP_cooling = inputs['eff_factor'] * inputs['T_c'] / (inputs['T_h'] - inputs['T_c'])
+        # Cooling coefficient of performance, use sigmoid to avoid negative COPs
+        delta_T = inputs['T_h'] - inputs['T_c']
+        COP_cooling = sigmoid(delta_T) * inputs['eff_factor'] * inputs['T_c'] / (delta_T)
         outputs['COP_cooling'] = COP_cooling
 
         # Heat transfer
@@ -169,19 +205,21 @@ class SimpleHeatPump(ExplicitComponent):
         Wdot = inputs['Wdot']
         eff_factor = inputs['eff_factor']
 
-        J['COP_cooling', 'T_h'] = - eff_factor * T_c / (T_h - T_c) ** 2
-        J['COP_cooling', 'T_c'] = eff_factor * T_h / (T_h - T_c) ** 2
-        J['COP_cooling', 'eff_factor'] = T_c / (T_h - T_c)
+        J['COP_cooling', 'T_h'] = - sigmoid(T_h - T_c) * eff_factor * T_c / (T_h - T_c) ** 2 + \
+                                    sigmoid_deriv(T_h - T_c) * eff_factor * T_c / (T_h - T_c)
+        J['COP_cooling', 'T_c'] = sigmoid(T_h - T_c) * eff_factor * T_h / (T_h - T_c) ** 2 - \
+                                  sigmoid_deriv(T_h - T_c) * eff_factor * T_c / (T_h - T_c)
+        J['COP_cooling', 'eff_factor'] = sigmoid(T_h - T_c) * T_c / (T_h - T_c)
 
-        J['q_c', 'T_h'] = eff_factor * Wdot * T_c / (T_h - T_c) ** 2
-        J['q_c', 'T_c'] = - eff_factor * Wdot * T_h / (T_h - T_c) ** 2
-        J['q_c', 'Wdot'] = - eff_factor * T_c / (T_h - T_c)
-        J['q_c', 'eff_factor'] = - Wdot * T_c / (T_h - T_c)
+        J['q_c', 'T_h'] = - J['COP_cooling', 'T_h'] * Wdot
+        J['q_c', 'T_c'] = - J['COP_cooling', 'T_c'] * Wdot
+        J['q_c', 'Wdot'] = - sigmoid(T_h - T_c) * eff_factor * T_c / (T_h - T_c)
+        J['q_c', 'eff_factor'] = - J['COP_cooling', 'eff_factor'] * Wdot
 
-        J['q_h', 'T_h'] = - eff_factor * Wdot * T_c / (T_h - T_c) ** 2
-        J['q_h', 'T_c'] = eff_factor * Wdot * T_h / (T_h - T_c) ** 2
-        J['q_h', 'Wdot'] = 1 + eff_factor * T_c / (T_h - T_c)
-        J['q_h', 'eff_factor'] = Wdot * T_c / (T_h - T_c)
+        J['q_h', 'T_h'] = J['COP_cooling', 'T_h'] * Wdot
+        J['q_h', 'T_c'] = J['COP_cooling', 'T_c'] * Wdot
+        J['q_h', 'Wdot'] = 1 + sigmoid(T_h - T_c) * eff_factor * T_c / (T_h - T_c)
+        J['q_h', 'eff_factor'] = J['COP_cooling', 'eff_factor'] * Wdot
 
 class SimpleTMS(Group):
     """
@@ -366,7 +404,7 @@ class SimpleTMS(Group):
 
         # Set the heat sink temperature to be constant and connect it to the heat pump
         ivc.add_output('heat_sink_T', val=self.options['heat_sink_T'], units='K', shape=(nn,))
-        self.connect('ivc.heat_sink_T', 'refrigerator.T_h')        
+        self.connect('ivc.heat_sink_T', 'refrigerator.T_h')
 
 class ThermalComponentWithMass(ExplicitComponent):
     """
@@ -390,7 +428,7 @@ class ThermalComponentWithMass(ExplicitComponent):
     -------
     specific_heat : float
         Specific heat capacity of the object in J / kg / K (default 921 = aluminum)
-    num_nodes : float
+    num_nodes : int
         The number of analysis points to run
     """
     def initialize(self):
@@ -444,7 +482,7 @@ class CoolantReservoirRate(ExplicitComponent):
 
     Options
     -------
-    num_nodes : float
+    num_nodes : int
         The number of analysis points to run
     """
     def initialize(self):
@@ -490,7 +528,7 @@ class ThermalComponentMassless(ImplicitComponent):
 
     Options
     -------
-    num_nodes : float
+    num_nodes : int
         The number of analysis points to run
     """
     def initialize(self):
@@ -541,7 +579,7 @@ class ConstantSurfaceTemperatureColdPlate_NTU(ExplicitComponent):
 
     Options
     -------
-    num_nodes : float
+    num_nodes : int
         The number of analysis points to run
     fluid_rho : float
         Coolant density in kg/m**3 (default 0.997, water)

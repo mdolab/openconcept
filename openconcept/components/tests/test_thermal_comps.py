@@ -77,6 +77,19 @@ class SimpleHeatPumpTestCase(unittest.TestCase):
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
+    def test_partials_near_zero_thermal_lift(self):
+        nn = 3
+        T_h = np.array([300.1, 300., 100.])
+        T_c = np.array([300., 300.1, 500.])
+        prob = Problem(thermal.SimpleHeatPump(num_nodes=nn))
+        prob.setup(check=True, force_alloc_complex=True)
+        prob['T_h'] = T_h
+        prob['T_c'] = T_c
+        prob.run_model()
+
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+
 class SimpleTMSTestCase(unittest.TestCase):
     """
     Test the convergence of the SimpleTMS Group
