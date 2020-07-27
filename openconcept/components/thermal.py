@@ -406,6 +406,62 @@ class SimpleTMS(Group):
         ivc.add_output('heat_sink_T', val=self.options['heat_sink_T'], units='K', shape=(nn,))
         self.connect('ivc.heat_sink_T', 'refrigerator.T_h')
 
+class PerfectHeatTransferComp(ExplicitComponent):
+    """
+    Models heat transfer to coolant loop assuming zero thermal resistance.
+
+    Inputs
+    ------
+    T_in : float
+        Incoming coolant temperature (vector, K)
+    q : float
+        Heat flow into fluid stream; positive is heat addition (vector, W)
+    mdot_coolant : float
+        Coolant mass flow (vector, kg/s)
+    
+    Outputs
+    -------
+    T_out : float
+        Outgoing coolant temperature (vector, K)
+    T_average : float
+        Average coolant temperature (vector K)
+    
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (scalar, default 1)
+    specific_heat : float
+        Specific heat of the coolant (scalar, J/kg/K, default 3801 glycol/water)
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points')
+        self.options.declare('specific_heat', default=3801., desc='Specific heat in J/kg/K')
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+        arange = np.arange(0, nn)
+
+        self.add_input('T_in', desc='Incoming coolant temp', units='K', shape=(nn,))
+        self.add_input('q', desc='Heat INTO the fluid stream (positive is heat addition)', units='W', shape=(nn,))
+        self.add_input('mdot_coolant', desc='Mass flow rate of coolant', units='kg/s', shape=(nn,))
+        self.add_output('T_out', desc='Outgoing coolant temp', val=np.random.uniform(300, 330), units='K', shape=(nn,))
+        self.add_output('T_average', desc='Average temp of fluid', val=np.random.uniform(300, 330), units='K', shape=(nn,))
+
+        self.declare_partials(['T_out', 'T_average'], ['q', 'mdot_coolant'], rows=arange, cols=arange)
+        self.declare_partials('T_out', 'T_in', rows=arange, cols=arange, val=np.ones((nn,)))
+        self.declare_partials('T_average', 'T_in', rows=arange, cols=arange, val=np.ones((nn,)))
+    
+    def compute(self, inputs, outputs):
+        outputs['T_out'] = inputs['T_in'] + inputs['q'] / self.options['specific_heat'] / inputs['mdot_coolant']
+        outputs['T_average'] = (inputs['T_in'] + outputs['T_out']) / 2
+    
+    def compute_partials(self, inputs, J):
+        J['T_out', 'q'] = 1 / self.options['specific_heat'] / inputs['mdot_coolant']
+        J['T_out', 'mdot_coolant'] = - inputs['q'] / self.options['specific_heat'] / inputs['mdot_coolant']**2
+
+        J['T_average', 'q'] = J['T_out', 'q'] / 2
+        J['T_average', 'mdot_coolant'] = J['T_out', 'mdot_coolant'] / 2
+
 class ThermalComponentWithMass(ExplicitComponent):
     """
     Computes thermal residual of a component with heating, cooling, and thermal mass
