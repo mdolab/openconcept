@@ -4,7 +4,6 @@ from openconcept.utilities.math.integrals import NewIntegrator
 import warnings 
 
 # OpenConcept PhaseGroup will be used to hold analysis phases with time integration
-# =============== These will go in OpenConcept Core ===============#
 def find_integrators_in_model(system, abs_namespace, timevars, states):
     durationvar = system._problem_meta['oc_time_var']
 
@@ -28,10 +27,13 @@ def find_integrators_in_model(system, abs_namespace, timevars, states):
 class PhaseGroup(om.Group):
     def __init__(self, **kwargs):
         # BB what if user isn't passing num_nodes to the phases?
-        num_nodes = kwargs.get('num_nodes', 11)
+        num_nodes = kwargs.get('num_nodes', 1)
         super(PhaseGroup, self).__init__(**kwargs)
         self._oc_time_var_name = 'duration'
         self._oc_num_nodes = num_nodes
+
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, types=int, lower=0)
 
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         # need to pass down the name of the duration variable via prob_meta
@@ -59,7 +61,10 @@ class IntegratorGroup(om.Group):
 
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         time_units = self._oc_time_units
-        num_nodes = prob_meta['oc_num_nodes']
+        try:
+            num_nodes = prob_meta['oc_num_nodes']
+        except KeyError:
+            raise NameError('Integrator group must be created within an OpenConcept phase')
         self.add_subsystem('ode_integ', NewIntegrator(time_setup='duration', diff_units=time_units, num_nodes=num_nodes))
         super(IntegratorGroup, self)._setup_procs(pathname, comm, mode, prob_meta)
 
@@ -76,6 +81,7 @@ class IntegratorGroup(om.Group):
                     state_lower = -1e30
                     state_upper = 1e30
                     state_promotes = False
+                    # TODO Check for duplicates otherwise generic Openmdao duplicate output/input error raised
 
                     for tag in tags:
                         split_tag = tag.split(':')
@@ -128,4 +134,6 @@ class TrajectoryGroup(om.Group):
 
     def link_phases(self, phase1, phase2, states_to_skip=[]):
         # need to cache this because the data we need isn't ready yet
+        if not isinstance(phase1, PhaseGroup) or not isinstance(phase2, PhaseGroup):
+            raise ValueError('link_phases phase arguments must be OpenConcept PhaseGroup objects')
         self._oc_phases_to_link.append((phase1, phase2, states_to_skip))
