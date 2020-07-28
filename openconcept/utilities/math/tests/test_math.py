@@ -80,7 +80,7 @@ class FirstDerivCommonTestCases(object):
         prob['iv.quant_to_diff'] = np.linspace(0,1,nn_tot)
         prob['iv.dt'] = 1 / (nn_tot - 1)
         prob.run_model()
-        assert_near_equal(prob['derivative.dqdt'], np.ones((nn_tot,)),tolerance=1e-15)
+        assert_near_equal(prob['derivative.dqdt'], np.ones((nn_tot,)),tolerance=2e-15)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials, atol=1e-8, rtol=1e2)
 
