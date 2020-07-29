@@ -43,6 +43,7 @@ class HybridTwinThermalTestCase(unittest.TestCase):
         assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 4434.461454141321, tolerance=1e-5)
         assert_near_equal(prob.get_val('engineoutclimb.gamma',units='deg'), 1.7508055214855194, tolerance=1e-5)
         assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 862.667748103923, tolerance=1e-5)
+        assert_near_equal(prob.get_val('descent.propmodel.batt1.SOC_final', units=None), -1.3067363280327982e-06, tolerance=1e-5)
 
         assert_near_equal(prob.get_val('climb.propmodel.motorheatsink.T', units='degC')[-1], 76.29252153, tolerance=1e-5)
         assert_near_equal(prob.get_val('climb.propmodel.batteryheatsink.T', units='degC')[-1], -0.12704621031633678, tolerance=1e-5)
