@@ -22,7 +22,11 @@ def find_integrators_in_model(system, abs_namespace, timevars, states):
                 if varname == durationvar:
                     timevars.append(abs_namespace + '.' + varname)
             for state in system._state_vars.keys():
-                states.append(abs_namespace + '.' + state)
+                state_options = system._state_vars[state]
+                state_tuple = (abs_namespace + '.' + state_options['name'], 
+                               abs_namespace + '.' + state_options['start_name'], 
+                               abs_namespace + '.' + state_options['end_name'])
+                states.append(state_tuple)
 
 class PhaseGroup(om.Group):
     def __init__(self, **kwargs):
@@ -144,10 +148,10 @@ class TrajectoryGroup(om.Group):
         phase1_states = phase1._oc_states_list
         phase2_states = phase2._oc_states_list
         self._setup_var_data()
-        for state in phase1_states:
-            if state in phase2_states and not state in states_to_skip:
-                state_phase1_abs_name = phase1.name + '.' + state + '_final'
-                state_phase2_abs_name = phase2.name + '.' + state + '_initial'
+        for state_tuple in phase1_states:
+            if state_tuple[0] in [state_tuple_2[0] for state_tuple_2 in phase2_states] and not state_tuple[0] in states_to_skip:
+                state_phase1_abs_name = phase1.name + '.' + state_tuple[2] # final 
+                state_phase2_abs_name = phase2.name + '.' + state_tuple[1] # initial
                 if self.pathname:
                     state_phase1_abs_name = self.pathname + '.' + state_phase1_abs_name
                     state_phase2_abs_name = self.pathname + '.' + state_phase2_abs_name

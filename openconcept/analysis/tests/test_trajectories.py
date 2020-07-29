@@ -502,7 +502,7 @@ class TestPhasePromotedDurationVariable(unittest.TestCase):
         phase.add_subsystem('iv', om.IndepVarComp('duration', val=5.0, units='s'), promotes_outputs=['*'])
         phase.add_subsystem('grp1', grp1)
         phase.add_subsystem('grp2', grp2)
-        phase.add_subsystem('c', om.ExecComp('result = 1.0*duration'), promotes_inputs=['duration'])
+        phase.add_subsystem('c', om.ExecComp('result = 1.0*duration', duration={'units':'s'}), promotes_inputs=['duration'])
 
         self.p = om.Problem(model=phase)
         self.p.setup(force_alloc_complex=True)

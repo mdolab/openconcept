@@ -11,7 +11,7 @@ from openmdao.api import NewtonSolver, BoundsEnforceLS
 # imports for the airplane model itself
 from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
-from openconcept.utilities.math.integrals import Integrator
+from openconcept.utilities.math.integrals import NewIntegrator
 from examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
 from examples.propulsion_layouts.simple_turboprop import TwinTurbopropPropulsionSystem
 from examples.methods.costs_commuter import OperatingCost
@@ -66,13 +66,11 @@ class KingAirC90GTModel(Group):
         self.connect('propmodel.engines_weight', 'W_engine')
 
         # airplanes which consume fuel will need to integrate
-        # fuel usage across the mission and subtract it from TOW   
-        self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson',
-                                                 quantity_units='kg', diff_units='s',
-                                                 time_setup='duration'),
-                           promotes_inputs=[('dqdt', 'fuel_flow'), 'duration',
-                           ('q_initial', 'fuel_used_initial')],
-                           promotes_outputs=[('q', 'fuel_used'), ('q_final', 'fuel_used_final')])
+        # fuel usage across the mission and subtract it from TOW           
+        intfuel = self.add_subsystem('intfuel', NewIntegrator(num_nodes=nn, method='simpson', diff_units='s',
+                                                              time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
+        intfuel.add_integrand('fuel_used', rate_name='fuel_flow', val=1.0, units='kg')
+
         self.add_subsystem('weight', AddSubtractComp(output_name='weight',
                                                      input_names=['ac|weights|MTOW', 'fuel_used'],
                                                      units='kg', vec_size=[1, nn],
@@ -122,19 +120,15 @@ class KingAirAnalysisGroup(Group):
         dv_comp.add_output_from_dict('ac|q_cruise')
         dv_comp.add_output_from_dict('ac|num_engines')
 
-        # Ensure that any state variables are connected across the mission as intended
-        connect_phases = ['rotate', 'climb', 'cruise', 'descent']
-        connect_states = ['range', 'fuel_used', 'fltcond|h']
-        extra_states_tuple = [(connect_state, connect_phases) for connect_state in connect_states]
-
         # Run a full mission analysis including takeoff, climb, cruise, and descent
         analysis = self.add_subsystem('analysis',
                                       FullMissionAnalysis(num_nodes=nn,
-                                                          aircraft_model=KingAirC90GTModel,
-                                                          extra_states=extra_states_tuple),
+                                                          aircraft_model=KingAirC90GTModel),
                                       promotes_inputs=['*'], promotes_outputs=['*'])
 
-
+        # TODO need to mark the rotate pseudo"states" as states manually
+        analysis.connect('rotate.range_final','climb.ode_integ.range_initial')
+        analysis.connect('rotate.fltcond|h_final','climb.ode_integ.fltcond|h_initial')
 
 def configure_problem():
     prob = Problem()
