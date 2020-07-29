@@ -11,7 +11,7 @@ import openmdao.api as om
 # imports for the airplane model itself
 from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
-from openconcept.utilities.math.integrals import NewIntegrator
+from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from examples.aircraft_data.B738 import data as acdata
 from openconcept.analysis.performance.mission_profiles import MissionWithReserve

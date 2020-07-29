@@ -473,7 +473,7 @@ def multistep_integrator(q0, dqdt, dts, tri_mat, repeat_mat, segment_names=None,
     # partials_q_wrt_deltas = sp.csr_matrix(jacmat)
     # return partials_q_wrt_deltas
 
-class NewIntegrator(ExplicitComponent):
+class Integrator(ExplicitComponent):
     """
     Integrates rate variables implicitly.
     Add new integrated quantities by using the add_integrand method.
@@ -513,7 +513,7 @@ class NewIntegrator(ExplicitComponent):
         'bounds' creates inputs 't_initial', 't_final'
     """
     def __init__(self, **kwargs):
-        super(NewIntegrator, self).__init__(**kwargs)
+        super(Integrator, self).__init__(**kwargs)
         self._state_vars = {}
         num_nodes = self.options['num_nodes']
         method = self.options['method']
@@ -787,7 +787,7 @@ class NewIntegrator(ExplicitComponent):
 
 
 
-class Integrator(ExplicitComponent):
+class OldIntegrator(ExplicitComponent):
     """
     This component integrates a vector using a BDF3 formulation
     with 2nd order startup.

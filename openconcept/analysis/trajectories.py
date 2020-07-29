@@ -1,6 +1,6 @@
 import openmdao.api as om 
 import numpy as np
-from openconcept.utilities.math.integrals import NewIntegrator
+from openconcept.utilities.math.integrals import Integrator
 import warnings 
 
 # OpenConcept PhaseGroup will be used to hold analysis phases with time integration
@@ -17,7 +17,7 @@ def find_integrators_in_model(system, abs_namespace, timevars, states):
             find_integrators_in_model(subsys, next_namespace, timevars, states)
     else:
         # if the duration variable shows up we need to add its absolute path to timevars
-        if isinstance(system, NewIntegrator):
+        if isinstance(system, Integrator):
             for varname in system._var_rel_names['input']:
                 if varname == durationvar:
                     timevars.append(abs_namespace + '.' + varname)
@@ -78,7 +78,7 @@ class IntegratorGroup(om.Group):
             num_nodes = prob_meta['oc_num_nodes']
         except KeyError:
             raise NameError('Integrator group must be created within an OpenConcept phase')
-        self.add_subsystem('ode_integ', NewIntegrator(time_setup='duration', method='simpson',diff_units=time_units, num_nodes=num_nodes))
+        self.add_subsystem('ode_integ', Integrator(time_setup='duration', method='simpson',diff_units=time_units, num_nodes=num_nodes))
         super(IntegratorGroup, self)._setup_procs(pathname, comm, mode, prob_meta)
 
     def _configure(self):

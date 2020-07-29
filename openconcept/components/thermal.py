@@ -7,7 +7,7 @@ import scipy.sparse as sp
 import sys, os
 sys.path.insert(0,os.getcwd())
 from openconcept.components.ducts import ImplicitCompressibleDuct
-from openconcept.utilities.math.integrals import NewIntegrator
+from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.math.derivatives import FirstDerivative
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp, VectorConcatenateComp, VectorSplitComp
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
@@ -304,7 +304,7 @@ class LiquidCooledComp(Group):
                                ThermalComponentWithMass(specific_heat=self.options['specific_heat_object'],
                                                         num_nodes=nn),
                                                         promotes_inputs=['q_in', 'mass'])
-            ode_integ = self.add_subsystem('ode_integ', NewIntegrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
+            ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
                                            promotes_outputs=['*'], promotes_inputs=['*'])
             # TODO lower limit 0
             ode_integ.add_integrand('T', rate_name='dTdt', units='K')
@@ -358,7 +358,7 @@ class CoolantReservoir(Group):
                            CoolantReservoirRate(num_nodes=nn),
                            promotes_inputs=['T_in', 'T_out', 'mass', 'mdot_coolant'])
 
-        ode_integ = self.add_subsystem('ode_integ', NewIntegrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
+        ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
                                            promotes_outputs=['*'], promotes_inputs=['*'])
         # TODO lower limit 0
         ode_integ.add_integrand('T_out', rate_name='dTdt', start_name='T_initial', end_name='T_final', units='K')

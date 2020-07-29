@@ -11,7 +11,7 @@ from openmdao.api import DirectSolver, IndepVarComp, NewtonSolver, BoundsEnforce
 # imports for the airplane model itself
 from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
-from openconcept.utilities.math.integrals import NewIntegrator
+from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dvlabel import DVLabel
 from examples.methods.weights_twin_hybrid import TwinSeriesHybridEmptyWeight
 from examples.propulsion_layouts.simple_series_hybrid import TwinSeriesHybridElectricPropulsionSystem
@@ -88,7 +88,7 @@ class SeriesHybridTwinModel(Group):
         self.connect('propmodel.eng1.component_weight', 'W_engine')
         self.connect('propmodel.gen1.component_weight', 'W_generator')
         self.connect('propmodel.motors_weight', 'W_motors')
-        intfuel = self.add_subsystem('intfuel', NewIntegrator(num_nodes=nn, method='simpson', diff_units='s',
+        intfuel = self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson', diff_units='s',
                                                               time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
         intfuel.add_integrand('fuel_used', rate_name='fuel_flow', val=1.0, units='kg')
         self.add_subsystem('weight', AddSubtractComp(output_name='weight',

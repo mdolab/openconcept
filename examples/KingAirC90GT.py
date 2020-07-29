@@ -11,7 +11,7 @@ from openmdao.api import NewtonSolver, BoundsEnforceLS
 # imports for the airplane model itself
 from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
-from openconcept.utilities.math.integrals import NewIntegrator
+from openconcept.utilities.math.integrals import Integrator
 from examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
 from examples.propulsion_layouts.simple_turboprop import TwinTurbopropPropulsionSystem
 from examples.methods.costs_commuter import OperatingCost
@@ -67,7 +67,7 @@ class KingAirC90GTModel(Group):
 
         # airplanes which consume fuel will need to integrate
         # fuel usage across the mission and subtract it from TOW           
-        intfuel = self.add_subsystem('intfuel', NewIntegrator(num_nodes=nn, method='simpson', diff_units='s',
+        intfuel = self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson', diff_units='s',
                                                               time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
         intfuel.add_integrand('fuel_used', rate_name='fuel_flow', val=1.0, units='kg')
 

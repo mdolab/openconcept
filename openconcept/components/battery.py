@@ -3,7 +3,7 @@ import numpy as np
 from openmdao.api import ExplicitComponent, Group
 from openmdao.api import Group
 from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
-from openconcept.utilities.math.integrals import NewIntegrator
+from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dvlabel import DVLabel
 
 class SOCBattery(Group):
@@ -81,7 +81,7 @@ class SOCBattery(Group):
         self.add_subsystem('divider',ElementMultiplyDivideComp(output_name='dSOCdt',input_names=['elec_load','max_energy'],vec_size=[nn,1],scaling_factor=-1,divide=[False,True],input_units=['W','kJ']),
                            promotes_inputs=['*'],promotes_outputs=['*'])
 
-        integ = self.add_subsystem('ode_integ', NewIntegrator(num_nodes=nn, method='simpson', diff_units='s', time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
+        integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, method='simpson', diff_units='s', time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
         integ.add_integrand('SOC', rate_name='dSOCdt', start_name='SOC_initial', end_name='SOC_final', units=None, val=1.0, start_val=1.0)
 
 class SimpleBattery(ExplicitComponent):
