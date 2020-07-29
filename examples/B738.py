@@ -11,12 +11,13 @@ import openmdao.api as om
 # imports for the airplane model itself
 from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
-from openconcept.utilities.math.integrals import Integrator
+from openconcept.utilities.math.integrals import NewIntegrator
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from examples.aircraft_data.B738 import data as acdata
 from openconcept.analysis.performance.mission_profiles import MissionWithReserve
 from openconcept.utilities.visualization import plot_trajectory
 from openconcept.components.cfm56 import CFM56
+from openconcept.utilities.dvlabel import DVLabel
 
 class B738AirplaneModel(Group):
     """
@@ -75,12 +76,8 @@ class B738AirplaneModel(Group):
 
         # airplanes which consume fuel will need to integrate
         # fuel usage across the mission and subtract it from TOW
-        self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson',
-                                                 quantity_units='kg', diff_units='s',
-                                                 time_setup='duration'),
-                           promotes_inputs=[('dqdt', 'fuel_flow'), 'duration',
-                                            ('q_initial', 'fuel_used_initial')],
-                           promotes_outputs=[('q', 'fuel_used'), ('q_final', 'fuel_used_final')])
+        integ = self.add_subsystem('ode_integ', NewIntegrator(num_nodes=nn, diff_units='s', time_setup='duration', method='simpson'), promotes_inputs=['duration', 'fuel_flow'], promotes_outputs=['fuel_used'])
+        integ.add_integrand('fuel_used', rate_name='fuel_flow', val=1.0, units='kg')
         self.add_subsystem('weight', AddSubtractComp(output_name='weight',
                                                      input_names=['ac|weights|MTOW', 'fuel_used'],
                                                      units='kg', vec_size=[1, nn],
@@ -125,24 +122,10 @@ class B738AnalysisGroup(Group):
         dv_comp.add_output_from_dict('ac|num_passengers_max')
         dv_comp.add_output_from_dict('ac|q_cruise')
 
-        # Ensure that any state variables are connected across the mission as intended
-        connect_phases = ['climb', 'cruise', 'descent']
-        connect_states = ['range', 'fuel_used', 'fltcond|h']
-        extra_states_tuple = [(connect_state, connect_phases) for connect_state in connect_states]
-        connect_phases = ['reserve_climb', 'reserve_cruise', 'reserve_descent']
-        connect_states = ['range', 'fuel_used', 'fltcond|h']
-        for connect_state in connect_states:
-            extra_states_tuple.append((connect_state, connect_phases))
-        extra_states_tuple.append(('fuel_used', ['descent', 'reserve_climb']))
-        extra_states_tuple.append(('fuel_used', ['reserve_descent', 'loiter']))
-        extra_states_tuple.append(('range', ['descent', 'reserve_climb']))
-        extra_states_tuple.append(('range', ['reserve_descent', 'loiter']))
-
         # Run a full mission analysis including takeoff, reserve_, cruise,reserve_ and descereserve_nt
         analysis = self.add_subsystem('analysis',
                                       MissionWithReserve(num_nodes=nn,
-                                                          aircraft_model=B738AirplaneModel,
-                                                          extra_states=extra_states_tuple),
+                                                          aircraft_model=B738AirplaneModel),
                                       promotes_inputs=['*'], promotes_outputs=['*'])
 
 def configure_problem():
@@ -181,7 +164,7 @@ def set_values(prob, num_nodes):
 
 def show_outputs(prob):
     # print some outputs
-    vars_list = ['descent.fuel_used_final','loiter.fuel_used_final']
+    vars_list = ['descent.ode_integ.fuel_used_final','loiter.ode_integ.fuel_used_final']
     units = ['lb','lb']
     nice_print_names = ['Block fuel', 'Total fuel']
     print("=======================================================================")
@@ -209,6 +192,7 @@ def run_738_analysis(plots=False):
     prob.setup(check=True, mode='fwd')
     set_values(prob, num_nodes)
     prob.run_model()
+    prob.model.list_outputs()
     if plots:
         show_outputs(prob)
     return prob

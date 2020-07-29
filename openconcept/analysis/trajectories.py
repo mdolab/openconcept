@@ -46,10 +46,17 @@ class PhaseGroup(om.Group):
         # check child subsys for variables to be integrated and add them all
         timevars = []
         states = []
+        # TODO revisit this approach once var data in configure is officially supported
         find_integrators_in_model(self, '', timevars, states)
+        self._setup_var_data()
+
         # make connections from duration to integrated vars automatically
         for var_abs_address in timevars:
-            self.connect(self._oc_time_var_name, var_abs_address)
+            if self.pathname:
+                var_abs_address = self.pathname + '.' + var_abs_address
+            var_prom_address = self._var_abs2prom['input'][var_abs_address]
+            if var_prom_address != self._oc_time_var_name:
+                self.connect(self._oc_time_var_name, var_prom_address)
         self._oc_states_list = states
 
 class IntegratorGroup(om.Group):
@@ -126,11 +133,17 @@ class TrajectoryGroup(om.Group):
         # print a report of states linked
         phase1_states = phase1._oc_states_list
         phase2_states = phase2._oc_states_list
+        self._setup_var_data()
         for state in phase1_states:
             if state in phase2_states and not state in states_to_skip:
                 state_phase1_abs_name = phase1.name + '.' + state + '_final'
                 state_phase2_abs_name = phase2.name + '.' + state + '_initial'
-                self.connect(state_phase1_abs_name, state_phase2_abs_name)
+                if self.pathname:
+                    state_phase1_abs_name = self.pathname + '.' + state_phase1_abs_name
+                    state_phase2_abs_name = self.pathname + '.' + state_phase2_abs_name
+                state_phase1_prom_name = self._var_abs2prom['output'][state_phase1_abs_name]
+                state_phase2_prom_name = self._var_abs2prom['input'][state_phase2_abs_name]
+                self.connect(state_phase1_prom_name, state_phase2_prom_name)
 
     def link_phases(self, phase1, phase2, states_to_skip=[]):
         # need to cache this because the data we need isn't ready yet
