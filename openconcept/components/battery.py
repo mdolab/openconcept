@@ -3,7 +3,7 @@ import numpy as np
 from openmdao.api import ExplicitComponent, Group
 from openmdao.api import Group
 from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
-from openconcept.utilities.math.integrals import Integrator
+from openconcept.utilities.math.integrals import NewIntegrator
 from openconcept.utilities.dvlabel import DVLabel
 
 class SOCBattery(Group):
@@ -67,9 +67,9 @@ class SOCBattery(Group):
         cost_inc = self.options['cost_inc']
         cost_base = self.options['cost_base']
 
-        defaults = [['SOC_initial', 'batt_SOC_initial', 1, None]]
-        self.add_subsystem('defaults', DVLabel(defaults),
-                           promotes_inputs=["*"], promotes_outputs=["*"])
+        # defaults = [['SOC_initial', 'batt_SOC_initial', 1, None]]
+        # self.add_subsystem('defaults', DVLabel(defaults),
+        #                    promotes_inputs=["*"], promotes_outputs=["*"])
 
         self.add_subsystem('batt_base',SimpleBattery(num_nodes=nn, efficiency=eta_b, specific_energy=e_b,
                                                      specific_power=p_b, cost_inc=cost_inc, cost_base=cost_base),
@@ -80,12 +80,9 @@ class SOCBattery(Group):
 
         self.add_subsystem('divider',ElementMultiplyDivideComp(output_name='dSOCdt',input_names=['elec_load','max_energy'],vec_size=[nn,1],scaling_factor=-1,divide=[False,True],input_units=['W','kJ']),
                            promotes_inputs=['*'],promotes_outputs=['*'])
-        
-        self.add_subsystem('intload',Integrator(num_nodes=nn, method='simpson', quantity_units=None, diff_units='s', time_setup='duration'),
-                                                promotes_inputs=[('q_initial','batt_SOC_initial'),'duration',('dqdt','dSOCdt')],
-                                                promotes_outputs=[('q','SOC'),('q_final','SOC_final')])
 
-
+        integ = self.add_subsystem('ode_integ', NewIntegrator(num_nodes=nn, method='simpson', diff_units='s', time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
+        integ.add_integrand('SOC', rate_name='dSOCdt', start_name='SOC_initial', end_name='SOC_final', units=None, val=1.0, start_val=1.0)
 
 class SimpleBattery(ExplicitComponent):
     """

@@ -11,7 +11,7 @@ from openmdao.api import DirectSolver, IndepVarComp, NewtonSolver, BoundsEnforce
 # imports for the airplane model itself
 from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
-from openconcept.utilities.math.integrals import Integrator
+from openconcept.utilities.math.integrals import NewIntegrator
 from openconcept.utilities.dvlabel import DVLabel
 from examples.methods.weights_twin_hybrid import TwinSeriesHybridEmptyWeight
 from examples.propulsion_layouts.simple_series_hybrid import TwinSeriesHybridElectricPropulsionSystem
@@ -88,12 +88,9 @@ class SeriesHybridTwinModel(Group):
         self.connect('propmodel.eng1.component_weight', 'W_engine')
         self.connect('propmodel.gen1.component_weight', 'W_generator')
         self.connect('propmodel.motors_weight', 'W_motors')
-        self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson',
-                                                 quantity_units='kg', diff_units='s',
-                                                 time_setup='duration'),
-                           promotes_inputs=[('dqdt', 'fuel_flow'), 'duration',
-                           ('q_initial', 'fuel_used_initial')],
-                           promotes_outputs=[('q', 'fuel_used'), ('q_final', 'fuel_used_final')])
+        intfuel = self.add_subsystem('intfuel', NewIntegrator(num_nodes=nn, method='simpson', diff_units='s',
+                                                              time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
+        intfuel.add_integrand('fuel_used', rate_name='fuel_flow', val=1.0, units='kg')
         self.add_subsystem('weight', AddSubtractComp(output_name='weight',
                                                      input_names=['ac|weights|MTOW', 'fuel_used'],
                                                      units='kg', vec_size=[1, nn],
@@ -149,15 +146,20 @@ class ElectricTwinAnalysisGroup(Group):
         mission_data_comp = self.add_subsystem('mission_data_comp',IndepVarComp(),promotes_outputs=["*"])
         mission_data_comp.add_output('batt_soc_target', val=0.1, units=None)
 
-        # Ensure that any state variables are connected across the mission as intended
-        connect_phases = ['rotate', 'climb', 'cruise', 'descent']
-        connect_states = ['range', 'fuel_used', 'fltcond|h', 'propmodel.batt1.SOC']
-        extra_states_tuple = [(connect_state, connect_phases) for connect_state in connect_states]
-        extra_states_tuple.append(('propmodel.batt1.SOC', ['v0v1', 'v1vr', 'rotate']))
+        # # Ensure that any state variables are connected across the mission as intended
+        # connect_phases = ['rotate', 'climb', 'cruise', 'descent']
+        # connect_states = ['range', 'fuel_used', 'fltcond|h', 'propmodel.batt1.SOC']
+        # extra_states_tuple = [(connect_state, connect_phases) for connect_state in connect_states]
+        # extra_states_tuple.append(('propmodel.batt1.SOC', ['v0v1', 'v1vr', 'rotate']))
         analysis = self.add_subsystem('analysis',FullMissionAnalysis(num_nodes=nn,
-                                                                     aircraft_model=SeriesHybridTwinModel,
-                                                                     extra_states=extra_states_tuple),
+                                                                     aircraft_model=SeriesHybridTwinModel),
                                                  promotes_inputs=['*'],promotes_outputs=['*'])
+        # TODO need to mark the rotate pseudo"states" as states manually
+        analysis.connect('rotate.range_final','climb.ode_integ.range_initial')
+        analysis.connect('rotate.fltcond|h_final','climb.ode_integ.fltcond|h_initial')
+        # TODO the reg test connects SOC but not fuel flow through takeoff...
+        analysis.connect('v0v1.propmodel.batt1.SOC_final','v1vr.propmodel.batt1.SOC_initial')
+        analysis.connect('v1vr.propmodel.batt1.SOC_final','rotate.propmodel.batt1.SOC_initial')
 
         margins = self.add_subsystem('margins',ExecComp('MTOW_margin = MTOW - OEW - total_fuel - W_battery - payload',
                                                         MTOW_margin={'units':'lbm','value':100},
