@@ -32,7 +32,7 @@ x. Skip works correctly
 class TestForDocs(unittest.TestCase):
     def test_for_docs(self):
         prob = self.trajectory_example()
-        assert_near_equal(prob['phase2.vm.ode_integ.velocity_final'], 1.6756704, 1e-8)
+        assert_near_equal(prob['phase2.vm.ode_integ.velocity_final'], 1.66689857, 1e-8)
         
     def trajectory_example(self):
         """
@@ -400,6 +400,8 @@ class TestIntegratorNoIntegratedState(unittest.TestCase):
     def test_runs(self):
         self.p.run_model()
 
+# TODO test integrator with tagged state and promoted rate
+
 # ============== PhaseGroup Tests ========== #
 
 class TestPhaseNoTime(unittest.TestCase):
@@ -445,6 +447,8 @@ class TestPhaseMultipleIntegrators(unittest.TestCase):
         self.p.run_model()
         partials = self.p.check_partials(method='cs', out_stream=None)
         assert_check_partials(partials)
+
+# TODO test phase where a duration var is promoted already 
 
 # ============ Trajectory Tests ============ #
 

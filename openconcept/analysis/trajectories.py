@@ -51,12 +51,14 @@ class PhaseGroup(om.Group):
         self._setup_var_data()
 
         # make connections from duration to integrated vars automatically
+        time_prom_addresses_already_connected = []
         for var_abs_address in timevars:
             if self.pathname:
                 var_abs_address = self.pathname + '.' + var_abs_address
             var_prom_address = self._var_abs2prom['input'][var_abs_address]
-            if var_prom_address != self._oc_time_var_name:
+            if var_prom_address != self._oc_time_var_name and var_prom_address not in time_prom_addresses_already_connected:
                 self.connect(self._oc_time_var_name, var_prom_address)
+                time_prom_addresses_already_connected.append(var_prom_address)
         self._oc_states_list = states
 
 class IntegratorGroup(om.Group):
@@ -72,11 +74,13 @@ class IntegratorGroup(om.Group):
             num_nodes = prob_meta['oc_num_nodes']
         except KeyError:
             raise NameError('Integrator group must be created within an OpenConcept phase')
-        self.add_subsystem('ode_integ', NewIntegrator(time_setup='duration', diff_units=time_units, num_nodes=num_nodes))
+        self.add_subsystem('ode_integ', NewIntegrator(time_setup='duration', method='simpson',diff_units=time_units, num_nodes=num_nodes))
         super(IntegratorGroup, self)._setup_procs(pathname, comm, mode, prob_meta)
 
     def _configure(self):
         super(IntegratorGroup, self)._configure()
+        # TODO revisit this when variable data available by default in configure
+        self._setup_var_data()
         for subsys in self._subsystems_allprocs:
             for var in subsys._var_rel_names['output']:
                 # check if there are any variables to integrate
@@ -111,7 +115,11 @@ class IntegratorGroup(om.Group):
                     self.ode_integ.add_integrand(state_name, rate_name=var, val=state_val,
                                        units=state_units, lower=state_lower, upper=state_upper)
                     # make the rate connection
-                    self.connect(subsys.name+'.'+var, 'ode_integ'+'.'+var)
+                    rate_var_abs_address = subsys.name+'.'+var
+                    if self.pathname:
+                        rate_var_abs_address = self.pathname + '.' + rate_var_abs_address
+                    rate_var_prom_address = self._var_abs2prom['output'][rate_var_abs_address]
+                    self.connect(rate_var_prom_address, 'ode_integ'+'.'+var)
                     if state_promotes:
                         self.ode_integ._var_promotes['output'].append(state_name)
 

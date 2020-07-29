@@ -18,8 +18,9 @@ from openconcept.analysis.performance.mission_profiles import MissionWithReserve
 from openconcept.utilities.visualization import plot_trajectory
 from openconcept.components.cfm56 import CFM56
 from openconcept.utilities.dvlabel import DVLabel
+import openconcept.api as oc
 
-class B738AirplaneModel(Group):
+class B738AirplaneModel(oc.IntegratorGroup):
     """
     A custom model specific to the Boeing 737-800 airplane.
     This class will be passed in to the mission analysis code.
@@ -48,12 +49,15 @@ class B738AirplaneModel(Group):
                   thrust={'value': 1.0*np.ones((nn,)),
                        'units': 'kN'},
                   fuel_flow={'value': 1.0*np.ones((nn,)),
-                     'units': 'kg/s'},
+                     'units': 'kg/s',
+                     'tags': ['integrate', 'state_name:fuel_used', 'state_units:kg', 'state_val:1.0', 'state_promotes:True']},
                   fuel_flow_in={'value': 1.0*np.ones((nn,)),
                        'units': 'kg/s'})
+        
         self.add_subsystem('doubler', doubler, promotes_outputs=['*'])
         self.connect('propmodel.thrust', 'doubler.thrust_in')
         self.connect('propmodel.fuel_flow', 'doubler.fuel_flow_in')
+
         # use a different drag coefficient for takeoff versus cruise
         if flight_phase not in ['v0v1', 'v1v0', 'v1vr', 'rotate']:
             cd0_source = 'ac|aero|polar|CD0_cruise'
@@ -74,10 +78,6 @@ class B738AirplaneModel(Group):
                            promotes_inputs=[('x', 'ac|weights|OEW')],
                            promotes_outputs=['OEW'])
 
-        # airplanes which consume fuel will need to integrate
-        # fuel usage across the mission and subtract it from TOW
-        integ = self.add_subsystem('ode_integ', NewIntegrator(num_nodes=nn, diff_units='s', time_setup='duration', method='simpson'), promotes_inputs=['duration', 'fuel_flow'], promotes_outputs=['fuel_used'])
-        integ.add_integrand('fuel_used', rate_name='fuel_flow', val=1.0, units='kg')
         self.add_subsystem('weight', AddSubtractComp(output_name='weight',
                                                      input_names=['ac|weights|MTOW', 'fuel_used'],
                                                      units='kg', vec_size=[1, nn],
