@@ -579,7 +579,7 @@ class GroundRollPhase(oc.PhaseGroup):
         else:
             ode_integ.add_integrand('range', rate_name='fltcond|groundspeed', units='m')
 
-class RotationPhase(Group):
+class RotationPhase(oc.PhaseGroup):
     """
     This group models the transition from ground roll to climb out during a takeoff
     using force balance in the vertical and horizontal directions.
@@ -676,14 +676,23 @@ class RotationPhase(Group):
         # TODO always starts from zero altitude
         self.add_subsystem('clear_obstacle',BalanceComp(name='duration',units='s',val=1,eq_units='m',rhs_name='fltcond|h_final',lhs_name='h_obs',lower=0.1,upper=15),
                        promotes_inputs=['*'],promotes_outputs=['duration'])
-        self.add_subsystem('intvelocity',Integrator(num_nodes=nn, method='simpson', quantity_units='m/s', diff_units='s',time_setup='duration',lower=0.1),
-                                                    promotes_inputs=[('dqdt','accel_horiz'),'duration',('q_initial','fltcond|Utrue_initial')],promotes_outputs=[('q','fltcond|Utrue'),('q_final','fltcond|Utrue_final')])
-        self.add_subsystem('intrange',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration'),
-                                                    promotes_inputs=[('dqdt','fltcond|groundspeed'),'duration',('q_initial','range_initial')],promotes_outputs=[('q','range'),('q_final','range_final')])
-        self.add_subsystem('intvs',Integrator(num_nodes=nn, method='simpson', quantity_units='m/s', diff_units='s', time_setup='duration',zero_start=True),
-                                                    promotes_inputs=[('dqdt','accel_vert'),'duration'],promotes_outputs=[('q','fltcond|vs'),('q_final','fltcond|vs_final')])
-        self.add_subsystem('inth',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration',zero_start=True),
-                                                    promotes_inputs=[('dqdt','fltcond|vs'),'duration'],promotes_outputs=[('q','fltcond|h'),('q_final','fltcond|h_final')])
+        int1 = self.add_subsystem('intvelocity', NewIntegrator(num_nodes=nn, method='simpson',diff_units='s',time_setup='duration'), promotes_outputs=['*'], promotes_inputs=['*'])
+        int1.add_integrand('fltcond|Utrue', rate_name='accel_horiz', units='m/s', lower=0.1)
+        int2 = self.add_subsystem('intrange', NewIntegrator(num_nodes=nn, method='simpson',diff_units='s',time_setup='duration'), promotes_outputs=['*'], promotes_inputs=['*'])
+        int2.add_integrand('range', rate_name='fltcond|groundspeed', units='m')        
+        int3 = self.add_subsystem('intvs', NewIntegrator(num_nodes=nn, method='simpson',diff_units='s',time_setup='duration'), promotes_outputs=['*'], promotes_inputs=['*'])
+        int3.add_integrand('fltcond|vs', rate_name='accel_vert', units='m/s', zero_start=True)        
+        int4 = self.add_subsystem('inth', NewIntegrator(num_nodes=nn, method='simpson',diff_units='s',time_setup='duration'), promotes_outputs=['*'], promotes_inputs=['*'])
+        int4.add_integrand('fltcond|h', rate_name='fltcond|vs', units='m', zero_start=True)               
+        
+        # self.add_subsystem('intvelocity',Integrator(num_nodes=nn, method='simpson', quantity_units='m/s', diff_units='s',time_setup='duration',lower=0.1),
+        #                                             promotes_inputs=[('dqdt','accel_horiz'),'duration',('q_initial','fltcond|Utrue_initial')],promotes_outputs=[('q','fltcond|Utrue'),('q_final','fltcond|Utrue_final')])
+        # self.add_subsystem('intrange',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration'),
+        #                                             promotes_inputs=[('dqdt','fltcond|groundspeed'),'duration',('q_initial','range_initial')],promotes_outputs=[('q','range'),('q_final','range_final')])
+        # self.add_subsystem('intvs',Integrator(num_nodes=nn, method='simpson', quantity_units='m/s', diff_units='s', time_setup='duration',zero_start=True),
+        #                                             promotes_inputs=[('dqdt','accel_vert'),'duration'],promotes_outputs=[('q','fltcond|vs'),('q_final','fltcond|vs_final')])
+        # self.add_subsystem('inth',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration',zero_start=True),
+        #                                             promotes_inputs=[('dqdt','fltcond|vs'),'duration'],promotes_outputs=[('q','fltcond|h'),('q_final','fltcond|h_final')])
 
 class NewSteadyFlightPhase(oc.PhaseGroup):
     """

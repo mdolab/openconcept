@@ -313,7 +313,6 @@ class FullMissionAnalysis(oc.TrajectoryGroup):
             if transition_method == 'simplified':
                 rotate = self.add_subsystem('rotate',RobustRotationPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='rotate'),promotes_inputs=['ac|*'])
             elif transition_method == 'ode':
-                raise NotImplementedError('Have not updated this to latest standard yet')
                 rotate = self.add_subsystem('rotate',RotationPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='rotate'),promotes_inputs=['ac|*'])
                 self.connect('v1vr.fltcond|Utrue_final','rotate.fltcond|Utrue_initial')
             else:
