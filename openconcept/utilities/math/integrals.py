@@ -534,7 +534,7 @@ class NewIntegrator(ExplicitComponent):
         self.options.declare('method',default='bdf3', desc="Numerical method to use.")
         self.options.declare('time_setup',default='dt')
 
-    def add_integrand(self, name, rate_name=None, start_name=None, end_name=None, val=0.0,
+    def add_integrand(self, name, rate_name=None, start_name=None, end_name=None, val=0.0, start_val=0.0,
                       units=None, rate_units=None, zero_start=False, final_only=False, lower=-1e30, upper=1e30):
             """
             Add a new integrated variable q = integrate(dqdt) + q0
@@ -602,6 +602,7 @@ class NewIntegrator(ExplicitComponent):
             options = {'name': name,
                         'rate_name': rate_name,
                         'start_name': start_name,
+                        'start_val': start_val,
                         'end_name': end_name,
                         'units': units,
                         'rate_units': rate_units,
@@ -624,7 +625,7 @@ class NewIntegrator(ExplicitComponent):
             if not final_only:
                 self.add_output(name, shape=(num_nodes), val=val, units=units, upper=options['upper'],lower=options['lower'])
             if not zero_start:
-                self.add_input(start_name, val=0.0, units=units)
+                self.add_input(start_name, val=start_val, units=units)
                 if not final_only:
                     self.declare_partials([name], [start_name], rows=np.arange(num_nodes), cols=np.zeros((num_nodes,)), val=np.ones((num_nodes,)))
                 self.declare_partials([end_name], [start_name], val=1)
