@@ -400,7 +400,50 @@ class TestIntegratorNoIntegratedState(unittest.TestCase):
     def test_runs(self):
         self.p.run_model()
 
-# TODO test integrator with tagged state and promoted rate
+class IntegratorGroupTestPromotedRate(oc.IntegratorGroup):
+    def initialize(self):
+        self.options.declare('num_nodes', default=1)
+
+    def setup(self):
+        nn = self.options['num_nodes']
+        iv = self.add_subsystem('iv', om.IndepVarComp('x', val=np.linspace(0, 5, nn), units='s'))
+        ec = self.add_subsystem('ec', om.ExecComp(['df = -10.2*x**2 + 4.2*x -10.5'], 
+                  df={'value': 1.0*np.ones((nn,)),
+                     'units': 'kg/s',
+                     'tags': ['integrate', 'state_name:f', 'state_units:kg']},
+                  x={'value': 1.0*np.ones((nn,)),
+                       'units': 's'}), promotes_outputs=['df'])
+        self.connect('iv.x', 'ec.x')
+        self.set_order(['iv', 'ec', 'ode_integ'])
+
+class TestIntegratorSingleStatePromotedRate(unittest.TestCase):
+    class TestPhase(oc.PhaseGroup):
+        def initialize(self):
+            self.options.declare('num_nodes', default=1)
+
+        def setup(self):
+            nn = self.options['num_nodes']
+            self.add_subsystem('iv', om.IndepVarComp('duration', val=5.0, units='s'), promotes_outputs=['*'])
+            self.add_subsystem('ic', IntegratorGroupTestPromotedRate(num_nodes=nn))
+
+    def setUp(self):
+        self.nn = 5
+        self.p = om.Problem(model=self.TestPhase(num_nodes=self.nn))
+        self.p.setup(force_alloc_complex=True)
+
+    def test_results(self):
+        self.p.run_model()
+        x = np.linspace(0, 5, self.nn)
+        f_exact = -10.2*x**3/3 + 4.2*x**2/2 -10.5*x
+        assert_near_equal(self.p['ic.ode_integ.f'], f_exact)
+        self.p['ic.ode_integ.f_initial'] = -2.0
+        self.p.run_model()
+        assert_near_equal(self.p['ic.ode_integ.f'], f_exact-2.0)
+
+    def test_partials(self):
+        self.p.run_model()
+        partials = self.p.check_partials(method='cs', out_stream=None)
+        assert_check_partials(partials)
 
 # ============== PhaseGroup Tests ========== #
 
@@ -448,7 +491,38 @@ class TestPhaseMultipleIntegrators(unittest.TestCase):
         partials = self.p.check_partials(method='cs', out_stream=None)
         assert_check_partials(partials)
 
-# TODO test phase where a duration var is promoted already 
+class TestPhasePromotedDurationVariable(unittest.TestCase):
+    def setUp(self):
+        self.nn = 5
+        grp1 = IntegratorGroupTestBase(num_nodes=self.nn)
+        grp2 = om.Group()
+        grp2a = grp2.add_subsystem('a', IntegratorGroupTestBase(num_nodes=self.nn))
+        grp2b = grp2.add_subsystem('b', IntegratorGroupTestBase(num_nodes=self.nn))
+        phase = oc.PhaseGroup(num_nodes=self.nn)
+        phase.add_subsystem('iv', om.IndepVarComp('duration', val=5.0, units='s'), promotes_outputs=['*'])
+        phase.add_subsystem('grp1', grp1)
+        phase.add_subsystem('grp2', grp2)
+        phase.add_subsystem('c', om.ExecComp('result = 1.0*duration'), promotes_inputs=['duration'])
+
+        self.p = om.Problem(model=phase)
+        self.p.setup(force_alloc_complex=True)
+
+    def test_results(self):
+        self.p.run_model()
+        x = np.linspace(0, 5, self.nn)
+        f_exact = -10.2*x**3/3 + 4.2*x**2/2 -10.5*x
+        assert_near_equal(self.p['grp1.ode_integ.f'], f_exact)
+        assert_near_equal(self.p['grp2.a.ode_integ.f'], f_exact)
+        assert_near_equal(self.p['grp2.b.ode_integ.f'], f_exact)
+        self.p['grp2.a.ode_integ.f_initial'] = -2.0
+        self.p.run_model()
+        assert_near_equal(self.p['grp2.a.ode_integ.f'], f_exact-2.0)
+
+    def test_partials(self):
+        self.p.run_model()
+        partials = self.p.check_partials(method='cs', out_stream=None)
+        assert_check_partials(partials)
+
 
 # ============ Trajectory Tests ============ #
 
@@ -461,6 +535,28 @@ class PhaseForTrajTest(oc.PhaseGroup):
         self.add_subsystem('iv', om.IndepVarComp('duration', val=5.0, units='s'), promotes_outputs=['*'])
         a = self.add_subsystem('a', IntegratorGroupTestBase(num_nodes=nn))
         b = self.add_subsystem('b', IntegratorTestMultipleOutputs(num_nodes=nn))
+
+class PhaseForTrajTestWithPromotion(oc.PhaseGroup):
+    def initialize(self):
+        self.options.declare('num_nodes', default=1)
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+        self.add_subsystem('iv', om.IndepVarComp('duration', val=5.0, units='s'), promotes_outputs=['*'])
+        a = self.add_subsystem('a', IntegratorGroupTestBase(num_nodes=nn))
+        # promote the outputs of b
+        b = self.add_subsystem('b', IntegratorTestMultipleOutputs(num_nodes=nn), promotes_outputs=['*f2*'], promotes_inputs=['*df2'])
+
+class PhaseForTrajTestWithPromotionNamesCollide(oc.PhaseGroup):
+    def initialize(self):
+        self.options.declare('num_nodes', default=1)
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+        self.add_subsystem('iv', om.IndepVarComp('duration', val=5.0, units='s'), promotes_outputs=['*'])
+        a = self.add_subsystem('a', IntegratorGroupTestBase(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
+        # promote the outputs of b
+        b = self.add_subsystem('b', IntegratorTestMultipleOutputs(num_nodes=nn), promotes_outputs=['*f2*'], promotes_inputs=['*df2'])
 
 class TestTrajectoryAllPhaseConnect(unittest.TestCase):
     def setUp(self):
@@ -497,6 +593,90 @@ class TestTrajectoryAllPhaseConnect(unittest.TestCase):
         assert_near_equal(self.p['phase3.a.ode_integ.f'], f_exact+2.0*f_exact[-1])
         assert_near_equal(self.p['phase3.b.ode_integ.f'], f_exact+2.0*f_exact[-1])
         assert_near_equal(self.p['phase3.b.ode_integ.f2'], f2_exact+2.0*f2_exact[-1])
+
+    def test_partials(self):
+        self.p.run_model()
+        partials = self.p.check_partials(method='cs', out_stream=None)
+        assert_check_partials(partials)
+
+class TestTrajectoryAllPhaseConnectWithVarPromotion(unittest.TestCase):
+    def setUp(self):
+        self.nn = 5
+        traj = oc.TrajectoryGroup()
+       
+        phase1 = traj.add_subsystem('phase1', PhaseForTrajTestWithPromotion(num_nodes=5))
+        phase2 = traj.add_subsystem('phase2', PhaseForTrajTestWithPromotion(num_nodes=5))
+        phase3 = traj.add_subsystem('phase3', PhaseForTrajTestWithPromotion(num_nodes=5))
+
+        traj.link_phases(phase1, phase2)
+        traj.link_phases(phase2, phase3)
+
+        self.p = om.Problem(model=traj)
+        self.p.setup(force_alloc_complex=True)
+
+    def test_results(self):
+        self.p.run_model()
+        x = np.linspace(0, 5, self.nn)
+        f_exact = -10.2*x**3/3 + 4.2*x**2/2 -10.5*x
+        f2_exact = 5.1*x**3/3 +0.5*x**2/2-7.2*x
+
+        # check first phase result
+        assert_near_equal(self.p['phase1.a.ode_integ.f'], f_exact)
+        assert_near_equal(self.p['phase1.b.ode_integ.f'], f_exact)
+        assert_near_equal(self.p['phase1.ode_integ.f2'], f2_exact)
+
+        # check second phase result
+        assert_near_equal(self.p['phase2.a.ode_integ.f'], f_exact+f_exact[-1])
+        assert_near_equal(self.p['phase2.b.ode_integ.f'], f_exact+f_exact[-1])
+        assert_near_equal(self.p['phase2.ode_integ.f2'], f2_exact+f2_exact[-1])
+
+        # check third phase result
+        assert_near_equal(self.p['phase3.a.ode_integ.f'], f_exact+2.0*f_exact[-1])
+        assert_near_equal(self.p['phase3.b.ode_integ.f'], f_exact+2.0*f_exact[-1])
+        assert_near_equal(self.p['phase3.ode_integ.f2'], f2_exact+2.0*f2_exact[-1])
+
+    def test_partials(self):
+        self.p.run_model()
+        partials = self.p.check_partials(method='cs', out_stream=None)
+        assert_check_partials(partials)
+
+class TestTrajectoryAllPhaseConnectWithVarPromotionODEIntegCollide(unittest.TestCase):
+    # This checks for the situation when multiple integrator comps are promoting up ode_integ to the phase level
+    # When this happens duplicate connections can occur
+    def setUp(self):
+        self.nn = 5
+        traj = oc.TrajectoryGroup()
+       
+        phase1 = traj.add_subsystem('phase1', PhaseForTrajTestWithPromotionNamesCollide(num_nodes=5))
+        phase2 = traj.add_subsystem('phase2', PhaseForTrajTestWithPromotionNamesCollide(num_nodes=5))
+        phase3 = traj.add_subsystem('phase3', PhaseForTrajTestWithPromotionNamesCollide(num_nodes=5))
+
+        traj.link_phases(phase1, phase2)
+        traj.link_phases(phase2, phase3)
+
+        self.p = om.Problem(model=traj)
+        self.p.setup(force_alloc_complex=True)
+
+    def test_results(self):
+        self.p.run_model()
+        x = np.linspace(0, 5, self.nn)
+        f_exact = -10.2*x**3/3 + 4.2*x**2/2 -10.5*x
+        f2_exact = 5.1*x**3/3 +0.5*x**2/2-7.2*x
+
+        # check first phase result
+        assert_near_equal(self.p['phase1.ode_integ.f'], f_exact)
+        assert_near_equal(self.p['phase1.b.ode_integ.f'], f_exact)
+        assert_near_equal(self.p['phase1.ode_integ.f2'], f2_exact)
+
+        # check second phase result
+        assert_near_equal(self.p['phase2.ode_integ.f'], f_exact+f_exact[-1])
+        assert_near_equal(self.p['phase2.b.ode_integ.f'], f_exact+f_exact[-1])
+        assert_near_equal(self.p['phase2.ode_integ.f2'], f2_exact+f2_exact[-1])
+
+        # check third phase result
+        assert_near_equal(self.p['phase3.ode_integ.f'], f_exact+2.0*f_exact[-1])
+        assert_near_equal(self.p['phase3.b.ode_integ.f'], f_exact+2.0*f_exact[-1])
+        assert_near_equal(self.p['phase3.ode_integ.f2'], f2_exact+2.0*f2_exact[-1])
 
     def test_partials(self):
         self.p.run_model()
