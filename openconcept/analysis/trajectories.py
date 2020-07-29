@@ -122,6 +122,8 @@ class IntegratorGroup(om.Group):
                     self.connect(rate_var_prom_address, 'ode_integ'+'.'+var)
                     if state_promotes:
                         self.ode_integ._var_promotes['output'].append(state_name)
+                        self.ode_integ._var_promotes['output'].append(state_name+'_final')
+                        self.ode_integ._var_promotes['input'].append(state_name+'_initial')
 
 class TrajectoryGroup(om.Group):
     def __init__(self, **kwargs):

@@ -88,6 +88,6 @@ class B738TestCase(unittest.TestCase):
     def test_values_B738(self):
         prob = self.prob
         # block fuel
-        assert_near_equal(prob.get_val('descent.ode_integ.fuel_used_final', units='lbm'), 28688.32933661591, tolerance=2e-5)
+        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lbm'), 28688.32933661591, tolerance=2e-5)
         # total fuel
-        assert_near_equal(prob.get_val('loiter.ode_integ.fuel_used_final', units='lbm'), 34555.31347454542, tolerance=2e-5)
+        assert_near_equal(prob.get_val('loiter.fuel_used_final', units='lbm'), 34555.31347454542, tolerance=2e-5)

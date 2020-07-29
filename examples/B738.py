@@ -164,7 +164,7 @@ def set_values(prob, num_nodes):
 
 def show_outputs(prob):
     # print some outputs
-    vars_list = ['descent.ode_integ.fuel_used_final','loiter.ode_integ.fuel_used_final']
+    vars_list = ['descent.fuel_used_final','loiter.fuel_used_final']
     units = ['lb','lb']
     nice_print_names = ['Block fuel', 'Total fuel']
     print("=======================================================================")
