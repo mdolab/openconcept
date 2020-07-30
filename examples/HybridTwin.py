@@ -146,11 +146,6 @@ class ElectricTwinAnalysisGroup(Group):
         mission_data_comp = self.add_subsystem('mission_data_comp',IndepVarComp(),promotes_outputs=["*"])
         mission_data_comp.add_output('batt_soc_target', val=0.1, units=None)
 
-        # # Ensure that any state variables are connected across the mission as intended
-        # connect_phases = ['rotate', 'climb', 'cruise', 'descent']
-        # connect_states = ['range', 'fuel_used', 'fltcond|h', 'propmodel.batt1.SOC']
-        # extra_states_tuple = [(connect_state, connect_phases) for connect_state in connect_states]
-        # extra_states_tuple.append(('propmodel.batt1.SOC', ['v0v1', 'v1vr', 'rotate']))
         analysis = self.add_subsystem('analysis',FullMissionAnalysis(num_nodes=nn,
                                                                      aircraft_model=SeriesHybridTwinModel),
                                                  promotes_inputs=['*'],promotes_outputs=['*'])
