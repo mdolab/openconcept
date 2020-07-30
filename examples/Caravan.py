@@ -4,22 +4,19 @@ import os
 import numpy as np
 
 sys.path.insert(0, os.getcwd())
-from openmdao.api import Problem, Group, ScipyOptimizeDriver
-from openmdao.api import DirectSolver, SqliteRecorder, IndepVarComp
-from openmdao.api import NewtonSolver, BoundsEnforceLS
+import openmdao.api as om 
+import openconcept.api as oc
 
 # imports for the airplane model itself
-from openconcept.analysis.aerodynamics import PolarDrag
-from openconcept.utilities.math import AddSubtractComp
-from openconcept.utilities.math.integrals import Integrator
-from examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
-from examples.propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
-from examples.methods.costs_commuter import OperatingCost
-from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from examples.aircraft_data.caravan import data as acdata
+from examples.propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
+from examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
+from examples.methods.costs_commuter import OperatingCost
+
+from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis
 
-class CaravanAirplaneModel(Group):
+class CaravanAirplaneModel(om.Group):
     """
     A custom model specific to the Cessna Caravan airplane.
     This class will be passed in to the mission analysis code.
@@ -34,7 +31,7 @@ class CaravanAirplaneModel(Group):
         flight_phase = self.options['flight_phase']
 
         # any control variables other than throttle and braking need to be defined here
-        controls = self.add_subsystem('controls', IndepVarComp(), promotes_outputs=['*'])
+        controls = self.add_subsystem('controls', om.IndepVarComp(), promotes_outputs=['*'])
         controls.add_output('prop1rpm', val=np.ones((nn,)) * 2000, units='rpm')
 
         # a propulsion system needs to be defined in order to provide thrust
@@ -66,10 +63,10 @@ class CaravanAirplaneModel(Group):
 
         # airplanes which consume fuel will need to integrate
         # fuel usage across the mission and subtract it from TOW
-        intfuel = self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson', diff_units='s',
+        intfuel = self.add_subsystem('intfuel', oc.Integrator(num_nodes=nn, method='simpson', diff_units='s',
                                                               time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
         intfuel.add_integrand('fuel_used', rate_name='fuel_flow', val=1.0, units='kg')
-        self.add_subsystem('weight', AddSubtractComp(output_name='weight',
+        self.add_subsystem('weight', oc.AddSubtractComp(output_name='weight',
                                                      input_names=['ac|weights|MTOW', 'fuel_used'],
                                                      units='kg', vec_size=[1, nn],
                                                      scaling_factors=[1, -1]),
@@ -77,7 +74,7 @@ class CaravanAirplaneModel(Group):
                            promotes_outputs=['weight'])
 
 
-class CaravanAnalysisGroup(Group):
+class CaravanAnalysisGroup(om.Group):
     """This is an example of a balanced field takeoff and three-phase mission analysis.
     """
     def setup(self):
@@ -85,7 +82,7 @@ class CaravanAnalysisGroup(Group):
         nn = 11
 
         # Define a bunch of design varaiables and airplane-specific parameters
-        dv_comp = self.add_subsystem('dv_comp',  DictIndepVarComp(acdata),
+        dv_comp = self.add_subsystem('dv_comp',  oc.DictIndepVarComp(acdata),
                                      promotes_outputs=["*"])
         dv_comp.add_output_from_dict('ac|aero|CLmax_TO')
         dv_comp.add_output_from_dict('ac|aero|polar|e')
@@ -130,16 +127,14 @@ class CaravanAnalysisGroup(Group):
 def run_caravan_analysis():
     # Set up OpenMDAO to analyze the airplane
     num_nodes = 11
-    prob = Problem()
+    prob = om.Problem()
     prob.model = CaravanAnalysisGroup()
-    prob.model.nonlinear_solver = NewtonSolver(iprint=2)
-    prob.model.options['assembled_jac_type'] = 'csc'
-    prob.model.linear_solver = DirectSolver(assemble_jac=True)
-    prob.model.nonlinear_solver.options['solve_subsystems'] = True
+    prob.model.nonlinear_solver = om.NewtonSolver(iprint=2, solve_subsystems=True)
+    prob.model.linear_solver = om.DirectSolver()
     prob.model.nonlinear_solver.options['maxiter'] = 20
     prob.model.nonlinear_solver.options['atol'] = 1e-6
     prob.model.nonlinear_solver.options['rtol'] = 1e-6
-    prob.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
+    prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
     prob.setup(check=True, mode='fwd')
 
     # set some (required) mission parameters. Each pahse needs a vertical and air-speed

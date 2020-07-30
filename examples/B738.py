@@ -111,7 +111,7 @@ class B738AnalysisGroup(om.Group):
 
         dv_comp.add_output_from_dict('ac|num_passengers_max')
         dv_comp.add_output_from_dict('ac|q_cruise')
-+
+
         # Run a full mission analysis including takeoff, reserve_, cruise,reserve_ and descereserve_nt
         analysis = self.add_subsystem('analysis',
                                       MissionWithReserve(num_nodes=nn,
