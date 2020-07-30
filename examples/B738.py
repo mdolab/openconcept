@@ -4,21 +4,13 @@ import os
 import numpy as np
 
 sys.path.insert(0, os.getcwd())
-from openmdao.api import Problem, Group, ScipyOptimizeDriver
-from openmdao.api import DirectSolver, SqliteRecorder, IndepVarComp
-from openmdao.api import NewtonSolver, BoundsEnforceLS
 import openmdao.api as om
+import openconcept.api as oc
 # imports for the airplane model itself
 from openconcept.analysis.aerodynamics import PolarDrag
-from openconcept.utilities.math import AddSubtractComp
-from openconcept.utilities.math.integrals import Integrator
-from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from examples.aircraft_data.B738 import data as acdata
 from openconcept.analysis.performance.mission_profiles import MissionWithReserve
-from openconcept.utilities.visualization import plot_trajectory
 from openconcept.components.cfm56 import CFM56
-from openconcept.utilities.dvlabel import DVLabel
-import openconcept.api as oc
 
 class B738AirplaneModel(oc.IntegratorGroup):
     """
@@ -78,22 +70,20 @@ class B738AirplaneModel(oc.IntegratorGroup):
                            promotes_inputs=[('x', 'ac|weights|OEW')],
                            promotes_outputs=['OEW'])
 
-        self.add_subsystem('weight', AddSubtractComp(output_name='weight',
+        self.add_subsystem('weight', oc.AddSubtractComp(output_name='weight',
                                                      input_names=['ac|weights|MTOW', 'fuel_used'],
                                                      units='kg', vec_size=[1, nn],
                                                      scaling_factors=[1, -1]),
                            promotes_inputs=['*'],
                            promotes_outputs=['weight'])
 
-class B738AnalysisGroup(Group):
-    """This is an example of a three-phase mission analysis.
-    """
+class B738AnalysisGroup(om.Group):
     def setup(self):
         # Define number of analysis points to run pers mission segment
         nn = 11
 
         # Define a bunch of design varaiables and airplane-specific parameters
-        dv_comp = self.add_subsystem('dv_comp',  DictIndepVarComp(acdata),
+        dv_comp = self.add_subsystem('dv_comp',  oc.DictIndepVarComp(acdata),
                                      promotes_outputs=["*"])
         dv_comp.add_output_from_dict('ac|aero|CLmax_TO')
         dv_comp.add_output_from_dict('ac|aero|polar|e')
@@ -121,7 +111,7 @@ class B738AnalysisGroup(Group):
 
         dv_comp.add_output_from_dict('ac|num_passengers_max')
         dv_comp.add_output_from_dict('ac|q_cruise')
-
++
         # Run a full mission analysis including takeoff, reserve_, cruise,reserve_ and descereserve_nt
         analysis = self.add_subsystem('analysis',
                                       MissionWithReserve(num_nodes=nn,
@@ -129,16 +119,14 @@ class B738AnalysisGroup(Group):
                                       promotes_inputs=['*'], promotes_outputs=['*'])
 
 def configure_problem():
-    prob = Problem()
+    prob = om.Problem()
     prob.model = B738AnalysisGroup()
-    prob.model.nonlinear_solver = NewtonSolver(iprint=2,solve_subsystems=True)
-    prob.model.options['assembled_jac_type'] = 'csc'
-    prob.model.linear_solver = DirectSolver(assemble_jac=True)
-    prob.model.nonlinear_solver.options['solve_subsystems'] = True
+    prob.model.nonlinear_solver = om.NewtonSolver(iprint=2,solve_subsystems=True)
+    prob.model.linear_solver = om.DirectSolver()
     prob.model.nonlinear_solver.options['maxiter'] = 20
     prob.model.nonlinear_solver.options['atol'] = 1e-6
     prob.model.nonlinear_solver.options['rtol'] = 1e-6
-    prob.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
+    prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
     return prob
 
 def set_values(prob, num_nodes):
@@ -181,7 +169,7 @@ def show_outputs(prob):
         x_label = 'Range (nmi)'
         y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)', 'Mach number', 'CL']
         phases = ['climb', 'cruise', 'descent','reserve_climb','reserve_cruise','reserve_descent','loiter']
-        plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
+        oc.plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels, marker='-',
                         plot_title='737-800 Mission Profile')
     # prob.model.list_outputs()
