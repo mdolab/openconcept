@@ -154,9 +154,6 @@ class ElectricTwinAnalysisGroup(Group):
         analysis = self.add_subsystem('analysis',FullMissionAnalysis(num_nodes=nn,
                                                                      aircraft_model=SeriesHybridTwinModel),
                                                  promotes_inputs=['*'],promotes_outputs=['*'])
-        # TODO need to mark the rotate pseudo"states" as states manually
-        analysis.connect('rotate.range_final','climb.ode_integ.range_initial')
-        analysis.connect('rotate.fltcond|h_final','climb.ode_integ.fltcond|h_initial')
         # TODO the reg test connects SOC but not fuel flow through takeoff...
         analysis.connect('v0v1.propmodel.batt1.SOC_final','v1vr.propmodel.batt1.SOC_initial')
         analysis.connect('v1vr.propmodel.batt1.SOC_final','rotate.propmodel.batt1.SOC_initial')

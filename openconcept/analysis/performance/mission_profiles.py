@@ -248,3 +248,5 @@ class FullMissionAnalysis(oc.TrajectoryGroup):
             self.link_phases(rotate, climb)
             self.link_phases(climb, cruise)
             self.link_phases(cruise, descent)
+            self.connect('rotate.range_final','climb.ode_integ.range_initial')
+            self.connect('rotate.fltcond|h_final','climb.ode_integ.fltcond|h_initial')

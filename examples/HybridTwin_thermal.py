@@ -173,9 +173,6 @@ class ElectricTwinAnalysisGroup(Group):
                                                                      aircraft_model=SeriesHybridTwinModel),
                                                  promotes_inputs=['*'],promotes_outputs=
                                                  ['*'])
-        # TODO need to mark the rotate pseudo"states" as states manually
-        analysis.connect('rotate.range_final','climb.ode_integ.range_initial')
-        analysis.connect('rotate.fltcond|h_final','climb.ode_integ.fltcond|h_initial')
         # TODO the reg test connects SOC but not fuel flow through takeoff...
         for state in ['propmodel.batt1.SOC','propmodel.motorheatsink.T','propmodel.batteryheatsink.T','propmodel.reservoir.T','fuel_used']:
             analysis.connect('v0v1.'+state+'_final','v1vr.'+state+'_initial')

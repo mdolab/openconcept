@@ -120,9 +120,6 @@ class CaravanAnalysisGroup(om.Group):
                                                           aircraft_model=CaravanAirplaneModel),
                                       promotes_inputs=['*'], promotes_outputs=['*'])
         
-        # TODO need to mark the rotate pseudo"states" as states manually
-        analysis.connect('rotate.range_final','climb.ode_integ.range_initial')
-        analysis.connect('rotate.fltcond|h_final','climb.ode_integ.fltcond|h_initial')
 
 def run_caravan_analysis():
     # Set up OpenMDAO to analyze the airplane
