@@ -99,13 +99,9 @@ class SeriesHybridTwinModel(Group):
         self.connect('propmodel.duct.drag','hxadder.drag_hx')
         self.connect('propmodel.hx.frontal_area','hxadder.hx_frontal_area')
         self.connect('propmodel.area_nozzle','hxadder.nozzle_area')
-
-        self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson',
-                                                 quantity_units='kg', diff_units='s',
-                                                 time_setup='duration'),
-                           promotes_inputs=[('dqdt', 'fuel_flow'), 'duration',
-                           ('q_initial', 'fuel_used_initial')],
-                           promotes_outputs=[('q', 'fuel_used'), ('q_final', 'fuel_used_final')])
+        intfuel = self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson', diff_units='s',
+                                                              time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
+        intfuel.add_integrand('fuel_used', rate_name='fuel_flow', val=1.0, units='kg')
         self.add_subsystem('weight', AddSubtractComp(output_name='weight',
                                                      input_names=['ac|weights|MTOW', 'fuel_used'],
                                                      units='kg', vec_size=[1, nn],
@@ -173,17 +169,10 @@ class ElectricTwinAnalysisGroup(Group):
         mission_data_comp.add_output('T_batt_initial', val=10.1, units='degC')
 
         # Ensure that any state variables are connected across the mission as intended
-        connect_phases_1 = ['v0v1','v1vr','rotate','climb','cruise','descent']
-        connect_states_1 = ['propmodel.batt1.SOC','propmodel.motorheatsink.T','propmodel.batteryheatsink.T','propmodel.reservoir.T','fuel_used']
-        extra_states_tuple_1 = [(connect_state, connect_phases_1) for connect_state in connect_states_1]
-        connect_phases_2 = ['rotate','climb','cruise','descent']
-        connect_states_2 = ['range','fltcond|h']
-        extra_states_tuple_2 = [(connect_state, connect_phases_2) for connect_state in connect_states_2]
-        extra_states_tuple = extra_states_tuple_1 + extra_states_tuple_2
         analysis = self.add_subsystem('analysis',FullMissionAnalysis(num_nodes=nn,
-                                                                     aircraft_model=SeriesHybridTwinModel,
-                                                                     extra_states=extra_states_tuple),
-                                                 promotes_inputs=['*'],promotes_outputs=['*'])
+                                                                     aircraft_model=SeriesHybridTwinModel),
+                                                 promotes_inputs=['*'],promotes_outputs=
+                                                 ['*'])
 
         margins = self.add_subsystem('margins',ExecComp('MTOW_margin = MTOW - OEW - total_fuel - W_battery - payload',
                                                         MTOW_margin={'units':'lbm','value':100},

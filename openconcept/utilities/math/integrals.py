@@ -213,267 +213,267 @@ def multistep_integrator(q0, dqdt, dts, tri_mat, repeat_mat, segment_names=None,
 
     return dQdqdt, dt_partials_list
 
-def three_point_lagrange_integration(dqdt, dts, num_segments=1, num_intervals=2,):
-    """This method integrates a rate over time using a 3 point Lagrange interpolant
-    Similar to Simpson's rule except extended to provide increments at every subinterval
+# def three_point_lagrange_integration(dqdt, dts, num_segments=1, num_intervals=2,):
+#     """This method integrates a rate over time using a 3 point Lagrange interpolant
+#     Similar to Simpson's rule except extended to provide increments at every subinterval
 
-    The number of points per segment nn_seg = (2 * num_intervals + 1)
-    The total number of points is nn_tot = nn_seg * num_segments
+#     The number of points per segment nn_seg = (2 * num_intervals + 1)
+#     The total number of points is nn_tot = nn_seg * num_segments
 
-    Inputs
-    ------
-    dqdt : float
-        The rate dqdt to integrate into quantity q (vector, length nn_tot)
-    dts : list
-        A list of timesteps dt corresponding to each interval (length num_intervals)
-    num_segments : int
-        The number of segments to integrate with different dts
-    num_intervals : int
-        The number of Simpson / 3 point quadrature intervals per segment
+#     Inputs
+#     ------
+#     dqdt : float
+#         The rate dqdt to integrate into quantity q (vector, length nn_tot)
+#     dts : list
+#         A list of timesteps dt corresponding to each interval (length num_intervals)
+#     num_segments : int
+#         The number of segments to integrate with different dts
+#     num_intervals : int
+#         The number of Simpson / 3 point quadrature intervals per segment
 
-    Returns
-    -------
-    delta_q : float
-        Amount of q accumulated during each interval (vector, length num_segments * (nn_seg - 1)
-    partials_wrt_dqdt : float
-        The Jacobian of delta_q with respect to the input rate dqdt
-        The result is a sparse matrix with num_segments * (nn_seg - 1) rows and nn_tot columns
-    partials_wrt_dts : list
-        A list of the Jacobians of delta_q with respect to the time steps
-        There will be one sparse vector with num_segments * (nn_seg - 1) rows per segment
-        But only (nn_seg - 1) rows will actually be populated
-    """
-    nn_seg = (2 * num_intervals + 1)
-    ndelta_seg = 2 * num_intervals
-    nn_tot = nn_seg * num_segments
-    ndelta_tot = ndelta_seg * num_segments
+#     Returns
+#     -------
+#     delta_q : float
+#         Amount of q accumulated during each interval (vector, length num_segments * (nn_seg - 1)
+#     partials_wrt_dqdt : float
+#         The Jacobian of delta_q with respect to the input rate dqdt
+#         The result is a sparse matrix with num_segments * (nn_seg - 1) rows and nn_tot columns
+#     partials_wrt_dts : list
+#         A list of the Jacobians of delta_q with respect to the time steps
+#         There will be one sparse vector with num_segments * (nn_seg - 1) rows per segment
+#         But only (nn_seg - 1) rows will actually be populated
+#     """
+#     nn_seg = (2 * num_intervals + 1)
+#     ndelta_seg = 2 * num_intervals
+#     nn_tot = nn_seg * num_segments
+#     ndelta_tot = ndelta_seg * num_segments
 
-    if len(dqdt) != nn_tot:
-        raise ValueError('dqdt must be of the correct length. dqdt is of length ' + str(len(dqdt)) +
-                         ' the number of nodes should be' + str(nn_tot))
+#     if len(dqdt) != nn_tot:
+#         raise ValueError('dqdt must be of the correct length. dqdt is of length ' + str(len(dqdt)) +
+#                          ' the number of nodes should be' + str(nn_tot))
 
-    if len(dts) != num_segments:
-        raise ValueError('must provide same number of dts as segments')
+#     if len(dts) != num_segments:
+#         raise ValueError('must provide same number of dts as segments')
 
-    # first let us construct the basic three point quadrature jacobian which will be
-    # multiplied by the timesteps to obtain the block matrices for the overall jacobian
+#     # first let us construct the basic three point quadrature jacobian which will be
+#     # multiplied by the timesteps to obtain the block matrices for the overall jacobian
 
-    # the structure of this is (1/12) * the following:
-    # 5 8 -1
-    # -1 8 5
-    #      5 8 -1
-    #      -1 8 5
-    #           5 8 -1
-    #           -1 8 5    and so on
+#     # the structure of this is (1/12) * the following:
+#     # 5 8 -1
+#     # -1 8 5
+#     #      5 8 -1
+#     #      -1 8 5
+#     #           5 8 -1
+#     #           -1 8 5    and so on
 
-    # the row indices are basically 0 0 0 1 1 1 2 2 2 ....
-    jacmat_rowidx = np.repeat(np.arange(ndelta_seg), 3)
-    # the column indices are 0 1 2 0 1 2 2 3 4 2 3 4 4 5 6 and so on
-    # so superimpose a 0 1 2 repeating pattern on a 0 0 0 0 0 0 2 2 2 2 2 2 2 repeating pattern
-    jacmat_colidx = np.repeat(np.arange(0, ndelta_seg, 2), 6) + np.tile(np.arange(3), ndelta_seg)
-    jacmat_data = np.tile(np.array([5, 8, -1, -1, 8, 5]) / 12, ndelta_seg // 2)
-    jacmat_base = sp.csr_matrix((jacmat_data, (jacmat_rowidx, jacmat_colidx)))
+#     # the row indices are basically 0 0 0 1 1 1 2 2 2 ....
+#     jacmat_rowidx = np.repeat(np.arange(ndelta_seg), 3)
+#     # the column indices are 0 1 2 0 1 2 2 3 4 2 3 4 4 5 6 and so on
+#     # so superimpose a 0 1 2 repeating pattern on a 0 0 0 0 0 0 2 2 2 2 2 2 2 repeating pattern
+#     jacmat_colidx = np.repeat(np.arange(0, ndelta_seg, 2), 6) + np.tile(np.arange(3), ndelta_seg)
+#     jacmat_data = np.tile(np.array([5, 8, -1, -1, 8, 5]) / 12, ndelta_seg // 2)
+#     jacmat_base = sp.csr_matrix((jacmat_data, (jacmat_rowidx, jacmat_colidx)))
 
-    jacmats_list = []
-    partials_wrt_dts = []
-    for i_seg in range(num_segments):
-        jacmats_list.append(jacmat_base * dts[i_seg])
-        # get the vector of partials of q with respect to this time step
-        dt_partials = jacmat_base.dot(dqdt[i_seg * nn_seg: (i_seg + 1) * nn_seg])
-        # offset the sparse partials if not the first segment to make it work in OpenMDAO terms
-        dt_partials_rowidxs = np.arange(i_seg * ndelta_seg, (i_seg + 1) * ndelta_seg)
-        dt_partials_colidxs = np.zeros((ndelta_seg,), dtype=np.int32)
-        partials_wrt_dts.append(sp.csr_matrix((dt_partials,
-                                              (dt_partials_rowidxs, dt_partials_colidxs)),
-                                               shape=(ndelta_tot, nn_tot)))
-    # now assemble the overall sparse block diagonal matrix to obtain the final result
-    partials_wrt_dqdt = sp.block_diag(jacmats_list)
-    delta_q = partials_wrt_dqdt.dot(dqdt)
+#     jacmats_list = []
+#     partials_wrt_dts = []
+#     for i_seg in range(num_segments):
+#         jacmats_list.append(jacmat_base * dts[i_seg])
+#         # get the vector of partials of q with respect to this time step
+#         dt_partials = jacmat_base.dot(dqdt[i_seg * nn_seg: (i_seg + 1) * nn_seg])
+#         # offset the sparse partials if not the first segment to make it work in OpenMDAO terms
+#         dt_partials_rowidxs = np.arange(i_seg * ndelta_seg, (i_seg + 1) * ndelta_seg)
+#         dt_partials_colidxs = np.zeros((ndelta_seg,), dtype=np.int32)
+#         partials_wrt_dts.append(sp.csr_matrix((dt_partials,
+#                                               (dt_partials_rowidxs, dt_partials_colidxs)),
+#                                                shape=(ndelta_tot, nn_tot)))
+#     # now assemble the overall sparse block diagonal matrix to obtain the final result
+#     partials_wrt_dqdt = sp.block_diag(jacmats_list)
+#     delta_q = partials_wrt_dqdt.dot(dqdt)
 
-    return delta_q, partials_wrt_dqdt, partials_wrt_dts
+#     return delta_q, partials_wrt_dqdt, partials_wrt_dts
 
-def trapezoid_integration(dqdt, dts, num_segments=1, num_intervals=2,):
-    """This method integrates a rate over time using a 2 point Trapezoid rule
-    For now this component is written to be interoperable with Simpson's rule,
-    but the concept of subintervals is not strictly necessary.
+# def trapezoid_integration(dqdt, dts, num_segments=1, num_intervals=2,):
+#     """This method integrates a rate over time using a 2 point Trapezoid rule
+#     For now this component is written to be interoperable with Simpson's rule,
+#     but the concept of subintervals is not strictly necessary.
 
-    The number of points per segment nn_seg = (2 * num_intervals + 1)
-    The total number of points is nn_tot = nn_seg * num_segments
+#     The number of points per segment nn_seg = (2 * num_intervals + 1)
+#     The total number of points is nn_tot = nn_seg * num_segments
 
-    Inputs
-    ------
-    dqdt : float
-        The rate dqdt to integrate into quantity q (vector, length nn_tot)
-    dts : list
-        A list of timesteps dt corresponding to each interval (length num_intervals)
-    num_segments : int
-        The number of segments to integrate with different dts
-    num_intervals : int
-        The number of Simpson / 3 point quadrature intervals per segment
+#     Inputs
+#     ------
+#     dqdt : float
+#         The rate dqdt to integrate into quantity q (vector, length nn_tot)
+#     dts : list
+#         A list of timesteps dt corresponding to each interval (length num_intervals)
+#     num_segments : int
+#         The number of segments to integrate with different dts
+#     num_intervals : int
+#         The number of Simpson / 3 point quadrature intervals per segment
 
-    Returns
-    -------
-    delta_q : float
-        Amount of q accumulated during each interval (vector, length num_segments * (nn_seg - 1)
-    partials_wrt_dqdt : float
-        The Jacobian of delta_q with respect to the input rate dqdt
-        The result is a sparse matrix with num_segments * (nn_seg - 1) rows and nn_tot columns
-    partials_wrt_dts : list
-        A list of the Jacobians of delta_q with respect to the time steps
-        There will be one sparse vector with num_segments * (nn_seg - 1) rows per segment
-        But only (nn_seg - 1) rows will actually be populated
-    """
-    nn_seg = (2 * num_intervals + 1)
-    ndelta_seg = 2 * num_intervals
-    nn_tot = nn_seg * num_segments
-    ndelta_tot = ndelta_seg * num_segments
+#     Returns
+#     -------
+#     delta_q : float
+#         Amount of q accumulated during each interval (vector, length num_segments * (nn_seg - 1)
+#     partials_wrt_dqdt : float
+#         The Jacobian of delta_q with respect to the input rate dqdt
+#         The result is a sparse matrix with num_segments * (nn_seg - 1) rows and nn_tot columns
+#     partials_wrt_dts : list
+#         A list of the Jacobians of delta_q with respect to the time steps
+#         There will be one sparse vector with num_segments * (nn_seg - 1) rows per segment
+#         But only (nn_seg - 1) rows will actually be populated
+#     """
+#     nn_seg = (2 * num_intervals + 1)
+#     ndelta_seg = 2 * num_intervals
+#     nn_tot = nn_seg * num_segments
+#     ndelta_tot = ndelta_seg * num_segments
 
-    if len(dqdt) != nn_tot:
-        raise ValueError('dqdt must be of the correct length. dqdt is of length ' + str(len(dqdt)) +
-                         ' the number of nodes should be' + str(nn_tot))
+#     if len(dqdt) != nn_tot:
+#         raise ValueError('dqdt must be of the correct length. dqdt is of length ' + str(len(dqdt)) +
+#                          ' the number of nodes should be' + str(nn_tot))
 
-    if len(dts) != num_segments:
-        raise ValueError('must provide same number of dts as segments')
+#     if len(dts) != num_segments:
+#         raise ValueError('must provide same number of dts as segments')
 
-    # the structure of this is (1/2) * the following:
-    # 1 1
-    #   1 1
-    #      1 1 and so on
+#     # the structure of this is (1/2) * the following:
+#     # 1 1
+#     #   1 1
+#     #      1 1 and so on
 
-    # the row indices are basically 0 0 1 1 2 2  ....
-    jacmat_rowidx = np.repeat(np.arange(ndelta_seg), 2)
-    # the column indices are 0 1 1 2 2 3 3 4....
-    # so superimpose a 0 1 repeating pattern on a 0 0 1 1 2 2 repeating pattern
-    jacmat_colidx = np.tile(np.arange(2), ndelta_seg) + np.repeat(np.arange(0, ndelta_seg, 1), 2)
-    jacmat_data = np.tile(np.array([1, 1]) / 2, ndelta_seg)
-    jacmat_base = sp.csr_matrix((jacmat_data, (jacmat_rowidx, jacmat_colidx)))
+#     # the row indices are basically 0 0 1 1 2 2  ....
+#     jacmat_rowidx = np.repeat(np.arange(ndelta_seg), 2)
+#     # the column indices are 0 1 1 2 2 3 3 4....
+#     # so superimpose a 0 1 repeating pattern on a 0 0 1 1 2 2 repeating pattern
+#     jacmat_colidx = np.tile(np.arange(2), ndelta_seg) + np.repeat(np.arange(0, ndelta_seg, 1), 2)
+#     jacmat_data = np.tile(np.array([1, 1]) / 2, ndelta_seg)
+#     jacmat_base = sp.csr_matrix((jacmat_data, (jacmat_rowidx, jacmat_colidx)))
 
-    jacmats_list = []
-    partials_wrt_dts = []
-    for i_seg in range(num_segments):
-        jacmats_list.append(jacmat_base * dts[i_seg])
-        # get the vector of partials of q with respect to this time step
-        dt_partials = jacmat_base.dot(dqdt[i_seg * nn_seg: (i_seg + 1) * nn_seg])
-        # offset the sparse partials if not the first segment to make it work in OpenMDAO terms
-        dt_partials_rowidxs = np.arange(i_seg * ndelta_seg, (i_seg + 1) * ndelta_seg)
-        dt_partials_colidxs = np.zeros((ndelta_seg,), dtype=np.int32)
-        partials_wrt_dts.append(sp.csr_matrix((dt_partials,
-                                              (dt_partials_rowidxs, dt_partials_colidxs)),
-                                               shape=(ndelta_tot, nn_tot)))
-    # now assemble the overall sparse block diagonal matrix to obtain the final result
-    partials_wrt_dqdt = sp.block_diag(jacmats_list)
-    delta_q = partials_wrt_dqdt.dot(dqdt)
+#     jacmats_list = []
+#     partials_wrt_dts = []
+#     for i_seg in range(num_segments):
+#         jacmats_list.append(jacmat_base * dts[i_seg])
+#         # get the vector of partials of q with respect to this time step
+#         dt_partials = jacmat_base.dot(dqdt[i_seg * nn_seg: (i_seg + 1) * nn_seg])
+#         # offset the sparse partials if not the first segment to make it work in OpenMDAO terms
+#         dt_partials_rowidxs = np.arange(i_seg * ndelta_seg, (i_seg + 1) * ndelta_seg)
+#         dt_partials_colidxs = np.zeros((ndelta_seg,), dtype=np.int32)
+#         partials_wrt_dts.append(sp.csr_matrix((dt_partials,
+#                                               (dt_partials_rowidxs, dt_partials_colidxs)),
+#                                                shape=(ndelta_tot, nn_tot)))
+#     # now assemble the overall sparse block diagonal matrix to obtain the final result
+#     partials_wrt_dqdt = sp.block_diag(jacmats_list)
+#     delta_q = partials_wrt_dqdt.dot(dqdt)
 
-    return delta_q, partials_wrt_dqdt, partials_wrt_dts
+#     return delta_q, partials_wrt_dqdt, partials_wrt_dts
 
-def backward_euler(dqdt, dts, num_segments=1, num_intervals=2,):
-    """This method integrates a rate over time using a backward Euler method
-    For now this component is written to be interoperable with Simpson's rule,
-    but the concept of subintervals is not strictly necessary.
+# def backward_euler(dqdt, dts, num_segments=1, num_intervals=2,):
+#     """This method integrates a rate over time using a backward Euler method
+#     For now this component is written to be interoperable with Simpson's rule,
+#     but the concept of subintervals is not strictly necessary.
 
-    The number of points per segment nn_seg = (2 * num_intervals + 1)
-    The total number of points is nn_tot = nn_seg * num_segments
+#     The number of points per segment nn_seg = (2 * num_intervals + 1)
+#     The total number of points is nn_tot = nn_seg * num_segments
 
-    Inputs
-    ------
-    dqdt : float
-        The rate dqdt to integrate into quantity q (vector, length nn_tot)
-    dts : list
-        A list of timesteps dt corresponding to each interval (length num_intervals)
-    num_segments : int
-        The number of segments to integrate with different dts
-    num_intervals : int
-        The number of Simpson / 3 point quadrature intervals per segment
+#     Inputs
+#     ------
+#     dqdt : float
+#         The rate dqdt to integrate into quantity q (vector, length nn_tot)
+#     dts : list
+#         A list of timesteps dt corresponding to each interval (length num_intervals)
+#     num_segments : int
+#         The number of segments to integrate with different dts
+#     num_intervals : int
+#         The number of Simpson / 3 point quadrature intervals per segment
 
-    Returns
-    -------
-    delta_q : float
-        Amount of q accumulated during each interval (vector, length num_segments * (nn_seg - 1)
-    partials_wrt_dqdt : float
-        The Jacobian of delta_q with respect to the input rate dqdt
-        The result is a sparse matrix with num_segments * (nn_seg - 1) rows and nn_tot columns
-    partials_wrt_dts : list
-        A list of the Jacobians of delta_q with respect to the time steps
-        There will be one sparse vector with num_segments * (nn_seg - 1) rows per segment
-        But only (nn_seg - 1) rows will actually be populated
-    """
-    nn_seg = (2 * num_intervals + 1)
-    ndelta_seg = 2 * num_intervals
-    nn_tot = nn_seg * num_segments
-    ndelta_tot = ndelta_seg * num_segments
+#     Returns
+#     -------
+#     delta_q : float
+#         Amount of q accumulated during each interval (vector, length num_segments * (nn_seg - 1)
+#     partials_wrt_dqdt : float
+#         The Jacobian of delta_q with respect to the input rate dqdt
+#         The result is a sparse matrix with num_segments * (nn_seg - 1) rows and nn_tot columns
+#     partials_wrt_dts : list
+#         A list of the Jacobians of delta_q with respect to the time steps
+#         There will be one sparse vector with num_segments * (nn_seg - 1) rows per segment
+#         But only (nn_seg - 1) rows will actually be populated
+#     """
+#     nn_seg = (2 * num_intervals + 1)
+#     ndelta_seg = 2 * num_intervals
+#     nn_tot = nn_seg * num_segments
+#     ndelta_tot = ndelta_seg * num_segments
 
-    if len(dqdt) != nn_tot:
-        raise ValueError('dqdt must be of the correct length. dqdt is of length ' + str(len(dqdt)) +
-                         ' the number of nodes should be' + str(nn_tot))
+#     if len(dqdt) != nn_tot:
+#         raise ValueError('dqdt must be of the correct length. dqdt is of length ' + str(len(dqdt)) +
+#                          ' the number of nodes should be' + str(nn_tot))
 
-    if len(dts) != num_segments:
-        raise ValueError('must provide same number of dts as segments')
+#     if len(dts) != num_segments:
+#         raise ValueError('must provide same number of dts as segments')
 
-    # the structure of this is the following:
-    # 0 1
-    # 0 0 1
-    # 0 0 0 1 1 and so on
+#     # the structure of this is the following:
+#     # 0 1
+#     # 0 0 1
+#     # 0 0 0 1 1 and so on
 
-    # the row indices are 0, 1, 2 ... n_delta seg
-    jacmat_rowidx = np.arange(ndelta_seg)
-    # the column indices are 1, 2, 3, ....
-    jacmat_colidx = np.arange(1, ndelta_seg + 1, 1)
-    jacmat_data = np.tile(np.array([1]), ndelta_seg)
-    jacmat_base = sp.csr_matrix((jacmat_data, (jacmat_rowidx, jacmat_colidx)))
+#     # the row indices are 0, 1, 2 ... n_delta seg
+#     jacmat_rowidx = np.arange(ndelta_seg)
+#     # the column indices are 1, 2, 3, ....
+#     jacmat_colidx = np.arange(1, ndelta_seg + 1, 1)
+#     jacmat_data = np.tile(np.array([1]), ndelta_seg)
+#     jacmat_base = sp.csr_matrix((jacmat_data, (jacmat_rowidx, jacmat_colidx)))
 
-    jacmats_list = []
-    partials_wrt_dts = []
-    for i_seg in range(num_segments):
-        jacmats_list.append(jacmat_base * dts[i_seg])
-        # get the vector of partials of q with respect to this time step
-        dt_partials = jacmat_base.dot(dqdt[i_seg * nn_seg: (i_seg + 1) * nn_seg])
-        # offset the sparse partials if not the first segment to make it work in OpenMDAO terms
-        dt_partials_rowidxs = np.arange(i_seg * ndelta_seg, (i_seg + 1) * ndelta_seg)
-        dt_partials_colidxs = np.zeros((ndelta_seg,), dtype=np.int32)
-        partials_wrt_dts.append(sp.csr_matrix((dt_partials,
-                                              (dt_partials_rowidxs, dt_partials_colidxs)),
-                                               shape=(ndelta_tot, nn_tot)))
-    # now assemble the overall sparse block diagonal matrix to obtain the final result
-    partials_wrt_dqdt = sp.block_diag(jacmats_list)
-    delta_q = partials_wrt_dqdt.dot(dqdt)
+#     jacmats_list = []
+#     partials_wrt_dts = []
+#     for i_seg in range(num_segments):
+#         jacmats_list.append(jacmat_base * dts[i_seg])
+#         # get the vector of partials of q with respect to this time step
+#         dt_partials = jacmat_base.dot(dqdt[i_seg * nn_seg: (i_seg + 1) * nn_seg])
+#         # offset the sparse partials if not the first segment to make it work in OpenMDAO terms
+#         dt_partials_rowidxs = np.arange(i_seg * ndelta_seg, (i_seg + 1) * ndelta_seg)
+#         dt_partials_colidxs = np.zeros((ndelta_seg,), dtype=np.int32)
+#         partials_wrt_dts.append(sp.csr_matrix((dt_partials,
+#                                               (dt_partials_rowidxs, dt_partials_colidxs)),
+#                                                shape=(ndelta_tot, nn_tot)))
+#     # now assemble the overall sparse block diagonal matrix to obtain the final result
+#     partials_wrt_dqdt = sp.block_diag(jacmats_list)
+#     delta_q = partials_wrt_dqdt.dot(dqdt)
 
-    return delta_q, partials_wrt_dqdt, partials_wrt_dts
+#     return delta_q, partials_wrt_dqdt, partials_wrt_dts
 
-def integrator_partials_wrt_deltas(num_segments, num_intervals):
-    """
-    This function computes partials of an integrated quantity with respect to the "delta quantity per interval"
-    in the context of openConcept's Simpson's rule approximated integration technique.
+# def integrator_partials_wrt_deltas(num_segments, num_intervals):
+    # """
+    # This function computes partials of an integrated quantity with respect to the "delta quantity per interval"
+    # in the context of openConcept's Simpson's rule approximated integration technique.
 
-    Inputs
-    ------
-    num_segments : float
-        Number of mission segments to integrate (scalar)
-    num_intervals : float
-        Number of Simpson intervals per segment (scalar)
+    # Inputs
+    # ------
+    # num_segments : float
+    #     Number of mission segments to integrate (scalar)
+    # num_intervals : float
+    #     Number of Simpson intervals per segment (scalar)
 
-    Outputs
-    -------
-    partial_q_wrt_deltas : float
-        A sparse (CSR) matrix representation of the partial derivatives of q
-        with respect to the delta quantity per half-interval
-        Dimension is nn * num_segments (rows) by (nn -1) * num_segments (cols)
-        where nn = (2 * num_intervals + 1)
+    # Outputs
+    # -------
+    # partial_q_wrt_deltas : float
+    #     A sparse (CSR) matrix representation of the partial derivatives of q
+    #     with respect to the delta quantity per half-interval
+    #     Dimension is nn * num_segments (rows) by (nn -1) * num_segments (cols)
+    #     where nn = (2 * num_intervals + 1)
 
-    """
-    nn = num_intervals * 2 + 1
-    # the basic structure of the jacobian is lower triangular (all late values depend on all early ones)
-    jacmat = np.tril(np.ones((num_segments*(nn-1),num_segments*(nn-1))))
-    # the first entry of q has no dependence on the deltas so insert a row of zeros
-    jacmat = np.insert(jacmat,0,np.zeros(num_segments*(nn-1)),axis=0)
-    for i in range(1,num_segments):
-        # since the end of each segment is equal to the beginning of the next
-        # duplicate the jacobian row once at the end of each segment
-        duplicate_row = jacmat[nn*i-1,:]
-        jacmat = np.insert(jacmat,nn*i,duplicate_row,axis=0)
-    partials_q_wrt_deltas = sp.csr_matrix(jacmat)
-    return partials_q_wrt_deltas
+    # """
+    # nn = num_intervals * 2 + 1
+    # # the basic structure of the jacobian is lower triangular (all late values depend on all early ones)
+    # jacmat = np.tril(np.ones((num_segments*(nn-1),num_segments*(nn-1))))
+    # # the first entry of q has no dependence on the deltas so insert a row of zeros
+    # jacmat = np.insert(jacmat,0,np.zeros(num_segments*(nn-1)),axis=0)
+    # for i in range(1,num_segments):
+    #     # since the end of each segment is equal to the beginning of the next
+    #     # duplicate the jacobian row once at the end of each segment
+    #     duplicate_row = jacmat[nn*i-1,:]
+    #     jacmat = np.insert(jacmat,nn*i,duplicate_row,axis=0)
+    # partials_q_wrt_deltas = sp.csr_matrix(jacmat)
+    # return partials_q_wrt_deltas
 
-class NewIntegrator(ExplicitComponent):
+class Integrator(ExplicitComponent):
     """
     Integrates rate variables implicitly.
     Add new integrated quantities by using the add_integrand method.
@@ -513,14 +513,14 @@ class NewIntegrator(ExplicitComponent):
         'bounds' creates inputs 't_initial', 't_final'
     """
     def __init__(self, **kwargs):
-        super(NewIntegrator, self).__init__(**kwargs)
+        super(Integrator, self).__init__(**kwargs)
         self._state_vars = {}
         num_nodes = self.options['num_nodes']
         method = self.options['method']
 
         # check to make sure num nodes is OK
         if (num_nodes - 1) % 2 > 0:
-            raise ValueError('num_nodes must be odd')
+            raise ValueError('num_nodes is ' +str(num_nodes) + ' and must be odd')
         
         if num_nodes > 1:
             if method == 'bdf3':
@@ -534,7 +534,7 @@ class NewIntegrator(ExplicitComponent):
         self.options.declare('method',default='bdf3', desc="Numerical method to use.")
         self.options.declare('time_setup',default='dt')
 
-    def add_integrand(self, name, rate_name=None, start_name=None, end_name=None,
+    def add_integrand(self, name, rate_name=None, start_name=None, end_name=None, val=0.0, start_val=0.0,
                       units=None, rate_units=None, zero_start=False, final_only=False, lower=-1e30, upper=1e30):
             """
             Add a new integrated variable q = integrate(dqdt) + q0
@@ -559,6 +559,9 @@ class NewIntegrator(ExplicitComponent):
                 If true, eliminates start value input and always begins from zero (default False)
             final_only : bool
                 If true, only integrates final quantity, not all the intermediate points (default False)
+            val : float
+                Default value for the integrated output (default 0.0)
+                Can be scalar or shape num_nodes
             upper : float
                 Upper bound on integrated quantity
             lower : float
@@ -568,9 +571,6 @@ class NewIntegrator(ExplicitComponent):
             num_nodes = self.options['num_nodes']
             diff_units = self.options['diff_units']
             time_setup = self.options['time_setup']
-            # check to make sure num nodes is OK
-            if (num_nodes - 1) % 2 > 0:
-                raise ValueError('num_nodes must be odd')
 
             if units and rate_units:
                 raise ValueError('Specify either quantity units or rate units, but not both')
@@ -602,6 +602,7 @@ class NewIntegrator(ExplicitComponent):
             options = {'name': name,
                         'rate_name': rate_name,
                         'start_name': start_name,
+                        'start_val': start_val,
                         'end_name': end_name,
                         'units': units,
                         'rate_units': rate_units,
@@ -612,12 +613,19 @@ class NewIntegrator(ExplicitComponent):
 
             # TODO maybe later can pass kwargs
             self._state_vars[name] = options
-            self.add_input(rate_name, val=0, shape=(num_nodes), units=rate_units)
-            self.add_output(end_name, units=units, upper=options['upper'],lower=options['lower'])
+            if not hasattr(val, '__len__'):
+                # scalar
+                default_final_val = val
+            else:
+                # vector
+                default_final_val = val[-1]
+
+            self.add_input(rate_name, val=0.0, shape=(num_nodes), units=rate_units)
+            self.add_output(end_name, units=units, val=default_final_val, upper=options['upper'],lower=options['lower'])
             if not final_only:
-                self.add_output(name, shape=(num_nodes), units=units, upper=options['upper'],lower=options['lower'])
+                self.add_output(name, shape=(num_nodes), val=val, units=units, upper=options['upper'],lower=options['lower'])
             if not zero_start:
-                self.add_input(start_name, val=0, units=units)
+                self.add_input(start_name, val=start_val, units=units)
                 if not final_only:
                     self.declare_partials([name], [start_name], rows=np.arange(num_nodes), cols=np.zeros((num_nodes,)), val=np.ones((num_nodes,)))
                 self.declare_partials([end_name], [start_name], val=1)
@@ -658,10 +666,6 @@ class NewIntegrator(ExplicitComponent):
         num_nodes = self.options['num_nodes']
         method = self.options['method']
         time_setup = self.options['time_setup']
-
-        # check to make sure num nodes is OK
-        if (num_nodes - 1) % 2 > 0:
-            raise ValueError('num_nodes must be odd')
 
         # branch logic here for the corner case of 0 segments
         # so point analysis can be run without breaking everything
@@ -708,7 +712,7 @@ class NewIntegrator(ExplicitComponent):
         
         for name, options in self._state_vars.items():
             if options['zero_start']:
-                q0 = 0
+                q0 = np.array([0.0])
             else:
                 q0 = inputs[options['start_name']]
             if not single_point:
@@ -783,7 +787,7 @@ class NewIntegrator(ExplicitComponent):
 
 
 
-class Integrator(ExplicitComponent):
+class OldIntegrator(ExplicitComponent):
     """
     This component integrates a vector using a BDF3 formulation
     with 2nd order startup.

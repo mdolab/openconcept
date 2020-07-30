@@ -71,9 +71,7 @@ class AddSubtractComp(ExplicitComponent):
             (same as add_output method for ExplicitComponent)
             Examples include units (str or None), desc (str)
         """
-
-        complexify = kwargs.pop('complex',False)
-        super(AddSubtractComp, self).__init__(complex=complexify)
+        super(AddSubtractComp, self).__init__()
 
         self._add_systems = []
 
@@ -91,18 +89,6 @@ class AddSubtractComp(ExplicitComponent):
             raise ValueError(
                 "first argument to adder init must be either of type "
                 "`str' or 'None'")
-
-    def initialize(self):
-        """
-        Declare options.
-
-        Parameters
-        ----------
-        complex : Boolean
-            Set True to enable complex math (e.g. for complex step verification)
-        """
-        self.options.declare('complex', default=False,
-                             desc="Allocate as complex (e.g. for complex-step verification)")
 
     def add_equation(self, output_name, input_names, vec_size=1, length=1, val=1.0,
                      units=None, res_units=None, desc='', lower=None, upper=None, ref=1.0,
@@ -244,7 +230,6 @@ class AddSubtractComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        complexify = self.options['complex']
         for (output_name, input_names, vec_size, length, val, scaling_factors,
              kwargs) in self._add_systems:
             if isinstance(input_names, string_types):
@@ -263,7 +248,7 @@ class AddSubtractComp(ExplicitComponent):
             else:
                 shape = (vec_out_size, length)
 
-            if complexify:
+            if self.under_complex_step:
                 temp = np.zeros(shape, dtype=np.complex_)
             else:
                 temp = np.zeros(shape)

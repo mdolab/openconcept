@@ -17,3 +17,5 @@ coloring_files/total_coloring.pkl
 *.pkl
 *openmdao_checks.out
 *egg-info/
+openconcept/.coverage
+.coverage

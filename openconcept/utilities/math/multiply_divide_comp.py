@@ -75,8 +75,7 @@ class ElementMultiplyDivideComp(ExplicitComponent):
             (same as add_output method for ExplicitComponent)
             Examples include units (str or None), desc (str)
         """
-        complexify = kwargs.pop('complex', False)
-        super(ElementMultiplyDivideComp, self).__init__(complex=complexify)
+        super(ElementMultiplyDivideComp, self).__init__()
 
         self._add_systems = []
 
@@ -94,18 +93,6 @@ class ElementMultiplyDivideComp(ExplicitComponent):
             raise ValueError(
                 "first argument to init must be either of type "
                 "`str' or 'None'")
-
-    def initialize(self):
-        """
-        Declare options.
-
-        Parameters
-        ----------
-        complex : Boolean
-            Set True to enable complex math (e.g. for complex step verification)
-        """
-        self.options.declare('complex', default=False,
-                             desc="Allocate as complex (e.g. for complex-step verification)")
 
     def add_equation(self, output_name, input_names, vec_size=1, length=1, val=1.0,
                      res_units=None, desc='', lower=None, upper=None, ref=1.0,
@@ -272,7 +259,6 @@ class ElementMultiplyDivideComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        complexify = self.options['complex']
         for (output_name, input_names, vec_size, length, val, scaling_factor, divide,
              input_units, kwargs) in self._add_systems:
             if isinstance(input_names, string_types):
@@ -292,7 +278,7 @@ class ElementMultiplyDivideComp(ExplicitComponent):
             else:
                 shape = (vec_out_size, length)
 
-            if complexify:
+            if self.under_complex_step:
                 temp = np.ones(shape, dtype=np.complex_)
             else:
                 temp = np.ones(shape)
