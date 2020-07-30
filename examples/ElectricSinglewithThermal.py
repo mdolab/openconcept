@@ -120,10 +120,6 @@ class ElectricTBMAnalysisGroup(Group):
                                                                      transition_method='ode'),
                                                  promotes_inputs=['*'],promotes_outputs=['*'])
         
-        # TODO the reg test connects SOC but not fuel flow through takeoff...
-        for state in ['propmodel.batt1.SOC','propmodel.motorheatsink.T','propmodel.reservoir.T']:
-            analysis.connect('v0v1.'+state+'_final','v1vr.'+state+'_initial')
-            analysis.connect('v1vr.'+state+'_final','rotate.'+state+'_initial')
         self.connect('T_motor_initial','v0v1.propmodel.motorheatsink.T_initial')
         self.connect('T_res_initial','v0v1.propmodel.reservoir.T_initial')
 

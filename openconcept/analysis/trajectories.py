@@ -149,15 +149,26 @@ class TrajectoryGroup(om.Group):
         phase2_states = phase2._oc_states_list
         self._setup_var_data()
         for state_tuple in phase1_states:
-            if state_tuple[0] in [state_tuple_2[0] for state_tuple_2 in phase2_states] and not state_tuple[0] in states_to_skip:
-                state_phase1_abs_name = phase1.name + '.' + state_tuple[2] # final 
-                state_phase2_abs_name = phase2.name + '.' + state_tuple[1] # initial
+            if state_tuple[0] in [state_tuple_2[0] for state_tuple_2 in phase2_states]:
+                
+                phase1_abs_name = phase1.name + '.' + state_tuple[0]
+                phase1_end_abs_name = phase1.name + '.' + state_tuple[2] # final 
+                phase2_start_abs_name = phase2.name + '.' + state_tuple[1] # initial
                 if self.pathname:
-                    state_phase1_abs_name = self.pathname + '.' + state_phase1_abs_name
-                    state_phase2_abs_name = self.pathname + '.' + state_phase2_abs_name
-                state_phase1_prom_name = self._var_abs2prom['output'][state_phase1_abs_name]
-                state_phase2_prom_name = self._var_abs2prom['input'][state_phase2_abs_name]
-                self.connect(state_phase1_prom_name, state_phase2_prom_name)
+                    phase1_abs_name = self.pathname + '.' + phase1_abs_name
+                    phase1_end_abs_name = self.pathname + '.' + phase1_end_abs_name
+                    phase2_start_abs_name = self.pathname + '.' + phase2_start_abs_name
+                
+                phase1_prom_name = self._var_abs2prom['output'][phase1_abs_name]
+                if phase1_prom_name.startswith(phase1.name): # only modify the text if it starts with the prefix
+                    state_prom_name = phase1_prom_name.replace(phase1.name+'.', "", 1)
+                else:
+                    state_prom_name = phase1_prom_name
+                phase1_end_prom_name = self._var_abs2prom['output'][phase1_end_abs_name]
+                phase2_start_prom_name = self._var_abs2prom['input'][phase2_start_abs_name]
+                if not (state_tuple[0] in states_to_skip):
+                    if not (state_prom_name in states_to_skip):
+                        self.connect(phase1_end_prom_name, phase2_start_prom_name)
 
     def link_phases(self, phase1, phase2, states_to_skip=[]):
         # need to cache this because the data we need isn't ready yet

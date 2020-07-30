@@ -20,9 +20,9 @@ class TBMAnalysisTestCase(unittest.TestCase):
     def test_values_TBM(self):
         prob = self.prob
         assert_near_equal(prob.get_val('climb.OEW', units='lb'), 4756.772140709275, tolerance=1e-5)
-        assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 2489.7142498884746, tolerance=1e-5)
+        assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 2489.49501148, tolerance=1e-5)
         assert_near_equal(prob.get_val('engineoutclimb.gamma',units='deg'), 8.78263, tolerance=1e-5)
-        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 1605.32123542, tolerance=1e-5)
+        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 1607.84846911, tolerance=1e-5)
 
 class CaravanAnalysisTestCase(unittest.TestCase):
     def setUp(self):
@@ -30,8 +30,8 @@ class CaravanAnalysisTestCase(unittest.TestCase):
 
     def test_values_Caravan(self):
         prob = self.prob
-        assert_near_equal(prob.get_val('v1vr.range_final', units='ft'), 1375.61684, tolerance=1e-5)
-        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 377.4998448764594, tolerance=1e-5)
+        assert_near_equal(prob.get_val('v1vr.range_final', units='ft'), 1375.59921952, tolerance=1e-5)
+        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 379.90334044, tolerance=1e-5)
 
 class HybridTwinThermalTestCase(unittest.TestCase):
     def setUp(self):
@@ -70,8 +70,8 @@ class KingAirTestCase(unittest.TestCase):
     def test_values_kingair(self):
         prob = self.prob
         assert_near_equal(prob.get_val('climb.OEW', units='lb'), 6471.539115423346, tolerance=1e-5)
-        assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 3056.9443135452075, tolerance=1e-5)
-        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 1663.490303796347, tolerance=1e-5)
+        assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 3054.61279799, tolerance=1e-5)
+        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 1666.73459582, tolerance=1e-5)
 
 
 class ElectricSingleTestCase(unittest.TestCase):

@@ -154,9 +154,6 @@ class ElectricTwinAnalysisGroup(Group):
         analysis = self.add_subsystem('analysis',FullMissionAnalysis(num_nodes=nn,
                                                                      aircraft_model=SeriesHybridTwinModel),
                                                  promotes_inputs=['*'],promotes_outputs=['*'])
-        # TODO the reg test connects SOC but not fuel flow through takeoff...
-        analysis.connect('v0v1.propmodel.batt1.SOC_final','v1vr.propmodel.batt1.SOC_initial')
-        analysis.connect('v1vr.propmodel.batt1.SOC_final','rotate.propmodel.batt1.SOC_initial')
 
         margins = self.add_subsystem('margins',ExecComp('MTOW_margin = MTOW - OEW - total_fuel - W_battery - payload',
                                                         MTOW_margin={'units':'lbm','value':100},

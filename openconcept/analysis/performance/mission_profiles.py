@@ -244,7 +244,9 @@ class FullMissionAnalysis(oc.TrajectoryGroup):
             self.connect('descent.ode_integ.fltcond|h_final','descent.descentdt.fltcond|h_final')
 
             # connect range, fuel burn, and altitude from the end of each segment to the beginning of the next, in order
-
+            self.link_phases(v0v1, v1vr, states_to_skip=['fltcond|Utrue','range'])
+            self.link_phases(v1vr, rotate, states_to_skip=['fltcond|Utrue','range'])
+            self.link_phases(v0v1, v1v0, states_to_skip=['fltcond|Utrue','range'])
             self.link_phases(rotate, climb)
             self.link_phases(climb, cruise)
             self.link_phases(cruise, descent)

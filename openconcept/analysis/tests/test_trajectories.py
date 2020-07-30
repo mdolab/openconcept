@@ -640,6 +640,47 @@ class TestTrajectoryAllPhaseConnectWithVarPromotion(unittest.TestCase):
         partials = self.p.check_partials(method='cs', out_stream=None)
         assert_check_partials(partials)
 
+class TestTrajectorySkipPromotedVar(unittest.TestCase):
+    def setUp(self):
+        self.nn = 5
+        traj = oc.TrajectoryGroup()
+       
+        phase1 = traj.add_subsystem('phase1', PhaseForTrajTestWithPromotion(num_nodes=5))
+        phase2 = traj.add_subsystem('phase2', PhaseForTrajTestWithPromotion(num_nodes=5))
+        phase3 = traj.add_subsystem('phase3', PhaseForTrajTestWithPromotion(num_nodes=5))
+
+        traj.link_phases(phase1, phase2, states_to_skip=['ode_integ.f2'])
+        traj.link_phases(phase2, phase3)
+
+        self.p = om.Problem(model=traj)
+        self.p.setup(force_alloc_complex=True)
+
+    def test_results(self):
+        self.p.run_model()
+        x = np.linspace(0, 5, self.nn)
+        f_exact = -10.2*x**3/3 + 4.2*x**2/2 -10.5*x
+        f2_exact = 5.1*x**3/3 +0.5*x**2/2-7.2*x
+
+        # check first phase result
+        assert_near_equal(self.p['phase1.a.ode_integ.f'], f_exact)
+        assert_near_equal(self.p['phase1.b.ode_integ.f'], f_exact)
+        assert_near_equal(self.p['phase1.ode_integ.f2'], f2_exact)
+
+        # check second phase result
+        assert_near_equal(self.p['phase2.a.ode_integ.f'], f_exact+f_exact[-1])
+        assert_near_equal(self.p['phase2.b.ode_integ.f'], f_exact+f_exact[-1])
+        assert_near_equal(self.p['phase2.ode_integ.f2'], f2_exact)
+
+        # check third phase result
+        assert_near_equal(self.p['phase3.a.ode_integ.f'], f_exact+2.0*f_exact[-1])
+        assert_near_equal(self.p['phase3.b.ode_integ.f'], f_exact+2.0*f_exact[-1])
+        assert_near_equal(self.p['phase3.ode_integ.f2'], f2_exact+f2_exact[-1])
+
+    def test_partials(self):
+        self.p.run_model()
+        partials = self.p.check_partials(method='cs', out_stream=None)
+        assert_check_partials(partials)
+
 class TestTrajectoryAllPhaseConnectWithVarPromotionODEIntegCollide(unittest.TestCase):
     # This checks for the situation when multiple integrator comps are promoting up ode_integ to the phase level
     # When this happens duplicate connections can occur
@@ -807,5 +848,6 @@ class TestBuryTrajectoryOneLevelDown(unittest.TestCase):
         partials = self.p.check_partials(method='cs', out_stream=None)
         assert_check_partials(partials)
 
+# TODO test promoted skipped states
 if __name__ == "__main__":
     unittest.main()

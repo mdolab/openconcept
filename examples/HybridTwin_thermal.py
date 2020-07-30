@@ -173,10 +173,6 @@ class ElectricTwinAnalysisGroup(Group):
                                                                      aircraft_model=SeriesHybridTwinModel),
                                                  promotes_inputs=['*'],promotes_outputs=
                                                  ['*'])
-        # TODO the reg test connects SOC but not fuel flow through takeoff...
-        for state in ['propmodel.batt1.SOC','propmodel.motorheatsink.T','propmodel.batteryheatsink.T','propmodel.reservoir.T','fuel_used']:
-            analysis.connect('v0v1.'+state+'_final','v1vr.'+state+'_initial')
-            analysis.connect('v1vr.'+state+'_final','rotate.'+state+'_initial')
 
         margins = self.add_subsystem('margins',ExecComp('MTOW_margin = MTOW - OEW - total_fuel - W_battery - payload',
                                                         MTOW_margin={'units':'lbm','value':100},
