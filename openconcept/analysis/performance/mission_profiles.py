@@ -47,9 +47,6 @@ class MissionWithReserve(oc.TrajectoryGroup):
         An aircraft model class with the standard OpenConcept interfaces promoted correctly
     num_nodes : int
         Number of analysis points per segment. Higher is more accurate but more expensive
-    extra_states : tuple
-        Any extra integrated states to connect across the model.
-        Format is ('state_var_name', ('segments','to','connect','across'))
     """
 
     def initialize(self):
@@ -179,9 +176,6 @@ class FullMissionAnalysis(oc.TrajectoryGroup):
         An aircraft model class with the standard OpenConcept interfaces promoted correctly
     num_nodes : int
         Number of analysis points per segment. Higher is more accurate but more expensive
-    extra_states : tuple
-        Any extra integrated states to connect across the model.
-        Format is ('state_var_name', ('segments','to','connect','across'))
     transition_method : str
         Analysis method to compute distance, altitude, and time during transition
         Default "simplified" is the Raymer circular arc method and is more robust
