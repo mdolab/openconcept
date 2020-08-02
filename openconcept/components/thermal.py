@@ -888,15 +888,11 @@ class LiquidCooledComp(Group):
                                ThermalComponentWithMass(specific_heat=self.options['specific_heat_object'],
                                                         num_nodes=nn),
                                                         promotes_inputs=['q_in', 'mass'])
-            self.add_subsystem('integratetemp',
-                               Integrator(num_nodes=nn,
-                                          quantity_units='K',
-                                          diff_units='s',
-                                          method='simpson',
-                                          time_setup='duration'),
-                                promotes_inputs=['duration',('q_initial','T_initial')],
-                                promotes_outputs=[('q','T'),('q_final','T_final')])
-            self.connect('base.dTdt','integratetemp.dqdt')
+            ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
+                                           promotes_outputs=['*'], promotes_inputs=['*'])
+            # TODO lower limit 0
+            ode_integ.add_integrand('T', rate_name='dTdt', units='K')
+            self.connect('base.dTdt','dTdt')
         else:
             self.add_subsystem('base',
                                ThermalComponentMassless(num_nodes=nn),
@@ -945,15 +941,12 @@ class CoolantReservoir(Group):
         self.add_subsystem('rate',
                            CoolantReservoirRate(num_nodes=nn),
                            promotes_inputs=['T_in', 'T_out', 'mass', 'mdot_coolant'])
-        self.add_subsystem('integratetemp',
-                           Integrator(num_nodes=nn,
-                                      quantity_units='K',
-                                      diff_units='s',
-                                      method='simpson',
-                                      time_setup='duration'),
-                            promotes_inputs=['duration',('q_initial','T_initial')],
-                            promotes_outputs=[('q','T_out'),('q_final','T_final')])
-        self.connect('rate.dTdt','integratetemp.dqdt')
+
+        ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
+                                           promotes_outputs=['*'], promotes_inputs=['*'])
+        # TODO lower limit 0
+        ode_integ.add_integrand('T_out', rate_name='dTdt', start_name='T_initial', end_name='T_final', units='K')
+        self.connect('rate.dTdt','dTdt')
 
 class LiquidCoolantTestGroup(Group):
     """A component (heat producing) with thermal mass

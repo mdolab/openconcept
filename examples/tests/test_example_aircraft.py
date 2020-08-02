@@ -20,18 +20,18 @@ class TBMAnalysisTestCase(unittest.TestCase):
     def test_values_TBM(self):
         prob = self.prob
         assert_near_equal(prob.get_val('climb.OEW', units='lb'), 4756.772140709275, tolerance=1e-5)
-        assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 2489.7142498884746, tolerance=1e-5)
+        assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 2489.49501148, tolerance=1e-5)
         assert_near_equal(prob.get_val('engineoutclimb.gamma',units='deg'), 8.78263, tolerance=1e-5)
-        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 1605.32123542, tolerance=1e-5)
+        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 1607.84846911, tolerance=1e-5)
 
 class CaravanAnalysisTestCase(unittest.TestCase):
     def setUp(self):
         self.prob = run_caravan_analysis()
 
-    def test_values_TBM(self):
+    def test_values_Caravan(self):
         prob = self.prob
-        assert_near_equal(prob.get_val('v1vr.range_final', units='ft'), 1375.61684, tolerance=1e-5)
-        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 377.4998448764594, tolerance=1e-5)
+        assert_near_equal(prob.get_val('v1vr.range_final', units='ft'), 1375.59921952, tolerance=1e-5)
+        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 379.90334044, tolerance=1e-5)
 
 class HybridTwinThermalTestCase(unittest.TestCase):
     def setUp(self):
@@ -43,6 +43,7 @@ class HybridTwinThermalTestCase(unittest.TestCase):
         assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 4434.461454141321, tolerance=1e-5)
         assert_near_equal(prob.get_val('engineoutclimb.gamma',units='deg'), 1.7508055214855194, tolerance=1e-5)
         assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 862.667748103923, tolerance=1e-5)
+        assert_near_equal(prob.get_val('descent.propmodel.batt1.SOC_final', units=None), -1.3067363280327982e-06, tolerance=1e-5)
 
         assert_near_equal(prob.get_val('climb.propmodel.motorheatsink.T', units='degC')[-1], 76.29252153, tolerance=1e-5)
         assert_near_equal(prob.get_val('climb.propmodel.batteryheatsink.T', units='degC')[-1], -0.12704621031633678, tolerance=1e-5)
@@ -59,6 +60,8 @@ class HybridTwinTestCase(unittest.TestCase):
         assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 4383.871458066499, tolerance=1e-5)
         assert_near_equal(prob.get_val('engineoutclimb.gamma',units='deg'), 1.7659046316724112, tolerance=1e-5)
         assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 854.8937776195904, tolerance=1e-5)
+        assert_near_equal(prob.get_val('descent.propmodel.batt1.SOC_final', units=None), -0.00030626412, tolerance=1e-5)
+
 
 class KingAirTestCase(unittest.TestCase):
     def setUp(self):
@@ -67,15 +70,15 @@ class KingAirTestCase(unittest.TestCase):
     def test_values_kingair(self):
         prob = self.prob
         assert_near_equal(prob.get_val('climb.OEW', units='lb'), 6471.539115423346, tolerance=1e-5)
-        assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 3056.9443135452075, tolerance=1e-5)
-        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 1663.490303796347, tolerance=1e-5)
+        assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 3054.61279799, tolerance=1e-5)
+        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 1666.73459582, tolerance=1e-5)
 
 
 class ElectricSingleTestCase(unittest.TestCase):
     def setUp(self):
         self.prob = run_electricsingle_analysis()
     
-    def test_values_kingair(self):
+    def test_values_electricsingle(self):
         prob = self.prob
         assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 2419.111568458725, tolerance=1e-5)
         assert_near_equal(prob.get_val('descent.propmodel.batt1.SOC')[-1], 0.1663373102614198, tolerance=1e-5)

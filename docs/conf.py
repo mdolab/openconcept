@@ -26,7 +26,8 @@ sys.path.insert(0, os.path.abspath(openmdao.__path__[0]+r'/docs/_exts'))
 
 def generate_src_docs(dir, top, packages):
     """
-    generate_src_docs
+    generate_src_docs is a modification of an OpenMDAO source doc generator
+    the main difference is it doesn't include all the inherited public API elements
     """
     index_top = """:orphan:
 
@@ -194,7 +195,7 @@ release = openconcept.__version__ + ' alpha'
 
 # If your documentation needs a minimal Sphinx version, state it here.
 #
-# needs_sphinx = '1.0'
+needs_sphinx = '1.5'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
@@ -204,13 +205,18 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.doctest',
-#    'sphinx.ext.intersphinx',
 	'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'embed_code',
+    'embed_options',
+    'embed_compare',
+    'embed_shell_cmd',
+    'embed_bibtex',
+    'embed_n2',
+    'tags'
 ]
 autodoc_inherit_docstrings = False
 autodoc_member_order = 'bysource'
@@ -251,7 +257,7 @@ pygments_style = 'sphinx'
 # a list of builtin themes.
 #
 html_theme = 'sphinx_rtd_theme'
-
+html_style = 'css/override_theme.css'
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
@@ -356,6 +362,3 @@ if generate_srcdocs:
                 'utilities',
                 'utilities.math']
     generate_src_docs(".", "../openconcept", packages)
-
-
-

@@ -1,10 +1,12 @@
 from __future__ import division
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, BalanceComp, ImplicitComponent
+import openconcept.api as oc
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
 from openconcept.analysis.aerodynamics import Lift, StallSpeed
 from openconcept.utilities.math import ElementMultiplyDivideComp, AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.linearinterp import LinearInterpolator
+from openconcept.utilities.math.integrals import Integrator
 import numpy as np
 import copy
 
@@ -438,7 +440,7 @@ class SteadyFlightCL(ExplicitComponent):
         J['fltcond|CL','ac|geom|wing|S_ref'] = - inputs['fltcond|cosgamma']*g*inputs['weight'] / inputs['fltcond|q'] / inputs['ac|geom|wing|S_ref']**2
         J['fltcond|CL','fltcond|cosgamma'] = g*inputs['weight']/inputs['fltcond|q']/inputs['ac|geom|wing|S_ref']
 
-class GroundRollPhase(Group):
+class GroundRollPhase(oc.PhaseGroup):
     """
     This component group models the ground roll phase of a takeoff (acceleration before flight)
     User-settable parameters include:
@@ -546,25 +548,24 @@ class GroundRollPhase(Group):
 
 
         self.add_subsystem('haccel',HorizontalAcceleration(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
-        
         if flight_phase == 'v1v0':
             #unfortunately need to shoot backwards to avoid negative airspeeds
             #reverse the order of the accelerations so the last one is first (and make them negative)
             self.add_subsystem('flipaccel', FlipVectorComp(num_nodes=nn, units='m/s**2', negative=True), promotes_inputs=[('vec_in','accel_horiz')])
             #integrate the timesteps in reverse from near zero speed.
-            self.add_subsystem('intvelocity',Integrator(num_nodes=nn, method='simpson', quantity_units='m/s', diff_units='s',time_setup='duration', lower=1.5),
-                                                        promotes_inputs=['duration',('q_initial','zero_speed')],promotes_outputs=[('q_final','fltcond|Utrue_initial')])
-            self.connect('flipaccel.vec_out','intvelocity.dqdt')
+            ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, method='simpson', diff_units='s',time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
+            ode_integ.add_integrand('vel_q', units='m/s', rate_name='vel_dqdt', start_name='zero_speed', end_name='fltcond|Utrue_initial', lower=1.5)            
+            self.connect('flipaccel.vec_out','vel_dqdt')
             #flip the result of the reverse integration again so the flight condition is forward and consistent with everythign else
             self.add_subsystem('flipvel', FlipVectorComp(num_nodes=nn, units='m/s', negative=False), promotes_outputs=[('vec_out','fltcond|Utrue')])
-            self.connect('intvelocity.q','flipvel.vec_in')
+            self.connect('vel_q','flipvel.vec_in')
             # now set the time step so that backwards shooting results in the correct 'initial' segment airspeed
             self.add_subsystem('v0constraint',BalanceComp(name='duration',units='s',eq_units='m/s',rhs_name='fltcond|Utrue_initial',lhs_name='takeoff|v1',val=10.,upper=100.,lower=1.),
                                        promotes_inputs=['*'],promotes_outputs=['duration'])
         else:
             # forward shooting for these acceleration segmentes
-            self.add_subsystem('intvelocity',Integrator(num_nodes=nn, method='simpson', quantity_units='m/s', diff_units='s', time_setup='duration', lower=1.5),
-                                                        promotes_inputs=[('dqdt','accel_horiz'),'duration',('q_initial','fltcond|Utrue_initial')],promotes_outputs=[('q','fltcond|Utrue'),('q_final','fltcond|Utrue_final')])
+            ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, method='simpson', diff_units='s',time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
+            ode_integ.add_integrand('fltcond|Utrue', units='m/s', rate_name='accel_horiz', start_name='fltcond|Utrue_initial', end_name='fltcond|Utrue_final', lower=1.5)
             if flight_phase == 'v0v1':
                 self.connect('zero_speed','fltcond|Utrue_initial')
                 self.add_subsystem('v1constraint',BalanceComp(name='duration',units='s',eq_units='m/s',rhs_name='fltcond|Utrue_final',lhs_name='takeoff|v1',val=10.,upper=100.,lower=1.),
@@ -574,13 +575,11 @@ class GroundRollPhase(Group):
                                promotes_inputs=['*'],promotes_outputs=['duration'])
 
         if zero_start:
-            self.add_subsystem('intrange',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s',zero_start=zero_start, time_setup='duration'),
-                                                        promotes_inputs=[('dqdt','fltcond|groundspeed'),'duration'],promotes_outputs=[('q','range'),('q_final','range_final')])
+            ode_integ.add_integrand('range', rate_name='fltcond|groundspeed', units='m', zero_start=True)
         else:
-            self.add_subsystem('intrange',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s',zero_start=zero_start, time_setup='duration'),
-                                                    promotes_inputs=[('dqdt','fltcond|groundspeed'),'duration',('q_initial','range_initial')],promotes_outputs=[('q','range'),('q_final','range_final')])
+            ode_integ.add_integrand('range', rate_name='fltcond|groundspeed', units='m')
 
-class RotationPhase(Group):
+class RotationPhase(oc.PhaseGroup):
     """
     This group models the transition from ground roll to climb out during a takeoff
     using force balance in the vertical and horizontal directions.
@@ -677,16 +676,16 @@ class RotationPhase(Group):
         # TODO always starts from zero altitude
         self.add_subsystem('clear_obstacle',BalanceComp(name='duration',units='s',val=1,eq_units='m',rhs_name='fltcond|h_final',lhs_name='h_obs',lower=0.1,upper=15),
                        promotes_inputs=['*'],promotes_outputs=['duration'])
-        self.add_subsystem('intvelocity',Integrator(num_nodes=nn, method='simpson', quantity_units='m/s', diff_units='s',time_setup='duration',lower=0.1),
-                                                    promotes_inputs=[('dqdt','accel_horiz'),'duration',('q_initial','fltcond|Utrue_initial')],promotes_outputs=[('q','fltcond|Utrue'),('q_final','fltcond|Utrue_final')])
-        self.add_subsystem('intrange',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration'),
-                                                    promotes_inputs=[('dqdt','fltcond|groundspeed'),'duration',('q_initial','range_initial')],promotes_outputs=[('q','range'),('q_final','range_final')])
-        self.add_subsystem('intvs',Integrator(num_nodes=nn, method='simpson', quantity_units='m/s', diff_units='s', time_setup='duration',zero_start=True),
-                                                    promotes_inputs=[('dqdt','accel_vert'),'duration'],promotes_outputs=[('q','fltcond|vs'),('q_final','fltcond|vs_final')])
-        self.add_subsystem('inth',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration',zero_start=True),
-                                                    promotes_inputs=[('dqdt','fltcond|vs'),'duration'],promotes_outputs=[('q','fltcond|h'),('q_final','fltcond|h_final')])
+        int1 = self.add_subsystem('intvelocity', Integrator(num_nodes=nn, method='simpson',diff_units='s',time_setup='duration'), promotes_outputs=['*'], promotes_inputs=['*'])
+        int1.add_integrand('fltcond|Utrue', rate_name='accel_horiz', units='m/s', lower=0.1)
+        int2 = self.add_subsystem('intrange', Integrator(num_nodes=nn, method='simpson',diff_units='s',time_setup='duration'), promotes_outputs=['*'], promotes_inputs=['*'])
+        int2.add_integrand('range', rate_name='fltcond|groundspeed', units='m')        
+        int3 = self.add_subsystem('intvs', Integrator(num_nodes=nn, method='simpson',diff_units='s',time_setup='duration'), promotes_outputs=['*'], promotes_inputs=['*'])
+        int3.add_integrand('fltcond|vs', rate_name='accel_vert', units='m/s', zero_start=True)        
+        int4 = self.add_subsystem('inth', Integrator(num_nodes=nn, method='simpson',diff_units='s',time_setup='duration'), promotes_outputs=['*'], promotes_inputs=['*'])
+        int4.add_integrand('fltcond|h', rate_name='fltcond|vs', units='m', zero_start=True)               
 
-class SteadyFlightPhase(Group):
+class SteadyFlightPhase(oc.PhaseGroup):
     """
     This component group models steady flight conditions.
     Settable mission parameters include:
@@ -763,8 +762,8 @@ class SteadyFlightPhase(Group):
         ivcomp.add_output('fltcond|vs',val=np.ones((nn,))*1, units='m/s')
         ivcomp.add_output('zero_accel',val=np.zeros((nn,)),units='m/s**2')
         
-        self.add_subsystem('inth',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration'),
-                                                    promotes_inputs=[('dqdt','fltcond|vs'),'duration',('q_initial','fltcond|h_initial')],promotes_outputs=[('q','fltcond|h'),('q_final','fltcond|h_final')])
+        integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', time_setup='duration', method='simpson'), promotes_inputs=['fltcond|vs', 'fltcond|groundspeed'], promotes_outputs=['fltcond|h', 'range'])
+        integ.add_integrand('fltcond|h', rate_name='fltcond|vs', val=1.0, units='m')
         self.add_subsystem('atmos', ComputeAtmosphericProperties(num_nodes=nn, true_airspeed_in=False), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('gs',Groundspeeds(num_nodes=nn),promotes_inputs=['*'],promotes_outputs=['*'])
         # add the user-defined aircraft model
@@ -772,13 +771,103 @@ class SteadyFlightPhase(Group):
         self.add_subsystem('clcomp',SteadyFlightCL(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('lift',Lift(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('haccel',HorizontalAcceleration(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
-
-        self.add_subsystem('intrange',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration'),
-                                                    promotes_inputs=[('dqdt','fltcond|groundspeed'),'duration',('q_initial','range_initial')],promotes_outputs=[('q','range'),('q_final','range_final')])
-
-
+        integ.add_integrand('range', rate_name='fltcond|groundspeed', val=1.0, units='m')
         self.add_subsystem('steadyflt',BalanceComp(name='throttle',val=np.ones((nn,))*0.5,lower=0.01,upper=2.0,units=None,normalize=False,eq_units='m/s**2',rhs_name='accel_horiz',lhs_name='zero_accel',rhs_val=np.zeros((nn,))),
                            promotes_inputs=['accel_horiz','zero_accel'],promotes_outputs=['throttle'])
+
+# class OldSteadyFlightPhase(Group):
+#     """
+#     This component group models steady flight conditions.
+#     Settable mission parameters include:
+#     Airspeed (fltcond|Ueas)
+#     Vertical speed (fltcond|vs)
+#     Duration of the segment (duration)
+
+#     Throttle is set automatically to ensure steady flight
+
+#     The BaseAircraftGroup object is passed in.
+#     The BaseAircraftGroup should be built to accept the following inputs
+#     and return the following outputs.
+#     The outputs should be promoted to the top level in the component.
+
+#     Inputs
+#     ------
+#     range : float
+#         Total distance travelled (vector, m)
+#     fltcond|h : float
+#         Altitude (vector, m)
+#     fltcond|vs : float
+#         Vertical speed (vector, m/s)
+#     fltcond|Ueas : float
+#         Equivalent airspeed (vector, m/s)
+#     fltcond|Utrue : float
+#         True airspeed (vector, m/s)
+#     fltcond|p : float
+#         Pressure (vector, Pa)
+#     fltcond|rho : float
+#         Density (vector, kg/m3)
+#     fltcond|T : float
+#         Temperature (vector, K)
+#     fltcond|q : float
+#         Dynamic pressure (vector, Pa)
+#     fltcond|CL : float
+#         Lift coefficient (vector, dimensionless)
+#     throttle : float
+#         Motor / propeller throttle setting scaled from 0 to 1 or slightly more (vector, dimensionless)
+#     propulsor_active : float
+#         If a multi-propulsor airplane, a failure condition should be modeled in the propulsion model by multiplying throttle by propulsor_active.
+#         It will generally be 1.0 unless a failure condition is being modeled, in which case it will be 0 (vector, dimensionless)
+#     braking : float
+#         Brake friction coefficient (default 0.4 for dry runway braking, 0.03 for resistance unbraked)
+#         Should not be applied in the air or nonphysical effects will result (vector, dimensionless)
+#     lift : float
+#         Lift force (vector, N)
+
+#     Outputs
+#     -------
+#     thrust : float
+#         Total thrust force produced by all propulsors (vector, N)
+#     drag : float
+#         Total drag force in the airplane axis produced by all sources of drag (vector, N)
+#     weight : float
+#         Weight (mass, really) of the airplane at each point in time. (vector, kg)
+#     ac|geom|wing|S_ref
+#         Wing reference area (scalar, m**2)
+#     ac|aero|CLmax_TO
+#         CLmax with flaps in max takeoff position (scalar, dimensionless)
+#     ac|weights|MTOW
+#         Maximum takeoff weight (scalar, kg)
+#     """
+#     def initialize(self):
+#         self.options.declare('num_nodes',default=1)
+#         self.options.declare('flight_phase',default=None,desc='Phase of flight e.g. v0v1, cruise')
+#         self.options.declare('aircraft_model',default=None)
+
+#     def setup(self):
+#         nn = self.options['num_nodes']
+#         ivcomp = self.add_subsystem('const_settings', IndepVarComp(), promotes_outputs=["*"])
+#         ivcomp.add_output('propulsor_active', val=np.ones(nn))
+#         ivcomp.add_output('braking', val=np.zeros(nn))
+#         ivcomp.add_output('fltcond|Ueas',val=np.ones((nn,))*90, units='m/s')
+#         ivcomp.add_output('fltcond|vs',val=np.ones((nn,))*1, units='m/s')
+#         ivcomp.add_output('zero_accel',val=np.zeros((nn,)),units='m/s**2')
+        
+#         self.add_subsystem('inth',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration'),
+#                                                     promotes_inputs=[('dqdt','fltcond|vs'),'duration',('q_initial','fltcond|h_initial')],promotes_outputs=[('q','fltcond|h'),('q_final','fltcond|h_final')])
+#         self.add_subsystem('atmos', ComputeAtmosphericProperties(num_nodes=nn, true_airspeed_in=False), promotes_inputs=['*'], promotes_outputs=['*'])
+#         self.add_subsystem('gs',Groundspeeds(num_nodes=nn),promotes_inputs=['*'],promotes_outputs=['*'])
+#         # add the user-defined aircraft model
+#         self.add_subsystem('acmodel',self.options['aircraft_model'](num_nodes=nn, flight_phase=self.options['flight_phase']),promotes_inputs=['*'],promotes_outputs=['*'])
+#         self.add_subsystem('clcomp',SteadyFlightCL(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
+#         self.add_subsystem('lift',Lift(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
+#         self.add_subsystem('haccel',HorizontalAcceleration(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
+
+#         self.add_subsystem('intrange',Integrator(num_nodes=nn, method='simpson', quantity_units='m', diff_units='s', time_setup='duration'),
+#                                                     promotes_inputs=[('dqdt','fltcond|groundspeed'),'duration',('q_initial','range_initial')],promotes_outputs=[('q','range'),('q_final','range_final')])
+
+
+#         self.add_subsystem('steadyflt',BalanceComp(name='throttle',val=np.ones((nn,))*0.5,lower=0.01,upper=2.0,units=None,normalize=False,eq_units='m/s**2',rhs_name='accel_horiz',lhs_name='zero_accel',rhs_val=np.zeros((nn,))),
+#                            promotes_inputs=['accel_horiz','zero_accel'],promotes_outputs=['throttle'])
 
 class ClimbAnglePhase(Group):
     """
@@ -1013,7 +1102,7 @@ class TakeoffClimb(ExplicitComponent):
         J['t_climb','fltcond|Utrue'] = - sc / ut ** 2
 
 
-class RobustRotationPhase(Group):
+class RobustRotationPhase(oc.PhaseGroup):
     """
     This adds general mission analysis capabilities to an existing airplane model.
     The BaseAircraftGroup object is passed in. It should be built to accept the following inputs and return the following outputs.

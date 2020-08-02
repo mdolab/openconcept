@@ -114,19 +114,12 @@ class ElectricTBMAnalysisGroup(Group):
         connect_phases_1 = ['v0v1','v1vr','rotate','climb','cruise','descent']
         connect_states_1 = ['propmodel.batt1.SOC','propmodel.motorheatsink.T','propmodel.reservoir.T']
         extra_states_tuple_1 = [(connect_state, connect_phases_1) for connect_state in connect_states_1]
-        connect_phases_2 = ['rotate','climb','cruise','descent']
-        connect_states_2 = ['range','fltcond|h']
-        extra_states_tuple_2 = [(connect_state, connect_phases_2) for connect_state in connect_states_2]
-        extra_states_tuple = extra_states_tuple_1 + extra_states_tuple_2
+
         analysis = self.add_subsystem('analysis',FullMissionAnalysis(num_nodes=nn,
                                                                      aircraft_model=ElectricTBM850Model,
-                                                                     extra_states=extra_states_tuple,
                                                                      transition_method='ode'),
                                                  promotes_inputs=['*'],promotes_outputs=['*'])
-
-
-
-
+        
         self.connect('T_motor_initial','v0v1.propmodel.motorheatsink.T_initial')
         self.connect('T_res_initial','v0v1.propmodel.reservoir.T_initial')
 

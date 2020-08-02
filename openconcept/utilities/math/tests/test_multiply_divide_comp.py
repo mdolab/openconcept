@@ -227,7 +227,7 @@ class TestElementMultiplyDivideDivisionFirst(unittest.TestCase):
                                    promotes_outputs=['a', 'b','c'])
 
         multi=self.p.model.add_subsystem(name='multiply_divide_comp',
-                                   subsys=ElementMultiplyDivideComp(complex=True))
+                                   subsys=ElementMultiplyDivideComp())
         multi.add_equation('multdiv_output',['input_a','input_b','input_c'],vec_size=self.nn,length=3,divide=[True,True,False])
 
         self.p.model.connect('a', 'multiply_divide_comp.input_a')
@@ -250,7 +250,6 @@ class TestElementMultiplyDivideDivisionFirst(unittest.TestCase):
         expected = 1 / a / b * c
         assert_near_equal(out, expected,1e-15)
 
-    @pytest.mark.filterwarnings("ignore:Casting*")
     def test_partials(self):
         partials = self.p.check_partials(method='cs', out_stream=None)
         assert_check_partials(partials)
@@ -316,7 +315,7 @@ class TestElementMultiplyDivideUnits(unittest.TestCase):
                                    promotes_outputs=['a', 'b','c'])
 
         multi=self.p.model.add_subsystem(name='multiply_divide_comp',
-                                   subsys=ElementMultiplyDivideComp(complex=True))
+                                   subsys=ElementMultiplyDivideComp())
         multi.add_equation('multdiv_output',['input_a','input_b','input_c'],vec_size=self.nn,length=3,
                            input_units=['kg','m','s**2'], divide=[False, False, True])
 
@@ -362,7 +361,7 @@ class TestElementMultiplyDivideUnits_DivideFirst(unittest.TestCase):
                                    promotes_outputs=['a', 'b','c'])
 
         multi=self.p.model.add_subsystem(name='multiply_divide_comp',
-                                   subsys=ElementMultiplyDivideComp(complex=True))
+                                   subsys=ElementMultiplyDivideComp())
         multi.add_equation('multdiv_output',['input_c','input_b','input_a'],vec_size=self.nn,length=3,
                            input_units=['s**2','m','kg'], divide=[True, False, False])
 
