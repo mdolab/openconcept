@@ -21,7 +21,7 @@ class ExplicitIncompressibleDuct(ExplicitComponent):
     fltcond|rho : float
         Density in the freestream (vector, kg/m**3)
     area_nozzle : float
-        Cross-sectional area of the outlet nozzle (scalar, m**2)
+        Cross-sectional area of the outlet nozzle (vector, m**2)
         Generally must be the narrowest portion of the duct for analysis to be valid
     delta_p_hex : float
         Pressure drop across the heat exchanger (vector, Pa)
@@ -55,7 +55,7 @@ class ExplicitIncompressibleDuct(ExplicitComponent):
         nn = self.options['num_nodes']
         self.add_input('fltcond|Utrue', shape=(nn,),  units='m/s')
         self.add_input('fltcond|rho', shape=(nn,),  units='kg/m**3')
-        self.add_input('area_nozzle',  units='m**2')
+        self.add_input('area_nozzle', shape=(nn,), units='m**2')
         self.add_input('delta_p_hex',  shape=(nn,), units='Pa')
 
         self.add_output('mdot', shape=(nn,),  units='kg/s')
