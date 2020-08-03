@@ -18,7 +18,7 @@ from examples.propulsion_layouts.thermal_series_hybrid import TwinSeriesHybridEl
 from examples.methods.costs_commuter import OperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from examples.aircraft_data.KingAirC90GT import data as acdata
-from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis
+from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis, MissionWithReserve
 from openconcept.utilities.linearinterp import LinearInterpolator
 from openconcept.utilities.visualization import plot_trajectory
 
@@ -91,14 +91,14 @@ class SeriesHybridTwinModel(Group):
         hxadder = AddSubtractComp()
         hxadder.add_equation('OEW',['OEW_orig','W_hx','W_coolant'],scaling_factors=[1,1,1],units='kg')
         hxadder.add_equation('drag',['drag_orig','drag_hx'], vec_size=nn, units='N', scaling_factors=[1,1])
-        hxadder.add_equation('area_constraint',['hx_frontal_area','nozzle_area'],units='m**2',scaling_factors=[1,-1])
+        # hxadder.add_equation('area_constraint',['hx_frontal_area','nozzle_area'],units='m**2',scaling_factors=[1,-1])
         self.add_subsystem('hxadder',hxadder, promotes_inputs=[('W_coolant','ac|propulsion|thermal|hx|coolant_mass')],promotes_outputs=['OEW','drag'])
         self.connect('drag.drag','hxadder.drag_orig')
         self.connect('OEW.OEW','hxadder.OEW_orig')
         self.connect('propmodel.hx.component_weight','hxadder.W_hx')
         self.connect('propmodel.duct.drag','hxadder.drag_hx')
-        self.connect('propmodel.hx.frontal_area','hxadder.hx_frontal_area')
-        self.connect('propmodel.area_nozzle','hxadder.nozzle_area')
+        # self.connect('propmodel.hx.frontal_area','hxadder.hx_frontal_area')
+        # self.connect('propmodel.area_nozzle','hxadder.nozzle_area')
         intfuel = self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson', diff_units='s',
                                                               time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
         intfuel.add_integrand('fuel_used', rate_name='fuel_flow', val=1.0, units='kg')
@@ -154,7 +154,6 @@ class ElectricTwinAnalysisGroup(Group):
         dv_comp.add_output('ac|propulsion|thermal|hx|channel_height',20.,units='mm')
         dv_comp.add_output('ac|propulsion|thermal|hx|channel_length',val=0.2,units='m')
         dv_comp.add_output('ac|propulsion|thermal|hx|n_parallel',val=50,units=None)
-        dv_comp.add_output('ac|propulsion|thermal|duct|area_nozzle',val=58.,units='inch**2')
         dv_comp.add_output('ac|propulsion|thermal|hx|n_wide_cold',val=430,units=None)
         dv_comp.add_output('ac|propulsion|battery|specific_energy',val=300,units='W*h/kg')
 
@@ -200,17 +199,18 @@ def configure_problem():
     prob.model= ElectricTwinAnalysisGroup()
     prob.model.nonlinear_solver=NewtonSolver(iprint=2)
     prob.model.options['assembled_jac_type'] = 'csc'
-    # prob.model.linear_solver = DirectSolver(assemble_jac=True)
+    prob.model.linear_solver = DirectSolver(assemble_jac=True)
     prob.model.nonlinear_solver.options['solve_subsystems'] = True
     prob.model.nonlinear_solver.options['maxiter'] = 10
     prob.model.nonlinear_solver.options['atol'] = 1e-8
     prob.model.nonlinear_solver.options['rtol'] = 1e-8
     prob.model.nonlinear_solver.linesearch = BoundsEnforceLS()
     prob.model.nonlinear_solver.linesearch.options['iprint'] = 2
+    # prob.model.nonlinear_solver.linesearch.options['print_bound_enforce'] = True
     return prob
 
 def set_values(prob, num_nodes, design_range, spec_energy):
-    # set some (required) mission parameters. Each pahse needs a vertical and air-speed
+    # set some (required) mission parameters. Each phase needs a vertical and air-speed
     # the entire mission needs a cruise altitude and range
     prob.set_val('climb.fltcond|vs', np.ones((num_nodes,))*1500, units='ft/min')
     prob.set_val('climb.fltcond|Ueas', np.ones((num_nodes,))*124, units='kn')

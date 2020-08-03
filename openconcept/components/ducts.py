@@ -74,6 +74,7 @@ class ExplicitIncompressibleDuct(ExplicitComponent):
         interior = (inputs['fltcond|rho']**2 * inputs['fltcond|Utrue']**2 + 2*inputs['fltcond|rho']*inputs['delta_p_hex'])/(1+static_pressure_loss_factor)
         interior[np.where(interior<0.0)]=1e-10
         mdot = inputs['area_nozzle'] * np.sqrt(interior)
+        mdot[np.where(mdot<0.0)]=1e-10
         # if self.pathname.split('.')[1] == 'climb':
         #     print('Nozzle area:'+str(inputs['area_nozzle']))
         #     print('mdot:'+str(mdot))

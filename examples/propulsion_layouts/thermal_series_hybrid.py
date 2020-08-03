@@ -70,7 +70,7 @@ class TwinSeriesHybridElectricPropulsionSystem(Group):
                     ['ac|propulsion|thermal|hx|channel_height','channel_height',20.,'mm'],
                     ['ac|propulsion|thermal|hx|channel_length','channel_length',0.2,'m'],
                     ['ac|propulsion|thermal|hx|n_parallel','n_parallel',50,None],
-                    ['ac|propulsion|thermal|duct|area_nozzle','area_nozzle',58.*np.ones((nn,)),'inch**2'],
+                    # ['ac|propulsion|thermal|duct|area_nozzle','area_nozzle',58.*np.ones((nn,)),'inch**2'],
                     ['ac|propulsion|battery|specific_energy','specific_energy',300,'W*h/kg']
                     ]
 
@@ -161,7 +161,8 @@ class TwinSeriesHybridElectricPropulsionSystem(Group):
         self.add_subsystem('duct',
                            ExplicitIncompressibleDuct(num_nodes=nn),
                            promotes_inputs=['fltcond|*'])
-        self.connect('area_nozzle','duct.area_nozzle')
+        iv.add_output('ac|propulsion|thermal|duct|area_nozzle', val=58.*np.ones((nn,)), units='inch**2')
+        self.connect('ac|propulsion|thermal|duct|area_nozzle','duct.area_nozzle')
         self.add_subsystem('hx',HXGroup(num_nodes=nn),promotes_inputs=['ac|*',('T_in_cold','fltcond|T'),('rho_cold','fltcond|rho')])
         self.connect('duct.mdot','hx.mdot_cold')
         self.connect('hx.delta_p_cold','duct.delta_p_hex')
@@ -233,7 +234,7 @@ class TwinSeriesHybridElectricPropulsionRefrigerated(Group):
                     ['ac|propulsion|thermal|hx|channel_height','channel_height',20.,'mm'],
                     ['ac|propulsion|thermal|hx|channel_length','channel_length',0.2,'m'],
                     ['ac|propulsion|thermal|hx|n_parallel','n_parallel',50,None],
-                    ['ac|propulsion|thermal|duct|area_nozzle','area_nozzle',58.*np.ones((nn,)),'inch**2'],
+                    # ['ac|propulsion|thermal|duct|area_nozzle','area_nozzle',58.*np.ones((nn,)),'inch**2'],
                     ['ac|propulsion|battery|specific_energy','specific_energy',300,'W*h/kg']
                     ]
 
@@ -315,7 +316,8 @@ class TwinSeriesHybridElectricPropulsionRefrigerated(Group):
         # so it pulls power from both the battery and turboshaft at the hybridization ratio
         self.add_subsystem('refrig', HeatPumpWithIntegratedCoolantLoop(num_nodes=nn,
                                                                        hot_side_balance_param_units='inch**2',
-                                                                       hot_side_balance_param_lower=1e-6))
+                                                                       hot_side_balance_param_lower=1e-10,
+                                                                       hot_side_balance_param_upper=1e3))
         self.connect('refrig.Wdot', 'add_power.refrig_elec_load')
         iv.add_output('refrig_eff_factor', val=0.4, shape=None, units=None)
         iv.add_output('refrig_T_h_set', val=400., shape=(nn,), units='K')
@@ -366,7 +368,6 @@ class TwinSeriesHybridElectricPropulsionRefrigerated(Group):
         self.add_subsystem('duct',
                            ExplicitIncompressibleDuct(num_nodes=nn),
                            promotes_inputs=['fltcond|*'])
-        # self.connect('area_nozzle', 'duct.area_nozzle')
         self.add_subsystem('hx',HXGroup(num_nodes=nn),promotes_inputs=['ac|*',('rho_cold','fltcond|rho'),('T_in_cold','fltcond|T')])
         self.connect('duct.mdot','hx.mdot_cold')
         self.connect('hx.delta_p_cold','duct.delta_p_hex')
@@ -375,13 +376,8 @@ class TwinSeriesHybridElectricPropulsionRefrigerated(Group):
         self.connect('refrig.T_out_hot','hx.T_in_hot')
         self.connect('hx.T_out_hot','refrig.T_in_hot')
 
-        # Use the ambient air temperature as the parameter to modulate hot side
-        # NOTE: this is unrealistic, but in this case, the easiest to successfully implement
+        # Modulate the duct inlet area to maintain the desired temperature on the hot side of the refrig
         self.connect('refrig.hot_side_balance_param', 'duct.area_nozzle')
-        # self.add_subsystem('in_out', ExecComp('res = inp', shape=(nn,), units='kg/s'))
-        # self.connect('refrig.hot_side_balance_param', 'in_out.inp')
-        # self.connect('in_out.res', ['refrig.mdot_coolant_hot',
-        #                               'hx.mdot_hot'])
 
         self.connect('mdot_coolant', ['refrig.mdot_coolant_hot',
                                       'hx.mdot_hot'])
