@@ -357,8 +357,8 @@ class HydraulicDiameterReynoldsNumber(ExplicitComponent):
         self.add_input('xs_area_hot', units='m**2')
         self.add_input('dh_hot', units='m')
 
-        self.add_output('Re_dh_cold', shape=(nn,))
-        self.add_output('Re_dh_hot', shape=(nn,))
+        self.add_output('Re_dh_cold', shape=(nn,), lower=1e-10)
+        self.add_output('Re_dh_hot', shape=(nn,), lower=1e-10)
         arange = np.arange(0, nn)
         self.declare_partials(['Re_dh_cold'], ['mdot_cold'], rows=arange, cols=arange)
         self.declare_partials(['Re_dh_cold'], ['mu_cold', 'xs_area_cold', 'dh_cold'], rows=arange, cols=np.zeros((nn,), dtype=np.int32))
@@ -813,7 +813,7 @@ class NTUMethod(ExplicitComponent):
         self.add_input('T_in_hot', shape=(nn,), units='K')
         self.add_input('cp_hot', units='J/kg/K')
 
-        self.add_output('NTU', shape=(nn,))
+        self.add_output('NTU', shape=(nn,), lower=1e-10)
         self.add_output('heat_max', shape=(nn,), units='W')
         self.add_output('C_ratio', shape=(nn,))
 
