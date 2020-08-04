@@ -45,7 +45,7 @@ def sigmoid_deriv(x):
     df : float
         Sigmoid derivitive w.r.t. x evaluated at x, same shape as x
     """
-    df = np.exp(-x) / (np.exp(-x) + 1)**2
+    df = 1 / (np.exp(-x) + 2 + 1/np.exp(-x))
     return df
 
 
@@ -191,7 +191,8 @@ class SimpleHeatPump(ExplicitComponent):
     def compute(self, inputs, outputs):
         # Cooling coefficient of performance, use sigmoid to avoid negative COPs
         delta_T = inputs['T_h'] - inputs['T_c']
-        COP_cooling = sigmoid(delta_T) * inputs['eff_factor'] * inputs['T_c'] / (delta_T)
+        shift = 2  # shift so sigmoid is very close to zero once delta_T < 0
+        COP_cooling = sigmoid(delta_T - shift) * inputs['eff_factor'] * inputs['T_c'] / (delta_T)
         outputs['COP_cooling'] = COP_cooling
 
         # Heat transfer
@@ -204,21 +205,22 @@ class SimpleHeatPump(ExplicitComponent):
         T_c = inputs['T_c']
         Wdot = inputs['Wdot']
         eff_factor = inputs['eff_factor']
+        shift = 2
 
-        J['COP_cooling', 'T_h'] = - sigmoid(T_h - T_c) * eff_factor * T_c / (T_h - T_c) ** 2 + \
-                                    sigmoid_deriv(T_h - T_c) * eff_factor * T_c / (T_h - T_c)
-        J['COP_cooling', 'T_c'] = sigmoid(T_h - T_c) * eff_factor * T_h / (T_h - T_c) ** 2 - \
-                                  sigmoid_deriv(T_h - T_c) * eff_factor * T_c / (T_h - T_c)
-        J['COP_cooling', 'eff_factor'] = sigmoid(T_h - T_c) * T_c / (T_h - T_c)
+        J['COP_cooling', 'T_h'] = - sigmoid(T_h - T_c - shift) * eff_factor * T_c / (T_h - T_c) ** 2 + \
+                                    sigmoid_deriv(T_h - T_c - shift) * eff_factor * T_c / (T_h - T_c)
+        J['COP_cooling', 'T_c'] = sigmoid(T_h - T_c - shift) * eff_factor * T_h / (T_h - T_c) ** 2 - \
+                                  sigmoid_deriv(T_h - T_c - shift) * eff_factor * T_c / (T_h - T_c)
+        J['COP_cooling', 'eff_factor'] = sigmoid(T_h - T_c - shift) * T_c / (T_h - T_c)
 
         J['q_c', 'T_h'] = - J['COP_cooling', 'T_h'] * Wdot
         J['q_c', 'T_c'] = - J['COP_cooling', 'T_c'] * Wdot
-        J['q_c', 'Wdot'] = - sigmoid(T_h - T_c) * eff_factor * T_c / (T_h - T_c)
+        J['q_c', 'Wdot'] = - sigmoid(T_h - T_c - shift) * eff_factor * T_c / (T_h - T_c)
         J['q_c', 'eff_factor'] = - J['COP_cooling', 'eff_factor'] * Wdot
 
         J['q_h', 'T_h'] = J['COP_cooling', 'T_h'] * Wdot
         J['q_h', 'T_c'] = J['COP_cooling', 'T_c'] * Wdot
-        J['q_h', 'Wdot'] = 1 + sigmoid(T_h - T_c) * eff_factor * T_c / (T_h - T_c)
+        J['q_h', 'Wdot'] = 1 + sigmoid(T_h - T_c - shift) * eff_factor * T_c / (T_h - T_c)
         J['q_h', 'eff_factor'] = J['COP_cooling', 'eff_factor'] * Wdot
 
 class SimpleTMS(Group):
@@ -347,13 +349,14 @@ class SimpleTMS(Group):
         ivc = self.add_subsystem('ivc', IndepVarComp(), promotes_outputs=['mdot_coolant'])
         ivc.add_output('motor_T_init', val=self.options['motor_T_init'], units='K')
 
-        self.add_subsystem('motor_temp_integrator', Integrator(num_nodes=nn,
-                                                               quantity_units='K',
+        int_temp = self.add_subsystem('motor_temp_integrator', Integrator(num_nodes=nn,
                                                                diff_units='s',
                                                                method='simpson',
                                                                time_setup='duration'),
                             promotes_inputs=['duration'],
-                            promotes_outputs=[('q', 'motor_T'), ('q_final', 'motor_T_final')])
+                            promotes_outputs=['motor_T', 'motor_T_final'])
+        int_temp.add_integrand('motor_T', start_name='motor_T_init', end_name='motor_T_final',
+                               rate_name='dTdt', val=1.0, units='K')
         
         # Add the cold plate to interface the motor and refrigerator
         self.add_subsystem('motor_cold_plate',
@@ -383,8 +386,8 @@ class SimpleTMS(Group):
         self.connect('motor.heat_out', 'motor_thermal_mass.q_in')
         self.connect('motor_cold_plate.q', 'motor_thermal_mass.q_out')
         self.connect('motor_T', 'motor_cold_plate.T_surface')
-        self.connect('ivc.motor_T_init', 'motor_temp_integrator.q_initial')
-        self.connect('motor_thermal_mass.dTdt', 'motor_temp_integrator.dqdt')
+        self.connect('ivc.motor_T_init', 'motor_temp_integrator.motor_T_init')
+        self.connect('motor_thermal_mass.dTdt', 'motor_temp_integrator.dTdt')
 
         # Connect the two cold plates to each other
         self.connect('motor_cold_plate.T_out', 'refrigerator_cold_plate.T_in')
