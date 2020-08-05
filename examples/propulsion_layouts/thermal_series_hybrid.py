@@ -329,15 +329,16 @@ class TwinSeriesHybridElectricPropulsionRefrigerated(Group):
         self.connect('bypass_refrig', 'refrig.bypass_heat_pump')
 
         # Coolant loop on electrical component side (cooling side of refrigerator)
-        # ,------> battery --------> motor ---,
-        # |                                   |
-        # '- reservoir <-- refrig cold side <-'
+        # ,---> battery ---> motor ---,
+        # |                           |
+        # '---- refrig cold side <----'
         self.add_subsystem('batteryheatsink',
                            LiquidCooledComp(num_nodes=nn,
                                             quasi_steady=False),
                                             promotes_inputs=lc_promotes)
         self.connect('batt1.heat_out','batteryheatsink.q_in')
         self.connect('batt_weight','batteryheatsink.mass')
+        self.connect('refrig.T_out_cold', 'batteryheatsink.T_in')
 
         self.add_subsystem('motorheatsink',
                            LiquidCooledComp(num_nodes=nn,
@@ -348,17 +349,9 @@ class TwinSeriesHybridElectricPropulsionRefrigerated(Group):
         self.connect('motorheatsink.T_out', 'refrig.T_in_cold')
         self.connect('batteryheatsink.T_out', 'motorheatsink.T_in')
 
-        self.add_subsystem('reservoir',
-                           CoolantReservoir(num_nodes=nn),
-                                            promotes_inputs=['duration'])
-        self.connect('coolant_mass','reservoir.mass')
-        self.connect('refrig.T_out_cold','reservoir.T_in')
-        self.connect('reservoir.T_out','batteryheatsink.T_in')
-
         self.connect('mdot_coolant',['batteryheatsink.mdot_coolant',
                                      'motorheatsink.mdot_coolant',
-                                     'refrig.mdot_coolant_cold',
-                                     'reservoir.mdot_coolant'])
+                                     'refrig.mdot_coolant_cold'])
 
 
         # Coolant loop on hot side of refrigerator to reject heat

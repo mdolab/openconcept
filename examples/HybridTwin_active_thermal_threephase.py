@@ -164,7 +164,6 @@ class ElectricTwinAnalysisGroup(Group):
         mission_data_comp = self.add_subsystem('mission_data_comp',IndepVarComp(),promotes_outputs=["*"])
         mission_data_comp.add_output('batt_soc_target', val=0.1, units=None)
         mission_data_comp.add_output('T_motor_initial', val=15, units='degC')
-        mission_data_comp.add_output('T_res_initial', val=15.1, units='degC')
         mission_data_comp.add_output('T_batt_initial', val=10.1, units='degC')
 
         # Ensure that any state variables are connected across the mission as intended
@@ -191,7 +190,6 @@ class ElectricTwinAnalysisGroup(Group):
         self.connect('descent.fuel_used_final','aug_obj.fuel_burn')
 
         self.connect('T_motor_initial','climb.propmodel.motorheatsink.T_initial')
-        self.connect('T_res_initial','climb.propmodel.reservoir.T_initial')
         self.connect('T_batt_initial','climb.propmodel.batteryheatsink.T_initial')
 
 def configure_problem():
@@ -206,7 +204,7 @@ def configure_problem():
     prob.model.nonlinear_solver.options['rtol'] = 1e-8
     prob.model.nonlinear_solver.linesearch = BoundsEnforceLS()
     # prob.model.nonlinear_solver.linesearch.options['iprint'] = 2
-    prob.model.nonlinear_solver.linesearch.options['print_bound_enforce'] = True
+    # prob.model.nonlinear_solver.linesearch.options['print_bound_enforce'] = True
     return prob
 
 def set_values(prob, num_nodes, design_range, spec_energy):
@@ -229,6 +227,9 @@ def set_values(prob, num_nodes, design_range, spec_energy):
     prob['analysis.cruise.acmodel.OEW.const.structural_fudge'] = 2.0
     prob['ac|propulsion|propeller|diameter'] = 2.2
     prob['ac|propulsion|engine|rating'] = 1117.2
+
+    # set the initial battery SOC to match the HybridTwin_thermal after takeoff
+    prob.set_val('climb.propmodel.batt1.SOC_initial', 0.8611499461827815, units=None)
 
 def run_hybrid_twin_thermal_analysis(plots=False):
     prob = configure_problem()
@@ -277,10 +278,10 @@ def show_outputs(prob):
         x_var = 'range'
         x_unit = 'NM'
         y_vars = ['fltcond|h','fltcond|Ueas','fuel_used','throttle','fltcond|vs','propmodel.batt1.SOC',
-                  'propmodel.motorheatsink.T','propmodel.batteryheatsink.T','propmodel.reservoir.T_out', 'propmodel.refrig.hot_side_balance_param']
-        y_units = ['ft','kn','lbm',None,'ft/min',None,'degC','degC','degC','inch**2']
+                  'propmodel.motorheatsink.T','propmodel.batteryheatsink.T','propmodel.refrig.hot_side_balance_param']
+        y_units = ['ft','kn','lbm',None,'ft/min',None,'degC','degC','inch**2']
         x_label = 'Range (nmi)'
-        y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)', 'Battery SOC', 'Motor temp', 'Battery temp','Reservoir outlet temp', 'HX area']
+        y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)', 'Battery SOC', 'Motor temp', 'Battery temp', 'HX area']
 
         phases = ['climb','cruise','descent']
         plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
