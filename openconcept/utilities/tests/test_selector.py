@@ -2,7 +2,7 @@ from __future__ import division
 import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
-from openmdao.api import Problem
+from openmdao.api import Problem, IndepVarComp
 from openconcept.utilities.selector import SelectorComp
 
 class SelectorCompTestCase(unittest.TestCase):
@@ -53,12 +53,17 @@ class SelectorCompTestCase(unittest.TestCase):
     
     def test_three_inputs(self):
         nn = 5
-        p = Problem(SelectorComp(num_nodes=nn, input_names=['A', 'B', 'C'], units='g'))
+        p = Problem()
+        # Need to use an IndepVarComp here unlike the other two tests because
+        # setting an input wasn't working when units were included
+        iv = p.model.add_subsystem('iv', IndepVarComp(), promotes=['*'])
+        iv.add_output('A', np.array([5.7, 2.3, -10., 2., 77.]), units='g')
+        iv.add_output('B', np.array([-1., -1., -1., -1., -2.]), units='kg')
+        iv.add_output('C', 42.*np.ones(nn), units='g')
+        iv.add_output('selector', np.array([0, 1, 2, 0, 2]))
+        p.model.add_subsystem('selector', SelectorComp(num_nodes=nn, input_names=['A', 'B', 'C'], units='g'),
+                            promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
-        p.set_val('A', np.array([5.7, 2.3, -10., 2., 77.]), units='g')
-        p.set_val('B', np.array([-1., -1., -1., -1., -2.]), units='kg')
-        p.set_val('C', 42.*np.ones(nn), units='g')
-        p.set_val('selector', np.array([0, 1, 2, 0, 2]))
         p.run_model()
         assert_near_equal(p['result'], np.array([5.7, -1000., 42., 2., 42.]))
         

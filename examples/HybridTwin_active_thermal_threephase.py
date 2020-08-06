@@ -204,7 +204,7 @@ def configure_problem():
     prob.model.nonlinear_solver.options['rtol'] = 1e-8
     prob.model.nonlinear_solver.linesearch = BoundsEnforceLS()
     # prob.model.nonlinear_solver.linesearch.options['iprint'] = 2
-    # prob.model.nonlinear_solver.linesearch.options['print_bound_enforce'] = True
+    prob.model.nonlinear_solver.linesearch.options['print_bound_enforce'] = True
     return prob
 
 def set_values(prob, num_nodes, design_range, spec_energy):
@@ -222,11 +222,15 @@ def set_values(prob, num_nodes, design_range, spec_energy):
     prob.set_val('payload',1000,units='lb')
     prob.set_val('ac|propulsion|battery|specific_energy', spec_energy, units='W*h/kg')
     prob.set_val('climb.propmodel.refrig_T_h_set', np.linspace(550, 450, num_nodes), units='K')
-    prob.set_val('cruise.propmodel.refrig_T_h_set', np.linspace(450, 450, num_nodes), units='K')
+    prob.set_val('cruise.propmodel.refrig_T_h_set', np.linspace(250, 250, num_nodes), units='K')
+    prob.set_val('descent.propmodel.refrig_T_h_set', np.linspace(400, 400, num_nodes), units='K')
     # set some airplane-specific values
     prob['analysis.cruise.acmodel.OEW.const.structural_fudge'] = 2.0
     prob['ac|propulsion|propeller|diameter'] = 2.2
     prob['ac|propulsion|engine|rating'] = 1117.2
+
+    # Turn off the refrigerator during certain segments
+    prob['analysis.cruise.acmodel.propmodel.bypass_refrig'] = np.ones((num_nodes,))
 
     # set the initial battery SOC to match the HybridTwin_thermal after takeoff
     prob.set_val('climb.propmodel.batt1.SOC_initial', 0.8611499461827815, units=None)

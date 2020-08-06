@@ -8,6 +8,7 @@ import sys, os
 sys.path.insert(0,os.getcwd())
 from openconcept.components.ducts import ImplicitCompressibleDuct
 from openconcept.components.motor import SimpleMotor
+from openconcept.utilities.selector import SelectorComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.math.derivatives import FirstDerivative
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp, VectorConcatenateComp, VectorSplitComp
@@ -551,19 +552,17 @@ class HeatPumpWithIntegratedCoolantLoop(Group):
         self.connect('cold_side_bal.Wdot', 'heat_pump.Wdot')
         # Use a selector to prevent the BalanceComp from solving if bypass mode is switched on
         # by setting T_c in the BalanceComp to T_c_set so they'll match on the first iteration
-        selector_eqn = 'out = control * one + (1 - control) * zero'
-        self.add_subsystem('cold_bal_selector', ExecComp(selector_eqn, shape=(nn,), out={'units':'K'},
-                                                          one={'units':'K'}, zero={'units':'K'}),
-                           promotes_inputs=[('control', 'bypass_heat_pump')])
-        self.connect('cold_side.T_out', 'cold_bal_selector.zero')
-        self.connect('cold_bal_selector.out', 'cold_side_bal.T_c')
+        self.add_subsystem('cold_bal_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'Wdot'], units='K'),
+                           promotes_inputs=[('selector', 'bypass_heat_pump')])
+        self.connect('cold_side.T_out', 'cold_bal_selector.T_out')
+        self.connect('cold_bal_selector.result', 'cold_side_bal.T_c')
         # Feed the BalanceComp outputs directly back into the lhs when bypass is on
         self.add_subsystem('bal_dummy', ExecComp('T_c = Wdot', T_c={'units':'K', 'shape':(nn,)}, 
                                                  Wdot={'units':'W', 'shape':(nn,)}))
         self.connect('cold_side_bal.Wdot', 'bal_dummy.Wdot')
-        self.connect('bal_dummy.T_c', 'cold_bal_selector.one')
+        self.connect('bal_dummy.T_c', 'cold_bal_selector.Wdot')
 
-        # Set the hot side balance parameter such that the hot side coolant outlet temperature
+        # Set the hot side balance parameter such that the hot side coolant temperature
         # set point is maintained
         self.add_subsystem('hot_side_bal', BalanceComp('hot_side_balance_param', eq_units='K', lhs_name='T_h',
                                                        rhs_name='T_h_set', val=nn_ones,
@@ -571,7 +570,12 @@ class HeatPumpWithIntegratedCoolantLoop(Group):
                                                        lower=self.options['hot_side_balance_param_lower']*nn_ones,
                                                        upper=self.options['hot_side_balance_param_upper']*nn_ones), 
                            promotes_inputs=['T_h_set'], promotes_outputs=['hot_side_balance_param'])
-        self.connect('hot_side.T_out', 'hot_side_bal.T_h')
+        # If bypass, use the hot side T_in instead of T_out
+        self.add_subsystem('hot_bal_selector', SelectorComp(num_nodes=nn, input_names=['T_out_hot', 'T_in_hot'],
+                                                            units='K'),
+                           promotes_inputs=['T_in_hot', ('selector', 'bypass_heat_pump')])
+        self.connect('hot_side.T_out', 'hot_bal_selector.T_out_hot')
+        self.connect('hot_bal_selector.result', 'hot_side_bal.T_h')
 
         # Connect the heat transfers on either side of the heat pump
         self.connect('heat_pump.q_c', 'cold_side.q')
@@ -579,25 +583,23 @@ class HeatPumpWithIntegratedCoolantLoop(Group):
 
         # Use selectors to control the I/O routing to bypass the heat pump if specified
         # T_out_cold selector
-        self.add_subsystem('cold_side_selector', ExecComp(selector_eqn, shape=(nn,), out={'units':'K'},
-                                                          one={'units':'K'}, zero={'units':'K'}),
-                           promotes_inputs=[('control', 'bypass_heat_pump'), ('one', 'T_in_hot')],
-                           promotes_outputs=[('out', 'T_out_cold')])
-        self.connect('cold_side.T_out', 'cold_side_selector.zero')
+        self.add_subsystem('cold_side_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'T_in_hot'], units='K'),
+                           promotes_inputs=[('selector', 'bypass_heat_pump'), 'T_in_hot'],
+                           promotes_outputs=[('result', 'T_out_cold')])
+        self.connect('cold_side.T_out', 'cold_side_selector.T_out')
         # T_out_hot selector
-        self.add_subsystem('hot_side_selector', ExecComp(selector_eqn, shape=(nn,), out={'units':'K'},
-                                                          one={'units':'K'}, zero={'units':'K'}),
-                           promotes_inputs=[('control', 'bypass_heat_pump'), ('one', 'T_in_cold')],
-                           promotes_outputs=[('out', 'T_out_hot')])
-        self.connect('hot_side.T_out', 'hot_side_selector.zero')
+        self.add_subsystem('hot_side_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'T_in_cold'], units='K'),
+                           promotes_inputs=[('selector', 'bypass_heat_pump'), 'T_in_cold'],
+                           promotes_outputs=[('result', 'T_out_hot')])
+        self.connect('hot_side.T_out', 'hot_side_selector.T_out')
         # Wdot selector
-        self.add_subsystem('Wdot_selector', ExecComp('out = (1 - control) * zero', shape=(nn,), out={'units':'W'},
-                                                          zero={'units':'W'}),
-                           promotes_inputs=[('control', 'bypass_heat_pump')],
-                           promotes_outputs=[('out', 'Wdot')])
-        self.connect('cold_side_bal.Wdot', 'Wdot_selector.zero')
+        self.add_subsystem('Wdot_selector', SelectorComp(num_nodes=nn, input_names=['Wdot', 'zero'], units='W'),
+                           promotes_inputs=[('selector', 'bypass_heat_pump')],
+                           promotes_outputs=[('result', 'Wdot')])
+        self.connect('cold_side_bal.Wdot', 'Wdot_selector.Wdot')
 
         # Set the default set points and T_in defaults for continuity
+        self.set_input_defaults('Wdot_selector.zero', val=np.zeros((nn,)), units='W')
         self.set_input_defaults('T_c_set', val=300.*nn_ones, units='K')
         self.set_input_defaults('T_h_set', val=500.*nn_ones, units='K')
         self.set_input_defaults('T_in_hot', val=400.*nn_ones, units='K')

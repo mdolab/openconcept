@@ -69,6 +69,7 @@ class SelectorComp(om.ExplicitComponent):
         nn = self.options['num_nodes']
 
         outputs['result'] = np.zeros((nn,))
+        # selector = np.around(inputs['selector']).astype(int)
         selector = inputs['selector']
 
         if np.any(selector < 0) or np.any(selector >= num_inputs):
@@ -83,6 +84,7 @@ class SelectorComp(om.ExplicitComponent):
         num_inputs = len(input_names)
         nn = self.options['num_nodes']
 
+        # selector = np.around(inputs['selector']).astype(int)
         selector = inputs['selector']
 
         for i_input, input_name in enumerate(input_names):
