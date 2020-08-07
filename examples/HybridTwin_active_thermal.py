@@ -11,6 +11,7 @@ from openmdao.api import DirectSolver, IndepVarComp, NewtonSolver, BoundsEnforce
 # imports for the airplane model itself
 from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
+from openconcept.utilities.math.max_min_comp import MaxComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dvlabel import DVLabel
 from examples.methods.weights_twin_hybrid import TwinSeriesHybridEmptyWeight
@@ -91,14 +92,16 @@ class SeriesHybridTwinModel(Group):
         hxadder = AddSubtractComp()
         hxadder.add_equation('OEW',['OEW_orig','W_hx','W_coolant'],scaling_factors=[1,1,1],units='kg')
         hxadder.add_equation('drag',['drag_orig','drag_hx'], vec_size=nn, units='N', scaling_factors=[1,1])
-        # hxadder.add_equation('area_constraint',['hx_frontal_area','nozzle_area'],units='m**2',scaling_factors=[1,-1])
+        hxadder.add_equation('area_constraint',['hx_frontal_area','nozzle_area'],units='m**2',scaling_factors=[1,-1])
         self.add_subsystem('hxadder',hxadder, promotes_inputs=[('W_coolant','ac|propulsion|thermal|hx|coolant_mass')],promotes_outputs=['OEW','drag'])
         self.connect('drag.drag','hxadder.drag_orig')
         self.connect('OEW.OEW','hxadder.OEW_orig')
         self.connect('propmodel.hx.component_weight','hxadder.W_hx')
         self.connect('propmodel.duct.drag','hxadder.drag_hx')
-        # self.connect('propmodel.hx.frontal_area','hxadder.hx_frontal_area')
-        # self.connect('propmodel.area_nozzle','hxadder.nozzle_area')
+        self.connect('propmodel.hx.frontal_area','hxadder.hx_frontal_area')
+        self.add_subsystem('nozzle_area', MaxComp(num_nodes=nn, units='m**2'))
+        self.connect('propmodel.refrig.hot_side_balance_param', 'nozzle_area.array')
+        self.connect('nozzle_area.max','hxadder.nozzle_area')
         intfuel = self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson', diff_units='s',
                                                               time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
         intfuel.add_integrand('fuel_used', rate_name='fuel_flow', val=1.0, units='kg')
@@ -203,8 +206,7 @@ def configure_problem():
     prob.model.nonlinear_solver.options['atol'] = 1e-8
     prob.model.nonlinear_solver.options['rtol'] = 1e-8
     prob.model.nonlinear_solver.linesearch = BoundsEnforceLS()
-    # prob.model.nonlinear_solver.linesearch.options['iprint'] = 2
-    prob.model.nonlinear_solver.linesearch.options['print_bound_enforce'] = True
+    # prob.model.nonlinear_solver.linesearch.options['print_bound_enforce'] = True
     return prob
 
 def set_values(prob, num_nodes, design_range, spec_energy):
@@ -230,12 +232,12 @@ def set_values(prob, num_nodes, design_range, spec_energy):
     prob['ac|propulsion|engine|rating'] = 1117.2
 
     # Turn off the refrigerator during certain segments
-    prob['analysis.cruise.acmodel.propmodel.bypass_refrig'] = np.ones((num_nodes,))
+    prob['analysis.cruise.acmodel.propmodel.bypass_refrig'] = np.ones((num_nodes,), dtype=int)
 
     # set the initial battery SOC to match the HybridTwin_thermal after takeoff
     prob.set_val('climb.propmodel.batt1.SOC_initial', 0.8611499461827815, units=None)
 
-def run_hybrid_twin_thermal_analysis(plots=False):
+def run_hybrid_twin_active_thermal_analysis(plots=False):
     prob = configure_problem()
     prob.setup(check=False)
     prob['cruise.hybridization'] = 0.05778372636876463
@@ -262,11 +264,10 @@ def show_outputs(prob):
              'lbf','lb',
              'lb/s']
     nice_print_names = ['MTOW', 'OEW', 'Fuel used',
-                        'TOFL (over 35ft obstacle)', 'Final state of charge', 'Cruise hybridization',
+                        'Final state of charge', 'Cruise hybridization',
                         'Battery weight','MTOW margin',
                         'Motor rating', 'Generator rating', 'Engine rating',
-                        'Wing area', 'Stall speed', 'Rotate speed',
-                        'Engine out climb angle', 'HX nozzle area',
+                        'Wing area',
                         'Coolant duct cruise drag', 'Coolant mass',
                         'Coolant duct mass flow']
     print("=======================================================================")
@@ -299,7 +300,7 @@ if __name__ == "__main__":
 
     if run_type == 'example':
         # runs a default analysis-only mission (no optimization)
-        run_hybrid_twin_thermal_analysis(plots=True)
+        run_hybrid_twin_active_thermal_analysis(plots=True)
 
     else:
         # can run a sweep of design range and spec energy (not tested)

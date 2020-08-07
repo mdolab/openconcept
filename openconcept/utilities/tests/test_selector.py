@@ -55,7 +55,7 @@ class SelectorCompTestCase(unittest.TestCase):
         nn = 5
         p = Problem()
         # Need to use an IndepVarComp here unlike the other two tests because
-        # setting an input wasn't working when units were included
+        # setting an input isn't working when units are included
         iv = p.model.add_subsystem('iv', IndepVarComp(), promotes=['*'])
         iv.add_output('A', np.array([5.7, 2.3, -10., 2., 77.]), units='g')
         iv.add_output('B', np.array([-1., -1., -1., -1., -2.]), units='kg')

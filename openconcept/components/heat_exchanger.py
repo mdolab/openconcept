@@ -517,8 +517,8 @@ class ConvectiveCoefficient(ExplicitComponent):
         self.add_input('dh_hot', units='m')
         self.add_input('k_hot', units='W/m/K')
 
-        self.add_output('h_conv_cold', shape=(nn,), units='W/m**2/K')
-        self.add_output('h_conv_hot', shape=(nn,), units='W/m**2/K')
+        self.add_output('h_conv_cold', shape=(nn,), units='W/m**2/K', lower=1e-10)
+        self.add_output('h_conv_hot', shape=(nn,), units='W/m**2/K', lower=1e-10)
         arange = np.arange(0, nn)
         self.declare_partials(['h_conv_cold'], ['Nu_dh_cold'], rows=arange, cols=arange)
         self.declare_partials(['h_conv_cold'], ['dh_cold','k_cold'], rows=arange, cols=np.zeros((nn,), dtype=np.int32))

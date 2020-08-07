@@ -22,7 +22,8 @@ class SelectorComp(om.ExplicitComponent):
     ------
     selector : int
         Selects which input to route to the output based on the order they were specified; must be
-        in the range [0, # of inputs), note the upper bound is exclusive (vector, default 0)
+        in the range [0, # of inputs) and if the data type is not already an int, it is rounded to
+        the nearest integer value (vector, default 0)
     user defined inputs : any
         The data inputs must be specified by the user using the specify_inputs method,
         which must be called before setup and all inputs must have the same units (vector)
@@ -57,7 +58,7 @@ class SelectorComp(om.ExplicitComponent):
         for name in names:
             self.add_input(name, shape=(nn,), units=unit)
         
-        self.add_input('selector', shape=(nn,))
+        self.add_input('selector', np.zeros(nn, dtype=int), shape=(nn,))
         self.add_output('result', shape=(nn,), units=unit)
 
         arange = np.arange(0, nn)
@@ -69,8 +70,7 @@ class SelectorComp(om.ExplicitComponent):
         nn = self.options['num_nodes']
 
         outputs['result'] = np.zeros((nn,))
-        # selector = np.around(inputs['selector']).astype(int)
-        selector = inputs['selector']
+        selector = np.around(inputs['selector'])
 
         if np.any(selector < 0) or np.any(selector >= num_inputs):
             raise RuntimeWarning('selector input values must be in the range [0, # of inputs)')
@@ -84,8 +84,7 @@ class SelectorComp(om.ExplicitComponent):
         num_inputs = len(input_names)
         nn = self.options['num_nodes']
 
-        # selector = np.around(inputs['selector']).astype(int)
-        selector = inputs['selector']
+        selector = np.around(inputs['selector'])
 
         for i_input, input_name in enumerate(input_names):
             J['result', input_name] = np.where(selector == i_input, 1, 0)

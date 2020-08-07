@@ -11,6 +11,7 @@ from openmdao.api import DirectSolver, IndepVarComp, NewtonSolver, BoundsEnforce
 # imports for the airplane model itself
 from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
+from openconcept.utilities.math.max_min_comp import MaxComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dvlabel import DVLabel
 from examples.methods.weights_twin_hybrid import TwinSeriesHybridEmptyWeight
@@ -61,7 +62,7 @@ class SeriesHybridTwinModel(Group):
                                            promotes_inputs=[('start_val', 'hybridization'),
                                                             ('end_val', 'hybridization')])
 
-        propulsion_promotes_outputs = ['fuel_flow','thrust']
+        propulsion_promotes_outputs = ['fuel_flow','thrust', 'ac|propulsion|thermal|duct|area_nozzle']
         propulsion_promotes_inputs = ["fltcond|*", "ac|propulsion|*", "throttle", "propulsor_active",
                                       "ac|weights*", 'duration']
 
@@ -91,14 +92,16 @@ class SeriesHybridTwinModel(Group):
         hxadder = AddSubtractComp()
         hxadder.add_equation('OEW',['OEW_orig','W_hx','W_coolant'],scaling_factors=[1,1,1],units='kg')
         hxadder.add_equation('drag',['drag_orig','drag_hx'], vec_size=nn, units='N', scaling_factors=[1,1])
-        # hxadder.add_equation('area_constraint',['hx_frontal_area','nozzle_area'],units='m**2',scaling_factors=[1,-1])
+        hxadder.add_equation('area_constraint',['hx_frontal_area','nozzle_area'],units='m**2',scaling_factors=[1,-1])
         self.add_subsystem('hxadder',hxadder, promotes_inputs=[('W_coolant','ac|propulsion|thermal|hx|coolant_mass')],promotes_outputs=['OEW','drag'])
         self.connect('drag.drag','hxadder.drag_orig')
         self.connect('OEW.OEW','hxadder.OEW_orig')
         self.connect('propmodel.hx.component_weight','hxadder.W_hx')
         self.connect('propmodel.duct.drag','hxadder.drag_hx')
-        # self.connect('propmodel.hx.frontal_area','hxadder.hx_frontal_area')
-        # self.connect('propmodel.area_nozzle','hxadder.nozzle_area')
+        self.connect('propmodel.hx.frontal_area','hxadder.hx_frontal_area')
+        self.add_subsystem('nozzle_area', MaxComp(num_nodes=nn, units='m**2'))
+        self.connect('ac|propulsion|thermal|duct|area_nozzle','nozzle_area.array')
+        self.connect('nozzle_area.max','hxadder.nozzle_area')
         intfuel = self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson', diff_units='s',
                                                               time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
         intfuel.add_integrand('fuel_used', rate_name='fuel_flow', val=1.0, units='kg')
@@ -198,7 +201,7 @@ class ElectricTwinAnalysisGroup(Group):
 def configure_problem():
     prob = Problem()
     prob.model= ElectricTwinAnalysisGroup()
-    prob.model.nonlinear_solver=NewtonSolver(iprint=1)
+    prob.model.nonlinear_solver=NewtonSolver(iprint=2)
     prob.model.options['assembled_jac_type'] = 'csc'
     prob.model.linear_solver = DirectSolver(assemble_jac=True)
     prob.model.nonlinear_solver.options['solve_subsystems'] = True
@@ -249,7 +252,7 @@ def show_outputs(prob):
                  'ac|weights|W_battery','margins.MTOW_margin',
                  'ac|propulsion|motor|rating','ac|propulsion|generator|rating','ac|propulsion|engine|rating',
                  'ac|geom|wing|S_ref','v0v1.Vstall_eas','v0v1.takeoff|vr',
-                 'engineoutclimb.gamma', 'ac|propulsion|thermal|duct|area_nozzle',
+                 'engineoutclimb.gamma',
                  'cruise.propmodel.duct.drag', 'ac|propulsion|thermal|hx|coolant_mass',
                  'climb.propmodel.duct.mdot']
     units = ['lb','lb','lb',
@@ -257,7 +260,7 @@ def show_outputs(prob):
              'lb','lb',
              'hp','hp','hp',
              'ft**2','kn','kn',
-             'deg', 'inch**2',
+             'deg',
              'lbf','lb',
              'lb/s']
     nice_print_names = ['MTOW', 'OEW', 'Fuel used',
@@ -265,7 +268,7 @@ def show_outputs(prob):
                         'Battery weight','MTOW margin',
                         'Motor rating', 'Generator rating', 'Engine rating',
                         'Wing area', 'Stall speed', 'Rotate speed',
-                        'Engine out climb angle', 'HX nozzle area',
+                        'Engine out climb angle',
                         'Coolant duct cruise drag', 'Coolant mass',
                         'Coolant duct mass flow']
     print("=======================================================================")
