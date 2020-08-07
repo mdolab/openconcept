@@ -9,6 +9,12 @@ class SelectorCompTestCase(unittest.TestCase):
     """
     Test the SelectorComp component
     """
+    def test_zero_inputs(self):
+        p = Problem()
+        p.model.add_subsystem('select', SelectorComp(input_names=[]), promotes=['*'])
+        with self.assertRaises(ValueError):
+            p.setup()
+
     def test_one_input(self):
         p = Problem()
         p.model.add_subsystem('select', SelectorComp(input_names=['A']), promotes=['*'])
