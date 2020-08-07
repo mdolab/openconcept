@@ -11,7 +11,8 @@ class SimpleEngineTestCase(unittest.TestCase):
     """
     def test_default_settings(self):
         nn = 11
-        prob = Problem(thermal.SimpleEngine(num_nodes=nn))
+        prob = Problem()
+        prob.model.add_subsystem('test', thermal.SimpleEngine(num_nodes=nn), promotes=['*'])
         prob.setup(check=True, force_alloc_complex=True)
         prob.run_model()
         assert_near_equal(prob['eta_thermal'], np.ones(nn)*2./15.)
@@ -27,7 +28,8 @@ class SimpleEngineTestCase(unittest.TestCase):
         T_c = np.array([300., 400., 500.])
         Wdot = np.array([1000., 500., 250.])
         eff_factor = 0.8
-        prob = Problem(thermal.SimpleEngine(num_nodes=nn))
+        prob = Problem()
+        prob.model.add_subsystem('test', thermal.SimpleEngine(num_nodes=nn), promotes=['*'])
         prob.setup(check=True, force_alloc_complex=True)
         prob['T_h'] = T_h
         prob['T_c'] = T_c
@@ -47,7 +49,8 @@ class SimpleHeatPumpTestCase(unittest.TestCase):
     """
     def test_default_settings(self):
         nn = 11
-        prob = Problem(thermal.SimpleHeatPump(num_nodes=nn))
+        prob = Problem()
+        prob.model.add_subsystem('test', thermal.SimpleHeatPump(num_nodes=nn), promotes=['*'])
         prob.setup(check=True, force_alloc_complex=True)
         prob.run_model()
         assert_near_equal(prob['COP_cooling'], np.ones(nn)*0.8)
@@ -63,7 +66,8 @@ class SimpleHeatPumpTestCase(unittest.TestCase):
         T_c = np.array([300., 400., 500.])
         Wdot = np.array([1000., 500., 250.])
         eff_factor = 0.1
-        prob = Problem(thermal.SimpleHeatPump(num_nodes=nn))
+        prob = Problem()
+        prob.model.add_subsystem('test', thermal.SimpleHeatPump(num_nodes=nn), promotes=['*'])
         prob.setup(check=True, force_alloc_complex=True)
         prob['T_h'] = T_h
         prob['T_c'] = T_c
@@ -81,7 +85,8 @@ class SimpleHeatPumpTestCase(unittest.TestCase):
         nn = 3
         T_h = np.array([300.1, 300., 100.])
         T_c = np.array([300., 300.1, 500.])
-        prob = Problem(thermal.SimpleHeatPump(num_nodes=nn))
+        prob = Problem()
+        prob.model.add_subsystem('test', thermal.SimpleHeatPump(num_nodes=nn), promotes=['*'])
         prob.setup(check=True, force_alloc_complex=True)
         prob['T_h'] = T_h
         prob['T_c'] = T_c
@@ -162,7 +167,7 @@ class PerfectHeatTransferCompTestCase(unittest.TestCase):
     def test_comp(self):
         num_nodes = 3
         prob = Problem()
-        prob.model = thermal.PerfectHeatTransferComp(num_nodes=num_nodes)
+        prob.model.add_subsystem('test', thermal.PerfectHeatTransferComp(num_nodes=num_nodes), promotes=['*'])
         prob.setup(check=True, force_alloc_complex=True)
 
         # Set the values

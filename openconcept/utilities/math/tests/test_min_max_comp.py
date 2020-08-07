@@ -2,7 +2,7 @@ from __future__ import division
 import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
-from openmdao.api import Problem, IndepVarComp
+from openmdao.api import Problem
 from openconcept.utilities.math.max_min_comp import MaxComp, MinComp
 
 class MaxCompTestCase(unittest.TestCase):
@@ -10,7 +10,8 @@ class MaxCompTestCase(unittest.TestCase):
     Test the MaxComp component
     """
     def test_one_input(self):
-        p = Problem(MaxComp())
+        p = Problem()
+        p.model.add_subsystem('test', MaxComp(), promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
         p.set_val('array', np.array([42.]))
         p.run_model()
@@ -21,7 +22,8 @@ class MaxCompTestCase(unittest.TestCase):
     
     def test_multiple_inputs(self):
         nn = 5
-        p = Problem(MaxComp(num_nodes=nn))
+        p = Problem()
+        p.model.add_subsystem('test', MaxComp(num_nodes=nn), promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
         p.set_val('array', np.array([42., 12., -3., 58., 7.]))
         p.run_model()
@@ -32,7 +34,8 @@ class MaxCompTestCase(unittest.TestCase):
     
     def test_multiple_max(self):
         nn = 5
-        p = Problem(MaxComp(num_nodes=nn))
+        p = Problem()
+        p.model.add_subsystem('test', MaxComp(num_nodes=nn), promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
         p.set_val('array', np.array([42., 58., -3., 58., 7.]))
         p.run_model()
@@ -43,7 +46,8 @@ class MaxCompTestCase(unittest.TestCase):
     
     def test_multiple_very_close_max(self):
         nn = 5
-        p = Problem(MaxComp(num_nodes=nn))
+        p = Problem()
+        p.model.add_subsystem('test', MaxComp(num_nodes=nn), promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
         p.set_val('array', np.array([-2., 2e-45, -3., 1e-45, -7.]))
         p.run_model()
@@ -55,10 +59,9 @@ class MaxCompTestCase(unittest.TestCase):
     def test_units(self):
         nn = 5
         p = Problem()
-        iv = p.model.add_subsystem('iv', IndepVarComp(), promotes=['*'])
-        iv.add_output('array', np.array([42., 58., -3., 3., 7.]), units='N')
         p.model.add_subsystem('max_comp', MaxComp(num_nodes=nn, units='N'), promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
+        p.set_val('array', np.array([42., 58., -3., 3., 7.]), units='N')
         p.run_model()
         assert_near_equal(p['max'], 58.)
 
@@ -70,7 +73,8 @@ class MinCompTestCase(unittest.TestCase):
     Test the MinComp component
     """
     def test_one_input(self):
-        p = Problem(MinComp())
+        p = Problem()
+        p.model.add_subsystem('test', MinComp(), promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
         p.set_val('array', np.array([42.]))
         p.run_model()
@@ -81,7 +85,8 @@ class MinCompTestCase(unittest.TestCase):
     
     def test_multiple_inputs(self):
         nn = 5
-        p = Problem(MinComp(num_nodes=nn))
+        p = Problem()
+        p.model.add_subsystem('test', MinComp(num_nodes=nn), promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
         p.set_val('array', np.array([42., 12., -3., 58., 7.]))
         p.run_model()
@@ -105,7 +110,8 @@ class MinCompTestCase(unittest.TestCase):
     
     def test_multiple_very_close_min(self):
         nn = 5
-        p = Problem(MinComp(num_nodes=nn))
+        p = Problem()
+        p.model.add_subsystem('test', MinComp(num_nodes=nn), promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
         p.set_val('array', np.array([2., 2e-45, 3., 1e-45, 7.]))
         p.run_model()
@@ -117,10 +123,9 @@ class MinCompTestCase(unittest.TestCase):
     def test_units(self):
         nn = 5
         p = Problem()
-        iv = p.model.add_subsystem('iv', IndepVarComp(), promotes=['*'])
-        iv.add_output('array', np.array([42., 58., -3., 3., 7.]), units='N')
         p.model.add_subsystem('min_comp', MinComp(num_nodes=nn, units='N'), promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
+        p.set_val('array', np.array([42., 58., -3., 3., 7.]), units='N')
         p.run_model()
         assert_near_equal(p['min'], -3.)
 
