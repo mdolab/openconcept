@@ -48,7 +48,8 @@ def CFM56(num_nodes=1, plot=False):
             for kthrot, throttle in enumerate(np.array([10, 9, 8, 7, 6, 5, 4, 3, 2])*0.1):
                 thrustijk = thrustdata[ialt, jmach, kthrot]
                 if thrustijk > 0.0:
-                    krigedata.append(np.array([throttle, altitude, mach, thrustijk.copy(), fuelburndata[ialt, jmach, kthrot].copy(), t4data[ialt, jmach, kthrot].copy()]))
+                    if not (mach > 0.5 and altitude == 0.0):
+                        krigedata.append(np.array([throttle, altitude, mach, thrustijk.copy(), fuelburndata[ialt, jmach, kthrot].copy(), t4data[ialt, jmach, kthrot].copy()]))
 
     a = np.array(krigedata)
     comp = om.MetaModelUnStructuredComp(vec_size=num_nodes)
@@ -79,7 +80,7 @@ def CFM56(num_nodes=1, plot=False):
         pred = np.zeros((25, 25, 3))
         for i in range(25):
             for j in range(25):
-                prob['comp.throttle'] = 0.95
+                prob['comp.throttle'] = 1.0
                 prob['comp.fltcond|h'] = alts[i,j]
                 prob['comp.fltcond|M'] = machs[i,j]
                 prob.run_model()
@@ -90,7 +91,7 @@ def CFM56(num_nodes=1, plot=False):
         plt.ylabel('Altitude')
         plt.title('SFC (lb / hr lb) OM')
         # plt.contourf(machs, alts, pred[:,:,0])
-        plt.contourf(machs, alts, (pred[:,:,1] / pred[:,:,0])*60*60, levels=np.linspace(0.3,1.2,20))
+        plt.contourf(machs, alts, (pred[:,:,1] / pred[:,:,0])*60*60)
         plt.colorbar()
         plt.figure()
         plt.xlabel('Mach')

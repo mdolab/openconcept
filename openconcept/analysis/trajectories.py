@@ -1,6 +1,7 @@
 import openmdao.api as om 
 import numpy as np
 from openconcept.utilities.math.integrals import Integrator
+import dymos as dm
 import warnings 
 
 # OpenConcept PhaseGroup will be used to hold analysis phases with time integration
@@ -76,9 +77,11 @@ class IntegratorGroup(om.Group):
         time_units = self._oc_time_units
         try:
             num_nodes = prob_meta['oc_num_nodes']
+            self._under_dymos = False
+            self.add_subsystem('ode_integ', Integrator(time_setup='duration', method='simpson',diff_units=time_units, num_nodes=num_nodes))
         except KeyError:
-            raise NameError('Integrator group must be created within an OpenConcept phase')
-        self.add_subsystem('ode_integ', Integrator(time_setup='duration', method='simpson',diff_units=time_units, num_nodes=num_nodes))
+            # TODO this is a hack. best way would be to check if parent is instance of Dymos phase
+            self._under_dymos = True
         super(IntegratorGroup, self)._setup_procs(pathname, comm, mode, prob_meta)
 
     def _configure(self):
