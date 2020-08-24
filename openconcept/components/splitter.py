@@ -180,3 +180,57 @@ class PowerSplit(ExplicitComponent):
         J['component_sizing_margin', 'power_in'] = 1 / inputs['power_rating']
         J['component_sizing_margin', 'power_rating'] = - (inputs['power_in'] /
                                                           inputs['power_rating'] ** 2)
+
+
+class FlowSplit(ExplicitComponent):
+    """
+    Split incoming flow from one inlet into two outlets at a fractional ratio.
+
+    Inputs
+    ------
+    mdot_in : float
+        Mass flow rate of incoming fluid (vector, kg/s)
+    mdot_split_fraction : float
+        Fraction of incoming mass flow directed to output A, must be in
+        range 0-1 inclusive (vector, dimensionless)
+    
+    Outputs
+    -------
+    mdot_out_A : float
+        Mass flow rate directed to first output (vector, kg/s)
+    mdot_out_B : float
+        Mass flow rate directed to second output (vector, kg/s)
+    
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (sets vec length; default 1)
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points')
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+        rng = np.arange(0, nn)
+
+        self.add_input('mdot_in', units='kg/s', shape=(nn,))
+        self.add_input('mdot_split_fraction', units=None, shape=(nn,), val=0.5)
+
+        self.add_output('mdot_out_A', units='kg/s', shape=(nn,))
+        self.add_output('mdot_out_B', units='kg/s', shape=(nn,))
+
+        self.declare_partials(['mdot_out_A'], ['mdot_in', 'mdot_split_fraction'], rows=rng, cols=rng)
+        self.declare_partials(['mdot_out_B'], ['mdot_in', 'mdot_split_fraction'], rows=rng, cols=rng)
+    
+    def compute(self, inputs, outputs):
+        if np.any(inputs['mdot_split_fraction'] < 0) or np.any(inputs['mdot_split_fraction'] > 1):
+            raise RuntimeWarning(f"mdot_split_fraction of {inputs['mdot_split_fraction']} has at least one element out of range [0, 1]")
+        outputs['mdot_out_A'] = inputs['mdot_in'] * inputs['mdot_split_fraction']
+        outputs['mdot_out_B'] = inputs['mdot_in'] * (1 - inputs['mdot_split_fraction'])
+
+    def compute_partials(self, inputs, J):
+        J['mdot_out_A', 'mdot_in'] = inputs['mdot_split_fraction']
+        J['mdot_out_A', 'mdot_split_fraction'] = inputs['mdot_in']
+
+        J['mdot_out_B', 'mdot_in'] = 1 - inputs['mdot_split_fraction']
+        J['mdot_out_B', 'mdot_split_fraction'] = - inputs['mdot_in']
