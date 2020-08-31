@@ -309,7 +309,7 @@ class HeatPumpWithIntegratedCoolantLoop(Group):
         Heat pump percentage of Carnot efficiency (scalar, dimensionaless)
     bypass_heat_pump : int (either 1 or 0)
         If 1, heat pump is removed from coolant loop and coolant flows; if 0, heat pump
-        is kept in the loop (vector, default all ones)
+        is kept in the loop (vector, default all zeros)
 
     Outputs
     -------
@@ -322,8 +322,8 @@ class HeatPumpWithIntegratedCoolantLoop(Group):
     hot_side_balance_param : float
         Parameter set (by BalanceComp) so that outgoing coolant on the
         hot side has temp of T_h_set, one common example would be to connect this
-        to mdot_cold of a heat exchanger on the hot side to modulate the coolant
-        temperature (vector, unit varies)
+        to the nozzle area of a duct connected to a heat exchanger on the hot side
+        to modulate the coolant temperature (vector, unit varies)
 
     Options
     -------
@@ -411,9 +411,12 @@ class HeatPumpWithIntegratedCoolantLoop(Group):
                            promotes_inputs=[('selector', 'bypass_heat_pump')],
                            promotes_outputs=[('result', 'Wdot')])
         self.connect('cold_side_bal.Wdot', 'Wdot_selector.Wdot')
+        iv = IndepVarComp()
+        iv.add_output('zero', val=0., shape=(nn,), units='W')
+        self.add_subsystem('iv', iv)
+        self.connect('iv.zero', 'Wdot_selector.zero')
 
         # Set the default set points and T_in defaults for continuity
-        self.set_input_defaults('Wdot_selector.zero', val=np.zeros((nn,)), units='W')
         self.set_input_defaults('T_c_set', val=300.*nn_ones, units='K')
         self.set_input_defaults('T_h_set', val=500.*nn_ones, units='K')
         self.set_input_defaults('T_in_hot', val=400.*nn_ones, units='K')
@@ -716,7 +719,7 @@ class LiquidCooledComp(Group):
             self.add_subsystem('base',
                                ThermalComponentMassless(num_nodes=nn),
                                promotes_inputs=['q_in'],
-                               promotes_outputs=['T'])
+                               promotes_outputs=[('T_object', 'T')])
         self.add_subsystem('hex',
                            ConstantSurfaceTemperatureColdPlate_NTU(num_nodes=nn, specific_heat=self.options['specific_heat_coolant']),
                                                                    promotes_inputs=['T_in', ('T_surface','T'),'n_parallel','channel*','mdot_coolant'],

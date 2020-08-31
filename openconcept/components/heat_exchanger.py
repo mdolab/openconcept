@@ -1195,7 +1195,7 @@ class HXGroup(Group):
     rho_cold : float
         Inflow density of the cold side (air) (vector, kg/m**3)
     mdot_hot : float
-        Mass flow rate of the hot die (liquid) (vector, kg/s)
+        Mass flow rate of the hot side (liquid) (vector, kg/s)
     T_in_hot : float
         Inflow temperature of the hot side (liquid) (vector, kg/s)
     rho_hot : float
