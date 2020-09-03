@@ -49,8 +49,8 @@ class ParallelTMS(Group):
         self.options.declare('num_nodes', default=1, desc='Number of analysis points to run')
         self.options.declare('motor_efficiency', default=0.93, desc='Motor efficiency (dimensionless)')
         self.options.declare('batt_efficiency', default=0.97, desc='Battery efficiency (dimensionless)')
-        self.options.declare('motor_T_limit', default=100., desc='Upper limit on motor temperature (K)')
-        self.options.declare('battery_T_limit', default=45., desc='Upper limit on battery temperature (K)')
+        self.options.declare('motor_T_limit', default=273.15 + 100., desc='Upper limit on motor temperature (K)')
+        self.options.declare('battery_T_limit', default=273.15 + 45., desc='Upper limit on battery temperature (K)')
         self.options.declare('motor_weight_inc', default=135./560e3, desc='Motor kg/W')
         self.options.declare('motor_weight_base', default=0., desc='Motor base weight kg')
     
@@ -75,7 +75,7 @@ class ParallelTMS(Group):
         self.add_subsystem('coolant_combiner', FlowCombine(num_nodes=nn))
         self.add_subsystem('refrig', HeatPumpWithIntegratedCoolantLoop(num_nodes=nn,
                                                                        hot_side_balance_param_units='inch**2',
-                                                                       hot_side_balance_param_lower=1e-10,
+                                                                       hot_side_balance_param_lower=1e-6,
                                                                        hot_side_balance_param_upper=1e3),
                            promotes_inputs=['mdot_coolant_hot', ('T_h_set', 'refrig_T_h_set'), 'bypass_heat_pump'])
         self.add_subsystem('hx', HXGroup(num_nodes=nn), promotes_inputs=[('mdot_hot', 'mdot_coolant_hot')])
@@ -85,10 +85,10 @@ class ParallelTMS(Group):
         # Use balance comps to set the coolant split fraction and refrig cold side temp to meet
         # battery and motor temperature limits
         self.add_subsystem('battery_temp_bal',
-                           BalanceComp(name='splitter_fraction', units=None, eq_units='K', val=0.5*np.ones(nn),
-                                       lhs_name='battery_T_limit', rhs_name='battery_T'), promotes_inputs=['battery_T_limit'])
+                           BalanceComp(name='splitter_fraction', units=None, eq_units='K', val=0.5*np.ones(nn), lower=1e-4*np.ones(nn),
+                                       upper=np.ones(nn)-1e-4, lhs_name='battery_T_limit', rhs_name='battery_T'), promotes_inputs=['battery_T_limit'])
         self.add_subsystem('motor_temp_bal',
-                           BalanceComp(name='refrig_T_c', units='K', eq_units='K', val=300*np.ones(nn),
+                           BalanceComp(name='refrig_T_c', units='K', eq_units='K', val=300*np.ones(nn), lower=1e-10*np.ones(nn),
                                        lhs_name='motor_T_limit', rhs_name='motor_T'), promotes_inputs=['motor_T_limit'])
 
         # Connecting components
@@ -132,8 +132,8 @@ class ParallelTMS(Group):
 
         # Default inputs if not connected
         nn_ones = np.ones((nn,))
-        self.set_input_defaults('mdot_coolant_cold', val=1.*nn_ones, units='kg/s')
-        self.set_input_defaults('mdot_coolant_hot', val=1.*nn_ones, units='kg/s')
+        self.set_input_defaults('mdot_coolant_cold', val=5.*nn_ones, units='kg/s')
+        self.set_input_defaults('mdot_coolant_hot', val=5.*nn_ones, units='kg/s')
         self.set_input_defaults('refrig_T_h_set', val=500.*nn_ones, units='K')
         self.set_input_defaults('bypass_heat_pump', val=0*nn_ones)
         self.set_input_defaults('battery_weight', val=500., units='kg')

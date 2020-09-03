@@ -177,9 +177,9 @@ class SimpleHeatPump(ExplicitComponent):
         self.add_input('Wdot', units='W', shape=(nn_tot,), val=1000.)
         self.add_input('eff_factor', units=None, val=0.4)
 
-        self.add_output('q_c', units='W', shape=(nn_tot,))
-        self.add_output('q_h', units='W', shape=(nn_tot,))
-        self.add_output('COP_cooling', units=None, shape=(nn_tot,))
+        self.add_output('q_c', units='W', shape=(nn_tot,), upper=0.)
+        self.add_output('q_h', units='W', shape=(nn_tot,), lower=0.)
+        self.add_output('COP_cooling', units=None, shape=(nn_tot,), lower=0.)
 
         self.declare_partials(['q_c'], ['T_h', 'T_c', 'Wdot'], rows=arange, cols=arange)
         self.declare_partials(['q_h'], ['T_h', 'T_c', 'Wdot'], rows=arange, cols=arange)
@@ -262,8 +262,8 @@ class PerfectHeatTransferComp(ExplicitComponent):
         self.add_input('T_in', desc='Incoming coolant temp', units='K', shape=(nn,))
         self.add_input('q', desc='Heat INTO the fluid stream (positive is heat addition)', units='W', shape=(nn,))
         self.add_input('mdot_coolant', desc='Mass flow rate of coolant', units='kg/s', shape=(nn,))
-        self.add_output('T_out', desc='Outgoing coolant temp', val=np.random.uniform(300, 330), units='K', shape=(nn,))
-        self.add_output('T_average', desc='Average temp of fluid', val=np.random.uniform(300, 330), units='K', shape=(nn,))
+        self.add_output('T_out', desc='Outgoing coolant temp', val=np.random.uniform(300, 330), lower=1e-10, units='K', shape=(nn,))
+        self.add_output('T_average', desc='Average temp of fluid', val=np.random.uniform(300, 330), lower=1e-10, units='K', shape=(nn,))
 
         self.declare_partials(['T_out', 'T_average'], ['q', 'mdot_coolant'], rows=arange, cols=arange)
         self.declare_partials('T_out', 'T_in', rows=arange, cols=arange, val=np.ones((nn,)))

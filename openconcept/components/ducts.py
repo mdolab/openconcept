@@ -58,7 +58,7 @@ class ExplicitIncompressibleDuct(ExplicitComponent):
         self.add_input('area_nozzle', shape=(nn,), units='m**2')
         self.add_input('delta_p_hex',  shape=(nn,), units='Pa')
 
-        self.add_output('mdot', shape=(nn,),  units='kg/s')
+        self.add_output('mdot', shape=(nn,),  units='kg/s', lower=1e-10)
         self.add_output('drag', shape=(nn,), units='N')
 
         # self.declare_partials(['drag','mdot'],['fltcond|Utrue','fltcond|rho','delta_p_hex'],rows=np.arange(nn),cols=np.arange(nn))
