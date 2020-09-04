@@ -379,17 +379,22 @@ class HeatPumpWithIntegratedCoolantLoop(Group):
         # Set the hot side balance parameter such that the hot side coolant temperature
         # set point is maintained
         self.add_subsystem('hot_side_bal', BalanceComp('hot_side_balance_param', eq_units='K', lhs_name='T_h',
-                                                       rhs_name='T_h_set', val=nn_ones,
+                                                       rhs_name='T_set', val=nn_ones,
                                                        units=self.options['hot_side_balance_param_units'],
                                                        lower=self.options['hot_side_balance_param_lower']*nn_ones,
                                                        upper=self.options['hot_side_balance_param_upper']*nn_ones), 
-                           promotes_inputs=['T_h_set'], promotes_outputs=['hot_side_balance_param'])
+                           promotes_outputs=['hot_side_balance_param'])
         # If bypass, use the hot side T_in instead of T_out
         self.add_subsystem('hot_bal_selector', SelectorComp(num_nodes=nn, input_names=['T_out_hot', 'T_in_hot'],
                                                             units='K'),
                            promotes_inputs=['T_in_hot', ('selector', 'bypass_heat_pump')])
         self.connect('hot_side.T_out', 'hot_bal_selector.T_out_hot')
         self.connect('hot_bal_selector.result', 'hot_side_bal.T_h')
+        # Also if bypass, set the coolant going from the hot to cold side to T_c_set instead of T_h_set
+        self.add_subsystem('hot_bal_set_temp_selector', SelectorComp(num_nodes=nn, input_names=['T_h_set', 'T_c_set'],
+                                                                     units='K'),
+                           promotes_inputs=['T_h_set', 'T_c_set', ('selector', 'bypass_heat_pump')])
+        self.connect('hot_bal_set_temp_selector.result', 'hot_side_bal.T_set')
 
         # Connect the heat transfers on either side of the heat pump
         self.connect('heat_pump.q_c', 'cold_side.q')
