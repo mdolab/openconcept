@@ -290,8 +290,9 @@ class FlowCombine(ExplicitComponent):
         outputs['T_out'] = (mdot_A * inputs['T_in_A'] + mdot_B * inputs['T_in_B']) / (mdot_A + mdot_B)
 
     def compute_partials(self, inputs, J):
-        J['mdot_out', 'mdot_in_A'] = 1.
-        J['mdot_out', 'mdot_in_B'] = 1.
+        nn = self.options['num_nodes']
+        J['mdot_out', 'mdot_in_A'] = np.ones((nn,))
+        J['mdot_out', 'mdot_in_B'] = np.ones((nn,))
 
         mdot_A = inputs['mdot_in_A']
         mdot_B = inputs['mdot_in_B']
