@@ -24,26 +24,24 @@ class ParallelTMS(Group):
     a single heat pump. The coolant is split based on the temperature constraints
     of the battery and motor. The following schematic shows the setup of the system:
 
-            ,---> Motor ---->,
-            |                |
-    ,--> Splitter         Combiner -->,
-    |       |                |        |
-    |       '---> Battery -->'        |
-    |                                 |
-    '<--------    (Cold)    <---------'
-               Refrigerator
+    ,--> Splitter --> Motor --> Combiner -->,
+    |       |                      |        |
+    |       '----> Battery ------->'        |
+    |                                       |
+    '<--------    (Cold)    <---------------'
+    ---------> Refrigerator
     ,-------->    (Hot)     --------->,
     |                                 |
     '<--- Heat exchanger and duct <---'
 
-    Inupts
+    Inputs
     ------
     throttle : float
         Throttle value usually between 0 and 1, inclusive (vector, dimensionless)
     motor_elec_power_rating : float
         Electric (not mechanical) motor design power (scalar, W)
 
-        ADD MORE HERE
+    ADD MORE HERE
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of analysis points to run')
