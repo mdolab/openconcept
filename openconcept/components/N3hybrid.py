@@ -59,7 +59,7 @@ def N3Opt(num_nodes=1, plot=False):
 
     a = np.array(krigedata)
     comp = om.MetaModelUnStructuredComp(vec_size=num_nodes)
-    comp.add_input('throttle', np.ones((num_nodes,))*1., training_data=a[:,0], units=None)
+    comp.add_input('throttle', np.ones((num_nodes,))*1., training_data=a[:,0], units=None, lower=0.0, upper=1.0)
     comp.add_input('fltcond|h', np.ones((num_nodes,))*0., training_data=a[:,1], units='ft')
     comp.add_input('fltcond|M', np.ones((num_nodes,))*0.3, training_data=a[:,2], units=None)
 

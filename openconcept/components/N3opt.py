@@ -168,6 +168,9 @@ def N3Hybrid(num_nodes=1, plot=False):
     fltcond|M: float
         Mach number
         (vector, dimensionless)
+    hybrid_power : float
+        Shaft power added to LP shaft
+        (vector, kW)
 
     Outputs
     -------
@@ -175,8 +178,8 @@ def N3Hybrid(num_nodes=1, plot=False):
         Thrust developed by the engine (vector, lbf)
     fuel_flow : float
         Fuel flow consumed (vector, lbm/s)
-    T4 : float
-        Turbine inlet temperature (vector, Rankine)
+    surge_margin : float
+        Surge margin (vector, percent)
 
     Options
     -------
