@@ -1,7 +1,6 @@
 import openmdao.api as om 
 import numpy as np
 from openconcept.utilities.math.integrals import Integrator
-import dymos as dm
 import warnings 
 
 # OpenConcept PhaseGroup will be used to hold analysis phases with time integration
