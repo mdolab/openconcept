@@ -9,4 +9,4 @@ six
 sphinx
 sphinx_rtd_theme
 redbaron
--e git+https://github.com/OpenMDAO/dymos.git@2243f2e8158e31e132782dc72c38ce4e9d47a1ad
+-e git+https://github.com/OpenMDAO/dymos.git@2243f2e8158e31e132782dc72c38ce4e9d47a1ad#egg=dymos
