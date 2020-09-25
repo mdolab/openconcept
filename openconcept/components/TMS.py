@@ -16,6 +16,7 @@ from openconcept.utilities.math.integrals import Integrator
 from openconcept.components.thermal import ThermalComponentWithMass, ConstantSurfaceTemperatureColdPlate_NTU
 from openconcept.components.thermal import SimpleHeatPump, HeatPumpWithIntegratedCoolantLoop, LiquidCooledComp
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
+from battery_cooling import LiquidCooledBattery ################################################### THIS WILL CHANGE #######################################
 
 class ParallelTMS(Group):
     """
@@ -34,117 +35,135 @@ class ParallelTMS(Group):
     |                                 |
     '<--- Heat exchanger and duct <---'
 
-    Inputs
-    ------
-    throttle : float
-        Throttle value usually between 0 and 1, inclusive (vector, dimensionless)
-    motor_elec_power_rating : float
-        Electric (not mechanical) motor design power (scalar, W)
+    Two parameters are varied so that the battery and motor temperatures
+    are at their desired temperature (set using a combination of the limit
+    temperatures and temperature buffer). Those two parameters are the following:
+        1. The refrigerator cold side set temperature is adjusted to
+           set the battery temperature
+        2. The amount of coolant that goes to the motor vs. the battery (think
+           of this as how open the splitter valve is) is used to set the
+           motor temperature
 
-    ADD MORE HERE
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (sets vec length; default 1)
+    motor_T_limit : float
+        Upper temperature limit of motor (deg C; default 90 deg C)
+    battery_T_limit : float
+        Upper temperature limit of battery (deg C; default 40 deg C)
+    T_limit_buffer : float
+        Degrees below limit temp to set battery and motor temp (deg C; default 5 deg C)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of analysis points to run')
-        self.options.declare('motor_efficiency', default=0.93, desc='Motor efficiency (dimensionless)')
-        self.options.declare('batt_efficiency', default=0.97, desc='Battery efficiency (dimensionless)')
-        self.options.declare('motor_T_limit', default=273.15 + 100., desc='Upper limit on motor temperature (K)')
-        self.options.declare('battery_T_limit', default=273.15 + 45., desc='Upper limit on battery temperature (K)')
-        self.options.declare('motor_weight_inc', default=135./560e3, desc='Motor kg/W')
-        self.options.declare('motor_weight_base', default=0., desc='Motor base weight kg')
-    
+        self.options.declare('motor_T_limit', default=90., desc='Upper limit on motor temperature (degC)')
+        self.options.declare('battery_T_limit', default=40., desc='Upper limit on battery temperature (degC)')
+        self.options.declare('T_limit_buffer', default=5., desc='Buffer below limit to set motor and battery temp (degC)')
+
     def setup(self):
         nn = self.options['num_nodes']
+        nn_ones = np.ones((nn,))
+
+        ######### Declare variables needed for components to simplify the TMS's I/O #########
+        iv = IndepVarComp()
+        # Flight condition
+        iv.add_output('throttle', val=0.5, shape=(nn,))
+        iv.add_output('fltcond|h', val=20e3, shape=(nn,), units='ft')
+        iv.add_output('fltcond|Ueas', val=250., shape=(nn,), units='kn')
+        # Refrigerator settings
+        iv.add_output('refrig_T_h_set', val=100., shape=(nn,), units='degC')
+        iv.add_output('eff_factor', val=0.4, units=None)
+        iv.add_output('bypass_heat_pump', val=0., shape=(nn,), units=None)
+        # Coolant parameters
+        iv.add_output('mdot_coolant_hot', val=1., shape=(nn,), units='kg/s')
+        iv.add_output('mdot_coolant_cold', val=1., shape=(nn,), units='kg/s')
+        iv.add_output('rho_coolant', val=1000., shape=(nn,), units='kg/m**3')
+        # Battery
+        iv.add_output('battery_weight', val=500., units='kg')
+        iv.add_output('q_batt', val=5., shape=(nn,), units='kW')
+        iv.add_output('batt_T_limit', val=self.options['battery_T_limit'] - self.options['T_limit_buffer'],
+                      shape=(nn,), units='degC')  # set this via options
+        # Motor
+        iv.add_output('q_motor', val=3., shape=(nn,), units='kW')
+        iv.add_output('motor_T_limit', val=self.options['motor_T_limit'] - self.options['T_limit_buffer'],
+                      shape=(nn,), units='degC')  # set this via options
+        # Cold plate/bandolier geometry
+        iv.add_output('channel_width', val=1., units='mm')
+        iv.add_output('channel_length', val=.2, units='m')
+        iv.add_output('channel_height', val=50., units='mm')
+        iv.add_output('n_parallel', val=15)
+        iv.add_output('cells_per_bandolier', val=21)
         
-        # Adding subsystems to model
-        self.add_subsystem('motor', SimpleMotor(num_nodes=nn,
-                                                efficiency=self.options['motor_efficiency'],
-                                                weight_inc=self.options['motor_weight_inc'],
-                                                weight_base=self.options['motor_weight_base']),
-                            promotes_inputs=['throttle', ('elec_power_rating', 'motor_elec_power_rating')],
-                            promotes_outputs=['shaft_power_out'])
+        self.add_subsystem('iv', iv, promotes_outputs=['*'])
+
+
+        ######### Add components to model #########
+        # Motor and battery run in massless mode
         self.add_subsystem('motor_heat_sink', LiquidCooledComp(num_nodes=nn, quasi_steady=True),
-                           promotes_inputs=['channel_length', 'channel_width', 'channel_height', 'n_parallel'])
-        self.add_subsystem('battery', SimpleBattery(num_nodes=nn,
-                                                    efficiency=self.options['batt_efficiency']),
-                           promotes_inputs=['battery_weight'])
-        self.add_subsystem('battery_heat_sink', LiquidCooledComp(num_nodes=nn, quasi_steady=True),
-                           promotes_inputs=['channel_length', 'channel_width', 'channel_height', 'n_parallel'])
-        self.add_subsystem('coolant_splitter', FlowSplit(num_nodes=nn), promotes_inputs=[('mdot_in', 'mdot_coolant_cold')])
+                           promotes_inputs=[('q_in', 'q_motor'), 'channel_length', 'channel_width', 'channel_height', 'n_parallel'])
+        self.add_subsystem('battery_heat_sink', LiquidCooledBattery(num_nodes=nn, quasi_steady=True),
+                           promotes_inputs=[('q_in', 'q_batt'), 'battery_weight', ('n_cpb', 'cells_per_bandolier'),
+                                            ('t_channel', 'channel_width')])
+        
+        # Use splitter and combiner to cool motor and battery in parallel
+        self.add_subsystem('coolant_splitter', FlowSplit(num_nodes=nn),
+                           promotes_inputs=[('mdot_in', 'mdot_coolant_cold'), 'mdot_split_fraction'])
         self.add_subsystem('coolant_combiner', FlowCombine(num_nodes=nn))
+
+        # Hot side balance param will be set to the cooling duct nozzle area
         self.add_subsystem('refrig', HeatPumpWithIntegratedCoolantLoop(num_nodes=nn,
                                                                        hot_side_balance_param_units='inch**2',
-                                                                       hot_side_balance_param_lower=1e-6,
-                                                                       hot_side_balance_param_upper=1e3),
-                           promotes_inputs=['mdot_coolant_hot', ('T_h_set', 'refrig_T_h_set'), 'bypass_heat_pump'])
-        self.add_subsystem('hx', HXGroup(num_nodes=nn), promotes_inputs=[('mdot_hot', 'mdot_coolant_hot')])
-        self.add_subsystem('duct', ExplicitIncompressibleDuct(num_nodes=nn))
-        self.add_subsystem('atmos', ComputeAtmosphericProperties(num_nodes=nn), promotes_inputs=['fltcond|h', 'fltcond|Ueas'])
+                                                                       hot_side_balance_param_lower=1e-10,
+                                                                       hot_side_balance_param_upper=100),
+                           promotes_inputs=['mdot_coolant_hot', 'T_in_hot', ('T_h_set', 'refrig_T_h_set'),
+                                            ('T_c_set', 'refrig_T_c_set'), 'bypass_heat_pump', 'eff_factor'])
 
-        # Use balance comps to set the coolant split fraction and refrig cold side temp to meet
-        # battery and motor temperature limits
-        self.add_subsystem('battery_temp_bal',
-                           BalanceComp(name='splitter_fraction', units=None, eq_units='K', val=0.5*np.ones(nn), lower=1e-4*np.ones(nn),
-                                       upper=np.ones(nn)-1e-4, lhs_name='battery_T_limit', rhs_name='battery_T'), promotes_inputs=['battery_T_limit'])
-        self.add_subsystem('motor_temp_bal',
-                           BalanceComp(name='refrig_T_c', units='K', eq_units='K', val=300*np.ones(nn), lower=1e-10*np.ones(nn),
-                                       lhs_name='motor_T_limit', rhs_name='motor_T'), promotes_inputs=['motor_T_limit'])
+        # Hot side components
+        self.add_subsystem('hx', HXGroup(num_nodes=nn), promotes_inputs=[('mdot_hot', 'mdot_coolant_hot'),('rho_cold','fltcond|rho'),
+                                                                         ('T_in_cold', 'fltcond|T'), ('rho_hot', 'rho_coolant')])
+        self.add_subsystem('duct', ExplicitIncompressibleDuct(num_nodes=nn), promotes_inputs=['fltcond|*'])
 
-        # Connecting components
-        # Motor and battery to their heat sinks
-        self.connect('motor.heat_out', 'motor_heat_sink.q_in')
-        self.connect('battery.heat_out', 'battery_heat_sink.q_in')
-        self.connect('motor.elec_load', 'battery.elec_load')
+        # Atmospheric model
+        self.add_subsystem('atmos', ComputeAtmosphericProperties(num_nodes=nn),
+                           promotes_inputs=['fltcond|h', 'fltcond|Ueas'], promotes_outputs=['fltcond|*'])
 
-        # Cold side coolant loop temperatures
-        self.connect('refrig.T_out_cold', 'motor_heat_sink.T_in')
+        ######### Connect cold side #########
+        # Battery
         self.connect('refrig.T_out_cold', 'battery_heat_sink.T_in')
-        self.connect('motor_heat_sink.T_out', 'coolant_combiner.T_in_A')
+        self.connect('coolant_splitter.mdot_out_B', 'battery_heat_sink.mdot_coolant')
+        self.connect('coolant_splitter.mdot_out_B', 'coolant_combiner.mdot_in_B')
         self.connect('battery_heat_sink.T_out', 'coolant_combiner.T_in_B')
+
+        # Motor
+        self.connect('refrig.T_out_cold', 'motor_heat_sink.T_in')
+        self.connect('coolant_splitter.mdot_out_A', 'motor_heat_sink.mdot_coolant')
+        self.connect('motor_heat_sink.T_out', 'coolant_combiner.T_in_A')
+        self.connect('coolant_splitter.mdot_out_A', 'coolant_combiner.mdot_in_A')
+
+        # Connecting back to refrigerator
+        self.connect('coolant_combiner.mdot_out', 'refrig.mdot_coolant_cold')
         self.connect('coolant_combiner.T_out', 'refrig.T_in_cold')
 
-        # Cold side coolant loop mass flow rate
-        self.connect('coolant_splitter.mdot_out_A', 'motor_heat_sink.mdot_coolant')
-        self.connect('coolant_splitter.mdot_out_B', 'battery_heat_sink.mdot_coolant')
-        self.connect('coolant_splitter.mdot_out_A', 'coolant_combiner.mdot_in_A')
-        self.connect('coolant_splitter.mdot_out_B', 'coolant_combiner.mdot_in_B')
-        self.connect('coolant_combiner.mdot_out', 'refrig.mdot_coolant_cold')
+        ######### Connect hot side #########
+        self.connect('refrig.hot_side_balance_param','duct.area_nozzle')
+        self.connect('refrig.T_out_hot', 'hx.T_in_hot')
+        self.connect('hx.T_out_hot', 'T_in_hot')
+        self.connect('hx.delta_p_cold', 'duct.delta_p_hex')
+        self.connect('duct.mdot','hx.mdot_cold')
 
-        # Set up the BalanceComps' connections
-        self.connect('battery_temp_bal.splitter_fraction', 'coolant_splitter.mdot_split_fraction')
-        self.connect('battery_heat_sink.T', 'battery_temp_bal.battery_T')
-        self.connect('motor_temp_bal.refrig_T_c', 'refrig.T_c_set')
+        ######### Modulate the refrig cold set temp and FlowSplitter fraction to hit battery and motor temp limits #########
+        self.add_subsystem('motor_temp_bal', BalanceComp(name='splitter_fraction', units=None, eq_units='K', val=0.01*np.ones(nn),
+                                                        lower=1e-4*np.ones(nn), upper=np.ones(nn)-1e-4, lhs_name='motor_T',
+                                                        rhs_name='motor_T_limit'), promotes_inputs=['motor_T_limit'],
+                                                        promotes_outputs=[('splitter_fraction', 'mdot_split_fraction')])
         self.connect('motor_heat_sink.T', 'motor_temp_bal.motor_T')
 
-        # Hot side
-        self.connect('atmos.fltcond|Utrue', 'duct.fltcond|Utrue')
-        self.connect('atmos.fltcond|rho', 'duct.fltcond|rho')
-        self.connect('atmos.fltcond|rho', 'hx.rho_cold')
-        self.connect('atmos.fltcond|T', 'hx.T_in_cold')
-
-        self.connect('refrig.hot_side_balance_param', 'duct.area_nozzle')
-        self.connect('duct.mdot', 'hx.mdot_cold')
-        self.connect('hx.delta_p_cold','duct.delta_p_hex')
-
-        self.connect('refrig.T_out_hot', 'hx.T_in_hot')
-        self.connect('hx.T_out_hot', 'refrig.T_in_hot')
-
-        # Default inputs if not connected
-        nn_ones = np.ones((nn,))
-        self.set_input_defaults('mdot_coolant_cold', val=5.*nn_ones, units='kg/s')
-        self.set_input_defaults('mdot_coolant_hot', val=5.*nn_ones, units='kg/s')
-        self.set_input_defaults('refrig_T_h_set', val=500.*nn_ones, units='K')
-        self.set_input_defaults('bypass_heat_pump', val=0*nn_ones)
-        self.set_input_defaults('battery_weight', val=500., units='kg')
-        self.set_input_defaults('motor_elec_power_rating', val=1., units='MW')
-        self.set_input_defaults('battery_T_limit', val=self.options['battery_T_limit']*nn_ones, units='K')
-        self.set_input_defaults('motor_T_limit', val=self.options['motor_T_limit']*nn_ones, units='K')
-
-        # Motor and battery cold plate geometry
-        self.set_input_defaults('channel_width', val=1., units='mm')
-        self.set_input_defaults('channel_length', val=.2, units='m')
-        self.set_input_defaults('channel_height', val=50., units='mm')
-        self.set_input_defaults('n_parallel', val=15)
-
+        self.add_subsystem('batt_temp_bal', BalanceComp(name='T_c_set', units='degC', eq_units='K', val=30.*np.ones(nn),
+                                                        lower=-1e2*np.ones(nn), upper=99*np.ones(nn), lhs_name='batt_T',
+                                                        rhs_name='batt_T_limit'), promotes_inputs=['batt_T_limit'],
+                                                        promotes_outputs=[('T_c_set', 'refrig_T_c_set')])
+        self.connect('battery_heat_sink.T', 'batt_temp_bal.batt_T')
 
 class SimpleTMS(Group):
     """
