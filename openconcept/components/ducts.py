@@ -6,6 +6,7 @@ import sys, os
 sys.path.insert(0,os.getcwd())
 from openconcept.components.heat_exchanger import HXGroup
 from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
+from openconcept.utilities.dvlabel import DVLabel
 
 class ExplicitIncompressibleDuct(ExplicitComponent):
     """
@@ -135,7 +136,7 @@ class TemperatureIsentropic(ExplicitComponent):
         gam = self.options['gamma']
         self.add_input('Tt', shape=(nn,),  units='K')
         self.add_input('M', shape=(nn,))
-        self.add_output('T', shape=(nn,),  units='K')
+        self.add_output('T', shape=(nn,),  units='K', lower=100.0)
         self.declare_partials(['*'], ['*'], method='cs')
 
     def compute(self, inputs, outputs):
@@ -341,13 +342,23 @@ class SpeedOfSound(ExplicitComponent):
         nn = self.options['num_nodes']
         self.add_input('T', shape=(nn,), units='K')
         self.add_output('a', shape=(nn,),  units='m/s')
-        self.declare_partials(['*'], ['*'], method='cs')
+        arange = np.arange(nn)
+        self.declare_partials(['a'], ['T'], rows=arange, cols=arange)
 
     def compute(self, inputs, outputs):
         nn = self.options['num_nodes']
         R = self.options['R']
         gam = self.options['gamma']
-        outputs['a'] = np.sqrt(gam * R * inputs['T'])
+        T = inputs['T'].copy()
+        T[np.where(T<0.0)]=100
+        outputs['a'] = np.sqrt(gam * R * T)
+
+    def compute_partials(self, inputs, J):
+        R = self.options['R']
+        gam = self.options['gamma']
+        T = inputs['T'].copy()
+        T[np.where(T<0.0)]=100
+        J['a', 'T'] = 0.5 * np.sqrt(gam * R / T)
 
 class MachNumberfromSpeed(ExplicitComponent):
     """
@@ -399,7 +410,7 @@ class HeatAdditionPressureLoss(ExplicitComponent):
         Mass flow (vector, kg/s)
     delta_p : float
         Pressure gain / loss (vector, Pa)
-    factor_p : float
+    pressure_recovery : float
         Total pressure gain / loss as a multiple (vector, dimensionless)
     heat_in : float
         Heat addition (subtraction) rate (vector, W)
@@ -428,19 +439,40 @@ class HeatAdditionPressureLoss(ExplicitComponent):
         self.add_input('pt_in', shape=(nn,), units='Pa')
         self.add_input('mdot', shape=(nn,), units='kg/s')
         self.add_input('delta_p', shape=(nn,), units='Pa')
-        self.add_input('factor_p', shape=(nn,), val=np.ones((nn,)))
+        self.add_input('pressure_recovery', shape=(nn,), val=np.ones((nn,)))
         self.add_input('heat_in', shape=(nn,), units='W')
         self.add_input('cp', units='J/kg/K')
 
         self.add_output('Tt_out', shape=(nn,), units='K')
         self.add_output('pt_out', shape=(nn,), units='Pa')
 
-        self.declare_partials(['*'], ['*'], method='cs')
+        arange = np.arange(nn)
+
+        self.declare_partials(['Tt_out'], ['Tt_in','heat_in','mdot'], rows=arange, cols=arange)
+        self.declare_partials(['Tt_out'], ['cp'], rows=arange, cols=np.zeros((nn,)))
+        self.declare_partials(['pt_out'], ['pt_in','pressure_recovery','delta_p'], rows=arange, cols=arange)
 
     def compute(self, inputs, outputs):
         nn = self.options['num_nodes']
+        divisor = inputs['cp'] * inputs['mdot']
+        mindivisor = np.min(inputs['mdot'])
+        if mindivisor == 0.0:
+            raise ValueError(self.msginfo)
         outputs['Tt_out'] = inputs['Tt_in'] + inputs['heat_in'] / inputs['cp'] / inputs['mdot']
-        outputs['pt_out'] = inputs['pt_in'] * inputs['factor_p'] + inputs['delta_p']
+        outputs['pt_out'] = inputs['pt_in'] * inputs['pressure_recovery'] + inputs['delta_p']
+
+
+    def compute_partials(self, inputs, J):
+        nn = self.options['num_nodes']
+        J['Tt_out','Tt_in'] = np.ones((nn,))
+        J['Tt_out','heat_in'] = 1 / inputs['cp']/inputs['mdot']
+        J['Tt_out','cp'] = - inputs['heat_in'] / inputs['cp'] ** 2 / inputs['mdot']
+        J['Tt_out','mdot'] = - inputs['heat_in'] / inputs['cp'] / inputs['mdot'] ** 2
+
+        J['pt_out', 'pt_in'] = inputs['pressure_recovery']
+        J['pt_out', 'pressure_recovery'] = inputs['pt_in']
+        J['pt_out', 'delta_p'] = np.ones((nn,))
+
 
 class MassFlow(ExplicitComponent):
     """
@@ -477,7 +509,7 @@ class MassFlow(ExplicitComponent):
         self.add_input('area', shape=(nn,), units='m**2')
         self.add_input('rho', shape=(nn,), units='kg/m**3')
         self.add_input('M', shape=(nn,))
-        self.add_output('mdot', shape=(nn,), units='kg/s')
+        self.add_output('mdot', shape=(nn,), units='kg/s', lower=1e-8)
         arange = np.arange(0, nn)
         self.declare_partials(['mdot'], ['M', 'a', 'rho', 'area'], rows=arange, cols=arange)
 
@@ -501,7 +533,7 @@ class MachNumberDuct(ImplicitComponent):
         self.add_input('area', units='m**2')
         self.add_input('rho', shape=(nn,), units='kg/m**3')
        # self.add_output('M', shape=(nn,), lower=0.0, upper=1.0)
-        self.add_output('M', shape=(nn,), val=np.ones((nn,))*0.3, lower=0.0)
+        self.add_output('M', shape=(nn,), val=np.ones((nn,))*0.6, lower=0.000001, upper=0.999999)
         arange = np.arange(0, nn)
         self.declare_partials(['M'], ['mdot'], rows=arange, cols=arange, val=np.ones((nn, )))
         self.declare_partials(['M'], ['M', 'a', 'rho'], rows=arange, cols=arange)
@@ -545,7 +577,7 @@ class DuctExitPressureRatioImplicit(ImplicitComponent):
         nn = self.options['num_nodes']
         self.add_input('p_exit', shape=(nn,), units='Pa')
         self.add_input('pt', shape=(nn,), units='Pa')
-        self.add_output('nozzle_pressure_ratio', shape=(nn,), val=np.ones((nn,))*0.9, upper=1.)
+        self.add_output('nozzle_pressure_ratio', shape=(nn,), val=np.ones((nn,))*0.9, upper=0.99999999)
         arange = np.arange(0, nn)
         self.declare_partials(['nozzle_pressure_ratio'], ['nozzle_pressure_ratio'], rows=arange, cols=arange, val=np.ones((nn, )))
         self.declare_partials(['nozzle_pressure_ratio'], ['p_exit','pt'], rows=arange, cols=arange)
@@ -587,7 +619,7 @@ class DuctExitMachNumber(ExplicitComponent):
         nn = self.options['num_nodes']
         gam = self.options['gamma']
         self.add_input('nozzle_pressure_ratio', shape=(nn,))
-        self.add_output('M', shape=(nn,))
+        self.add_output('M', shape=(nn,), lower=1e-8)
         self.declare_partials(['*'], ['*'], method='cs')
 
     def compute(self, inputs, outputs):
@@ -793,7 +825,7 @@ class ImplicitCompressibleDuct(Group):
         iv.add_output('pressure_recovery_3', val=np.ones((nn,)))
 
         iv.add_output('area_nozzle', val=58*np.ones((nn,)), units='inch**2')
-        iv.add_output('convergence_hack', val=-40, units='Pa')
+        iv.add_output('convergence_hack', val=-20, units='Pa')
 
         self.add_subsystem('inlet', Inlet(num_nodes=nn),
                            promotes_inputs=[('p','p_inf'),('T','T_inf'),'Utrue'])
@@ -802,7 +834,7 @@ class ImplicitCompressibleDuct(Group):
                                                                                ('area','area_1'),
                                                                                ('delta_p','delta_p_1'),
                                                                                ('heat_in','heat_in_1'),
-                                                                               ('factor_p','pressure_recovery_1')])
+                                                                               ('pressure_recovery','pressure_recovery_1')])
         self.connect('inlet.pt','sta1.pt_in')
         self.connect('inlet.Tt','sta1.Tt_in')
 
@@ -811,17 +843,17 @@ class ImplicitCompressibleDuct(Group):
                                                                                ('area','area_2'),
                                                                                ('delta_p','delta_p_2'),
                                                                                ('heat_in','heat_in_2'),
-                                                                               ('factor_p','pressure_recovery_2')])
+                                                                               ('pressure_recovery','pressure_recovery_2')])
         self.connect('sta1.pt_out','sta2.pt_in')
         self.connect('sta1.Tt_out','sta2.Tt_in')
 
-        self.add_subsystem('hx', HXGroup(num_nodes=nn), promotes_inputs=[('mdot_cold','mdot'),'mdot_hot','T_in_hot','rho_hot'],
+        self.add_subsystem('hx', HXGroup(num_nodes=nn), promotes_inputs=[('mdot_cold','mdot'),'mdot_hot','T_in_hot','rho_hot','ac|propulsion|thermal|hx|n_wide_cold'],
                                                         promotes_outputs=['T_out_hot'])
         self.connect('sta2.T','hx.T_in_cold')
         self.connect('sta2.rho','hx.rho_cold')
 
         self.add_subsystem('sta3', DuctStation(num_nodes=nn), promotes_inputs=['mdot','cp',
-                                                                               ('factor_p','pressure_recovery_3'),
+                                                                               ('pressure_recovery','pressure_recovery_3'),
                                                                                ('area','area_3')])
         self.connect('sta2.pt_out','sta3.pt_in')
         self.connect('sta2.Tt_out','sta3.Tt_in')
@@ -839,3 +871,84 @@ class ImplicitCompressibleDuct(Group):
         self.connect('nozzle.p','force.p_nozzle')
         self.connect('nozzle.rho','force.rho_nozzle')
 
+class ImplicitCompressibleDuct_ExternalHX(Group):
+    """
+    Ducted heat exchanger with compressible flow assumptions
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points' )
+
+    def setup(self):
+        nn = self.options['num_nodes']
+
+        iv = self.add_subsystem('dv', IndepVarComp(), promotes_outputs=['cp','*_1','*_2','*_3','convergence_hack'])
+        iv.add_output('cp', val=1002.93, units='J/kg/K')
+
+        iv.add_output('area_1', val=60, units='inch**2')
+        iv.add_output('delta_p_1', val=np.zeros((nn,)), units='Pa')
+        iv.add_output('heat_in_1', val=np.zeros((nn,)), units='W')
+        iv.add_output('pressure_recovery_1', val=np.ones((nn,)))
+
+        iv.add_output('delta_p_2', val=np.ones((nn,))*0., units='Pa')
+        iv.add_output('heat_in_2', val=np.ones((nn,))*0., units='W')
+        iv.add_output('pressure_recovery_2', val=np.ones((nn,)))
+
+        iv.add_output('pressure_recovery_3', val=np.ones((nn,)))
+
+        # iv.add_output('area_nozzle', val=58*np.ones((nn,)), units='inch**2')
+        iv.add_output('convergence_hack', val=-40, units='Pa')
+        dvlist = [['area_nozzle_in', 'area_nozzle', 58*np.ones((nn,)), 'inch**2']]
+        self.add_subsystem('dvpassthru',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
+
+        
+
+        self.add_subsystem('inlet', Inlet(num_nodes=nn),
+                           promotes_inputs=[('p','p_inf'),('T','T_inf'),'Utrue'])
+
+        self.add_subsystem('sta1', DuctStation(num_nodes=nn), promotes_inputs=['mdot','cp',
+                                                                               ('area','area_1'),
+                                                                               ('delta_p','delta_p_1'),
+                                                                               ('heat_in','heat_in_1'),
+                                                                               ('pressure_recovery','pressure_recovery_1')])
+        self.connect('inlet.pt','sta1.pt_in')
+        self.connect('inlet.Tt','sta1.Tt_in')
+
+
+        self.add_subsystem('sta2', DuctStation(num_nodes=nn), promotes_inputs=['mdot','cp',
+                                                                               ('area','area_2'),
+                                                                               ('delta_p','delta_p_2'),
+                                                                               ('heat_in','heat_in_2'),
+                                                                               ('pressure_recovery','pressure_recovery_2')])
+        self.connect('sta1.pt_out','sta2.pt_in')
+        self.connect('sta1.Tt_out','sta2.Tt_in')
+
+        # in to HXGroup:
+        # duct.mdot -> mdot_cold
+        # mdot_hot
+        # T_in_hot
+        # rho_hot
+        # duct.sta2.T -> T_in_cold
+        # duct.sta2.rho -> rho_cold
+
+        #out from HXGroup
+        # T_out_hot
+        # delta_p_cold ->sta3.delta_p
+        # heat_transfer -> sta3.heat_in
+        # frontal_area -> 'area_2', 'area_3'
+
+        self.add_subsystem('sta3', DuctStation(num_nodes=nn), promotes_inputs=['mdot','cp',
+                                                                               ('pressure_recovery','pressure_recovery_3'),
+                                                                               ('area','area_3')])
+        self.connect('sta2.pt_out','sta3.pt_in')
+        self.connect('sta2.Tt_out','sta3.Tt_in')
+
+        self.add_subsystem('pexit',AddSubtractComp(output_name='p_exit',input_names=['p_inf','convergence_hack'],vec_size=[nn,1],units='Pa'),promotes_inputs=['*'],promotes_outputs=['*'])
+        self.add_subsystem('nozzle', OutletNozzle(num_nodes=nn),
+                                                  promotes_inputs=['p_exit',('area','area_nozzle')],
+                                                  promotes_outputs=['mdot'])
+        self.connect('sta3.pt_out','nozzle.pt')
+        self.connect('sta3.Tt_out','nozzle.Tt')
+
+        self.add_subsystem('force', NetForce(num_nodes=nn), promotes_inputs=['mdot','p_inf',('Utrue_inf','Utrue'),'area_nozzle'])
+        self.connect('nozzle.p','force.p_nozzle')
+        self.connect('nozzle.rho','force.rho_nozzle')
