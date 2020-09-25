@@ -156,7 +156,7 @@ class AllElectricSinglePropulsionSystemWithThermal_Incompressible(Group):
         iv.add_output('channel_height', val=20, units='mm')
         iv.add_output('channel_length', val=0.2, units='m')
         iv.add_output('n_parallel', val=50)
-        iv.add_output('area_nozzle', val=58, units='inch**2')
+        iv.add_output('area_nozzle', val=58*np.ones((nn,)), units='inch**2')
 
         lc_promotes = ['duration','channel_*','n_parallel']
         self.add_subsystem('motorheatsink',

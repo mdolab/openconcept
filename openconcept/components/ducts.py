@@ -21,7 +21,7 @@ class ExplicitIncompressibleDuct(ExplicitComponent):
     fltcond|rho : float
         Density in the freestream (vector, kg/m**3)
     area_nozzle : float
-        Cross-sectional area of the outlet nozzle (scalar, m**2)
+        Cross-sectional area of the outlet nozzle (vector, m**2)
         Generally must be the narrowest portion of the duct for analysis to be valid
     delta_p_hex : float
         Pressure drop across the heat exchanger (vector, Pa)
@@ -55,7 +55,7 @@ class ExplicitIncompressibleDuct(ExplicitComponent):
         nn = self.options['num_nodes']
         self.add_input('fltcond|Utrue', shape=(nn,),  units='m/s')
         self.add_input('fltcond|rho', shape=(nn,),  units='kg/m**3')
-        self.add_input('area_nozzle',  units='m**2')
+        self.add_input('area_nozzle', shape=(nn,), units='m**2')
         self.add_input('delta_p_hex',  shape=(nn,), units='Pa')
 
         self.add_output('mdot', shape=(nn,),  units='kg/s')
@@ -74,6 +74,7 @@ class ExplicitIncompressibleDuct(ExplicitComponent):
         interior = (inputs['fltcond|rho']**2 * inputs['fltcond|Utrue']**2 + 2*inputs['fltcond|rho']*inputs['delta_p_hex'])/(1+static_pressure_loss_factor)
         interior[np.where(interior<0.0)]=1e-10
         mdot = inputs['area_nozzle'] * np.sqrt(interior)
+        mdot[np.where(mdot<0.0)]=1e-10
         # if self.pathname.split('.')[1] == 'climb':
         #     print('Nozzle area:'+str(inputs['area_nozzle']))
         #     print('mdot:'+str(mdot))

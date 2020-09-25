@@ -1,20 +1,609 @@
 from __future__ import division
-from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, DirectSolver, BoundsEnforceLS
-from openmdao.api import ScipyOptimizeDriver, ExplicitComponent, ImplicitComponent
+from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, NewtonSolver, DirectSolver, BoundsEnforceLS
+from openmdao.api import ScipyOptimizeDriver, ExplicitComponent, ImplicitComponent, ExecComp
 
 import numpy as np
 import scipy.sparse as sp
 import sys, os
 sys.path.insert(0,os.getcwd())
 from openconcept.components.ducts import ImplicitCompressibleDuct
+from openconcept.components.motor import SimpleMotor
+from openconcept.utilities.selector import SelectorComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.math.derivatives import FirstDerivative
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp, VectorConcatenateComp, VectorSplitComp
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
 
+# Define sigmoid function and its derivative for later use
+def sigmoid(x):
+    """
+    Logistic sigmoid function f(x) = 1/(1 + exp(-x))
+
+    Inputs
+    ------
+    x : float
+        Input value, any shape
+    
+    Outputs
+    -------
+    f : float
+        Sigmoid function evaluated at x, same shape as x
+    """
+    f = 1 / (1 + np.exp(-x))
+    return f
+
+def sigmoid_deriv(x):
+    """
+    Derivative of logistic sigmoid function w.r.t. x
+
+    Inputs
+    ------
+    x : float
+        Input value, any shape
+    
+    Outputs
+    -------
+    df : float
+        Sigmoid derivitive w.r.t. x evaluated at x, same shape as x
+    """
+    df = 1 / (np.exp(-x) + 2 + 1/np.exp(-x))
+    return df
+
 
 """Analysis routines for simulating thermal management of aircraft components"""
 
+class SimpleEngine(ExplicitComponent):
+    """
+    Convert heat to work based on an assumed fraction of the
+    Carnot efficiency. 
+
+    Inputs
+    ------
+    T_h : float
+        Temperature of the hot heat input (vector, K)
+    T_c : float
+        Temperature of the cold heat input (vector, K)
+    Wdot : float
+        Work generation rate (vector, W)
+    eff_factor : float
+        Percentage of the Carnot efficiency (scalar, dimensionless)
+
+    Outputs
+    -------
+    q_h : float
+        Heat extracted from the hot side (vector, W)
+    q_c : float
+        Waste heat sent to cold side (vector, W)
+    eta_thermal : float
+        Overall thermal efficiency (vector, dimensionless)
+
+    Options
+    -------
+    num_nodes : int
+        The number of analysis points to run
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1)
+
+    def setup(self):
+        nn_tot = self.options['num_nodes']
+        arange = np.arange(0, nn_tot)
+
+        self.add_input('T_h', units='K', shape=(nn_tot,), val=600.)
+        self.add_input('T_c', units='K', shape=(nn_tot,), val=400.)
+        self.add_input('Wdot', units='W', shape=(nn_tot,), val=1000.)
+        self.add_input('eff_factor', units=None, val=0.4)
+
+        self.add_output('q_h', units='W', shape=(nn_tot,))
+        self.add_output('q_c', units='W', shape=(nn_tot,))
+        self.add_output('eta_thermal', units=None, shape=(nn_tot,))
+
+        self.declare_partials(['q_h'], ['T_h', 'T_c', 'Wdot'], rows=arange, cols=arange)
+        self.declare_partials(['q_c'], ['T_h', 'T_c', 'Wdot'], rows=arange, cols=arange)
+        self.declare_partials(['eta_thermal'], ['T_h', 'T_c'], rows=arange, cols=arange)
+
+        self.declare_partials(['q_h'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(['q_c'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(['eta_thermal'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
+
+    def compute(self, inputs, outputs):
+        # compute carnot efficiency
+        # 1 - Tc/Th
+        eta_carnot = 1 - inputs['T_c'] / inputs['T_h']
+        eta_thermal = inputs['eff_factor'] * eta_carnot
+        outputs['eta_thermal'] = eta_thermal
+        # compute the heats
+        outputs['q_h'] = inputs['Wdot'] / eta_thermal
+        outputs['q_c'] = inputs['Wdot'] / eta_thermal - inputs['Wdot'] 
+
+    def compute_partials(self, inputs, J):
+        eta_carnot = 1 - inputs['T_c'] / inputs['T_h']
+        eta_thermal = inputs['eff_factor'] * eta_carnot
+
+        J['eta_thermal', 'T_h'] = inputs['eff_factor'] * inputs['T_c'] / inputs['T_h'] ** 2
+        J['eta_thermal', 'T_c'] = inputs['eff_factor'] * (-1 / inputs['T_h'])
+        J['eta_thermal', 'eff_factor'] = eta_carnot
+
+        J['q_h', 'T_h'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['eff_factor'] * inputs['T_c'] / inputs['T_h'] ** 2)
+        J['q_h', 'T_c'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['eff_factor'] * (-1 / inputs['T_h']))
+        J['q_h', 'Wdot'] = 1 / eta_thermal
+        J['q_h', 'eff_factor'] = - inputs['Wdot'] / eta_thermal ** 2 * (eta_carnot)
+
+        J['q_c', 'T_h'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['eff_factor'] * inputs['T_c'] / inputs['T_h'] ** 2)
+        J['q_c', 'T_c'] = - inputs['Wdot'] / eta_thermal ** 2 * (inputs['eff_factor'] * (-1 / inputs['T_h']))
+        J['q_c', 'Wdot'] = (1 / eta_thermal - 1)
+        J['q_c', 'eff_factor'] = - inputs['Wdot'] / eta_thermal ** 2 * (eta_carnot)
+
+class SimpleHeatPump(ExplicitComponent):
+    """
+    Pumps heat from cold source to hot sink with work input
+    based on assumed fraction of Carnot efficiency.
+
+    Inputs
+    ------
+    T_h : float
+        Temperature of the hot heat input (vector, K)
+    T_c : float
+        Temperature of the cold heat input (vector, K)
+    Wdot : float
+        Work usage rate (vector, W)
+    eff_factor : float
+        Percentage of the Carnot efficiency (scalar, dimensionless)
+    
+    Outputs
+    -------
+    q_c : float
+        Heat extracted from the cold side (vector, W)
+    q_h : float
+        Heat sent to hot side (vector, W)
+    COP_cooling : float
+        Cooling coefficient of performance, heat removed from cold side
+        divided by work used (vector, dimensionless)
+
+    Options
+    -------
+    num_nodes : int
+        The number of analysis points to run
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points to run')
+    
+    def setup(self):
+        nn_tot = self.options['num_nodes']
+        arange = np.arange(0, nn_tot)
+
+        self.add_input('T_h', units='K', shape=(nn_tot,), val=600.)
+        self.add_input('T_c', units='K', shape=(nn_tot,), val=400.)
+        self.add_input('Wdot', units='W', shape=(nn_tot,), val=1000.)
+        self.add_input('eff_factor', units=None, val=0.4)
+
+        self.add_output('q_c', units='W', shape=(nn_tot,))
+        self.add_output('q_h', units='W', shape=(nn_tot,))
+        self.add_output('COP_cooling', units=None, shape=(nn_tot,))
+
+        self.declare_partials(['q_c'], ['T_h', 'T_c', 'Wdot'], rows=arange, cols=arange)
+        self.declare_partials(['q_h'], ['T_h', 'T_c', 'Wdot'], rows=arange, cols=arange)
+        self.declare_partials(['COP_cooling'], ['T_h', 'T_c'], rows=arange, cols=arange)
+
+        self.declare_partials(['q_c'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(['q_h'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(['COP_cooling'], ['eff_factor'], rows=arange, cols=np.zeros((nn_tot,)))
+    
+    def compute(self, inputs, outputs):
+        # Cooling coefficient of performance, use sigmoid to avoid negative COPs
+        delta_T = inputs['T_h'] - inputs['T_c']
+        shift = 2  # shift so sigmoid is very close to zero once delta_T < 0
+        COP_cooling = sigmoid(delta_T - shift) * inputs['eff_factor'] * inputs['T_c'] / (delta_T)
+        outputs['COP_cooling'] = COP_cooling
+
+        # Heat transfer
+        outputs['q_c'] = - COP_cooling * inputs['Wdot']
+        outputs['q_h'] = (1 + COP_cooling) * inputs['Wdot']
+    
+    def compute_partials(self, inputs, J):
+        # Assign inputs to variables for readability
+        T_h = inputs['T_h']
+        T_c = inputs['T_c']
+        Wdot = inputs['Wdot']
+        eff_factor = inputs['eff_factor']
+        shift = 2
+
+        J['COP_cooling', 'T_h'] = - sigmoid(T_h - T_c - shift) * eff_factor * T_c / (T_h - T_c) ** 2 + \
+                                    sigmoid_deriv(T_h - T_c - shift) * eff_factor * T_c / (T_h - T_c)
+        J['COP_cooling', 'T_c'] = sigmoid(T_h - T_c - shift) * eff_factor * T_h / (T_h - T_c) ** 2 - \
+                                  sigmoid_deriv(T_h - T_c - shift) * eff_factor * T_c / (T_h - T_c)
+        J['COP_cooling', 'eff_factor'] = sigmoid(T_h - T_c - shift) * T_c / (T_h - T_c)
+
+        J['q_c', 'T_h'] = - J['COP_cooling', 'T_h'] * Wdot
+        J['q_c', 'T_c'] = - J['COP_cooling', 'T_c'] * Wdot
+        J['q_c', 'Wdot'] = - sigmoid(T_h - T_c - shift) * eff_factor * T_c / (T_h - T_c)
+        J['q_c', 'eff_factor'] = - J['COP_cooling', 'eff_factor'] * Wdot
+
+        J['q_h', 'T_h'] = J['COP_cooling', 'T_h'] * Wdot
+        J['q_h', 'T_c'] = J['COP_cooling', 'T_c'] * Wdot
+        J['q_h', 'Wdot'] = 1 + sigmoid(T_h - T_c - shift) * eff_factor * T_c / (T_h - T_c)
+        J['q_h', 'eff_factor'] = J['COP_cooling', 'eff_factor'] * Wdot
+
+class SimpleTMS(Group):
+    """
+    Models a thermal management system (TMS) cooling an electric motor
+    with a heat pump (refrigerator). The motor (with thermal mass) is linked
+    with a cold plate that exchanges heat with the heat pump. The heat pump's
+    waste heat is sent to a constant temperature reservoir via a cold plate.
+
+    Inputs
+    ------
+    throttle : float
+        Motor power control setting. Should be [0, 1]. (vector, dimensionless)
+    motor_elec_power_rating: float
+        Motor electric (not mech) design power. (scalar, W)
+    duration : float
+        Duration of mission segment, only required in unsteady mode. (scalar, sec)
+    channel_width_motor : float
+        Width of coolant channels in motor's cold plate (scalar, m)
+    channel_height_motor : float
+        Height of coolant channels in motor's cold plate (scalar, m)
+    channel_length_motor : float
+        Length of coolant channels in motor's cold plate (scalar, m)
+    n_parallel_motor : float
+        Number of identical coolant channels in motor's cold plate (scalar, dimensionless)
+    channel_width_refrig : float
+        Width of coolant channels in refrigerator's cold plate (scalar, m)
+    channel_height_refrig : float
+        Height of coolant channels in refrigerator's cold plate (scalar, m)
+    channel_length_refrig : float
+        Length of coolant channels in refrigerator's cold plate (scalar, m)
+    n_parallel_refrig : float
+        Number of identical coolant channels in refrigerator's cold plate (scalar, dimensionless)
+    Wdot : float
+        Heat pump work usage rate (vector, W)
+    eff_factor : float
+        Heat pump's percentage of the Carnot efficiency (scalar, dimensionless)
+    
+    Outputs
+    -------
+    shaft_power_out : float
+        Shaft power output from motor (vector, W)
+    motor_elec_load : float
+        Electrical load consumed by motor (vector, W)
+    motor_cost : float
+        Nonrecurring cost of the motor (scalar, USD)
+    motor_weight : float
+        Weight of the motor (scalar, kg)
+    motor_sizing_margin : float
+        Equal to 1 when producing full rated power (vector, dimensionless)
+    motor_T : float
+        Temperature of the motor (vector, K)
+    motor_T_final : float
+        Final temperature of the motor (scalar, K)
+    mdot_coolant : float
+        Coolant mass flow rate in cold plates (vector, kg/s)
+    q_h : float
+        Heat sent to hot side of refrigerator (vector, W)
+    COP_cooling : float
+        Cooling coefficient of performance of refrigerator, heat removed from motor
+        divided by work used (vector, dimensionless)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (sets vec length; default 1)
+    motor_efficiency : float
+        Motor shaft power efficiency. Sensible range 0.0 to 1.0 (default 0.93, same as magni500)
+    motor_weight_inc : float
+        Motor weight per unit rated power (default 2.411e-4, same as magni500, kg/W)
+    motor_weight_base : float
+        Motor base weight (default 0, kg)
+    motor_cost_inc : float
+        Motor cost per unit rated power (default 0.134228, USD/W)
+    motor_cost_base : float
+        Motor base cost (default 1 USD) B
+    motor_specific_heat : float
+        Specific heat capacity of the object in J / kg / K (default 921 = aluminum)
+    motor_T_init : float
+        Initial temperature of the motor in K (default 294 K = room temperature, 70 deg F)
+    coolant_rho : float
+        Density of coolant in cold plates in kg/m**3 (default 0.997, water)
+    coolant_k : float
+        Thermal conductivity of the coolant in cold plates (W/m/K) (default 0.405, glycol/water)
+    coolant_nusselt : float
+        Hydraulic diameter Nusselt number of the coolant in the cold plate's channels
+        (default 7.54 for constant temperature infinite parallel plate)
+    coolant_specific_heat : float
+        Specific heat of the coolant in cold plates (J/kg/K) (default 3801, glycol/water)
+    heat_sink_T : float
+        Temperature of the heat sink where waste heat is dumped (K) (default 294 K = room temperature, 70 deg F)
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points to run')
+        self.options.declare('motor_efficiency', default=0.93, desc='Motor efficiency (dimensionless)')
+        self.options.declare('motor_weight_inc', default=135./560e3, desc='Motor kg/W')
+        self.options.declare('motor_weight_base', default=0., desc='Motor base weight kg')
+        self.options.declare('motor_cost_inc', default=100./745., desc='Motor cost per watt $/W')
+        self.options.declare('motor_cost_base', default=1., desc='Motor cost base $')
+        self.options.declare('motor_specific_heat', default=921., desc='Specific heat of motor in J/kg/K - default 921 for Al')
+        self.options.declare('motor_T_init', default=294., desc='Initial motor temperature in K - default to room temp')
+        self.options.declare('coolant_rho', default=997.0, desc='Fluid density in kg/m3')
+        self.options.declare('coolant_k', default=0.405, desc='Thermal conductivity of the fluid in W / mK')
+        self.options.declare('coolant_nusselt', default=7.54, desc='Hydraulic diameter Nusselt number')
+        self.options.declare('coolant_specific_heat', default=3801, desc='Specific heat in J/kg/K')
+        self.options.declare('heat_sink_T', default=294., desc='Heat sink temperature in K')
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+        # Add the electric motor and its thermal mass component (with an integrator to track temperature)
+        self.add_subsystem('motor', SimpleMotor(num_nodes=nn,
+                                                efficiency=self.options['motor_efficiency'],
+                                                weight_inc=self.options['motor_weight_inc'],
+                                                weight_base=self.options['motor_weight_base'],
+                                                cost_inc=self.options['motor_cost_inc'],
+                                                cost_base=self.options['motor_cost_base']),
+                            promotes_inputs=['throttle', ('elec_power_rating', 'motor_elec_power_rating')],
+                            promotes_outputs=['shaft_power_out', ('elec_load', 'motor_elec_load'),
+                                              ('component_cost', 'motor_cost'), ('component_weight', 'motor_weight'),
+                                              ('component_sizing_margin', 'motor_sizing_margin')])
+        
+        self.add_subsystem('motor_thermal_mass',
+                           ThermalComponentWithMass(num_nodes=nn,
+                                                    specific_heat=self.options['motor_specific_heat']))
+
+        ivc = self.add_subsystem('ivc', IndepVarComp(), promotes_outputs=['mdot_coolant'])
+        ivc.add_output('motor_T_init', val=self.options['motor_T_init'], units='K')
+
+        int_temp = self.add_subsystem('motor_temp_integrator', Integrator(num_nodes=nn,
+                                                               diff_units='s',
+                                                               method='simpson',
+                                                               time_setup='duration'),
+                            promotes_inputs=['duration'],
+                            promotes_outputs=['motor_T', 'motor_T_final'])
+        int_temp.add_integrand('motor_T', start_name='motor_T_init', end_name='motor_T_final',
+                               rate_name='dTdt', val=1.0, units='K')
+        
+        # Add the cold plate to interface the motor and refrigerator
+        self.add_subsystem('motor_cold_plate',
+                           ConstantSurfaceTemperatureColdPlate_NTU(num_nodes=nn,
+                                                                   fluid_rho=self.options['coolant_rho'],
+                                                                   fluid_k=self.options['coolant_k'],
+                                                                   nusselt=self.options['coolant_nusselt'],
+                                                                   specific_heat=self.options['coolant_specific_heat']),
+                            promotes_inputs=[('channel_width', 'channel_width_motor'), ('channel_height', 'channel_height_motor'),
+                                             ('channel_length', 'channel_length_motor'), ('n_parallel', 'n_parallel_motor'), 'mdot_coolant'])
+        
+        self.add_subsystem('refrigerator_cold_plate',
+                           ConstantSurfaceTemperatureColdPlate_NTU(num_nodes=nn,
+                                                                   fluid_rho=self.options['coolant_rho'],
+                                                                   fluid_k=self.options['coolant_k'],
+                                                                   nusselt=self.options['coolant_nusselt'],
+                                                                   specific_heat=self.options['coolant_specific_heat']),
+                            promotes_inputs=[('channel_width', 'channel_width_refrig'), ('channel_height', 'channel_height_refrig'),
+                                             ('channel_length', 'channel_length_refrig'), ('n_parallel', 'n_parallel_refrig'), 'mdot_coolant'])
+        
+
+        self.add_subsystem('refrigerator', SimpleHeatPump(num_nodes=nn), promotes_inputs=['Wdot', 'eff_factor'],
+                           promotes_outputs=['q_h', 'COP_cooling'])
+        
+        # Connect the motor to its thermal mass and cold plate and connect the integrator to det T from dT/dt
+        self.connect('motor_weight', 'motor_thermal_mass.mass')
+        self.connect('motor.heat_out', 'motor_thermal_mass.q_in')
+        self.connect('motor_cold_plate.q', 'motor_thermal_mass.q_out')
+        self.connect('motor_T', 'motor_cold_plate.T_surface')
+        self.connect('ivc.motor_T_init', 'motor_temp_integrator.motor_T_init')
+        self.connect('motor_thermal_mass.dTdt', 'motor_temp_integrator.dTdt')
+
+        # Connect the two cold plates to each other
+        self.connect('motor_cold_plate.T_out', 'refrigerator_cold_plate.T_in')
+        self.connect('refrigerator_cold_plate.T_out', 'motor_cold_plate.T_in')
+        ivc.add_output('mdot_coolant', shape=(nn,), units='kg/s')
+
+        # Use a BalanceComp to set the surface temperature of the cold plate such that the heat extracted from
+        # the coolant equals the heat in on the cold side of the refrigerator
+        self.add_subsystem('refrigerator_plate_bal',
+                           BalanceComp(name='T_surface', units='K', eq_units='W', val=np.ones(nn),
+                                       lhs_name='plate_q_out', rhs_name='refrigerator_q_c'))
+
+        self.connect('refrigerator_cold_plate.q', 'refrigerator_plate_bal.plate_q_out')
+        self.connect('refrigerator.q_c', 'refrigerator_plate_bal.refrigerator_q_c')
+        self.connect('refrigerator_plate_bal.T_surface', 'refrigerator_cold_plate.T_surface')
+        self.connect('refrigerator_plate_bal.T_surface', 'refrigerator.T_c')
+
+        # Set the heat sink temperature to be constant and connect it to the heat pump
+        ivc.add_output('heat_sink_T', val=self.options['heat_sink_T'], units='K', shape=(nn,))
+        self.connect('ivc.heat_sink_T', 'refrigerator.T_h')
+
+class PerfectHeatTransferComp(ExplicitComponent):
+    """
+    Models heat transfer to coolant loop assuming zero thermal resistance.
+
+    Inputs
+    ------
+    T_in : float
+        Incoming coolant temperature (vector, K)
+    q : float
+        Heat flow into fluid stream; positive is heat addition (vector, W)
+    mdot_coolant : float
+        Coolant mass flow (vector, kg/s)
+    
+    Outputs
+    -------
+    T_out : float
+        Outgoing coolant temperature (vector, K)
+    T_average : float
+        Average coolant temperature (vector K)
+    
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (scalar, default 1)
+    specific_heat : float
+        Specific heat of the coolant (scalar, J/kg/K, default 3801 glycol/water)
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points')
+        self.options.declare('specific_heat', default=3801., desc='Specific heat in J/kg/K')
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+        arange = np.arange(0, nn)
+
+        self.add_input('T_in', desc='Incoming coolant temp', units='K', shape=(nn,))
+        self.add_input('q', desc='Heat INTO the fluid stream (positive is heat addition)', units='W', shape=(nn,))
+        self.add_input('mdot_coolant', desc='Mass flow rate of coolant', units='kg/s', shape=(nn,))
+        self.add_output('T_out', desc='Outgoing coolant temp', val=np.random.uniform(300, 330), units='K', shape=(nn,))
+        self.add_output('T_average', desc='Average temp of fluid', val=np.random.uniform(300, 330), units='K', shape=(nn,))
+
+        self.declare_partials(['T_out', 'T_average'], ['q', 'mdot_coolant'], rows=arange, cols=arange)
+        self.declare_partials('T_out', 'T_in', rows=arange, cols=arange, val=np.ones((nn,)))
+        self.declare_partials('T_average', 'T_in', rows=arange, cols=arange, val=np.ones((nn,)))
+    
+    def compute(self, inputs, outputs):
+        outputs['T_out'] = inputs['T_in'] + inputs['q'] / self.options['specific_heat'] / inputs['mdot_coolant']
+        outputs['T_average'] = (inputs['T_in'] + outputs['T_out']) / 2
+    
+    def compute_partials(self, inputs, J):
+        J['T_out', 'q'] = 1 / self.options['specific_heat'] / inputs['mdot_coolant']
+        J['T_out', 'mdot_coolant'] = - inputs['q'] / self.options['specific_heat'] / inputs['mdot_coolant']**2
+
+        J['T_average', 'q'] = J['T_out', 'q'] / 2
+        J['T_average', 'mdot_coolant'] = J['T_out', 'mdot_coolant'] / 2
+
+class HeatPumpWithIntegratedCoolantLoop(Group):
+    """
+    SimpleHeatPump connected to two PerfectHeatTransferComp components on either side. This setup
+    takes in cold and hot side temperature set points, along with other inputs, and solves for
+    the remaining variables including heat pump work usage rate.
+    
+    One nuance of this group is the hot_side_balance_param output, which must be connected to
+    an input that can modulate the hot side coolant temperature. The hot_side_balance_param
+    is then adjusted to set the coolant temperature (T_out_hot) to the specified hot side
+    temperature set point (T_h_set).
+
+    Inputs
+    ------
+    T_in_hot : float
+        Incoming coolant temperature on the hot side (vector, K)
+    T_in_cold : float
+        Incoming coolant temperature on the cold side (vector, K)
+    mdot_coolant_cold : float
+        Coolant mass flow rate on cold side (vector, kg/s)
+    mdot_coolant_hot : float
+        Coolant mass flow rate on hot side (vector, kg/s)
+    T_h_set : float
+        Heat pump hot side temperature set point (vector, K)
+    T_c_set : float
+        Heat pump cold side temperature set point (vector, K)
+    eff_factor : float
+        Heat pump percentage of Carnot efficiency (scalar, dimensionaless)
+    bypass_heat_pump : int (either 1 or 0)
+        If 1, heat pump is removed from coolant loop and coolant flows; if 0, heat pump
+        is kept in the loop (vector, default all ones)
+
+    Outputs
+    -------
+    T_out_hot : float
+        Outgoing coolant temperature on the hot side (vector, K)
+    T_out_cold : float
+        Outgoing coolant temperature on the cold side (vector, K)
+    Wdot : float
+        Heat pump work usage rate (vector, W)
+    hot_side_balance_param : float
+        Parameter set (by BalanceComp) so that outgoing coolant on the
+        hot side has temp of T_h_set, one common example would be to connect this
+        to mdot_cold of a heat exchanger on the hot side to modulate the coolant
+        temperature (vector, unit varies)
+
+    Options
+    -------
+    num_nodes : int
+        The number of analysis points to run
+    specific_heat : float
+        Specific heat of the coolant (scalar, J/kg/K, default 3801 glycol/water)
+    hot_side_balance_param_units : string
+        Units of parameter being used to modulate hot side coolant temp (default None)
+    hot_side_balance_param_lower : float
+        Lower bound on hot_side_balance_param in the BalanceComp (scalar, default -inf)
+    hot_side_balance_param_upper : float
+        Upper bound on hot_side_balance_param in the BalanceComp (scalar, default inf)
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points')
+        self.options.declare('specific_heat', default=3801., desc='Specific heat in J/kg/K')
+        self.options.declare('hot_side_balance_param_units', default=None,
+                             desc='Units of input hot_side_balance_param is connected to in outer model')
+        self.options.declare('hot_side_balance_param_lower', default=-np.inf, desc='Lower bound on hot_side_balance_param')
+        self.options.declare('hot_side_balance_param_upper', default=np.inf, desc='Upper bound on hot_side_balance_param')
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+        nn_ones = np.ones((nn,))
+        spec_heat = self.options['specific_heat']
+        
+        self.add_subsystem('hot_side', PerfectHeatTransferComp(num_nodes=nn, specific_heat=spec_heat),
+                           promotes_inputs=[('T_in', 'T_in_hot'), ('mdot_coolant', 'mdot_coolant_hot')])
+        self.add_subsystem('cold_side', PerfectHeatTransferComp(num_nodes=nn, specific_heat=spec_heat),
+                           promotes_inputs=[('T_in', 'T_in_cold'), ('mdot_coolant', 'mdot_coolant_cold')])
+        self.add_subsystem('heat_pump', SimpleHeatPump(num_nodes=nn),
+                           promotes_inputs=['eff_factor', ('T_c', 'T_c_set'), ('T_h', 'T_h_set')])
+
+        # Set the work usage rate of the heat pump such that the cold side coolant outlet temperature
+        # set point is maintained
+        self.add_subsystem('cold_side_bal', BalanceComp('Wdot', eq_units='K', lhs_name='T_c', rhs_name='T_c_set',
+                                                   units='kW', val=10.*nn_ones, lower=0.*nn_ones), 
+                           promotes_inputs=['T_c_set'])
+        self.connect('cold_side_bal.Wdot', 'heat_pump.Wdot')
+        # Use a selector to prevent the BalanceComp from solving if bypass mode is switched on
+        # by setting T_c in the BalanceComp to T_c_set so they'll match on the first iteration
+        self.add_subsystem('cold_bal_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'Wdot'], units='K'),
+                           promotes_inputs=[('selector', 'bypass_heat_pump')])
+        self.connect('cold_side.T_out', 'cold_bal_selector.T_out')
+        self.connect('cold_bal_selector.result', 'cold_side_bal.T_c')
+        # Feed the BalanceComp outputs directly back into the lhs when bypass is on
+        self.add_subsystem('bal_dummy', ExecComp('T_c = Wdot', T_c={'units':'K', 'shape':(nn,)}, 
+                                                 Wdot={'units':'W', 'shape':(nn,)}))
+        self.connect('cold_side_bal.Wdot', 'bal_dummy.Wdot')
+        self.connect('bal_dummy.T_c', 'cold_bal_selector.Wdot')
+
+        # Set the hot side balance parameter such that the hot side coolant temperature
+        # set point is maintained
+        self.add_subsystem('hot_side_bal', BalanceComp('hot_side_balance_param', eq_units='K', lhs_name='T_h',
+                                                       rhs_name='T_h_set', val=nn_ones,
+                                                       units=self.options['hot_side_balance_param_units'],
+                                                       lower=self.options['hot_side_balance_param_lower']*nn_ones,
+                                                       upper=self.options['hot_side_balance_param_upper']*nn_ones), 
+                           promotes_inputs=['T_h_set'], promotes_outputs=['hot_side_balance_param'])
+        # If bypass, use the hot side T_in instead of T_out
+        self.add_subsystem('hot_bal_selector', SelectorComp(num_nodes=nn, input_names=['T_out_hot', 'T_in_hot'],
+                                                            units='K'),
+                           promotes_inputs=['T_in_hot', ('selector', 'bypass_heat_pump')])
+        self.connect('hot_side.T_out', 'hot_bal_selector.T_out_hot')
+        self.connect('hot_bal_selector.result', 'hot_side_bal.T_h')
+
+        # Connect the heat transfers on either side of the heat pump
+        self.connect('heat_pump.q_c', 'cold_side.q')
+        self.connect('heat_pump.q_h', 'hot_side.q')
+
+        # Use selectors to control the I/O routing to bypass the heat pump if specified
+        # T_out_cold selector
+        self.add_subsystem('cold_side_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'T_in_hot'], units='K'),
+                           promotes_inputs=[('selector', 'bypass_heat_pump'), 'T_in_hot'],
+                           promotes_outputs=[('result', 'T_out_cold')])
+        self.connect('cold_side.T_out', 'cold_side_selector.T_out')
+        # T_out_hot selector
+        self.add_subsystem('hot_side_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'T_in_cold'], units='K'),
+                           promotes_inputs=[('selector', 'bypass_heat_pump'), 'T_in_cold'],
+                           promotes_outputs=[('result', 'T_out_hot')])
+        self.connect('hot_side.T_out', 'hot_side_selector.T_out')
+        # Wdot selector
+        self.add_subsystem('Wdot_selector', SelectorComp(num_nodes=nn, input_names=['Wdot', 'zero'], units='W'),
+                           promotes_inputs=[('selector', 'bypass_heat_pump')],
+                           promotes_outputs=[('result', 'Wdot')])
+        self.connect('cold_side_bal.Wdot', 'Wdot_selector.Wdot')
+
+        # Set the default set points and T_in defaults for continuity
+        self.set_input_defaults('Wdot_selector.zero', val=np.zeros((nn,)), units='W')
+        self.set_input_defaults('T_c_set', val=300.*nn_ones, units='K')
+        self.set_input_defaults('T_h_set', val=500.*nn_ones, units='K')
+        self.set_input_defaults('T_in_hot', val=400.*nn_ones, units='K')
+        self.set_input_defaults('T_in_cold', val=400.*nn_ones, units='K')
 
 class ThermalComponentWithMass(ExplicitComponent):
     """
@@ -38,7 +627,7 @@ class ThermalComponentWithMass(ExplicitComponent):
     -------
     specific_heat : float
         Specific heat capacity of the object in J / kg / K (default 921 = aluminum)
-    num_nodes : float
+    num_nodes : int
         The number of analysis points to run
     """
     def initialize(self):
@@ -92,7 +681,7 @@ class CoolantReservoirRate(ExplicitComponent):
 
     Options
     -------
-    num_nodes : float
+    num_nodes : int
         The number of analysis points to run
     """
     def initialize(self):
@@ -138,7 +727,7 @@ class ThermalComponentMassless(ImplicitComponent):
 
     Options
     -------
-    num_nodes : float
+    num_nodes : int
         The number of analysis points to run
     """
     def initialize(self):
@@ -189,7 +778,7 @@ class ConstantSurfaceTemperatureColdPlate_NTU(ExplicitComponent):
 
     Options
     -------
-    num_nodes : float
+    num_nodes : int
         The number of analysis points to run
     fluid_rho : float
         Coolant density in kg/m**3 (default 0.997, water)
