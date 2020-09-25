@@ -15,11 +15,11 @@ from openconcept.utilities.math.max_min_comp import MaxComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dvlabel import DVLabel
 from examples.methods.weights_twin_hybrid import TwinSeriesHybridEmptyWeight
-from examples.propulsion_layouts.thermal_series_hybrid import TwinSeriesHybridElectricPropulsionSystem
+from examples.propulsion_layouts.thermal_series_hybrid import TwinSeriesHybridElectricPropulsionRefrigerated
 from examples.methods.costs_commuter import OperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from examples.aircraft_data.KingAirC90GT import data as acdata
-from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis
+from openconcept.analysis.performance.mission_profiles import BasicMission
 from openconcept.utilities.linearinterp import LinearInterpolator
 from openconcept.utilities.visualization import plot_trajectory
 
@@ -35,8 +35,8 @@ class AugmentedFBObjective(ExplicitComponent):
 
 class SeriesHybridTwinModel(Group):
     """
-    A custom model specific to a series hybrid twin turboprop-class airplane
-    This class will be passed in to the mission analysis code.
+    A custom model specific to a series hybrid twin turboprop-class airplane with an active
+    thermal management system. This class will be passed in to the mission analysis code.
 
     """
     def initialize(self):
@@ -62,12 +62,12 @@ class SeriesHybridTwinModel(Group):
                                            promotes_inputs=[('start_val', 'hybridization'),
                                                             ('end_val', 'hybridization')])
 
-        propulsion_promotes_outputs = ['fuel_flow','thrust', 'ac|propulsion|thermal|duct|area_nozzle']
+        propulsion_promotes_outputs = ['fuel_flow','thrust', 'bypass_refrig']
         propulsion_promotes_inputs = ["fltcond|*", "ac|propulsion|*", "throttle", "propulsor_active",
                                       "ac|weights*", 'duration']
 
         self.add_subsystem('propmodel',
-                           TwinSeriesHybridElectricPropulsionSystem(num_nodes=nn),
+                           TwinSeriesHybridElectricPropulsionRefrigerated(num_nodes=nn),
                            promotes_inputs=propulsion_promotes_inputs,
                            promotes_outputs=propulsion_promotes_outputs)
         self.connect('proprpm', ['propmodel.prop1.rpm', 'propmodel.prop2.rpm'])
@@ -100,7 +100,7 @@ class SeriesHybridTwinModel(Group):
         self.connect('propmodel.duct.drag','hxadder.drag_hx')
         self.connect('propmodel.hx.frontal_area','hxadder.hx_frontal_area')
         self.add_subsystem('nozzle_area', MaxComp(num_nodes=nn, units='m**2'))
-        self.connect('ac|propulsion|thermal|duct|area_nozzle','nozzle_area.array')
+        self.connect('propmodel.refrig.hot_side_balance_param', 'nozzle_area.array')
         self.connect('nozzle_area.max','hxadder.nozzle_area')
         intfuel = self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson', diff_units='s',
                                                               time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
@@ -157,7 +157,6 @@ class ElectricTwinAnalysisGroup(Group):
         dv_comp.add_output('ac|propulsion|thermal|hx|channel_height',20.,units='mm')
         dv_comp.add_output('ac|propulsion|thermal|hx|channel_length',val=0.2,units='m')
         dv_comp.add_output('ac|propulsion|thermal|hx|n_parallel',val=50,units=None)
-        # dv_comp.add_output('ac|propulsion|thermal|duct|area_nozzle',val=58.*np.ones((nn,)),units='inch**2')
         dv_comp.add_output('ac|propulsion|thermal|hx|n_wide_cold',val=430,units=None)
         dv_comp.add_output('ac|propulsion|battery|specific_energy',val=300,units='W*h/kg')
 
@@ -168,11 +167,10 @@ class ElectricTwinAnalysisGroup(Group):
         mission_data_comp = self.add_subsystem('mission_data_comp',IndepVarComp(),promotes_outputs=["*"])
         mission_data_comp.add_output('batt_soc_target', val=0.1, units=None)
         mission_data_comp.add_output('T_motor_initial', val=15, units='degC')
-        mission_data_comp.add_output('T_res_initial', val=15.1, units='degC')
         mission_data_comp.add_output('T_batt_initial', val=10.1, units='degC')
 
         # Ensure that any state variables are connected across the mission as intended
-        analysis = self.add_subsystem('analysis',FullMissionAnalysis(num_nodes=nn,
+        analysis = self.add_subsystem('analysis',BasicMission(num_nodes=nn,
                                                                      aircraft_model=SeriesHybridTwinModel),
                                                  promotes_inputs=['*'],promotes_outputs=
                                                  ['*'])
@@ -194,9 +192,8 @@ class ElectricTwinAnalysisGroup(Group):
         self.connect('ac|weights|MTOW','aug_obj.ac|weights|MTOW')
         self.connect('descent.fuel_used_final','aug_obj.fuel_burn')
 
-        self.connect('T_motor_initial','v0v1.propmodel.motorheatsink.T_initial')
-        self.connect('T_res_initial','v0v1.propmodel.reservoir.T_initial')
-        self.connect('T_batt_initial','v0v1.propmodel.batteryheatsink.T_initial')
+        self.connect('T_motor_initial','climb.propmodel.motorheatsink.T_initial')
+        self.connect('T_batt_initial','climb.propmodel.batteryheatsink.T_initial')
 
 def configure_problem():
     prob = Problem()
@@ -208,10 +205,12 @@ def configure_problem():
     prob.model.nonlinear_solver.options['maxiter'] = 10
     prob.model.nonlinear_solver.options['atol'] = 1e-8
     prob.model.nonlinear_solver.options['rtol'] = 1e-8
+    prob.model.nonlinear_solver.linesearch = BoundsEnforceLS()
+    # prob.model.nonlinear_solver.linesearch.options['print_bound_enforce'] = True
     return prob
 
 def set_values(prob, num_nodes, design_range, spec_energy):
-    # set some (required) mission parameters. Each pahse needs a vertical and air-speed
+    # set some (required) mission parameters. Each phase needs a vertical and air-speed
     # the entire mission needs a cruise altitude and range
     prob.set_val('climb.fltcond|vs', np.ones((num_nodes,))*1500, units='ft/min')
     prob.set_val('climb.fltcond|Ueas', np.ones((num_nodes,))*124, units='kn')
@@ -224,18 +223,21 @@ def set_values(prob, num_nodes, design_range, spec_energy):
     prob.set_val('mission_range',design_range,units='NM')
     prob.set_val('payload',1000,units='lb')
     prob.set_val('ac|propulsion|battery|specific_energy', spec_energy, units='W*h/kg')
-
-    # (optional) guesses for takeoff speeds may help with convergence
-    prob.set_val('v0v1.fltcond|Utrue',np.ones((num_nodes))*50,units='kn')
-    prob.set_val('v1vr.fltcond|Utrue',np.ones((num_nodes))*85,units='kn')
-    prob.set_val('v1v0.fltcond|Utrue',np.ones((num_nodes))*85,units='kn')
-
+    prob.set_val('climb.propmodel.refrig_T_h_set', np.linspace(550, 450, num_nodes), units='K')
+    prob.set_val('cruise.propmodel.refrig_T_h_set', np.linspace(250, 250, num_nodes), units='K')
+    prob.set_val('descent.propmodel.refrig_T_h_set', np.linspace(400, 400, num_nodes), units='K')
     # set some airplane-specific values
     prob['analysis.cruise.acmodel.OEW.const.structural_fudge'] = 2.0
     prob['ac|propulsion|propeller|diameter'] = 2.2
     prob['ac|propulsion|engine|rating'] = 1117.2
 
-def run_hybrid_twin_thermal_analysis(plots=False):
+    # Turn off the refrigerator during certain segments
+    prob['analysis.cruise.acmodel.propmodel.bypass_refrig'] = np.ones((num_nodes,), dtype=int)
+
+    # set the initial battery SOC to match the HybridTwin_thermal after takeoff
+    prob.set_val('climb.propmodel.batt1.SOC_initial', 0.8611499461827815, units=None)
+
+def run_hybrid_twin_active_thermal_analysis(plots=False):
     prob = configure_problem()
     prob.setup(check=False)
     prob['cruise.hybridization'] = 0.05778372636876463
@@ -248,27 +250,24 @@ def run_hybrid_twin_thermal_analysis(plots=False):
 def show_outputs(prob):
     # print some outputs
     vars_list = ['ac|weights|MTOW','climb.OEW','descent.fuel_used_final',
-                 'rotate.range_final','descent.propmodel.batt1.SOC_final','cruise.hybridization',
+                 'descent.propmodel.batt1.SOC_final','cruise.hybridization',
                  'ac|weights|W_battery','margins.MTOW_margin',
                  'ac|propulsion|motor|rating','ac|propulsion|generator|rating','ac|propulsion|engine|rating',
-                 'ac|geom|wing|S_ref','v0v1.Vstall_eas','v0v1.takeoff|vr',
-                 'engineoutclimb.gamma',
+                 'ac|geom|wing|S_ref',
                  'cruise.propmodel.duct.drag', 'ac|propulsion|thermal|hx|coolant_mass',
                  'climb.propmodel.duct.mdot']
     units = ['lb','lb','lb',
-             'ft', None, None,
+             None, None,
              'lb','lb',
              'hp','hp','hp',
-             'ft**2','kn','kn',
-             'deg',
+             'ft**2',
              'lbf','lb',
              'lb/s']
     nice_print_names = ['MTOW', 'OEW', 'Fuel used',
-                        'TOFL (over 35ft obstacle)', 'Final state of charge', 'Cruise hybridization',
+                        'Final state of charge', 'Cruise hybridization',
                         'Battery weight','MTOW margin',
                         'Motor rating', 'Generator rating', 'Engine rating',
-                        'Wing area', 'Stall speed', 'Rotate speed',
-                        'Engine out climb angle',
+                        'Wing area',
                         'Coolant duct cruise drag', 'Coolant mass',
                         'Coolant duct mass flow']
     print("=======================================================================")
@@ -284,16 +283,12 @@ def show_outputs(prob):
         x_var = 'range'
         x_unit = 'NM'
         y_vars = ['fltcond|h','fltcond|Ueas','fuel_used','throttle','fltcond|vs','propmodel.batt1.SOC',
-                  'propmodel.motorheatsink.T','propmodel.batteryheatsink.T','propmodel.reservoir.T_out']
-        y_units = ['ft','kn','lbm',None,'ft/min',None,'degC','degC','degC']
+                  'propmodel.motorheatsink.T','propmodel.batteryheatsink.T','propmodel.refrig.hot_side_balance_param']
+        y_units = ['ft','kn','lbm',None,'ft/min',None,'degC','degC','inch**2']
         x_label = 'Range (nmi)'
-        y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)', 'Battery SOC', 'Motor temp', 'Battery temp','Reservoir outlet temp']
-        phases = ['v0v1','v1vr','v1v0','rotate']
-        plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
-                        x_label=x_label, y_labels=y_labels, marker='o',
-                        plot_title='Takeoff Profile')
+        y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)', 'Battery SOC', 'Motor temp', 'Battery temp', 'HX area']
 
-        phases = ['v0v1','v1vr','rotate','climb','cruise','descent']
+        phases = ['climb','cruise','descent']
         plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels, marker='-',
                         plot_title='Full Mission Profile')
@@ -305,7 +300,7 @@ if __name__ == "__main__":
 
     if run_type == 'example':
         # runs a default analysis-only mission (no optimization)
-        run_hybrid_twin_thermal_analysis(plots=True)
+        run_hybrid_twin_active_thermal_analysis(plots=True)
 
     else:
         # can run a sweep of design range and spec energy (not tested)
