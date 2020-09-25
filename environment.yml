@@ -16,3 +16,4 @@ dependencies:
     - six
     - sphinx_rtd_theme
     - redbaron
+    - dymos

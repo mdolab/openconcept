@@ -9,3 +9,4 @@ six
 sphinx
 sphinx_rtd_theme
 redbaron
+dymos
