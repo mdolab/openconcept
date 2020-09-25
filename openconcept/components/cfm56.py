@@ -48,8 +48,8 @@ def CFM56(num_nodes=1, plot=False):
             for kthrot, throttle in enumerate(np.array([10, 9, 8, 7, 6, 5, 4, 3, 2])*0.1):
                 thrustijk = thrustdata[ialt, jmach, kthrot]
                 if thrustijk > 0.0:
-                    # if not (mach > 0.5 and altitude == 0.0):
-                    krigedata.append(np.array([throttle, altitude, mach, thrustijk.copy(), fuelburndata[ialt, jmach, kthrot].copy(), t4data[ialt, jmach, kthrot].copy()]))
+                    if not (mach > 0.5 and altitude == 0.0):
+                        krigedata.append(np.array([throttle, altitude, mach, thrustijk.copy(), fuelburndata[ialt, jmach, kthrot].copy(), t4data[ialt, jmach, kthrot].copy()]))
 
     a = np.array(krigedata)
     comp = om.MetaModelUnStructuredComp(vec_size=num_nodes)
