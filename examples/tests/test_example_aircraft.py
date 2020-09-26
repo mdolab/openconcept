@@ -115,8 +115,8 @@ class B738TestCase(unittest.TestCase):
     def test_values_B738(self):
         prob = self.prob
         # block fuel
-        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lbm'), 28549.432517, tolerance=1e-4)
+        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lbm'), 28549.432517, tolerance=3e-4)
         # changelog: 9/2020 - previously 28688.329, updated CFM surrogate model to reject spurious high Mach, low altitude points
         # total fuel
-        assert_near_equal(prob.get_val('loiter.fuel_used_final', units='lbm'), 34424.68533072, tolerance=1e-4)
+        assert_near_equal(prob.get_val('loiter.fuel_used_final', units='lbm'), 34424.68533072, tolerance=3e-4)
         # changelog: 9/2020 - previously 34555.313, updated CFM surrogate model to reject spurious high Mach, low altitude points
