@@ -9,17 +9,17 @@ class BandolierCoolingSystem(om.ExplicitComponent):
     based on Tesla's Model 3 design.
 
     Assumptions:
-    - Heat generated uniformly in the cell
-    - Weight per cell and thermal resistance stay constant
+    Heat generated uniformly in the cell
+    Weight per cell and thermal resistance stay constant
     even as specific energy varies parametrically
     (this means that cell count is constant with pack WEIGHT,
     not pack ENERGY as technology improves)
-    - Cylindrical cells attached to Tesla-style thermal ribbon
-    - Liquid cooling
-    - Heat transfer through axial direction only (not baseplate)
-    - 2170 cells (21 mm diameter, 70mm tall)
-    - Battery thermal model assumes unsteady cell temperature,
-      quasi-steady temperature gradients
+    Cylindrical cells attached to Tesla-style thermal ribbon
+    Liquid cooling
+    Heat transfer through axial direction only (not baseplate)
+    2170 cells (21 mm diameter, 70mm tall)
+    Battery thermal model assumes unsteady cell temperature,
+    quasi-steady temperature gradients
 
     Inputs
     ------
