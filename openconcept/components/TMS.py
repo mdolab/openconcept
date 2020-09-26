@@ -16,7 +16,7 @@ from openconcept.utilities.math.integrals import Integrator
 from openconcept.components.thermal import ThermalComponentWithMass, ConstantSurfaceTemperatureColdPlate_NTU
 from openconcept.components.thermal import SimpleHeatPump, HeatPumpWithIntegratedCoolantLoop, LiquidCooledComp
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
-from battery_cooling import LiquidCooledBattery ################################################### THIS WILL CHANGE #######################################
+from openconcept.components.heat_sinks import LiquidCooledBattery
 
 class ParallelTMS(Group):
     """
@@ -38,11 +38,11 @@ class ParallelTMS(Group):
     Two parameters are varied so that the battery and motor temperatures
     are at their desired temperature (set using a combination of the limit
     temperatures and temperature buffer). Those two parameters are the following:
-        1. The refrigerator cold side set temperature is adjusted to
-           set the battery temperature
-        2. The amount of coolant that goes to the motor vs. the battery (think
-           of this as how open the splitter valve is) is used to set the
-           motor temperature
+    1. The refrigerator cold side set temperature is adjusted to
+    set the battery temperature
+    2. The amount of coolant that goes to the motor vs. the battery (think
+    of this as how open the splitter valve is) is used to set the
+    motor temperature
 
     Options
     -------
