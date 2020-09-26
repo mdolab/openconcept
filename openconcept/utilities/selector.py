@@ -25,8 +25,8 @@ class SelectorComp(om.ExplicitComponent):
         in the range [0, # of inputs) and if the data type is not already an int, it is rounded to
         the nearest integer value (vector, default 0)
     user defined inputs : any
-        The data inputs must be specified by the user using the specify_inputs method,
-        which must be called before setup and all inputs must have the same units (vector)
+        The data inputs must be specified by the user using the input_names option
+        and all inputs must have the same units, if none are specified error is raised (vector)
     
     Outputs
     -------
