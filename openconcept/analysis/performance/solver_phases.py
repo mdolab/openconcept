@@ -772,7 +772,7 @@ class SteadyFlightPhase(oc.PhaseGroup):
         self.add_subsystem('lift',Lift(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('haccel',HorizontalAcceleration(num_nodes=nn), promotes_inputs=['*'],promotes_outputs=['*'])
         integ.add_integrand('range', rate_name='fltcond|groundspeed', val=1.0, units='m')
-        self.add_subsystem('steadyflt',BalanceComp(name='throttle',val=np.ones((nn,))*0.5,lower=0.01,upper=2.0,units=None,normalize=False,eq_units='m/s**2',rhs_name='accel_horiz',lhs_name='zero_accel',rhs_val=np.zeros((nn,))),
+        self.add_subsystem('steadyflt',BalanceComp(name='throttle',val=np.ones((nn,))*0.5,lower=0.01,upper=1.05,units=None,normalize=False,eq_units='m/s**2',rhs_name='accel_horiz',lhs_name='zero_accel',rhs_val=np.zeros((nn,))),
                            promotes_inputs=['accel_horiz','zero_accel'],promotes_outputs=['throttle'])
 
 # class OldSteadyFlightPhase(Group):

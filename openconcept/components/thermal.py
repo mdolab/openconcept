@@ -822,11 +822,12 @@ class ConstantSurfaceTemperatureColdPlate_NTU(ExplicitComponent):
         Cmin = inputs['mdot_coolant'] * self.options['specific_heat']
 
         #cross_section_area = inputs['channel_width'] * inputs['channel_height'] * inputs['n_parallel']
-        #flow_rate = inputs['mdot_coolant'] / self.options['rho'] / cross_section_area # m/s
+        #flow_rate = inputs['mdot_coolant'] / self.options['fluid_rho'] / cross_section_area # m/s
         surface_area = 2 * (inputs['channel_width']*inputs['channel_length'] +
                             inputs['channel_height'] * inputs['channel_length']) * inputs['n_parallel']
         d_h = 2 * inputs['channel_width'] * inputs['channel_height'] / (inputs['channel_width'] + inputs['channel_height'])
 
+        # redh = self.options['fluid_rho'] * flow_rate * d_h / 3.39e-3
         h = self.options['nusselt'] * self.options['fluid_k'] / d_h
         ntu = surface_area * h / Cmin
         effectiveness = 1 - np.exp(-ntu)
@@ -969,7 +970,7 @@ class LiquidCoolantTestGroup(Group):
         iv = self.add_subsystem('iv',IndepVarComp(), promotes_outputs=['*'])
         #iv.add_output('q_in', val=10*np.concatenate([np.ones((nn,)),0.5*np.ones((nn,)),0.2*np.ones((nn,))]), units='kW')
         throttle_profile = np.ones((nn,))
-        iv.add_output('q_in',val=10*throttle_profile, units='kW')
+        iv.add_output('q_in',val=20*throttle_profile, units='kW')
         #iv.add_output('T_in', val=40*np.ones((nn_tot,)), units='degC')
         iv.add_output('mdot_coolant', val=0.1*np.ones((nn,)), units='kg/s')
         iv.add_output('rho_coolant', val=997*np.ones((nn,)),units='kg/m**3')
@@ -982,8 +983,8 @@ class LiquidCoolantTestGroup(Group):
         iv.add_output('channel_height', val=20, units='mm')
         iv.add_output('channel_length', val=0.2, units='m')
         iv.add_output('n_parallel', val=20)
-        Ueas = np.ones((nn))*150
-        h = np.concatenate([np.linspace(0,25000,nn)])
+        Ueas = np.ones((nn))*260
+        h = np.concatenate([np.linspace(0,35000,nn)])
         iv.add_output('fltcond|Ueas', val=Ueas, units='kn' )
         iv.add_output('fltcond|h', val=h, units='ft')
 
@@ -1041,7 +1042,7 @@ if __name__ == '__main__':
     prob.model.nonlinear_solver.options['atol'] = 1e-8
     prob.model.nonlinear_solver.options['rtol'] = 1e-8
     prob.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar',print_bound_enforce=True)
-
+    prob.model.nonlinear_solver.linesearch.options['print_bound_enforce'] = True
     prob.setup(check=True,force_alloc_complex=True)
 
     prob.run_model()
@@ -1049,7 +1050,7 @@ if __name__ == '__main__':
     print(np.max(prob['component.T']-273.15))
     print(np.max(-prob['duct.force.F_net']))
 
-    prob.check_partials(method='cs', compact_print=True)
+    # prob.check_partials(method='cs', compact_print=True)
 
     #prob.model.list_outputs(units=True, print_arrays=True)
     if quasi_steady:
@@ -1085,3 +1086,4 @@ if __name__ == '__main__':
     plt.xlabel('M_inf')
     # plt.ylabel('M_nozzle')
     plt.show()
+    prob.model.list_outputs(print_arrays=True)

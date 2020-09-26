@@ -12,7 +12,7 @@ dependencies:
   - pip
   - pip:
     - pytest
-    - openmdao
+    - openmdao<=3.2.1
     - six
     - sphinx_rtd_theme
     - redbaron

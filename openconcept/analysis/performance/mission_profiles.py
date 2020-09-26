@@ -130,7 +130,6 @@ class BasicMission(oc.TrajectoryGroup):
     """
     This analysis group is set up to compute all the major parameters
     of a fixed wing mission, including climb, cruise, and descent but no Part 25 reserves
-
     To use this analysis, pass in an aircraft model following OpenConcept interface.
     Namely, the model should consume the following:
     - flight conditions (fltcond|q/rho/p/T/Utrue/Ueas/...)
@@ -138,18 +137,15 @@ class BasicMission(oc.TrajectoryGroup):
     - lift coefficient (fltcond|CL; either solved from steady flight or assumed during ground roll)
     - throttle
     - propulsor_failed (value 0 when failed, 1 when not failed)
-
     and produce top-level outputs:
     - thrust
     - drag
     - weight
-
     the following parameters need to either be defined as design variables or
     given as top-level analysis outputs from the airplane model:
     - ac|geom|S_ref
     - ac|aero|CL_max_flaps30
     - ac|weights|MTOW
-
 
     Inputs
     ------
@@ -163,7 +159,7 @@ class BasicMission(oc.TrajectoryGroup):
         Mission payload (default 1000 lbm)
     mission_range : float
         Design range (deault 1250 NM)
-
+        
     Options
     -------
     aircraft_model : class
@@ -175,16 +171,24 @@ class BasicMission(oc.TrajectoryGroup):
     def initialize(self):
         self.options.declare('num_nodes', default=9, desc="Number of points per segment. Needs to be 2N + 1 due to simpson's rule")
         self.options.declare('aircraft_model', default=None, desc="OpenConcept-compliant airplane model")
+        self.options.declare('include_ground_roll', default=False, desc='Whether to include groundroll phase')
 
     def setup(self):
             nn = self.options['num_nodes']
             acmodelclass = self.options['aircraft_model']
+            grflag = self.options['include_ground_roll']
 
             mp = self.add_subsystem('missionparams', om.IndepVarComp(),promotes_outputs=['*'])
             mp.add_output('takeoff|h',val=0.,units='ft')
             mp.add_output('cruise|h0',val=28000.,units='ft')
             mp.add_output('mission_range',val=1250.,units='NM')
             mp.add_output('payload',val=1000.,units='lbm')
+            mp.add_output('takeoff|v2', val=150., units='kn')
+
+            if grflag:
+                mp.add_output('takeoff|v0', val=4.0, units='kn')
+                phase0 = self.add_subsystem('groundroll', GroundRollPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='v0v1'), promotes_inputs=['ac|*'])                
+                self.connect('takeoff|v2', 'groundroll.takeoff|v1')
 
             # add the climb, cruise, and descent segments
             phase1 = self.add_subsystem('climb',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='climb'),promotes_inputs=['ac|*'])
@@ -206,9 +210,10 @@ class BasicMission(oc.TrajectoryGroup):
             self.connect('takeoff|h', 'descent.descentdt.takeoff|h')
             phase3.connect('ode_integ.fltcond|h_final','descentdt.fltcond|h_final')
 
+            if grflag:
+                self.link_phases(phase0, phase1, states_to_skip=['fltcond|h'])
             self.link_phases(phase1, phase2)
             self.link_phases(phase2, phase3)
-
 
 class FullMissionAnalysis(oc.TrajectoryGroup):
     """
