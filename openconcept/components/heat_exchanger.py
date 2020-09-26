@@ -357,7 +357,7 @@ class HydraulicDiameterReynoldsNumber(ExplicitComponent):
         self.add_input('xs_area_hot', units='m**2')
         self.add_input('dh_hot', units='m')
 
-        self.add_output('Re_dh_cold', shape=(nn,), lower=1e-10)
+        self.add_output('Re_dh_cold', shape=(nn,), lower=1e-1)
         self.add_output('Re_dh_hot', shape=(nn,), lower=1e-10)
         arange = np.arange(0, nn)
         self.declare_partials(['Re_dh_cold'], ['mdot_cold'], rows=arange, cols=arange)
@@ -1195,7 +1195,7 @@ class HXGroup(Group):
     rho_cold : float
         Inflow density of the cold side (air) (vector, kg/m**3)
     mdot_hot : float
-        Mass flow rate of the hot die (liquid) (vector, kg/s)
+        Mass flow rate of the hot side (liquid) (vector, kg/s)
     T_in_hot : float
         Inflow temperature of the hot side (liquid) (vector, kg/s)
     rho_hot : float
