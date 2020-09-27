@@ -30,7 +30,7 @@ class QuasiSteadyBatteryCoolingTestCase(unittest.TestCase):
         assert_near_equal(prob.get_val('T_core', units='K'), 307.10184074, tolerance=1e-10)
         assert_near_equal(prob.get_val('test.hex.q', units='W'), 2000.0, tolerance=1e-10)
         assert_near_equal(prob.get_val('T_out', units='K'), 298.6761773, tolerance=1e-10)
-        assert_near_equal(prob.get_val('test.thermal_bal.T', units='K'), 303.02094476, tolerance=1e-10)
+        assert_near_equal(prob.get_val('T', units='K'), 303.02094476, tolerance=1e-10)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
@@ -51,12 +51,12 @@ class QuasiSteadyBatteryCoolingTestCase(unittest.TestCase):
                           np.array([333.67617732, 333.75510392, 333.83403052, 333.91295712,
                            333.99188371, 334.07081031, 334.14973691, 334.22866351,
                            334.30759011, 334.38651671, 334.4654433 ])-35., tolerance=1e-10)
-        assert_near_equal(prob.get_val('test.thermal_bal.T', units='K'),
+        assert_near_equal(prob.get_val('T', units='K'),
                           np.array([338.02094476, 338.75158647, 339.48222819, 340.2128699 ,
                         340.94351162, 341.67415333, 342.40479505, 343.13543676,
                         343.86607847, 344.59672019, 345.3273619])-35., tolerance=1e-10)
 
-        prob.model.list_outputs(print_arrays=True, units='True')
+        # prob.model.list_outputs(print_arrays=True, units='True')
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
@@ -116,12 +116,12 @@ class UnsteadyBatteryCoolingTestCase(unittest.TestCase):
         prob.model.nonlinear_solver.options['maxiter'] = 20
         prob.model.nonlinear_solver.options['atol'] = 1e-6
         prob.model.nonlinear_solver.options['rtol'] = 1e-6    
-        prob.setup()
+        prob.setup(force_alloc_complex=True)
         # set the initial value of the state at the beginning of the TrajectoryGroup
         prob['phase1.vm.bcs.T_initial'] = 300.
         prob.run_model()
-        prob.model.list_outputs(print_arrays=True, units=True)
-        prob.model.list_inputs(print_arrays=True, units=True)
+        # prob.model.list_outputs(print_arrays=True, units=True)
+        # prob.model.list_inputs(print_arrays=True, units=True)
         
         return prob
 
@@ -145,11 +145,120 @@ class UnsteadyBatteryCoolingTestCase(unittest.TestCase):
                                310.23990666, 310.30540727, 310.31931397, 310.32534156,
                                310.3266213 , 310.32717598, 310.32729375]), tolerance=1e-10)
 
-        prob.model.list_outputs(print_arrays=True, units='True')
+        # prob.model.list_outputs(print_arrays=True, units='True')
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
+class QuasiSteadyMotorCoolingTestCase(unittest.TestCase):
+    """
+    Test the liquid cooled motor in quasi-steady (massless) mode
+    """
+    def generate_model(self, nn):
+        prob = om.Problem()
+        ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes_outputs=['*'])
+        ivc.add_output('q_in', val=np.ones((nn,))*10000, units='W')
+        ivc.add_output('T_in', 25.*np.ones((nn,)), units='degC')
+        ivc.add_output('mdot_coolant', 1.0*np.ones((nn,)), units='kg/s')
+        ivc.add_output('motor_weight', 40, units='kg')
+        ivc.add_output('power_rating', 200, units='kW')
+        prob.model.add_subsystem('lcm', LiquidCooledMotor(num_nodes=nn, quasi_steady=True), promotes_inputs=['*'])
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+        prob.model.linear_solver = om.DirectSolver()
+        prob.setup(check=True, force_alloc_complex=True)
+        return prob
 
+    def test_scalar(self):
+        prob = self.generate_model(nn=1)
+        prob.run_model()
+        assert_near_equal(prob.get_val('lcm.dTdt'), 0.0, tolerance=1e-14)
+        assert_near_equal(prob.get_val('lcm.T', units='K'), 327.69545455, tolerance=1e-10)
+        assert_near_equal(prob.get_val('lcm.T_out', units='K'), 300.78088661, tolerance=1e-10)
+        partials = prob.check_partials(method='cs',compact_print=True)
+        # prob.model.list_outputs(print_arrays=True, units=True)
+        assert_check_partials(partials)
+
+    def test_vector(self):
+        prob = self.generate_model(nn=11)
+        prob.run_model()
+        assert_near_equal(prob.get_val('lcm.dTdt'), np.zeros((11,)), tolerance=1e-14)
+        assert_near_equal(prob.get_val('lcm.T', units='K'), np.ones((11,))*327.69545455, tolerance=1e-10)
+        assert_near_equal(prob.get_val('lcm.T_out', units='K'), np.ones((11,))*300.78088661, tolerance=1e-10)
+        # prob.model.list_outputs(print_arrays=True, units='True')
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+
+class UnsteadyMotorCoolingTestCase(unittest.TestCase):
+    """
+    Test the liquid cooled motor in unsteady mode
+    """
+    def generate_model(self, nn):
+        """
+        An example demonstrating unsteady motor cooling
+        """
+        import openconcept.api as oc
+        import openmdao.api as om
+        import numpy as np
+
+        class VehicleModel(om.Group):
+            def initialize(self):
+                self.options.declare('num_nodes', default=11)                
+                
+            def setup(self):
+                num_nodes = self.options['num_nodes']
+                ivc = self.add_subsystem('ivc', om.IndepVarComp(), promotes_outputs=['*'])
+                ivc.add_output('q_in', val=np.ones((num_nodes,))*10000, units='W')
+                ivc.add_output('T_in', 25.*np.ones((num_nodes,)), units='degC')
+                ivc.add_output('mdot_coolant', 1.0*np.ones((num_nodes,)), units='kg/s')
+                ivc.add_output('motor_weight', 40, units='kg')
+                ivc.add_output('power_rating', 200, units='kW')
+                self.add_subsystem('lcm', LiquidCooledMotor(num_nodes=num_nodes, quasi_steady=False), promotes_inputs=['*'])
+
+        class TrajectoryPhase(oc.PhaseGroup):
+            "An OpenConcept Phase comprises part of a time-based TrajectoryGroup and always needs to have a 'duration' defined"
+            def setup(self):
+                self.add_subsystem('ivc', om.IndepVarComp('duration', val=20, units='min'), promotes_outputs=['duration'])
+                self.add_subsystem('vm', VehicleModel(num_nodes=self.options['num_nodes']))
+
+        class Trajectory(oc.TrajectoryGroup):
+            "An OpenConcept TrajectoryGroup consists of one or more phases that may be linked together. This will often be a top-level model"
+            def setup(self):
+                self.add_subsystem('phase1', TrajectoryPhase(num_nodes=nn)) 
+                # self.add_subsystem('phase2', TrajectoryPhase(num_nodes=nn))
+                # the link_phases directive ensures continuity of state variables across phase boundaries
+                # self.link_phases(self.phase1, self.phase2)
+
+        prob = om.Problem(Trajectory())
+        prob.model.nonlinear_solver = om.NewtonSolver(iprint=2)
+        prob.model.linear_solver = om.DirectSolver()
+        prob.model.nonlinear_solver.options['solve_subsystems'] = True
+        prob.model.nonlinear_solver.options['maxiter'] = 20
+        prob.model.nonlinear_solver.options['atol'] = 1e-6
+        prob.model.nonlinear_solver.options['rtol'] = 1e-6    
+        prob.setup(force_alloc_complex=True)
+        # set the initial value of the state at the beginning of the TrajectoryGroup
+        prob['phase1.vm.T_initial'] = 300.
+        prob.run_model()
+        # prob.model.list_outputs(print_arrays=True, units=True)
+        # prob.model.list_inputs(print_arrays=True, units=True)
+        
+        return prob
+
+    def test_vector(self):
+        prob = self.generate_model(nn=11)
+        prob.run_model()
+        assert_near_equal(prob.get_val('phase1.vm.lcm.T', units='K'),
+                          np.array([300.        , 318.88835729, 324.35258729, 326.63242967,
+                             327.29196734, 327.56714645, 327.64675326, 327.67996764,
+                             327.68957626, 327.69358526, 327.69474503]), tolerance=1e-10)
+        assert_near_equal(prob.get_val('phase1.vm.lcm.T_out', units='K'), 
+                          np.array([298.31473398, 299.99665517, 300.48321968, 300.68622914,
+                             300.74495793, 300.76946136, 300.77654998, 300.77950757,
+                             300.78036317, 300.78072016, 300.78082343]), tolerance=1e-10)
+        # prob.model.list_outputs(print_arrays=True, units='True')
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
 
 if __name__ == "__main__":
     unittest.main()
+
+
