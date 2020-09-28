@@ -71,7 +71,7 @@ propulsion['battery']   = battery
 
 thermal = dict()
 hx = dict()
-hx['n_wide_cold']       = {'value': 1000, 'units': None}
+hx['n_wide_cold']       = {'value': 750, 'units': None}
 thermal['hx'] = hx
 propulsion['thermal'] = thermal
 

@@ -22,11 +22,11 @@ class OffsetStripFinGeometry(ExplicitComponent):
     fin_length_hot : float
         Length of each offset strip fin on the hot side (scalar, m)
     channel_width_cold : float
-        Width of each finned flow channel on the hot side (scalar, m)
+        Width of each finned flow channel on the cold side (scalar, m)
     channel_height_cold : float
-        Height of each finned flow channel on the hot side (scalar, m)
+        Height of each finned flow channel on the cold side (scalar, m)
     fin_length_cold : float
-        Length of each offset strip fin on the hot side (scalar, m)
+        Length of each offset strip fin on the cold side (scalar, m)
     fin_thickness : float
         Thickness of fin material (scalar, m)
     plate_thickness : float

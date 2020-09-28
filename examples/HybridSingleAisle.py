@@ -66,7 +66,7 @@ class HybridSingleAisleModel(oc.IntegratorGroup):
         iv = self.add_subsystem('iv',om.IndepVarComp(), promotes_outputs=['*'])
         iv.add_output('mdot_coolant', val=6.0*np.ones((nn,)), units='kg/s')
         iv.add_output('rho_coolant', val=997*np.ones((nn,)),units='kg/m**3')
-        iv.add_output('area_nozzle', val=58*np.ones((nn,)), units='inch**2')
+        iv.add_output('area_nozzle', val=90*np.ones((nn,)), units='inch**2')
         lc_promotes = [('power_rating','ac|propulsion|motor|rating')]
         self.add_subsystem('motorheatsink',
                            LiquidCooledMotor(num_nodes=nn,
@@ -90,11 +90,21 @@ class HybridSingleAisleModel(oc.IntegratorGroup):
         # self.connect('duct.mdot','hx.mdot_cold')
         self.connect('hx.delta_p_cold','duct.delta_p_hex')
 
-        self.connect('motorheatsink.T_out','batteryheatsink.T_in')
-        self.connect('batteryheatsink.T_out', 'hx.T_in_hot')
-        self.connect('hx.T_out_hot','motorheatsink.T_in')
+        
         self.connect('rho_coolant','hx.rho_hot')
-        self.connect('mdot_coolant',['motorheatsink.mdot_coolant','hx.mdot_hot','batteryheatsink.mdot_coolant'])
+
+        self.add_subsystem('fluid_split', FlowSplit(num_nodes=nn))
+        self.connect('mdot_coolant', 'fluid_split.mdot_in')
+        self.connect('fluid_split.mdot_out_A',['motorheatsink.mdot_coolant','fluid_combine.mdot_in_A'])
+        self.connect('fluid_split.mdot_out_B',['batteryheatsink.mdot_coolant','fluid_combine.mdot_in_B'])
+        self.connect('hx.T_out_hot',['motorheatsink.T_in','batteryheatsink.T_in'])
+
+        self.add_subsystem('fluid_combine', FlowCombine(num_nodes=nn))
+        self.connect('motorheatsink.T_out','fluid_combine.T_in_A')
+        self.connect('batteryheatsink.T_out','fluid_combine.T_in_B')
+        self.connect('fluid_combine.mdot_out','hx.mdot_hot')
+        self.connect('fluid_combine.T_out','hx.T_in_hot')
+        
 
         duct = self.add_subsystem('duct2',
                            ImplicitCompressibleDuct_ExternalHX(num_nodes=nn),
@@ -222,7 +232,7 @@ def configure_problem():
     prob.model = HybridSingleAisleAnalysisGroup()
     prob.model.nonlinear_solver = om.NewtonSolver(iprint=2,solve_subsystems=True)
     prob.model.linear_solver = om.DirectSolver()
-    prob.model.nonlinear_solver.options['maxiter'] = 8
+    prob.model.nonlinear_solver.options['maxiter'] = 20
     prob.model.nonlinear_solver.options['atol'] = 1e-6
     prob.model.nonlinear_solver.options['rtol'] = 1e-6
     prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
@@ -254,14 +264,21 @@ def set_values(prob, num_nodes):
     #               'reserve_cruise', 'reserve_descent', 'loiter']
     phases_list = ['groundroll','climb', 'cruise', 'descent']          
     for phase in phases_list:
+        prob.set_val(phase+'.duct2.area_1', 150, units='inch**2')
         prob.set_val(phase+'.hybrid_motor.throttle', 0.00)
         prob.set_val(phase+'.fltcond|TempIncrement', 20, units='degC')
         prob.set_val(phase+'.duct2.sta1.M', 0.8)
         prob.set_val(phase+'.duct2.sta2.M', 0.05)
         prob.set_val(phase+'.duct2.sta3.M', 0.05)
         prob.set_val(phase+'.duct2.nozzle.nozzle_pressure_ratio', 0.95)
+        prob.set_val(phase+'.duct2.convergence_hack', -1.0, units='Pa')
+        prob.set_val(phase+'.fluid_split.mdot_split_fraction', 0.2, units=None)
+        prob.set_val(phase+'.hx.channel_height_hot', 3, units='mm')
+        prob.set_val(phase+'.hx.n_long_cold', 4)
+        prob.set_val(phase+'.hx.n_tall', 50, units=None)
     prob.set_val('groundroll.duct2.sta1.M', 0.2)
     prob.set_val('groundroll.duct2.nozzle.nozzle_pressure_ratio', 0.85)
+    prob.set_val('groundroll.duct2.convergence_hack', -150, units='Pa')
 
     prob.set_val('groundroll.hybrid_motor.throttle', np.linspace(1.0, 1.0, num_nodes))
     prob.set_val('climb.hybrid_motor.throttle', np.linspace(0.5, 1.0, num_nodes))
@@ -301,9 +318,12 @@ def run_hybrid_sa_analysis(plots=True):
     prob.setup(check=True, mode='fwd')
     set_values(prob, num_nodes)
     prob.run_model()
-    prob.model.list_outputs(includes=['*.M','*.nozzle_pressure*'], print_arrays=True, units=True)
-    # prob.model.list_inputs(includes=['*.sta*'], print_arrays=True, units=True)
+    # prob.model.list_inputs(includes=['*T_in*','*mdot*'], excludes=['*duct*'], print_arrays=True)
+    # prob.model.list_outputs(includes=['*T_out*','*mdot*'], excludes=['*duct*'],  print_arrays=True)
 
+    # prob.model.list_outputs(includes=['*.M','*.nozzle_pressure*'], print_arrays=True, units=True)
+    # prob.model.list_inputs(includes=['*.sta*'], print_arrays=True, units=True)
+    prob.model.list_outputs(includes=['*.hx.*'], units=True, print_arrays=True)
     # prob.check_partials(includes=['*duct2.*'], compact_print=True)
     if plots:
         show_outputs(prob)
