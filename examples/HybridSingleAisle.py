@@ -13,6 +13,7 @@ from openconcept.analysis.performance.mission_profiles import MissionWithReserve
 from openconcept.components.N3opt import N3Hybrid
 from openconcept.components.motor import SimpleMotor
 from openconcept.components.battery import SOCBattery
+from openconcept.utilities.linearinterp import LinearInterpolator
 from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
 from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
 from openconcept.components.thermal import LiquidCooledComp
@@ -66,7 +67,13 @@ class HybridSingleAisleModel(oc.IntegratorGroup):
         iv = self.add_subsystem('iv',om.IndepVarComp(), promotes_outputs=['*'])
         iv.add_output('mdot_coolant', val=6.0*np.ones((nn,)), units='kg/s')
         iv.add_output('rho_coolant', val=997*np.ones((nn,)),units='kg/m**3')
-        iv.add_output('area_nozzle', val=90*np.ones((nn,)), units='inch**2')
+        iv.add_output('area_nozzle_start', val=90, units='inch**2')
+        iv.add_output('area_nozzle_end', val=90, units='inch**2')
+
+        li = self.add_subsystem('li',LinearInterpolator(num_nodes=nn, units='inch**2'), promotes_outputs=[('vec', 'area_nozzle')])
+        self.connect('area_nozzle_start','li.start_val')
+        self.connect('area_nozzle_end','li.end_val')
+        
         lc_promotes = [('power_rating','ac|propulsion|motor|rating')]
         self.add_subsystem('motorheatsink',
                            LiquidCooledMotor(num_nodes=nn,
@@ -158,7 +165,7 @@ class HybridSingleAisleModel(oc.IntegratorGroup):
                                             'fltcond|q', ('e', 'ac|aero|polar|e')])
         
         adder = self.add_subsystem('adder', AddSubtractComp(), promotes_outputs=['drag'])
-        adder.add_equation('drag', ['airframe_drag','hx_drag'], vec_size=1, length=nn, val=1.0,
+        adder.add_equation('drag', ['airframe_drag','hx_drag'], vec_size=nn, length=1, val=1.0,
                      units='N', scaling_factors=[1.0, -2.0])
         self.connect('drag.drag', 'adder.airframe_drag')
         self.connect('duct2.force.F_net', 'adder.hx_drag')
@@ -233,8 +240,8 @@ def configure_problem():
     prob.model.nonlinear_solver = om.NewtonSolver(iprint=2,solve_subsystems=True)
     prob.model.linear_solver = om.DirectSolver()
     prob.model.nonlinear_solver.options['maxiter'] = 20
-    prob.model.nonlinear_solver.options['atol'] = 1e-6
-    prob.model.nonlinear_solver.options['rtol'] = 1e-6
+    prob.model.nonlinear_solver.options['atol'] = 1e-7
+    prob.model.nonlinear_solver.options['rtol'] = 1e-7
     prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
     prob.model.nonlinear_solver.linesearch.options['print_bound_enforce'] = True
     return prob
@@ -304,27 +311,55 @@ def show_outputs(prob):
         y_vars = ['fltcond|h','fltcond|Ueas','fuel_used','throttle','fltcond|vs','fltcond|M','fltcond|CL', 'battery.SOC', 'motorheatsink.T', 'batteryheatsink.T', 'batteryheatsink.T_in', 'duct2.force.F_net', 'duct.drag']
         y_units = ['ft','kn','lbm',None,'ft/min', None, None, None, 'degC', 'degC','degC','lbf', 'lbf']
         x_label = 'Range (nmi)'
-        y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)', 'Mach number', 'CL', 'Batt SOC', 'Motor Temp', 'Battery Temp', 'Battery Coolant Inflow Temp', 'Compressible Duct Drag', 'Incomp Duct Drag']
+        y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)', 'Mach number', 'CL', 'Batt SOC', 'Motor Temp', 'Battery Temp (C)', 'Battery Coolant Inflow Temp', 'Cooling Net Force (lb)', 'Incomp Duct Drag']
         # phases = ['climb', 'cruise', 'descent','reserve_climb','reserve_cruise','reserve_descent','loiter']
         phases = ['groundroll','climb', 'cruise', 'descent']
         oc.plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels, marker='-',
-                        plot_title='Hybrid SA Mission Profile')
+                        plot_title='Hybrid Single Aisle Mission')
     # prob.model.list_outputs()
 
 def run_hybrid_sa_analysis(plots=True):
     num_nodes = 21
     prob = configure_problem()
-    prob.setup(check=True, mode='fwd')
+    prob.model.add_design_var('ac|propulsion|thermal|hx|n_wide_cold', 500, 750, scaler=0.01, units=None)
+    prob.model.add_design_var('cruise.hx.n_long_cold', lower=4., upper=75., scaler=0.1)
+    prob.model.add_objective('descent.fuel_used_final')
+
+    phases_list = ['climb','cruise']          
+    for phase in phases_list:
+        prob.model.add_design_var(phase+'.area_nozzle_start', lower=20., upper=150., scaler=1., units='inch**2')
+        prob.model.add_design_var(phase+'.area_nozzle_end', lower=20., upper=150., scaler=1., units='inch**2')
+        prob.model.add_constraint(phase+'.batteryheatsink.T',  upper=45, units='degC')
+    phases_list = ['descent']          
+    for phase in phases_list:
+        prob.model.add_design_var(phase+'.area_nozzle_start', lower=20., upper=150., scaler=1., units='inch**2')
+        prob.model.add_design_var(phase+'.area_nozzle_end', lower=20., upper=150., scaler=1., units='inch**2')
+        prob.model.add_constraint(phase+'.batteryheatsink.T',  indices=[20], upper=40, units='degC')
+    prob.driver = om.pyOptSparseDriver(optimizer='SNOPT')
+    # prob.driver = om.ScipyOptimizeDriver()
+    prob.driver.opt_settings['Major iterations limit'] = 100
+    prob.driver.opt_settings['Function precision'] = 0.00001
+    # prob.driver.opt_settings['Penalty parameter'] = 0.1
+    prob.setup(check=True, mode='fwd', force_alloc_complex=True)
     set_values(prob, num_nodes)
     prob.run_model()
+    phases_list = ['groundroll','climb', 'cruise', 'descent']          
+    # for i in np.arange(10,10):
+    print('=======================================')
+    for phase in phases_list:
+        prob.set_val(phase+'.hx.n_long_cold', 50)
+    prob.run_driver()
+    
     # prob.model.list_inputs(includes=['*T_in*','*mdot*'], excludes=['*duct*'], print_arrays=True)
     # prob.model.list_outputs(includes=['*T_out*','*mdot*'], excludes=['*duct*'],  print_arrays=True)
 
     # prob.model.list_outputs(includes=['*.M','*.nozzle_pressure*'], print_arrays=True, units=True)
     # prob.model.list_inputs(includes=['*.sta*'], print_arrays=True, units=True)
-    prob.model.list_outputs(includes=['*.hx.*'], units=True, print_arrays=True)
-    # prob.check_partials(includes=['*duct2.*'], compact_print=True)
+    prob.model.list_outputs(includes=['*cruise.hx*'], units=True, print_arrays=True)
+    prob.list_problem_vars(print_arrays=True)
+    # prob.check_partials(show_only_incorrect=True, compact_print=True, method='cs',excludes=['*engine*'])
+
     if plots:
         show_outputs(prob)
     return prob

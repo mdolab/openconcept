@@ -148,9 +148,9 @@ class BandolierCoolingSystem(om.ExplicitComponent):
         # UAcomb = 1/(1/hconv/A_heat_trans+1/K_cyl/2/inputs['n_cpb'])
         # qcheck2 = (Tbar - inputs['T_in']) * mdot_b * cpf * (1 - np.exp(-UAcomb/mdot_b/cpf)) / 2 / inputs['n_cpb']
 
-        if np.sum(np.abs(qcheck - outputs['q']/n_cells)) > 1e-5:
-            # the heat flux across the cell is not equal to the heat flux due to convection
-            raise ValueError('The surface temperature solution appears to be wrong')
+        # if np.sum(np.abs(qcheck - outputs['q']/n_cells)) > 1e-5:
+        #     # the heat flux across the cell is not equal to the heat flux due to convection
+        #     raise ValueError('The surface temperature solution appears to be wrong')
 
         outputs['T_out'] = inputs['T_in'] + outputs['q'] / inputs['mdot_coolant'] / cpf
         outputs['T_core'] = (Tbar - Ts) + Tbar

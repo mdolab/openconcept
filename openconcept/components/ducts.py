@@ -219,7 +219,7 @@ class PressureIsentropic(ExplicitComponent):
         gam = self.options['gamma']
         self.add_input('pt', shape=(nn,),  units='Pa')
         self.add_input('M', shape=(nn,))
-        self.add_output('p', shape=(nn,),  units='Pa')
+        self.add_output('p', shape=(nn,),  units='Pa', lower=1.0)
         self.declare_partials(['*'], ['*'], method='cs')
 
     def compute(self, inputs, outputs):
@@ -260,7 +260,7 @@ class TotalPressureIsentropic(ExplicitComponent):
         gam = self.options['gamma']
         self.add_input('p', shape=(nn,),  units='Pa')
         self.add_input('M', shape=(nn,))
-        self.add_output('pt', shape=(nn,),  units='Pa')
+        self.add_output('pt', shape=(nn,),  units='Pa', lower=1.0)
         self.declare_partials(['*'], ['*'], method='cs')
 
     def compute(self, inputs, outputs):
@@ -302,7 +302,7 @@ class DensityIdealGas(ExplicitComponent):
         R = self.options['R']
         self.add_input('p', shape=(nn,),  units='Pa')
         self.add_input('T', shape=(nn,), units='K')
-        self.add_output('rho', shape=(nn,),  units='kg/m**3')
+        self.add_output('rho', shape=(nn,),  units='kg/m**3', lower=1e-6)
         self.declare_partials(['*'], ['*'], method='cs')
 
     def compute(self, inputs, outputs):
@@ -342,7 +342,7 @@ class SpeedOfSound(ExplicitComponent):
     def setup(self):
         nn = self.options['num_nodes']
         self.add_input('T', shape=(nn,), units='K')
-        self.add_output('a', shape=(nn,),  units='m/s')
+        self.add_output('a', shape=(nn,),  units='m/s', lower=1e0)
         arange = np.arange(nn)
         self.declare_partials(['a'], ['T'], rows=arange, cols=arange)
 
@@ -444,8 +444,8 @@ class HeatAdditionPressureLoss(ExplicitComponent):
         self.add_input('heat_in', shape=(nn,), units='W')
         self.add_input('cp', units='J/kg/K')
 
-        self.add_output('Tt_out', shape=(nn,), units='K')
-        self.add_output('pt_out', shape=(nn,), units='Pa')
+        self.add_output('Tt_out', shape=(nn,), units='K', lower=100)
+        self.add_output('pt_out', shape=(nn,), units='Pa', lower=1.0)
 
         arange = np.arange(nn)
 
@@ -457,22 +457,27 @@ class HeatAdditionPressureLoss(ExplicitComponent):
         nn = self.options['num_nodes']
         divisor = inputs['cp'] * inputs['mdot']
         mindivisor = np.min(inputs['mdot'])
-        if mindivisor == 0.0:
-            raise ValueError(self.msginfo)
-        outputs['Tt_out'] = inputs['Tt_in'] + inputs['heat_in'] / inputs['cp'] / inputs['mdot']
-        outputs['pt_out'] = inputs['pt_in'] * inputs['pressure_recovery'] + inputs['delta_p']
 
+        tt_out = inputs['Tt_in'] + inputs['heat_in'] / inputs['cp'] / inputs['mdot']
+        pt_out = inputs['pt_in'] * inputs['pressure_recovery'] + inputs['delta_p']
+        # outputs['Tt_out'] = inputs['Tt_in'] + inputs['heat_in'] / inputs['cp'] / inputs['mdot']
+        outputs['Tt_out'] = np.where(tt_out <= 0.0, inputs['Tt_in'], tt_out)
+        outputs['pt_out'] = np.where(pt_out <= 0.0, inputs['pt_in'] * inputs['pressure_recovery'], pt_out)
 
     def compute_partials(self, inputs, J):
+        tt_out = inputs['Tt_in'] + inputs['heat_in'] / inputs['cp'] / inputs['mdot']
+        bool_array_tt = np.where(tt_out <= 0.0, np.zeros(inputs['Tt_in'].shape), np.ones(inputs['Tt_in'].shape))
+        pt_out = inputs['pt_in'] * inputs['pressure_recovery'] + inputs['delta_p']
+        bool_array_pt = np.where(pt_out <= 0.0, np.zeros(inputs['pt_in'].shape), np.ones(inputs['pt_in'].shape))
         nn = self.options['num_nodes']
         J['Tt_out','Tt_in'] = np.ones((nn,))
-        J['Tt_out','heat_in'] = 1 / inputs['cp']/inputs['mdot']
-        J['Tt_out','cp'] = - inputs['heat_in'] / inputs['cp'] ** 2 / inputs['mdot']
-        J['Tt_out','mdot'] = - inputs['heat_in'] / inputs['cp'] / inputs['mdot'] ** 2
+        J['Tt_out','heat_in'] = bool_array_tt / inputs['cp']/inputs['mdot']
+        J['Tt_out','cp'] = - bool_array_tt * inputs['heat_in'] / inputs['cp'] ** 2 / inputs['mdot']
+        J['Tt_out','mdot'] = - bool_array_tt * inputs['heat_in'] / inputs['cp'] / inputs['mdot'] ** 2
 
         J['pt_out', 'pt_in'] = inputs['pressure_recovery']
         J['pt_out', 'pressure_recovery'] = inputs['pt_in']
-        J['pt_out', 'delta_p'] = np.ones((nn,))
+        J['pt_out', 'delta_p'] = bool_array_pt
 
 
 class MassFlow(ExplicitComponent):
@@ -510,7 +515,7 @@ class MassFlow(ExplicitComponent):
         self.add_input('area', shape=(nn,), units='m**2')
         self.add_input('rho', shape=(nn,), units='kg/m**3')
         self.add_input('M', shape=(nn,))
-        self.add_output('mdot', shape=(nn,), units='kg/s', lower=1e-8)
+        self.add_output('mdot', shape=(nn,), units='kg/s', lower=1e-3)
         arange = np.arange(0, nn)
         self.declare_partials(['mdot'], ['M', 'a', 'rho', 'area'], rows=arange, cols=arange)
 
@@ -716,7 +721,7 @@ class Inlet(Group):
         self.add_subsystem('freestreamtotaltemperature',TotalTemperatureIsentropic(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('freestreamtotalpressure',TotalPressureIsentropic(num_nodes=nn), promotes_inputs=['*'])
         self.add_subsystem('inlet_recovery', ExecComp('eta_ram=1.0 - 0.00*tanh(10*M)', has_diag_partials=True, eta_ram=np.ones((nn,)), M=0.1*np.ones((nn,))), promotes_inputs=['M'])
-        self.add_subsystem('totalpressure', ExecComp('pt=pt_in * eta_ram', pt={'units':'Pa','value':np.ones((nn,))}, pt_in={'units':'Pa','value':np.ones((nn,))}, eta_ram=np.ones((nn,)), has_diag_partials=True), promotes_outputs=['pt'])
+        self.add_subsystem('totalpressure', ExecComp('pt=pt_in * eta_ram', pt={'units':'Pa','value':np.ones((nn,)),'lower':1.0}, pt_in={'units':'Pa','value':np.ones((nn,))}, eta_ram=np.ones((nn,)), has_diag_partials=True), promotes_outputs=['pt'])
         self.connect('freestreamtotalpressure.pt','totalpressure.pt_in')
         self.connect('inlet_recovery.eta_ram','totalpressure.eta_ram')
 

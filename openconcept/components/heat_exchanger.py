@@ -813,9 +813,9 @@ class NTUMethod(ExplicitComponent):
         self.add_input('T_in_hot', shape=(nn,), units='K')
         self.add_input('cp_hot', units='J/kg/K')
 
-        self.add_output('NTU', shape=(nn,), lower=1e-10)
+        self.add_output('NTU', shape=(nn,), lower=1e-6)
         self.add_output('heat_max', shape=(nn,), units='W')
-        self.add_output('C_ratio', shape=(nn,))
+        self.add_output('C_ratio', shape=(nn,), lower=1e-6)
 
         arange = np.arange(0, nn)
         self.declare_partials(['NTU'],
@@ -832,6 +832,8 @@ class NTUMethod(ExplicitComponent):
                               rows=arange, cols=np.zeros((nn,), dtype=np.int32))
 
     def compute(self, inputs, outputs):
+        if np.min(inputs['mdot_cold']) <= 0.0:
+            raise ValueError
         C_cold = inputs['mdot_cold'] * inputs['cp_cold']
         C_hot = inputs['mdot_hot'] * inputs['cp_hot']
         C_min_bool = np.less(C_cold, C_hot)
@@ -967,6 +969,8 @@ class NTUEffectivenessActualHeatTransfer(ExplicitComponent):
 
     def compute(self, inputs, outputs):
         outputs['heat_transfer'] = inputs['effectiveness'] * inputs['heat_max']
+        # if np.max(np.abs(inputs['heat_max'])) > 1e6:
+        #     raise ValueError(self.msginfo + ' ' + str(inputs['heat_max']))
 
 
     def compute_partials(self, inputs, J):

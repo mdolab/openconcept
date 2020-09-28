@@ -23,7 +23,7 @@ class PressureComp(ExplicitComponent):
         num_points = self.options['num_nodes']
 
         self.add_input('fltcond|h', shape=num_points, units='m')
-        self.add_output('fltcond|p', shape=num_points, lower=0., units='Pa')
+        self.add_output('fltcond|p', shape=num_points, lower=1., units='Pa')
 
         arange = np.arange(num_points)
         self.declare_partials('fltcond|p', 'fltcond|h', rows=arange, cols=arange)
