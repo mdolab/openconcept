@@ -832,8 +832,6 @@ class NTUMethod(ExplicitComponent):
                               rows=arange, cols=np.zeros((nn,), dtype=np.int32))
 
     def compute(self, inputs, outputs):
-        if np.min(inputs['mdot_cold']) <= 0.0:
-            raise ValueError
         C_cold = inputs['mdot_cold'] * inputs['cp_cold']
         C_hot = inputs['mdot_hot'] * inputs['cp_hot']
         C_min_bool = np.less(C_cold, C_hot)
@@ -969,8 +967,6 @@ class NTUEffectivenessActualHeatTransfer(ExplicitComponent):
 
     def compute(self, inputs, outputs):
         outputs['heat_transfer'] = inputs['effectiveness'] * inputs['heat_max']
-        # if np.max(np.abs(inputs['heat_max'])) > 1e6:
-        #     raise ValueError(self.msginfo + ' ' + str(inputs['heat_max']))
 
 
     def compute_partials(self, inputs, J):
