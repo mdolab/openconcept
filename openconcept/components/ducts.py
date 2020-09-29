@@ -464,23 +464,26 @@ class HeatAdditionPressureLoss(ExplicitComponent):
         tt_out = inputs['Tt_in'] + inputs['heat_in'] / inputs['cp'] / inputs['mdot']
         pt_out = inputs['pt_in'] * inputs['pressure_recovery'] - dynamic_pressure * inputs['dynamic_pressure_loss_factor'] + inputs['delta_p']
         # outputs['Tt_out'] = inputs['Tt_in'] + inputs['heat_in'] / inputs['cp'] / inputs['mdot']
-        outputs['Tt_out'] = np.where(tt_out <= 0.0, inputs['Tt_in'], tt_out)
-        outputs['pt_out'] = np.where(pt_out <= 0.0, inputs['pt_in'] * inputs['pressure_recovery'], pt_out)
+        # outputs['Tt_out'] = np.where(tt_out <= 0.0, inputs['Tt_in'], tt_out)
+        # outputs['pt_out'] = np.where(pt_out <= 0.0, inputs['pt_in'] * inputs['pressure_recovery'], pt_out)
+        outputs['pt_out'] = pt_out
+        outputs['Tt_out'] = tt_out
 
     def compute_partials(self, inputs, J):
+        dynamic_pressure = 0.5 * inputs['mdot'] ** 2 / inputs['rho'] / inputs['area'] ** 2
         tt_out = inputs['Tt_in'] + inputs['heat_in'] / inputs['cp'] / inputs['mdot']
-        bool_array_tt = np.where(tt_out <= 0.0, np.zeros(inputs['Tt_in'].shape), np.ones(inputs['Tt_in'].shape))
-        pt_out = inputs['pt_in'] * inputs['pressure_recovery'] + inputs['delta_p']
-        bool_array_pt = np.where(pt_out <= 0.0, np.zeros(inputs['pt_in'].shape), np.ones(inputs['pt_in'].shape))
+        # bool_array_tt = np.where(tt_out <= 0.0, np.zeros(inputs['Tt_in'].shape), np.ones(inputs['Tt_in'].shape))
+        pt_out = inputs['pt_in'] * inputs['pressure_recovery'] - dynamic_pressure * inputs['dynamic_pressure_loss_factor'] + inputs['delta_p']
+        # bool_array_pt = np.where(pt_out <= 0.0, np.zeros(inputs['pt_in'].shape), np.ones(inputs['pt_in'].shape))
         nn = self.options['num_nodes']
         J['Tt_out','Tt_in'] = np.ones((nn,))
-        J['Tt_out','heat_in'] = bool_array_tt / inputs['cp']/inputs['mdot']
-        J['Tt_out','cp'] = - bool_array_tt * inputs['heat_in'] / inputs['cp'] ** 2 / inputs['mdot']
-        J['Tt_out','mdot'] = - bool_array_tt * inputs['heat_in'] / inputs['cp'] / inputs['mdot'] ** 2
+        J['Tt_out','heat_in'] = 1 / inputs['cp']/inputs['mdot']
+        J['Tt_out','cp'] = - inputs['heat_in'] / inputs['cp'] ** 2 / inputs['mdot']
+        J['Tt_out','mdot'] = - inputs['heat_in'] / inputs['cp'] / inputs['mdot'] ** 2
 
         J['pt_out', 'pt_in'] = inputs['pressure_recovery']
         J['pt_out', 'pressure_recovery'] = inputs['pt_in']
-        J['pt_out', 'delta_p'] = bool_array_pt
+        J['pt_out', 'delta_p'] = np.ones((nn,))
         J['pt_out', 'mdot'] = - inputs['dynamic_pressure_loss_factor'] * inputs['mdot']  / inputs['rho'] / inputs['area'] ** 2
         J['pt_out', 'rho'] = 0.5 * inputs['dynamic_pressure_loss_factor'] * inputs['mdot'] ** 2  / inputs['rho'] ** 2 / inputs['area'] ** 2
         J['pt_out', 'area'] = inputs['dynamic_pressure_loss_factor'] * inputs['mdot'] ** 2  / inputs['rho'] / inputs['area'] ** 3
@@ -774,6 +777,64 @@ class DuctStation(Group):
         self.add_subsystem('speedsound', SpeedOfSound(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('mach', MachNumberDuct(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
 
+class NozzlePressureLoss(ExplicitComponent):
+    """This group adds proportional pressure loss to the nozzle component
+
+    Inputs
+    ------
+    pt_in : float
+        Total pressure upstream of the nozzle (vector, Pa)
+    mdot : float
+        Mass flow (vector, kg/s)
+    area : float
+        Nozzle cross sectional area (vector, m**2)
+    dynamic_pressure_loss_factor : float
+        Total pressure loss as a fraction of dynamic pressure
+    
+    Outputs
+    -------
+    pt : float
+        Total pressure downstream of the nozzle (vector, Pa)
+
+    Options
+    -------
+    num_nodes : int
+        Number of conditions to analyze
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
+
+    def setup(self):
+        nn = self.options['num_nodes']
+        self.add_input('pt_in', shape=(nn,), units='Pa')
+        self.add_input('mdot', shape=(nn,), units='kg/s')
+        self.add_input('rho', shape=(nn,), units='kg/m**3')
+        self.add_input('area', shape=(nn,), units='m**2')
+        self.add_input('dynamic_pressure_loss_factor', val=0.0)
+
+        self.add_output('pt', shape=(nn,), units='Pa', lower=1.0)
+
+        arange = np.arange(nn)
+
+        self.declare_partials(['pt'], ['pt_in','rho','mdot','area'], rows=arange, cols=arange)
+        self.declare_partials(['pt'], ['dynamic_pressure_loss_factor'], rows=arange, cols=np.zeros((nn,)))
+
+    def compute(self, inputs, outputs):
+        nn = self.options['num_nodes']
+        dynamic_pressure = 0.5 * inputs['mdot'] ** 2 / inputs['rho'] / inputs['area'] ** 2
+
+        pt_out = inputs['pt_in'] - dynamic_pressure * inputs['dynamic_pressure_loss_factor']
+        outputs['pt'] = pt_out
+
+    def compute_partials(self, inputs, J):
+        nn = self.options['num_nodes']
+
+        J['pt', 'pt_in'] = np.ones((nn,))
+        J['pt', 'mdot'] = - inputs['dynamic_pressure_loss_factor'] * inputs['mdot']  / inputs['rho'] / inputs['area'] ** 2
+        J['pt', 'rho'] = 0.5 * inputs['dynamic_pressure_loss_factor'] * inputs['mdot'] ** 2  / inputs['rho'] ** 2 / inputs['area'] ** 2
+        J['pt', 'area'] = inputs['dynamic_pressure_loss_factor'] * inputs['mdot'] ** 2  / inputs['rho'] / inputs['area'] ** 3
+        J['pt', 'dynamic_pressure_loss_factor'] = - 0.5 * inputs['mdot'] ** 2 / inputs['rho'] / inputs['area'] ** 2
+
 class OutletNozzle(Group):
     """This group is designed to be the farthest downstream point in a ducted heat exchanger model.
        Mass flow is set based on the upstream total pressure and ambient static pressure.
@@ -804,6 +865,7 @@ class OutletNozzle(Group):
 
     def setup(self):
         nn = self.options['num_nodes']
+        self.add_subsystem('pressureloss', NozzlePressureLoss(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('pressureratio', DuctExitPressureRatioImplicit(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('machimplicit', DuctExitMachNumber(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('temp', TemperatureIsentropic(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
@@ -960,7 +1022,7 @@ class ImplicitCompressibleDuct_ExternalHX(Group):
         self.add_subsystem('nozzle', OutletNozzle(num_nodes=nn),
                                                   promotes_inputs=['p_exit',('area','area_nozzle')],
                                                   promotes_outputs=['mdot'])
-        self.connect('sta3.pt_out','nozzle.pt')
+        self.connect('sta3.pt_out','nozzle.pt_in')
         self.connect('sta3.Tt_out','nozzle.Tt')
 
         self.add_subsystem('force', NetForce(num_nodes=nn), promotes_inputs=['mdot','p_inf',('Utrue_inf','Utrue'),'area_nozzle'])

@@ -349,7 +349,7 @@ def run_hybrid_sa_analysis(plots=True):
     print('=======================================')
     for phase in phases_list:
         prob.set_val(phase+'.hx.n_long_cold', 50)
-        prob.set_val(phase+'.duct2.loss_factor_1', 0.23)
+        prob.set_val(phase+'.duct2.nozzle.dynamic_pressure_loss_factor', 0.15)
     prob.run_driver()
     
     # prob.model.list_inputs(includes=['*T_in*','*mdot*'], excludes=['*duct*'], print_arrays=True)
