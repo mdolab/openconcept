@@ -349,6 +349,7 @@ def run_hybrid_sa_analysis(plots=True):
     print('=======================================')
     for phase in phases_list:
         prob.set_val(phase+'.hx.n_long_cold', 50)
+        prob.set_val(phase+'.duct2.loss_factor_1', 0.23)
     prob.run_driver()
     
     # prob.model.list_inputs(includes=['*T_in*','*mdot*'], excludes=['*duct*'], print_arrays=True)
@@ -358,7 +359,7 @@ def run_hybrid_sa_analysis(plots=True):
     # prob.model.list_inputs(includes=['*.sta*'], print_arrays=True, units=True)
     prob.model.list_outputs(includes=['*cruise.hx*'], units=True, print_arrays=True)
     prob.list_problem_vars(print_arrays=True)
-    # prob.check_partials(show_only_incorrect=True, compact_print=True, method='cs',excludes=['*engine*'])
+    prob.check_partials(show_only_incorrect=True, compact_print=True, method='cs',excludes=['*engine*'])
 
     if plots:
         show_outputs(prob)
