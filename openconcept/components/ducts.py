@@ -439,7 +439,10 @@ class HeatAdditionPressureLoss(ExplicitComponent):
         self.add_input('Tt_in', shape=(nn,), units='K')
         self.add_input('pt_in', shape=(nn,), units='Pa')
         self.add_input('mdot', shape=(nn,), units='kg/s')
+        self.add_input('rho', shape=(nn,), units='kg/m**3')
+        self.add_input('area', units='m**2')
         self.add_input('delta_p', shape=(nn,), units='Pa')
+        self.add_input('dynamic_pressure_loss_factor', val=0.0)
         self.add_input('pressure_recovery', shape=(nn,), val=np.ones((nn,)))
         self.add_input('heat_in', shape=(nn,), units='W')
         self.add_input('cp', units='J/kg/K')
@@ -451,15 +454,15 @@ class HeatAdditionPressureLoss(ExplicitComponent):
 
         self.declare_partials(['Tt_out'], ['Tt_in','heat_in','mdot'], rows=arange, cols=arange)
         self.declare_partials(['Tt_out'], ['cp'], rows=arange, cols=np.zeros((nn,)))
-        self.declare_partials(['pt_out'], ['pt_in','pressure_recovery','delta_p'], rows=arange, cols=arange)
+        self.declare_partials(['pt_out'], ['pt_in','pressure_recovery','delta_p', 'rho','mdot'], rows=arange, cols=arange)
+        self.declare_partials(['pt_out'], ['area','dynamic_pressure_loss_factor'], rows=arange, cols=np.zeros((nn,)))
 
     def compute(self, inputs, outputs):
         nn = self.options['num_nodes']
-        divisor = inputs['cp'] * inputs['mdot']
-        mindivisor = np.min(inputs['mdot'])
+        dynamic_pressure = 0.5 * inputs['mdot'] ** 2 / inputs['rho'] / inputs['area'] ** 2
 
         tt_out = inputs['Tt_in'] + inputs['heat_in'] / inputs['cp'] / inputs['mdot']
-        pt_out = inputs['pt_in'] * inputs['pressure_recovery'] + inputs['delta_p']
+        pt_out = inputs['pt_in'] * inputs['pressure_recovery'] - dynamic_pressure * inputs['dynamic_pressure_loss_factor'] + inputs['delta_p']
         # outputs['Tt_out'] = inputs['Tt_in'] + inputs['heat_in'] / inputs['cp'] / inputs['mdot']
         outputs['Tt_out'] = np.where(tt_out <= 0.0, inputs['Tt_in'], tt_out)
         outputs['pt_out'] = np.where(pt_out <= 0.0, inputs['pt_in'] * inputs['pressure_recovery'], pt_out)
@@ -478,7 +481,10 @@ class HeatAdditionPressureLoss(ExplicitComponent):
         J['pt_out', 'pt_in'] = inputs['pressure_recovery']
         J['pt_out', 'pressure_recovery'] = inputs['pt_in']
         J['pt_out', 'delta_p'] = bool_array_pt
-
+        J['pt_out', 'mdot'] = - inputs['dynamic_pressure_loss_factor'] * inputs['mdot']  / inputs['rho'] / inputs['area'] ** 2
+        J['pt_out', 'rho'] = 0.5 * inputs['dynamic_pressure_loss_factor'] * inputs['mdot'] ** 2  / inputs['rho'] ** 2 / inputs['area'] ** 2
+        J['pt_out', 'area'] = inputs['dynamic_pressure_loss_factor'] * inputs['mdot'] ** 2  / inputs['rho'] / inputs['area'] ** 3
+        J['pt_out', 'dynamic_pressure_loss_factor'] = - 0.5 * inputs['mdot'] ** 2 / inputs['rho'] / inputs['area'] ** 2
 
 class MassFlow(ExplicitComponent):
     """
@@ -894,6 +900,7 @@ class ImplicitCompressibleDuct_ExternalHX(Group):
         iv.add_output('delta_p_1', val=np.zeros((nn,)), units='Pa')
         iv.add_output('heat_in_1', val=np.zeros((nn,)), units='W')
         iv.add_output('pressure_recovery_1', val=np.ones((nn,)))
+        iv.add_output('loss_factor_1', val=0.0)
 
         iv.add_output('delta_p_2', val=np.ones((nn,))*0., units='Pa')
         iv.add_output('heat_in_2', val=np.ones((nn,))*0., units='W')
@@ -918,6 +925,7 @@ class ImplicitCompressibleDuct_ExternalHX(Group):
                                                                                ('pressure_recovery','pressure_recovery_1')])
         self.connect('inlet.pt','sta1.pt_in')
         self.connect('inlet.Tt','sta1.Tt_in')
+        self.connect('loss_factor_1','sta1.dynamic_pressure_loss_factor')
 
 
         self.add_subsystem('sta2', DuctStation(num_nodes=nn), promotes_inputs=['mdot','cp',
