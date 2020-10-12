@@ -16,7 +16,7 @@ from openconcept.utilities.math.integrals import Integrator
 from openconcept.components.thermal import ThermalComponentWithMass, ConstantSurfaceTemperatureColdPlate_NTU
 from openconcept.components.thermal import SimpleHeatPump, HeatPumpWithIntegratedCoolantLoop, LiquidCooledComp
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
-from openconcept.components.heat_sinks import LiquidCooledBattery
+from openconcept.components.heat_sinks import LiquidCooledBattery, LiquidCooledMotor
 
 class ParallelTMS(Group):
     """
@@ -68,9 +68,9 @@ class ParallelTMS(Group):
         ######### Declare variables needed for components to simplify the TMS's I/O #########
         iv = IndepVarComp()
         # Flight condition
-        iv.add_output('throttle', val=0.5, shape=(nn,))
         iv.add_output('fltcond|h', val=20e3, shape=(nn,), units='ft')
         iv.add_output('fltcond|Ueas', val=250., shape=(nn,), units='kn')
+        iv.add_output('fltcond|TempIncrement', val=0., shape=(nn,), units='degC')
         # Refrigerator settings
         iv.add_output('refrig_T_h_set', val=100., shape=(nn,), units='degC')
         iv.add_output('eff_factor', val=0.4, units=None)
@@ -79,32 +79,36 @@ class ParallelTMS(Group):
         iv.add_output('mdot_coolant_hot', val=1., shape=(nn,), units='kg/s')
         iv.add_output('mdot_coolant_cold', val=1., shape=(nn,), units='kg/s')
         iv.add_output('rho_coolant', val=1000., shape=(nn,), units='kg/m**3')
+        iv.add_output('mdot_split_fraction', val=0.1, shape=(nn,))
         # Battery
         iv.add_output('battery_weight', val=500., units='kg')
         iv.add_output('q_batt', val=5., shape=(nn,), units='kW')
         iv.add_output('batt_T_limit', val=self.options['battery_T_limit'] - self.options['T_limit_buffer'],
                       shape=(nn,), units='degC')  # set this via options
         # Motor
+        iv.add_output('motor_power_rating', val=1., units='MW')
         iv.add_output('q_motor', val=3., shape=(nn,), units='kW')
         iv.add_output('motor_T_limit', val=self.options['motor_T_limit'] - self.options['T_limit_buffer'],
                       shape=(nn,), units='degC')  # set this via options
-        # Cold plate/bandolier geometry
-        iv.add_output('channel_width', val=1., units='mm')
-        iv.add_output('channel_length', val=.2, units='m')
-        iv.add_output('channel_height', val=50., units='mm')
-        iv.add_output('n_parallel', val=15)
+        # Bandolier geometry
+        iv.add_output('bandolier_t_channel', val=1., units='mm')
         iv.add_output('cells_per_bandolier', val=21)
+        # iv.add_output('channel_length', val=.2, units='m')
+        # iv.add_output('channel_height', val=50., units='mm')
+        # iv.add_output('n_parallel', val=15)
         
         self.add_subsystem('iv', iv, promotes_outputs=['*'])
 
 
         ######### Add components to model #########
         # Motor and battery run in massless mode
-        self.add_subsystem('motor_heat_sink', LiquidCooledComp(num_nodes=nn, quasi_steady=True),
-                           promotes_inputs=[('q_in', 'q_motor'), 'channel_length', 'channel_width', 'channel_height', 'n_parallel'])
+        # self.add_subsystem('motor_heat_sink', LiquidCooledComp(num_nodes=nn, quasi_steady=True),
+        #                    promotes_inputs=[('q_in', 'q_motor'), 'channel_length', 'channel_width', 'channel_height', 'n_parallel'])
+        self.add_subsystem('motor_heat_sink', LiquidCooledMotor(num_nodes=nn, quasi_steady=True),
+                           promotes_inputs=[('q_in', 'q_motor'), ('power_rating', 'motor_power_rating')])
         self.add_subsystem('battery_heat_sink', LiquidCooledBattery(num_nodes=nn, quasi_steady=True),
                            promotes_inputs=[('q_in', 'q_batt'), 'battery_weight', ('n_cpb', 'cells_per_bandolier'),
-                                            ('t_channel', 'channel_width')])
+                                            ('t_channel', 'bandolier_t_channel')])
         
         # Use splitter and combiner to cool motor and battery in parallel
         self.add_subsystem('coolant_splitter', FlowSplit(num_nodes=nn),
@@ -126,7 +130,7 @@ class ParallelTMS(Group):
 
         # Atmospheric model
         self.add_subsystem('atmos', ComputeAtmosphericProperties(num_nodes=nn),
-                           promotes_inputs=['fltcond|h', 'fltcond|Ueas'], promotes_outputs=['fltcond|*'])
+                           promotes_inputs=['fltcond|h', 'fltcond|Ueas', 'fltcond|TempIncrement'], promotes_outputs=['fltcond|*'])
 
         ######### Connect cold side #########
         # Battery
@@ -153,15 +157,15 @@ class ParallelTMS(Group):
         self.connect('duct.mdot','hx.mdot_cold')
 
         ######### Modulate the refrig cold set temp and FlowSplitter fraction to hit battery and motor temp limits #########
-        self.add_subsystem('motor_temp_bal', BalanceComp(name='splitter_fraction', units=None, eq_units='K', val=0.01*np.ones(nn),
-                                                        lower=1e-4*np.ones(nn), upper=np.ones(nn)-1e-4, lhs_name='motor_T',
-                                                        rhs_name='motor_T_limit'), promotes_inputs=['motor_T_limit'],
-                                                        promotes_outputs=[('splitter_fraction', 'mdot_split_fraction')])
-        self.connect('motor_heat_sink.T', 'motor_temp_bal.motor_T')
+        # self.add_subsystem('motor_temp_bal', BalanceComp(name='splitter_fraction', units=None, eq_units='K', val=0.1*np.ones(nn),
+        #                                                 lower=1e-2*np.ones(nn), upper=np.ones(nn)-1e-2, lhs_name='motor_T',
+        #                                                 rhs_name='motor_T_limit', normalize=False), promotes_inputs=['motor_T_limit'],
+        #                                                 promotes_outputs=[('splitter_fraction', 'mdot_split_fraction')])
+        # self.connect('motor_heat_sink.T', 'motor_temp_bal.motor_T')
 
         self.add_subsystem('batt_temp_bal', BalanceComp(name='T_c_set', units='degC', eq_units='K', val=30.*np.ones(nn),
                                                         lower=-1e2*np.ones(nn), upper=99*np.ones(nn), lhs_name='batt_T',
-                                                        rhs_name='batt_T_limit'), promotes_inputs=['batt_T_limit'],
+                                                        rhs_name='batt_T_limit', normalize=False), promotes_inputs=['batt_T_limit'],
                                                         promotes_outputs=[('T_c_set', 'refrig_T_c_set')])
         self.connect('battery_heat_sink.T', 'batt_temp_bal.batt_T')
 
