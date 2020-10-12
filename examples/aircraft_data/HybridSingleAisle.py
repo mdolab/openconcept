@@ -73,6 +73,9 @@ thermal = dict()
 hx = dict()
 hx['n_wide_cold']       = {'value': 750, 'units': None}
 thermal['hx'] = hx
+heatpump = dict()
+heatpump['power_rating']       = {'value': 30, 'units': 'kW'}
+thermal['heatpump'] = heatpump
 propulsion['thermal'] = thermal
 
 ac['propulsion'] = propulsion

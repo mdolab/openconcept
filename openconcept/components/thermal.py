@@ -602,6 +602,70 @@ class MatchTRatio(ImplicitComponent):
         J['ThTcratio','T_h'] = np.where(inputs['bypass_heat_pump'] == 1.0, b, a1)
         J['ThTcratio','T_c'] = np.where(inputs['bypass_heat_pump'] == 1.0, b, a2)
 
+class WeightPower(ExplicitComponent):
+    """
+    Computes weight and power metrics for the vapor cycle machine. 
+    Defaults based on limited published data and guesswork.
+
+    Inputs
+    ------
+    throttle : float
+        Percentage of rated power to refrigerate with (vector, None)
+    power_rating : float
+        Rated electric power (scalar, W)
+    
+    Outputs
+    -------
+    component_weight : float
+        Component weight (including coolants + motor) (scalar, kg)
+    elec_load : float
+        Electrical load (vector, W)
+    Wdot : float
+        Shaft power out (vector, W)
+
+    Options
+    -------
+    num_nodes : int
+        The number of analysis points to run
+    efficiency : float
+        Compressor motor efficiency (default 0.95)
+    weight_inc : float
+        Weight per unit rated power (default 1/750, kg/W)
+    weight_base : float
+        Base weight (default 0, kg)
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points')
+        self.options.declare('efficiency', default=0.95, desc='Motor efficiency')
+        self.options.declare('weight_inc', default=1/750, desc='Weight per power (kg/W)')
+        self.options.declare('weight_base', default=0., desc='Base weight (kg)')
+
+    def setup(self):
+        nn = self.options['num_nodes']
+        self.add_input('throttle', val=0.0, units=None, shape=((nn,)))
+        self.add_input('power_rating', val=1000.0, units='W')
+        self.add_output('elec_load', val=0.0, units='W', shape=((nn,)))
+        self.add_output('Wdot', val=0.0, units='W', shape=((nn,)))
+        self.add_output('component_weight', val=0.0, units='kg')
+
+        arange = np.arange(nn)
+        
+        self.declare_partials(['elec_load','Wdot'],'throttle',rows=arange, cols=arange)
+        self.declare_partials(['elec_load','Wdot'],'power_rating',rows=arange, cols=np.zeros((nn,)))
+        self.declare_partials('component_weight','power_rating', val=self.options['weight_inc'])
+
+    def compute(self, inputs, outputs):
+        outputs['elec_load'] = inputs['throttle'] * inputs['power_rating'] / self.options['efficiency']
+        outputs['Wdot'] = inputs['throttle'] * inputs['power_rating']
+        outputs['component_weight'] = inputs['power_rating'] * self.options['weight_inc'] + self.options['weight_base']
+
+    def compute_partials(self, inputs, J):
+        nn = self.options['num_nodes']
+        J['elec_load','throttle'] = inputs['power_rating'] / self.options['efficiency'] * np.ones((nn,))
+        J['elec_load','power_rating'] = inputs['throttle'] / self.options['efficiency']
+        J['Wdot','throttle'] = inputs['power_rating'] * np.ones((nn,))
+        J['Wdot','power_rating'] = inputs['throttle']
+
 class HeatPumpWithIntegratedCoolantLoop_FixedWdot(Group):
     """
     SimpleHeatPump connected to two PerfectHeatTransferComp components on either side. This setup
@@ -624,8 +688,10 @@ class HeatPumpWithIntegratedCoolantLoop_FixedWdot(Group):
         If 1, heat pump is removed from coolant loop and coolant flows; if 0, heat pump
         is kept in the loop (vector, default all zeros)
     Wdot_start, Wdot_end : float
-        Heat pump work usage rate (vector, kW)
+        Heat pump power posed as a throttle setting from 0 to 1.
         this will linearly interpolate during the mission
+    power_rating : float
+        Rated electric power (scalar, W)
 
     Outputs
     -------
@@ -633,7 +699,10 @@ class HeatPumpWithIntegratedCoolantLoop_FixedWdot(Group):
         Outgoing coolant temperature on the hot side (vector, K)
     T_out_cold : float
         Outgoing coolant temperature on the cold side (vector, K)
-
+    component_weight : float
+        Component weight (including coolants + motor) (scalar, kg)
+    elec_load : float
+        Electrical load (vector, W)
 
     Options
     -------
@@ -641,22 +710,36 @@ class HeatPumpWithIntegratedCoolantLoop_FixedWdot(Group):
         The number of analysis points to run
     specific_heat : float
         Specific heat of the coolant (scalar, J/kg/K, default 3801 glycol/water)
+    efficiency : float
+        Compressor motor efficiency (default 0.95)
+    weight_inc : float
+        Weight per unit rated power (default 1/750, kg/W)
+    weight_base : float
+        Base weight (default 0, kg)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of analysis points')
         self.options.declare('specific_heat', default=3801., desc='Specific heat in J/kg/K')
-    
+        self.options.declare('efficiency', default=0.95, desc='Motor efficiency')
+        self.options.declare('weight_inc', default=1/750, desc='Weight per power (kg/W)')
+        self.options.declare('weight_base', default=0., desc='Base weight (kg)')
+
     def setup(self):
         nn = self.options['num_nodes']
         nn_ones = np.ones((nn,))
         spec_heat = self.options['specific_heat']
 
 
-        iv = self.add_subsystem('control', IndepVarComp('Wdot_start',val=10, units='kW'))
-        iv.add_output('Wdot_end',val=10, units='kW')
-        li = self.add_subsystem('li',LinearInterpolator(num_nodes=nn, units='kW'), promotes_outputs=[('vec', 'Wdot')])
+        iv = self.add_subsystem('control', IndepVarComp('Wdot_start',val=0.5))
+        iv.add_output('Wdot_end',val=0.5)
+        li = self.add_subsystem('li',LinearInterpolator(num_nodes=nn, units=None), promotes_outputs=[('vec', 'throttle')])
         self.connect('control.Wdot_start','li.start_val')
         self.connect('control.Wdot_end','li.end_val')
+        self.add_subsystem('weightpower',WeightPower(num_nodes=nn, 
+                                                     efficiency=self.options['efficiency'],
+                                                     weight_inc=self.options['weight_inc'],
+                                                     weight_base=self.options['weight_base']),
+                            promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('hot_side', PerfectHeatTransferComp(num_nodes=nn, specific_heat=spec_heat),
                            promotes_inputs=[('T_in', 'T_in_hot'), ('mdot_coolant', 'mdot_coolant_hot')])
         self.add_subsystem('cold_side', PerfectHeatTransferComp(num_nodes=nn, specific_heat=spec_heat),
