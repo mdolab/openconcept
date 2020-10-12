@@ -13,6 +13,7 @@ from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.math.derivatives import FirstDerivative
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp, VectorConcatenateComp, VectorSplitComp
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
+from openconcept.utilities.linearinterp import LinearInterpolator
 
 # Define sigmoid function and its derivative for later use
 def sigmoid(x):
@@ -224,6 +225,28 @@ class SimpleHeatPump(ExplicitComponent):
         J['q_h', 'Wdot'] = 1 + sigmoid(T_h - T_c - shift) * eff_factor * T_c / (T_h - T_c)
         J['q_h', 'eff_factor'] = J['COP_cooling', 'eff_factor'] * Wdot
 
+# class TempMatcher(ImplicitComponent):
+    
+#     def initialize(self):
+#         self.options.declare('num_nodes', default=1)
+    
+#     def setup(self):
+#         nn = self.options['num_nodes']
+#         self.add_input('T_out_hot', shape=(nn,), units='K')
+#         self.add_input('T_c_set', shape=(nn,), units='K')
+#         self.add_output('ThTcratio', shape=(nn,), units=None, lower=1.005, upper=1.5, val=1.1)
+
+#         arange = np.arange(0, nn)
+#         self.declare_partials(['ThTcratio'], ['T_c_set','T_out_hot'], rows=arange, cols=arange)
+#         self.declare_partials(['ThTcratio'], ['ThTcratio'], rows=arange, cols=arange, val=np.ones((nn, )))
+
+#     def apply_nonlinear(self, inputs, outputs, residuals):
+#         residuals['ThTcratio'] = outputs['ThTcratio'] - inputs['T_out_hot'] / inputs['T_c_set']
+
+#     def linearize(self, inputs, outputs, J):
+#         J['ThTcratio', 'T_out_hot'] = -1.0 / inputs['T_c_set']
+#         J['ThTcratio', 'T_c_set'] = inputs['T_out_hot'] / inputs['T_c_set'] ** 2
+
 class PerfectHeatTransferComp(ExplicitComponent):
     """
     Models heat transfer to coolant loop assuming zero thermal resistance.
@@ -279,6 +302,405 @@ class PerfectHeatTransferComp(ExplicitComponent):
 
         J['T_average', 'q'] = J['T_out', 'q'] / 2
         J['T_average', 'mdot_coolant'] = J['T_out', 'mdot_coolant'] / 2
+
+# class HeatPumpWithIntegratedCoolantLoop_FloatingTemp(Group):
+#     """
+#     SimpleHeatPump connected to two PerfectHeatTransferComp components on either side. This setup
+#     takes in cold and hot side temperature set points, along with other inputs, and solves for
+#     the remaining variables including heat pump work usage rate.
+    
+#     One nuance of this group is the hot_side_balance_param output, which must be connected to
+#     an input that can modulate the hot side coolant temperature. The hot_side_balance_param
+#     is then adjusted to set the coolant temperature (T_out_hot) to the specified hot side
+#     temperature set point (T_h_set).
+
+#     Inputs
+#     ------
+#     T_in_hot : float
+#         Incoming coolant temperature on the hot side (vector, K)
+#     T_in_cold : float
+#         Incoming coolant temperature on the cold side (vector, K)
+#     mdot_coolant_cold : float
+#         Coolant mass flow rate on cold side (vector, kg/s)
+#     mdot_coolant_hot : float
+#         Coolant mass flow rate on hot side (vector, kg/s)
+#     T_h : float
+#         Heat pump hot side temperature set point (vector, K)
+#     T_c_set : float
+#         Heat pump cold side temperature set point (vector, K)
+#     eff_factor : float
+#         Heat pump percentage of Carnot efficiency (scalar, dimensionaless)
+#     bypass_heat_pump : int (either 1 or 0)
+#         If 1, heat pump is removed from coolant loop and coolant flows; if 0, heat pump
+#         is kept in the loop (vector, default all zeros)
+
+#     Outputs
+#     -------
+#     T_out_hot : float
+#         Outgoing coolant temperature on the hot side (vector, K)
+#     T_out_cold : float
+#         Outgoing coolant temperature on the cold side (vector, K)
+#     Wdot : float
+#         Heat pump work usage rate (vector, W)
+
+#     Options
+#     -------
+#     num_nodes : int
+#         The number of analysis points to run
+#     specific_heat : float
+#         Specific heat of the coolant (scalar, J/kg/K, default 3801 glycol/water)
+#     """
+#     def initialize(self):
+#         self.options.declare('num_nodes', default=1, desc='Number of analysis points')
+#         self.options.declare('specific_heat', default=3801., desc='Specific heat in J/kg/K')
+    
+#     def setup(self):
+#         nn = self.options['num_nodes']
+#         nn_ones = np.ones((nn,))
+#         spec_heat = self.options['specific_heat']
+
+
+        
+#         self.add_subsystem('hot_side', PerfectHeatTransferComp(num_nodes=nn, specific_heat=spec_heat),
+#                            promotes_inputs=[('T_in', 'T_in_hot'), ('mdot_coolant', 'mdot_coolant_hot')])
+#         self.add_subsystem('cold_side', PerfectHeatTransferComp(num_nodes=nn, specific_heat=spec_heat),
+#                            promotes_inputs=[('T_in', 'T_in_cold'), ('mdot_coolant', 'mdot_coolant_cold')])
+
+
+#         self.add_subsystem('tempmatcher', TempMatcher(num_nodes=nn), promotes_inputs=['T_c_set'])
+#         self.connect('hot_side.T_out','tempmatcher.T_out_hot')
+#         self.add_subsystem('tempmult', ExecComp('T_h_set=T_c_set*ThTcratio',
+#                                                 T_h_set={'units':'K',
+#                                                          'value':np.ones((nn,))},
+#                                                 T_c_set={'units':'K',
+#                                                          'value':np.ones((nn,))},
+#                                                 ThTcratio={'units':None,
+#                                                            'value':np.ones((nn,))}),
+#                                                 promotes_inputs=['T_c_set'],
+#                                                 promotes_outputs=['T_h_set'])
+
+#         self.connect('tempmatcher.ThTcratio','tempmult.ThTcratio')
+#         self.add_subsystem('heat_pump', SimpleHeatPump(num_nodes=nn),
+#                            promotes_inputs=['eff_factor', ('T_c', 'T_c_set'), ('T_h', 'T_h_set')])
+#         # Set the work usage rate of the heat pump such that the cold side coolant outlet temperature
+#         # set point is maintained
+#         self.add_subsystem('cold_side_bal', BalanceComp('Wdot', eq_units='K', lhs_name='T_c', rhs_name='T_c_set',
+#                                                    units='kW', val=10.*nn_ones, lower=0.*nn_ones), 
+#                            promotes_inputs=['T_c_set'])
+#         self.connect('cold_side_bal.Wdot', 'heat_pump.Wdot')
+#         # Use a selector to prevent the BalanceComp from solving if bypass mode is switched on
+#         # by setting T_c in the BalanceComp to T_c_set so they'll match on the first iteration
+#         self.add_subsystem('cold_bal_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'Wdot'], units='K'),
+#                            promotes_inputs=[('selector', 'bypass_heat_pump')])
+#         self.connect('cold_side.T_out', 'cold_bal_selector.T_out')
+#         self.connect('cold_bal_selector.result', 'cold_side_bal.T_c')
+#         # Feed the BalanceComp outputs directly back into the lhs when bypass is on
+#         self.add_subsystem('bal_dummy', ExecComp('T_c = Wdot', T_c={'units':'K', 'shape':(nn,)}, 
+#                                                  Wdot={'units':'W', 'shape':(nn,)}))
+#         self.connect('cold_side_bal.Wdot', 'bal_dummy.Wdot')
+#         self.connect('bal_dummy.T_c', 'cold_bal_selector.Wdot')
+
+#         # Set the hot side balance parameter such that the hot side coolant temperature
+#         # set point is maintained
+#         # self.add_subsystem('hot_side_bal', BalanceComp('hot_side_balance_param', eq_units='K', lhs_name='T_h',
+#         #                                                rhs_name='T_set', val=nn_ones*20,
+#         #                                                units=self.options['hot_side_balance_param_units'],
+#         #                                                lower=self.options['hot_side_balance_param_lower']*nn_ones,
+#         #                                                upper=self.options['hot_side_balance_param_upper']*nn_ones), 
+#         #                    promotes_outputs=['hot_side_balance_param'])
+#         # If bypass, use the hot side T_in instead of T_out
+#         # self.add_subsystem('hot_bal_selector', SelectorComp(num_nodes=nn, input_names=['T_out_hot', 'T_in_hot'],
+#         #                                                     units='K'),
+#         #                    promotes_inputs=['T_in_hot', ('selector', 'bypass_heat_pump')])
+#         # self.connect('hot_side.T_out', 'hot_bal_selector.T_out_hot')
+#         # self.connect('hot_bal_selector.result', 'hot_side_bal.T_h')
+#         # self.connect('hot_side.T_out','simpleheatpump.T_h')
+#         # Also if bypass, set the coolant going from the hot to cold side to T_c_set instead of T_h_set
+#         # self.add_subsystem('hot_bal_set_temp_selector', SelectorComp(num_nodes=nn, input_names=['T_h_set', 'T_c_set'],
+#         #                                                              units='K'),
+#         #                    promotes_inputs=['T_h_set', 'T_c_set', ('selector', 'bypass_heat_pump')])
+#         # self.connect('hot_bal_set_temp_selector.result', 'hot_side_bal.T_set')
+
+#         # Connect the heat transfers on either side of the heat pump
+#         self.connect('heat_pump.q_c', 'cold_side.q')
+#         self.connect('heat_pump.q_h', 'hot_side.q')
+
+#         # Use selectors to control the I/O routing to bypass the heat pump if specified
+#         # T_out_cold selector
+#         self.add_subsystem('cold_side_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'T_in_hot'], units='K'),
+#                            promotes_inputs=[('selector', 'bypass_heat_pump'), 'T_in_hot'],
+#                            promotes_outputs=[('result', 'T_out_cold')])
+#         self.connect('cold_side.T_out', 'cold_side_selector.T_out')
+#         # T_out_hot selector
+#         self.add_subsystem('hot_side_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'T_in_cold'], units='K'),
+#                            promotes_inputs=[('selector', 'bypass_heat_pump'), 'T_in_cold'],
+#                            promotes_outputs=[('result', 'T_out_hot')])
+#         self.connect('hot_side.T_out', 'hot_side_selector.T_out')
+#         # Wdot selector
+#         self.add_subsystem('Wdot_selector', SelectorComp(num_nodes=nn, input_names=['Wdot', 'zero'], units='W'),
+#                            promotes_inputs=[('selector', 'bypass_heat_pump')],
+#                            promotes_outputs=[('result', 'Wdot')])
+#         self.connect('cold_side_bal.Wdot', 'Wdot_selector.Wdot')
+#         iv = IndepVarComp()
+#         iv.add_output('zero', val=0., shape=(nn,), units='W')
+#         self.add_subsystem('iv', iv)
+#         self.connect('iv.zero', 'Wdot_selector.zero')
+
+#         # Set the default set points and T_in defaults for continuity
+#         self.set_input_defaults('T_c_set', val=300.*nn_ones, units='K')
+#         self.set_input_defaults('T_in_hot', val=400.*nn_ones, units='K')
+#         self.set_input_defaults('T_in_cold', val=400.*nn_ones, units='K')
+
+# class HeatPumpWithIntegratedCoolantLoop_FloatingTempRatio(Group):
+#     """
+#     SimpleHeatPump connected to two PerfectHeatTransferComp components on either side. This setup
+#     takes in cold and hot side temperature set points, along with other inputs, and solves for
+#     the remaining variables including heat pump work usage rate.
+    
+#     One nuance of this group is the hot_side_balance_param output, which must be connected to
+#     an input that can modulate the hot side coolant temperature. The hot_side_balance_param
+#     is then adjusted to set the coolant temperature (T_out_hot) to the specified hot side
+#     temperature set point (T_h_set).
+
+#     Inputs
+#     ------
+#     T_in_hot : float
+#         Incoming coolant temperature on the hot side (vector, K)
+#     T_in_cold : float
+#         Incoming coolant temperature on the cold side (vector, K)
+#     mdot_coolant_cold : float
+#         Coolant mass flow rate on cold side (vector, kg/s)
+#     mdot_coolant_hot : float
+#         Coolant mass flow rate on hot side (vector, kg/s)
+#     T_h : float
+#         Heat pump hot side temperature set point (vector, K)
+#     T_c_set : float
+#         Heat pump cold side temperature set point (vector, K)
+#     eff_factor : float
+#         Heat pump percentage of Carnot efficiency (scalar, dimensionaless)
+#     bypass_heat_pump : int (either 1 or 0)
+#         If 1, heat pump is removed from coolant loop and coolant flows; if 0, heat pump
+#         is kept in the loop (vector, default all zeros)
+
+#     Outputs
+#     -------
+#     T_out_hot : float
+#         Outgoing coolant temperature on the hot side (vector, K)
+#     T_out_cold : float
+#         Outgoing coolant temperature on the cold side (vector, K)
+#     Wdot : float
+#         Heat pump work usage rate (vector, W)
+
+#     Options
+#     -------
+#     num_nodes : int
+#         The number of analysis points to run
+#     specific_heat : float
+#         Specific heat of the coolant (scalar, J/kg/K, default 3801 glycol/water)
+#     """
+#     def initialize(self):
+#         self.options.declare('num_nodes', default=1, desc='Number of analysis points')
+#         self.options.declare('specific_heat', default=3801., desc='Specific heat in J/kg/K')
+    
+#     def setup(self):
+#         nn = self.options['num_nodes']
+#         nn_ones = np.ones((nn,))
+#         spec_heat = self.options['specific_heat']
+
+
+        
+#         self.add_subsystem('hot_side', PerfectHeatTransferComp(num_nodes=nn, specific_heat=spec_heat),
+#                            promotes_inputs=[('T_in', 'T_in_hot'), ('mdot_coolant', 'mdot_coolant_hot')])
+#         self.add_subsystem('cold_side', PerfectHeatTransferComp(num_nodes=nn, specific_heat=spec_heat),
+#                            promotes_inputs=[('T_in', 'T_in_cold'), ('mdot_coolant', 'mdot_coolant_cold')])
+
+#         self.add_subsystem('tempmult', ExecComp('T_c_set=T_h_set/ThTcratio',
+#                                                 T_h_set={'units':'K',
+#                                                          'value':np.ones((nn,))},
+#                                                 T_c_set={'units':'K',
+#                                                          'value':np.ones((nn,))},
+#                                                 ThTcratio={'units':None,
+#                                                            'value':1.04*np.ones((nn,))}),
+#                                                 promotes_outputs=['T_c_set'])
+#         self.connect('hot_side.T_out',['tempmult.T_h_set','heat_pump.T_h'])
+
+#         self.add_subsystem('heat_pump', SimpleHeatPump(num_nodes=nn),
+#                            promotes_inputs=['eff_factor', ('T_c', 'T_c_set')])
+#         # Set the work usage rate of the heat pump such that the cold side coolant outlet temperature
+#         # set point is maintained
+#         self.add_subsystem('cold_side_bal', BalanceComp('Wdot', eq_units='K', lhs_name='T_c', rhs_name='T_c_set',
+#                                                    units='kW', val=10.*nn_ones, lower=0.*nn_ones), 
+#                            promotes_inputs=['T_c_set'])
+#         self.connect('cold_side_bal.Wdot', 'heat_pump.Wdot')
+#         # Use a selector to prevent the BalanceComp from solving if bypass mode is switched on
+#         # by setting T_c in the BalanceComp to T_c_set so they'll match on the first iteration
+#         self.add_subsystem('cold_bal_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'Wdot'], units='K'),
+#                            promotes_inputs=[('selector', 'bypass_heat_pump')])
+#         self.connect('cold_side.T_out', 'cold_bal_selector.T_out')
+#         self.connect('cold_bal_selector.result', 'cold_side_bal.T_c')
+#         # Feed the BalanceComp outputs directly back into the lhs when bypass is on
+#         self.add_subsystem('bal_dummy', ExecComp('T_c = Wdot', T_c={'units':'K', 'shape':(nn,)}, 
+#                                                  Wdot={'units':'W', 'shape':(nn,)}))
+#         self.connect('cold_side_bal.Wdot', 'bal_dummy.Wdot')
+#         self.connect('bal_dummy.T_c', 'cold_bal_selector.Wdot')
+
+#         # Connect the heat transfers on either side of the heat pump
+#         self.connect('heat_pump.q_c', 'cold_side.q')
+#         self.connect('heat_pump.q_h', 'hot_side.q')
+
+#         # Use selectors to control the I/O routing to bypass the heat pump if specified
+#         # T_out_cold selector
+#         self.add_subsystem('cold_side_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'T_in_hot'], units='K'),
+#                            promotes_inputs=[('selector', 'bypass_heat_pump'), 'T_in_hot'],
+#                            promotes_outputs=[('result', 'T_out_cold')])
+#         self.connect('cold_side.T_out', 'cold_side_selector.T_out')
+#         # T_out_hot selector
+#         self.add_subsystem('hot_side_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'T_in_cold'], units='K'),
+#                            promotes_inputs=[('selector', 'bypass_heat_pump'), 'T_in_cold'],
+#                            promotes_outputs=[('result', 'T_out_hot')])
+#         self.connect('hot_side.T_out', 'hot_side_selector.T_out')
+#         # Wdot selector
+#         self.add_subsystem('Wdot_selector', SelectorComp(num_nodes=nn, input_names=['Wdot', 'zero'], units='W'),
+#                            promotes_inputs=[('selector', 'bypass_heat_pump')],
+#                            promotes_outputs=[('result', 'Wdot')])
+#         self.connect('cold_side_bal.Wdot', 'Wdot_selector.Wdot')
+#         iv = IndepVarComp()
+#         iv.add_output('zero', val=0., shape=(nn,), units='W')
+#         self.add_subsystem('iv', iv)
+#         self.connect('iv.zero', 'Wdot_selector.zero')
+
+#         # Set the default set points and T_in defaults for continuity
+#         self.set_input_defaults('T_in_hot', val=400.*nn_ones, units='K')
+#         self.set_input_defaults('T_in_cold', val=400.*nn_ones, units='K')
+
+class MatchTRatio(ImplicitComponent):
+    def initialize(self):
+        self.options.declare('num_nodes',default=1)
+
+    def setup(self):
+        nn = self.options['num_nodes']
+        arange = np.arange(0, nn)
+
+        self.add_input('T_c', units='K', shape=(nn,))
+        self.add_input('T_h', units='K', shape=(nn,))
+        self.add_input('bypass_heat_pump', shape=(nn,))
+        self.add_output('ThTcratio', units=None, shape=(nn,), lower=1.001, val=1.05, upper=2.0)
+
+        self.declare_partials(['ThTcratio'], ['T_c','T_h'], rows=arange, cols=arange)
+        self.declare_partials(['ThTcratio'], ['ThTcratio'], rows=arange, cols=arange, val=np.ones((nn,)))
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        a = outputs['ThTcratio'] - inputs['T_h'] / inputs['T_c'] 
+        b = outputs['ThTcratio'] - 1.05
+        residuals['ThTcratio'] = np.where(inputs['bypass_heat_pump'] == 1.0, b, a)
+
+    def linearize(self, inputs, outputs, J):
+        nn = self.options['num_nodes']
+        a1 = - 1 / inputs['T_c'] 
+        a2 = inputs['T_h'] / inputs['T_c'] ** 2
+        b = np.zeros((nn,))
+        J['ThTcratio','T_h'] = np.where(inputs['bypass_heat_pump'] == 1.0, b, a1)
+        J['ThTcratio','T_c'] = np.where(inputs['bypass_heat_pump'] == 1.0, b, a2)
+
+class HeatPumpWithIntegratedCoolantLoop_FixedWdot(Group):
+    """
+    SimpleHeatPump connected to two PerfectHeatTransferComp components on either side. This setup
+    takes in the refrigerator mechanical power, along with other inputs, and solves for
+    the remaining variables including hot and cold side outlet temperatures.
+    
+    Inputs
+    ------
+    T_in_hot : float
+        Incoming coolant temperature on the hot side (vector, K)
+    T_in_cold : float
+        Incoming coolant temperature on the cold side (vector, K)
+    mdot_coolant_cold : float
+        Coolant mass flow rate on cold side (vector, kg/s)
+    mdot_coolant_hot : float
+        Coolant mass flow rate on hot side (vector, kg/s)
+    eff_factor : float
+        Heat pump percentage of Carnot efficiency (scalar, dimensionaless)
+    bypass_heat_pump : int (either 1 or 0)
+        If 1, heat pump is removed from coolant loop and coolant flows; if 0, heat pump
+        is kept in the loop (vector, default all zeros)
+    Wdot_start, Wdot_end : float
+        Heat pump work usage rate (vector, kW)
+        this will linearly interpolate during the mission
+
+    Outputs
+    -------
+    T_out_hot : float
+        Outgoing coolant temperature on the hot side (vector, K)
+    T_out_cold : float
+        Outgoing coolant temperature on the cold side (vector, K)
+
+
+    Options
+    -------
+    num_nodes : int
+        The number of analysis points to run
+    specific_heat : float
+        Specific heat of the coolant (scalar, J/kg/K, default 3801 glycol/water)
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points')
+        self.options.declare('specific_heat', default=3801., desc='Specific heat in J/kg/K')
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+        nn_ones = np.ones((nn,))
+        spec_heat = self.options['specific_heat']
+
+
+        iv = self.add_subsystem('control', IndepVarComp('Wdot_start',val=10, units='kW'))
+        iv.add_output('Wdot_end',val=10, units='kW')
+        li = self.add_subsystem('li',LinearInterpolator(num_nodes=nn, units='kW'), promotes_outputs=[('vec', 'Wdot')])
+        self.connect('control.Wdot_start','li.start_val')
+        self.connect('control.Wdot_end','li.end_val')
+        self.add_subsystem('hot_side', PerfectHeatTransferComp(num_nodes=nn, specific_heat=spec_heat),
+                           promotes_inputs=[('T_in', 'T_in_hot'), ('mdot_coolant', 'mdot_coolant_hot')])
+        self.add_subsystem('cold_side', PerfectHeatTransferComp(num_nodes=nn, specific_heat=spec_heat),
+                           promotes_inputs=[('T_in', 'T_in_cold'), ('mdot_coolant', 'mdot_coolant_cold')])
+
+        self.add_subsystem('tempmult', ExecComp('T_c_set=T_h_set/ThTcratio',
+                                                T_h_set={'units':'K',
+                                                         'value':np.ones((nn,))},
+                                                T_c_set={'units':'K',
+                                                         'value':np.ones((nn,))},
+                                                ThTcratio={'units':None,
+                                                           'value':1.04*np.ones((nn,))}),
+                                                promotes_outputs=['T_c_set'])
+        self.connect('hot_side.T_out',['tempmult.T_h_set','heat_pump.T_h','trmatch.T_h'])
+
+        self.add_subsystem('heat_pump', SimpleHeatPump(num_nodes=nn),
+                           promotes_inputs=['eff_factor', 'Wdot', ('T_c', 'T_c_set')])
+        # Set the work usage rate of the heat pump such that the cold side coolant outlet temperature
+        # set point is maintained
+        
+        self.add_subsystem('trmatch', MatchTRatio(num_nodes=nn), promotes_inputs=['bypass_heat_pump'])
+
+        self.connect('trmatch.ThTcratio', 'tempmult.ThTcratio')
+        self.connect('cold_side.T_out', 'trmatch.T_c')
+
+        # Connect the heat transfers on either side of the heat pump
+        self.connect('heat_pump.q_c', 'cold_side.q')
+        self.connect('heat_pump.q_h', 'hot_side.q')
+
+        # Use selectors to control the I/O routing to bypass the heat pump if specified
+        # T_out_cold selector
+        self.add_subsystem('cold_side_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'T_in_hot'], units='K'),
+                           promotes_inputs=[('selector', 'bypass_heat_pump'), 'T_in_hot'],
+                           promotes_outputs=[('result', 'T_out_cold')])
+        self.connect('cold_side.T_out', 'cold_side_selector.T_out')
+        # T_out_hot selector
+        self.add_subsystem('hot_side_selector', SelectorComp(num_nodes=nn, input_names=['T_out', 'T_in_cold'], units='K'),
+                           promotes_inputs=[('selector', 'bypass_heat_pump'), 'T_in_cold'],
+                           promotes_outputs=[('result', 'T_out_hot')])
+        self.connect('hot_side.T_out', 'hot_side_selector.T_out')
+
+        # Set the default set points and T_in defaults for continuity
+        self.set_input_defaults('T_in_hot', val=400.*nn_ones, units='K')
+        self.set_input_defaults('T_in_cold', val=400.*nn_ones, units='K')
 
 class HeatPumpWithIntegratedCoolantLoop(Group):
     """
