@@ -240,7 +240,7 @@ class HybridSingleAisleAnalysisGroup(om.Group):
                                                    aircraft_model=HybridSingleAisleModel,
                                                    include_ground_roll=True),
                                       promotes_inputs=['*'], promotes_outputs=['*'])
-
+        
 def configure_problem():
     prob = om.Problem()
     prob.model = HybridSingleAisleAnalysisGroup()
@@ -285,7 +285,7 @@ def set_values(prob, num_nodes):
     prob.set_val('groundroll.duct2.nozzle.nozzle_pressure_ratio', 0.85)
     prob.set_val('groundroll.duct2.convergence_hack', -500, units='Pa')
     # prob.set_val('groundroll.bypass_heat_pump', np.zeros((num_nodes,)))
-    prob.set_val('climb.bypass_heat_pump', np.zeros((num_nodes,)))
+    # prob.set_val('climb.bypass_heat_pump', np.zeros((num_nodes,)))
 
     prob.set_val('groundroll.area_nozzle_start', 60, units='inch**2')
     prob.set_val('groundroll.area_nozzle_end', 60, units='inch**2')
@@ -334,10 +334,10 @@ def run_hybrid_sa_analysis(plots=True):
     prob.model.add_constraint('descent.hx.width_overall', upper=1.2)
     prob.model.add_constraint('descent.hx.xs_area_cold', lower=70, units='inch**2', scaler=0.1)
     prob.model.add_objective('descent.margin', scaler=-0.001)
-    prob.model.add_design_var('climb.refrig.control.Wdot_start', lower=0.2, upper=1.0, units=None, scaler=2.)
-    prob.model.add_design_var('climb.refrig.control.Wdot_end', lower=0.2, upper=1.0, units=None, scaler=2.)
-    prob.model.add_design_var('cruise.refrig.control.Wdot_start', lower=0.2, upper=1.0, units=None, scaler=2.)
-    prob.model.add_design_var('cruise.refrig.control.Wdot_end', lower=0.2, upper=1.0, units=None, scaler=2.)
+    # prob.model.add_design_var('climb.refrig.control.Wdot_start', lower=0.2, upper=1.0, units=None, scaler=2.)
+    # prob.model.add_design_var('climb.refrig.control.Wdot_end', lower=0.2, upper=1.0, units=None, scaler=2.)
+    # prob.model.add_design_var('cruise.refrig.control.Wdot_start', lower=0.2, upper=1.0, units=None, scaler=2.)
+    # prob.model.add_design_var('cruise.refrig.control.Wdot_end', lower=0.2, upper=1.0, units=None, scaler=2.)
     phases_list = ['climb','cruise']          
     for phase in phases_list:
         prob.model.add_design_var(phase+'.area_nozzle_start', lower=10., upper=150., scaler=0.1, units='inch**2')
@@ -366,8 +366,8 @@ def run_hybrid_sa_analysis(plots=True):
         prob.set_val(phase+'.hx.n_long_cold', 50)
         if phase != 'groundroll':
             prob.set_val(phase+'.duct2.nozzle.dynamic_pressure_loss_factor', 0.15)
-    myvec = np.zeros((num_nodes,))
-    prob.set_val('cruise.bypass_heat_pump', myvec)
+    # myvec = np.zeros((num_nodes,))
+    # prob.set_val('cruise.bypass_heat_pump', myvec)
     prob.run_model()
     prob.run_driver()   
 

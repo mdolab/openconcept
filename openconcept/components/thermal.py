@@ -613,6 +613,9 @@ class WeightPower(ExplicitComponent):
         Percentage of rated power to refrigerate with (vector, None)
     power_rating : float
         Rated electric power (scalar, W)
+    bypass_heat_pump : int
+        Whether to have the heat pump turned on (vector, None)
+
     
     Outputs
     -------
@@ -644,6 +647,7 @@ class WeightPower(ExplicitComponent):
         nn = self.options['num_nodes']
         self.add_input('throttle', val=0.0, units=None, shape=((nn,)))
         self.add_input('power_rating', val=1000.0, units='W')
+        self.add_input('bypass_heat_pump', val=np.zeros((nn,)))
         self.add_output('elec_load', val=0.0, units='W', shape=((nn,)))
         self.add_output('Wdot', val=0.0, units='W', shape=((nn,)))
         self.add_output('component_weight', val=0.0, units='kg')
@@ -655,16 +659,19 @@ class WeightPower(ExplicitComponent):
         self.declare_partials('component_weight','power_rating', val=self.options['weight_inc'])
 
     def compute(self, inputs, outputs):
-        outputs['elec_load'] = inputs['throttle'] * inputs['power_rating'] / self.options['efficiency']
-        outputs['Wdot'] = inputs['throttle'] * inputs['power_rating']
+        nn = self.options['num_nodes']
+        bypass = np.where(inputs['bypass_heat_pump']==1.0, np.zeros((nn,)), np.ones((nn,)))
+        outputs['elec_load'] = bypass * inputs['throttle'] * inputs['power_rating'] / self.options['efficiency']
+        outputs['Wdot'] = bypass * inputs['throttle'] * inputs['power_rating']
         outputs['component_weight'] = inputs['power_rating'] * self.options['weight_inc'] + self.options['weight_base']
 
     def compute_partials(self, inputs, J):
         nn = self.options['num_nodes']
-        J['elec_load','throttle'] = inputs['power_rating'] / self.options['efficiency'] * np.ones((nn,))
-        J['elec_load','power_rating'] = inputs['throttle'] / self.options['efficiency']
-        J['Wdot','throttle'] = inputs['power_rating'] * np.ones((nn,))
-        J['Wdot','power_rating'] = inputs['throttle']
+        bypass = np.where(inputs['bypass_heat_pump']==1.0, np.zeros((nn,)), np.ones((nn,)))
+        J['elec_load','throttle'] = bypass * inputs['power_rating'] / self.options['efficiency'] * np.ones((nn,))
+        J['elec_load','power_rating'] = bypass * inputs['throttle'] / self.options['efficiency']
+        J['Wdot','throttle'] = bypass * inputs['power_rating'] * np.ones((nn,))
+        J['Wdot','power_rating'] = bypass * inputs['throttle']
 
 class HeatPumpWithIntegratedCoolantLoop_FixedWdot(Group):
     """
