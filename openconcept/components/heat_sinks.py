@@ -101,7 +101,7 @@ class BandolierCoolingSystem(om.ExplicitComponent):
         self.add_output('T_surface', shape=(nn,), units='K')
         self.add_output('T_core', shape=(nn,), units='K')
         self.add_output('q', shape=(nn,), units='W')
-        self.add_output('T_out', shape=(nn,), units='K')
+        self.add_output('T_out', shape=(nn,), units='K', val=300)
 
         self.declare_partials(['*'], ['*'], method='cs')
 
@@ -148,9 +148,9 @@ class BandolierCoolingSystem(om.ExplicitComponent):
         # UAcomb = 1/(1/hconv/A_heat_trans+1/K_cyl/2/inputs['n_cpb'])
         # qcheck2 = (Tbar - inputs['T_in']) * mdot_b * cpf * (1 - np.exp(-UAcomb/mdot_b/cpf)) / 2 / inputs['n_cpb']
 
-        if np.sum(np.abs(qcheck - outputs['q']/n_cells)) > 1e-5:
-            # the heat flux across the cell is not equal to the heat flux due to convection
-            raise ValueError('The surface temperature solution appears to be wrong')
+        # if np.sum(np.abs(qcheck - outputs['q']/n_cells)) > 1e-5:
+        #     # the heat flux across the cell is not equal to the heat flux due to convection
+        #     raise ValueError('The surface temperature solution appears to be wrong')
 
         outputs['T_out'] = inputs['T_in'] + outputs['q'] / inputs['mdot_coolant'] / cpf
         outputs['T_core'] = (Tbar - Ts) + Tbar
@@ -349,7 +349,7 @@ class MotorCoolingJacket(om.ExplicitComponent):
         self.add_input('power_rating', units='W', val=2e5)
         self.add_input('motor_weight', units='kg', val=100)
         self.add_output('q', shape=(nn,), units='W')
-        self.add_output('T_out', shape=(nn,), units='K')
+        self.add_output('T_out', shape=(nn,), units='K', val=300)
         self.add_output('dTdt', shape=(nn,), units='K/s', tags=['integrate', 'state_name:T_motor', 'state_units:K', 'state_val:300.0', 'state_promotes:True'])        
         
         self.declare_partials(['T_out','q','dTdt'], ['power_rating'], rows=arange, cols=np.zeros((nn,)))
