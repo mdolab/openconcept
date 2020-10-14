@@ -70,29 +70,140 @@ class OSFGeometryTestCase(unittest.TestCase):
         prob = Problem(OSFGeometryTestGroup(num_nodes=1))
         prob.setup(check=True,force_alloc_complex=True)
         prob.run_model()
-        assert_near_equal(prob['osfgeometry.dh_cold'], 0.002462541, tolerance=1e-6)
-        assert_near_equal(prob['heat_transfer'], 10020.13126, tolerance=1e-6 )
-        assert_near_equal(prob['delta_p_cold'], -131.9862069, tolerance=1e-6 )
+        assert_near_equal(prob['osfgeometry.dh_cold'], 0.00242316, tolerance=1e-6)
+        assert_near_equal(prob['heat_transfer'], 10040.9846, tolerance=1e-6 )
+        assert_near_equal(prob['delta_p_cold'], -135.15338626, tolerance=1e-6 )
         assert_near_equal(prob['delta_p_hot'], -9112.282754, tolerance=1e-6 )
         assert_near_equal(prob['component_weight'], 1.147605, tolerance=1e-5 )
 
-        partials = prob.check_partials(method='cs',compact_print=True)
+        partials = prob.check_partials(method='cs',compact_print=True, show_only_incorrect=True)
         assert_check_partials(partials)
 
-    # def test_nondefault_settings(self):
-    #     prob = Problem(BatteryTestGroup(vec_size=10,
-    #                                     use_defaults=False,
-    #                                     efficiency=0.95,
-    #                                     p=3000,
-    #                                     e=500,
-    #                                     cost_inc=100,
-    #                                     cost_base=0))
-    #     prob.setup(check=True,force_alloc_complex=True)
-    #     prob.run_model()
-    #     assert_near_equal(prob.get_val('battery.heat_out', units='kW'), np.ones(10)*100*0.05, tolerance=1e-15)
-    #     assert_near_equal(prob['battery.component_sizing_margin'], np.ones(10)/3, tolerance=1e-15)
-    #     assert_near_equal(prob['battery.component_cost'], 10000, tolerance=1e-15)
-    #     assert_near_equal(prob.get_val('battery.max_energy', units='W*h'), 500*100, tolerance=1e-15)
+    def test_kayslondon_10_61(self):
+        prob = Problem(OSFGeometryTestGroup(num_nodes=1))
+        prob.setup(check=True,force_alloc_complex=True)
+        prob.set_val('fin_thickness', 0.004, units='inch')
+        prob.set_val('plate_thickness', 0.004, units='inch')
+        prob.set_val('fin_length_cold', 1./10., units='inch')
+        fin_spacing = 1 / 19.35 - 0.004 # fin pitch minus fin thickness
+        prob.set_val('channel_height_cold', 0.0750-0.004, units='inch')
+        prob.set_val('channel_width_cold', fin_spacing, units='inch')
+        prob.set_val('n_long_cold', 2)
+        prob.set_val('mdot_cold', 0.0905, units='kg/s')
 
-    #     partials = prob.check_partials(method='cs',compact_print=True)
-    #     assert_check_partials(partials)
+        prob.run_model()
+        prob.model.list_outputs(units=True)
+        # test the geometry in Kays and London 3rd Ed Pg 248, Fig 10-61
+        assert_near_equal(prob['osfgeometry.dh_cold'], 1.403e-3, tolerance=1e-3)
+        assert_near_equal(prob['redh.Re_dh_cold'], 400., tolerance=1e-2)
+        # data directly from Kays/London at Redh=400
+        assert_near_equal(prob['osfdata.j_cold'], 0.0195, tolerance=2e-1)
+        assert_near_equal(prob['osfdata.f_cold'], 0.0750, tolerance=2e-1 )
+
+        prob.set_val('mdot_cold', 0.0905*5, units='kg/s')
+        prob.run_model()
+        # data directly from Kays/London at Redh=2000
+        assert_near_equal(prob['redh.Re_dh_cold'], 2000., tolerance=1e-2)
+        assert_near_equal(prob['osfdata.j_cold'], 0.00940, tolerance=2e-1)
+        assert_near_equal(prob['osfdata.f_cold'], 0.0303, tolerance=3.5e-1 )
+
+        assert_near_equal(prob['osfgeometry.alpha_cold'], 0.672, tolerance=1e-2)
+        assert_near_equal(prob['osfgeometry.delta_cold'], 0.040, tolerance=1e-2)
+        assert_near_equal(prob['osfgeometry.gamma_cold'], 0.084, tolerance=1e-2)
+
+    def test_kayslondon_10_55(self):
+        prob = Problem(OSFGeometryTestGroup(num_nodes=1))
+        prob.setup(check=True,force_alloc_complex=True)
+        prob.set_val('fin_thickness', 0.004, units='inch')
+        prob.set_val('plate_thickness', 0.004, units='inch')
+        prob.set_val('fin_length_cold', 1./8., units='inch')
+        fin_spacing = 1 / 15.61 - 0.004 # fin pitch minus fin thickness
+        prob.set_val('channel_height_cold', 0.250-0.004, units='inch')
+        prob.set_val('channel_width_cold', fin_spacing, units='inch')
+        prob.set_val('n_long_cold', 2)
+        prob.set_val('mdot_cold', 0.235, units='kg/s')
+
+        prob.run_model()
+        # test the geometry in Kays and London 3rd Ed Pg 248, Fig 10-55
+        assert_near_equal(prob['osfgeometry.dh_cold'], 2.383e-3, tolerance=1e-2)
+        # data directly from Kays/London at Redh=400
+        assert_near_equal(prob['redh.Re_dh_cold'], 400., tolerance=1e-2)
+        assert_near_equal(prob['osfdata.j_cold'], 0.0246, tolerance=1e-1)
+        assert_near_equal(prob['osfdata.f_cold'], 0.104, tolerance=1e-1)
+        prob.set_val('mdot_cold', 0.235*5, units='kg/s')
+        prob.run_model()
+        # data directly from Kays/London at Redh=2000
+        assert_near_equal(prob['redh.Re_dh_cold'], 2000., tolerance=1e-2)
+        assert_near_equal(prob['osfdata.j_cold'], 0.0111, tolerance=1e-1)
+        assert_near_equal(prob['osfdata.f_cold'], 0.0420, tolerance=1e-1 )
+
+        assert_near_equal(prob['osfgeometry.alpha_cold'], 0.244, tolerance=1e-2)
+        assert_near_equal(prob['osfgeometry.delta_cold'], 0.032, tolerance=1e-2)
+        assert_near_equal(prob['osfgeometry.gamma_cold'], 0.067, tolerance=1e-2)
+
+    def test_kayslondon_10_60(self):
+        prob = Problem(OSFGeometryTestGroup(num_nodes=1))
+        prob.setup(check=True,force_alloc_complex=True)
+        prob.set_val('fin_thickness', 0.004, units='inch')
+        prob.set_val('plate_thickness', 0.004, units='inch')
+        prob.set_val('fin_length_cold', 1./10., units='inch')
+        fin_spacing = 1 / 27.03 - 0.004 # fin pitch minus fin thickness
+        prob.set_val('channel_height_cold', 0.250-0.004, units='inch')
+        prob.set_val('channel_width_cold', fin_spacing, units='inch')
+        prob.set_val('n_long_cold', 2)
+        prob.set_val('mdot_cold', 0.27, units='kg/s')
+
+        prob.run_model()
+
+        # test the geometry in Kays and London 3rd Ed Pg 248, Fig 10-55
+        # assert_near_equal(prob['osfgeometry.dh_cold'], 0.00147796, tolerance=1e-4)
+        assert_near_equal(prob['osfgeometry.dh_cold'], 0.001423, tolerance=1e-2)
+        # data directly from Kays/London at Redh=500
+        assert_near_equal(prob['redh.Re_dh_cold'], 500., tolerance=1e-2)
+        assert_near_equal(prob['osfdata.j_cold'], 0.0238, tolerance=1e-1)
+        assert_near_equal(prob['osfdata.f_cold'], 0.0922, tolerance=1e-1)
+        prob.set_val('mdot_cold', 0.27*4, units='kg/s')
+        prob.run_model()
+        # data directly from Kays/London at Redh=2000
+        assert_near_equal(prob['redh.Re_dh_cold'], 2000., tolerance=1e-2)
+        assert_near_equal(prob['osfdata.j_cold'], 0.0113, tolerance=1e-1)
+        assert_near_equal(prob['osfdata.f_cold'], 0.0449, tolerance=1e-1 )
+
+        assert_near_equal(prob['osfgeometry.alpha_cold'], 0.134, tolerance=1e-2)
+        assert_near_equal(prob['osfgeometry.delta_cold'], 0.040, tolerance=1e-2)
+        assert_near_equal(prob['osfgeometry.gamma_cold'], 0.121, tolerance=1e-2)
+
+
+
+    def test_kayslondon_10_63(self):
+        prob = Problem(OSFGeometryTestGroup(num_nodes=1))
+        prob.setup(check=True,force_alloc_complex=True)
+        prob.set_val('fin_thickness', 0.004, units='inch')
+        prob.set_val('plate_thickness', 0.004, units='inch')
+        prob.set_val('fin_length_cold', 3./32., units='inch')
+        fin_spacing = 0.082 - 0.004 # fin pitch minus fin thickness
+        prob.set_val('channel_height_cold', 0.485-0.004, units='inch')
+        prob.set_val('channel_width_cold', fin_spacing, units='inch')
+        prob.set_val('n_long_cold', 4)
+        prob.set_val('mdot_cold', 0.54, units='kg/s')
+
+        prob.run_model()
+        # test the geometry in Kays and London 3rd Ed Pg 248, Fig 10-55
+        # assert_near_equal(prob['osfgeometry.dh_cold'], 0.00341, tolerance=1e-2)
+        # data directly from Kays/London at Redh=500
+        assert_near_equal(prob['redh.Re_dh_cold'], 500., tolerance=1e-2)
+        assert_near_equal(prob['osfdata.j_cold'], 0.0205, tolerance=2e-1)
+        assert_near_equal(prob['osfdata.f_cold'], 0.130, tolerance=2e-1)
+        prob.set_val('mdot_cold', 0.54*4, units='kg/s')
+        prob.run_model()
+        # data directly from Kays/London at Redh=2000
+        assert_near_equal(prob['redh.Re_dh_cold'], 2000., tolerance=1e-2)
+        assert_near_equal(prob['osfdata.j_cold'], 0.0119, tolerance=2e-1)
+        assert_near_equal(prob['osfdata.f_cold'], 0.0607, tolerance=2e-1 )
+
+        assert_near_equal(prob['osfgeometry.alpha_cold'], 0.162, tolerance=1e-2)
+        assert_near_equal(prob['osfgeometry.delta_cold'], 0.043, tolerance=1e-2)
+        assert_near_equal(prob['osfgeometry.gamma_cold'], 0.051, tolerance=1e-2)
+
+if __name__=="__main__":
+    unittest.main()

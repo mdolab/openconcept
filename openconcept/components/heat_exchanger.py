@@ -157,7 +157,9 @@ class OffsetStripFinGeometry(ExplicitComponent):
         outputs['frontal_area'] = outputs['width_overall'] * outputs['height_overall']
 
         # compute cold side geometric properties
-        outputs['dh_cold'] = 2 * w_c * h_c / (w_c + h_c)
+        # outputs['dh_cold'] = 2 * w_c * h_c / (w_c + h_c)
+        # special formula for dh (maybe accounts for bend radii?) from Manglik and Bergles paper
+        outputs['dh_cold'] = 4 * w_c * h_c * l_c / (2 * (w_c * l_c + h_c * l_c + t_f * h_c) + t_f * w_c)
         outputs['xs_area_cold'] = w_c * h_c * n_wide_c * n_tall
         outputs['heat_transfer_area_cold'] = 2 * (w_c + h_c) * l_c * n_long_c * n_wide_c * n_tall
         outputs['fin_area_ratio_cold'] = h_c / (h_c + w_c)
