@@ -308,7 +308,8 @@ def check_params_match_known(prob, known_vals):
 if not HAS_PYCYCLE:
     class TestOCDuct(unittest.TestCase):
         def __init__(self, *args, **kwargs):
-            self.list_output = True
+            self.list_output = False
+            warnings.warn('pycycle >= 3.0 must be installed to run reg tests using pycycle. Using cached values')
             super(TestOCDuct, self).__init__(*args, **kwargs)
 
         def test_baseline(self):
@@ -354,7 +355,7 @@ if not HAS_PYCYCLE:
 else:
     class TestOCDuct(unittest.TestCase):
         def __init__(self, *args, **kwargs):
-            self.list_output = True
+            self.list_output = False
             super(TestOCDuct, self).__init__(*args, **kwargs)
         def test_baseline(self):
             prob = run_problem(dPqP=0.0, heat_in=0.0, oc_use_dpqp=False, list_output=False)
@@ -377,9 +378,4 @@ else:
             check_params_match_pycycle(prob, list_output=self.list_output, case_name='cfg')
 
 if __name__ == "__main__":
-    if HAS_PYCYCLE:
-        # run_problem(dPqP=0.05, oc_use_dpqp=True)
-        unittest.main()
-    else:
-        warnings.warn('pycycle >= 3.0 must be installed to run reg tests using pycycle. Using cached values')
-        unittest.main()
+    unittest.main()
