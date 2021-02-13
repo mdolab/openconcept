@@ -1,4 +1,4 @@
-name: OpenConcept Build Test Coverage
+name: Build
 
 on:
   pull_request:
