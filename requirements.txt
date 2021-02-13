@@ -1,5 +1,5 @@
 pytest>=5.4.0
-python-coveralls
+coveralls
 coverage==4.4
 pytest-cov
 scipy
