@@ -29,11 +29,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Set Python Version
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.6
     - name: Push to Coveralls
-    - steps:
       uses: actions/setup-python@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        python-version: 3.6
       run: coveralls --service=github --rcfile=../.coveragerc;
