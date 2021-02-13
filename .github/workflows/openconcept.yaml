@@ -1,0 +1,39 @@
+name: OpenConcept Build Test Coverage
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set Python Version
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.6
+    - name: Install Dependencies
+      run: pip install -r requirements.txt
+    - name: Build and Test
+      run: python -m pytest --cov-config .coveragerc --cov=openconcept
+
+  coverage:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Push to Coveralls
+    - steps:
+      uses: actions/setup-python@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        python-version: 3.6
+      run: coveralls --service=github --rcfile=../.coveragerc;
