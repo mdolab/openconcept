@@ -18,10 +18,7 @@ jobs:
         python-version: 3.6
     - name: Install Dependencies
       run: |
-        pip install wheel
-        pip install coveralls
-        pip install coverage
-        pip install pytest-cov
+        pip install wheel coveralls coverage pytest-cov sphinx sphinx_rtd_theme
         pip install .
     - name: Build and Test
       run: python -m pytest --cov-config .coveragerc --cov=openconcept
@@ -43,16 +40,12 @@ jobs:
       run: |
         conda config --set always_yes yes
         conda update conda
-        conda install -c intel numpy
         conda install pip
         conda create -n openconcept
         activate openconcept
     - name: Install Dependencies
       run: |
-        pip install wheel
-        pip install coveralls
-        pip install coverage
-        pip install pytest-cov
+        pip install wheel coveralls coverage pytest-cov sphinx sphinx_rtd_theme
         pip install .
     - name: Build and Test
       run: python -m pytest
