@@ -12,6 +12,7 @@ jobs:
     strategy:
       matrix:
         os: ["ubuntu-latest", "windows-latest"]
+      fail-fast: false
     steps:
     - uses: actions/checkout@v2
     - name: Set Python Version
@@ -22,9 +23,10 @@ jobs:
     - name: Set environment
       run: |
         conda config --set always_yes yes
+        conda install numpy scipy
     - name: Install
       run: |
-        pip install wheel coveralls coverage pytest-cov sphinx sphinx_rtd_theme redbaron
+        pip install wheel coveralls coverage pytest pytest-cov sphinx sphinx_rtd_theme redbaron
         pip install .
     - name: Build and Test
       run: |
