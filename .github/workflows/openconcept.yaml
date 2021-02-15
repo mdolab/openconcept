@@ -18,7 +18,7 @@ jobs:
         python-version: 3.6
     - name: Install Dependencies
       run: |
-        pip install wheel coveralls coverage pytest-cov sphinx sphinx_rtd_theme
+        pip install wheel coveralls coverage pytest-cov sphinx sphinx_rtd_theme red_baron
         pip install .
     - name: Build and Test
       run: python -m pytest --cov-config .coveragerc --cov=openconcept
@@ -45,7 +45,7 @@ jobs:
         activate openconcept
     - name: Install Dependencies
       run: |
-        pip install wheel coveralls coverage pytest-cov sphinx sphinx_rtd_theme
+        pip install wheel coveralls coverage pytest-cov sphinx sphinx_rtd_theme red_baron
         pip install .
     - name: Build and Test
       run: python -m pytest
