@@ -7,45 +7,30 @@ on:
       - master
 
 jobs:
-  Linux_Build:
-    runs-on: ubuntu-latest
-
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "windows-latest"]
     steps:
     - uses: actions/checkout@v2
     - name: Set Python Version
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.6
-    - name: Install Dependencies
-      run: |
-        pip install wheel coveralls coverage pytest-cov sphinx sphinx_rtd_theme redbaron
-        pip install .
-    - name: Build and Test
-      run: python -m pytest --cov-config .coveragerc --cov=openconcept
-    - name: Push to Coveralls
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: coveralls --service=github --rcfile=.coveragerc;
-
-  Windows_Build:
-    runs-on: "windows-latest"
-
-    steps:
-    - uses: actions/checkout@v2
-    - uses: conda-incubator/setup-miniconda@v2
+      uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
         python-version: 3.6
     - name: Set environment
       run: |
         conda config --set always_yes yes
-        conda update conda
-        conda install pip
-        conda create -n openconcept
-        activate openconcept
-    - name: Install Dependencies
+    - name: Install
       run: |
         pip install wheel coveralls coverage pytest-cov sphinx sphinx_rtd_theme redbaron
         pip install .
     - name: Build and Test
-      run: python -m pytest
+      run: |
+        python -m pytest --cov-config .coveragerc --cov=openconcept
+    - name: Push to Coveralls
+      if: ${{ matrix.os }} == "ubuntu-latest"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: coveralls --service=github --rcfile=.coveragerc;
