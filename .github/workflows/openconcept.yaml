@@ -25,6 +25,7 @@ jobs:
       run: |
         conda config --set always_yes yes
         conda install numpy scipy
+        conda list
     - name: Install
       run: |
         pip install wheel coveralls coverage pytest pytest-cov sphinx sphinx_rtd_theme redbaron
