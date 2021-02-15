@@ -43,6 +43,7 @@ jobs:
       run: |
         conda config --set always_yes yes
         conda update conda
+        conda install -c intel numpy
         conda install pip
         conda create -n openconcept
         activate openconcept
