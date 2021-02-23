@@ -1,14 +1,21 @@
 from distutils.core import setup
+import re
+import os
+
+__version__ = re.findall(
+    r"""__version__ = ["']+([0-9\.]*)["']+""",
+    open('openconcept/__init__.py').read(),
+)[0]
+
+this_directory = os.path.abspath(os.path.dirname(__file__))
+with open(os.path.join(this_directory, "readme.md"), encoding="utf-8") as f:
+    long_description = f.read()
 
 setup(
     name='openconcept',
-    version='0.3.0',
+    version=__version__,
     description="Open Aircraft Conceptual Design Tools",
-    long_description="""OpenConcept is a set of analysis routines and components to aid
-    in the conceptual design of aircraft with unconventional energy and propulsion architectures.
-    It natively supports tracking of electrical power and heat as well as conventional fuel flows,
-    and can handle cases ranging from 100 percent electric to 100 percent fuel-burning propulsion.
-    """,
+    long_description=long_description,
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',
@@ -42,7 +49,9 @@ setup(
         'six',
         'scipy>=1.0.0',
         'numpy>=1.14.0',
-        'openmdao>=3.0.0',
-        'pytest',
-    ]
+        'openmdao>=3.0.0, <=3.2.1',
+    ],
+    extras_require = {
+        'testing':  ["pytest", "openmdao[docs]"]
+      },
 )
