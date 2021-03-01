@@ -1,11 +1,17 @@
-build:
-  image: latest
+version: 2
+
+sphinx:
+  configuration: docs/conf.py
+
+formats: 
+  - htmlzip
+  - epub
 
 python:
   version: 3.6
-
-conda:
-  file: environment.yml
-
-formats: [htmlzip,epub]
-
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - testing
+  system_packages: true
