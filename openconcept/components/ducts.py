@@ -462,10 +462,10 @@ class HeatAdditionPressureLoss(ExplicitComponent):
         self.add_input('mdot', shape=(nn,), units='kg/s')
         self.add_input('rho', shape=(nn,), units='kg/m**3')
         self.add_input('area', units='m**2')
-        self.add_input('delta_p', shape=(nn,), units='Pa')
+        self.add_input('delta_p', shape=(nn,), val=0.0, units='Pa')
         self.add_input('dynamic_pressure_loss_factor', val=0.0)
         self.add_input('pressure_recovery', shape=(nn,), val=np.ones((nn,)))
-        self.add_input('heat_in', shape=(nn,), units='W')
+        self.add_input('heat_in', shape=(nn,), val=0.0, units='W')
         self.add_input('cp', units='J/kg/K')
 
         self.add_output('Tt_out', shape=(nn,), units='K')
@@ -756,10 +756,10 @@ class Inlet(Group):
         self.add_subsystem('mach',MachNumberfromSpeed(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('freestreamtotaltemperature',TotalTemperatureIsentropic(num_nodes=nn), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('freestreamtotalpressure',TotalPressureIsentropic(num_nodes=nn), promotes_inputs=['*'])
-        self.add_subsystem('inlet_recovery', ExecComp('eta_ram=1.0 - 0.00*tanh(10*M)', has_diag_partials=True, eta_ram=np.ones((nn,)), M=0.1*np.ones((nn,))), promotes_inputs=['M'])
+        # self.add_subsystem('inlet_recovery', ExecComp('eta_ram=1.0 - 0.00*tanh(10*M)', has_diag_partials=True, eta_ram=np.ones((nn,)), M=0.1*np.ones((nn,))), promotes_inputs=['M'])
         self.add_subsystem('totalpressure', ExecComp('pt=pt_in * eta_ram', pt={'units':'Pa','value':np.ones((nn,)),'lower':1.0}, pt_in={'units':'Pa','value':np.ones((nn,))}, eta_ram=np.ones((nn,)), has_diag_partials=True), promotes_outputs=['pt'])
         self.connect('freestreamtotalpressure.pt','totalpressure.pt_in')
-        self.connect('inlet_recovery.eta_ram','totalpressure.eta_ram')
+        # self.connect('inlet_recovery.eta_ram','totalpressure.eta_ram')
 
 class DuctStation(Group):
     """A 'normal' station in a duct flow.
@@ -994,6 +994,7 @@ class ImplicitCompressibleDuct_ExternalHX(Group):
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of analysis points' )
+        self.options.declare('cfg', default=0.98, desc='Gross thrust coefficient')
 
     def setup(self):
         nn = self.options['num_nodes']
@@ -1069,6 +1070,6 @@ class ImplicitCompressibleDuct_ExternalHX(Group):
         self.connect('sta3.pt_out','nozzle.pt_in')
         self.connect('sta3.Tt_out','nozzle.Tt')
 
-        self.add_subsystem('force', NetForce(num_nodes=nn), promotes_inputs=['mdot','p_inf',('Utrue_inf','Utrue'),'area_nozzle'])
+        self.add_subsystem('force', NetForce(num_nodes=nn, cfg=self.options['cfg']), promotes_inputs=['mdot','p_inf',('Utrue_inf','Utrue'),'area_nozzle'])
         self.connect('nozzle.p','force.p_nozzle')
         self.connect('nozzle.rho','force.rho_nozzle')
