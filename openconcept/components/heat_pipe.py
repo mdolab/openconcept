@@ -43,7 +43,7 @@ class HeatPipe(Group):
     length_cond : float
         Length of condenser, default 0.25 m (scalar, m)
     wall_conduct : float
-        Thermal conductivity of wall material, default aluminum 6061 (scalar, W/(m-K))
+        Thermal conductivity of wall material, default aluminum 7075 (scalar, W/(m-K))
     wick_thickness : float
         Thickness of internal wick liner in heat pipe, default no wick (scalar, m)
     wick_conduct : float
@@ -65,7 +65,7 @@ class HeatPipe(Group):
         self.options.declare('num_nodes', default=1, desc='Number of design points to run')
         self.options.declare('length_evap', default=0.25, desc='Length of evaporator m')
         self.options.declare('length_cond', default=0.25, desc='Length of condenser m')
-        self.options.declare('wall_conduct', default=167., desc='Thermal conductivity of pipe wall material (default aluminum 6061) W/(m-K)')
+        self.options.declare('wall_conduct', default=196., desc='Thermal conductivity of pipe wall material (default aluminum 7075) W/(m-K)')
         self.options.declare('wick_thickness', default=0e-3, desc='Wick thickness in heat pipe m')
         self.options.declare('wick_conduct', default=4., desc='Thermal conductivity of wick material and evaporation/condensation W/(m-K)')
         self.options.declare('yield_stress', default=572., desc='Wall yield stress in MPa (default 7075)')
@@ -170,7 +170,7 @@ class HeatPipeThermalResistance(ExplicitComponent):
     length_cond : float
         Length of condenser, default 0.25 m (scalar, m)
     wall_conduct : float
-        Thermal conductivity of wall material, default aluminum 6061 (scalar, W/(m-K))
+        Thermal conductivity of wall material, default aluminum 7075 (scalar, W/(m-K))
     wick_thickness : float
         Thickness of internal wick liner in heat pipe, default no wick (scalar, m)
     wick_conduct : float
@@ -185,7 +185,7 @@ class HeatPipeThermalResistance(ExplicitComponent):
         self.options.declare('num_nodes', default=1, desc='Number of design points to run')
         self.options.declare('length_evap', default=0.25, desc='Length of evaporator m')
         self.options.declare('length_cond', default=0.25, desc='Length of condenser m')
-        self.options.declare('wall_conduct', default=167., desc='Thermal conductivity of pipe wall material (default aluminum 6061) W/(m-K)')
+        self.options.declare('wall_conduct', default=196., desc='Thermal conductivity of pipe wall material (default aluminum 7075) W/(m-K)')
         self.options.declare('wick_thickness', default=0e-3, desc='Wick thickness in heat pipe m')
         self.options.declare('wick_conduct', default=4., desc='Thermal conductivity of wick material and evaporation/condensation W/(m-K)')
         self.options.declare('vapor_resistance', default=False, desc='Include vapor resistance in calculation')
@@ -487,12 +487,9 @@ class QMaxHeatPipe(Group):
                                                         stress_safety_factor=self.options['stress_safety_factor']),
                                          promotes=['*'])
 
-        self.add_subsystem('delta_T_calc', HeatPipeVaporTempDrop(num_nodes=nn), promotes_inputs=['*'])
-
         # Connect surrogate to analytical expressions
         self.connect('ammonia_current.rho_liquid', 'q_max_calc.rho_liquid')
-        self.connect('ammonia_current.rho_vapor', ['q_max_calc.rho_vapor','rho_vapor'])
-        self.connect('q_max', 'q')
+        self.connect('ammonia_current.rho_vapor', 'q_max_calc.rho_vapor')
 
 class QMaxAnalyticalPart(ExplicitComponent):
     """
@@ -612,33 +609,3 @@ class QMaxWarning(ExplicitComponent):
             warnings.warn(self.msginfo + f" Heat pipe is being asked to transfer "
             f"{np.max(q/q_max)*100:2.1f}% of its maximum heat transfer capability. This is {(np.max(q/q_max) - q_warn)*100:2.1f}% over "
             f"the warning threshold of {q_warn*100:2.1f}%.", stacklevel=2)
-
-
-if __name__=="__main__":
-    # Heat pipe ready-to-go test
-    p = Problem()
-    nn = 3
-    theta = 84.
-
-    hp = p.model.add_subsystem('heat_pipe', HeatPipe(num_nodes=nn, theta=theta))
-    hp.set_input_defaults('T_evap', units='degC', val=np.linspace(30, 60, nn))
-    hp.set_input_defaults('q', units='W', val=np.linspace(400, 1000, nn))
-    hp.set_input_defaults('length', units='m', val=10.22)
-    hp.set_input_defaults('inner_diam', units='inch', val=.902)
-    hp.set_input_defaults('n_pipes', val=1.)
-    hp.set_input_defaults('T_design', units='degC', val=40)
-
-    p.setup()
-    p.run_model()
-    print("\nINPUTS")
-    print(f"Evaporator temperature: {p.get_val('heat_pipe.T_evap', units='degC')} deg C")
-    print(f"Heat transferred:       {p.get_val('heat_pipe.q', units='W')} W")
-    print(f"Length:                 {p.get_val('heat_pipe.length', units='m')} m")
-    print(f"Inner diameter:         {p.get_val('heat_pipe.inner_diam', units='cm')} cm")
-    print(f"Number of heat pipes:   {p.get_val('heat_pipe.n_pipes')}")
-    print(f"Design temperature:     {p.get_val('heat_pipe.T_design')} deg C")
-    print(f"Angle from vertical:    [{theta}] deg")
-    print("\nOUTPUTS")
-    print(f"Max heat transfer:      {p.get_val('heat_pipe.q_max', units='W')} W")
-    print(f"Heat pipe(s) weight:    {p.get_val('heat_pipe.weight', units='kg')} kg")
-    print(f"Condenser temperature:  {p.get_val('heat_pipe.T_cond', units='degC')} deg C\n")

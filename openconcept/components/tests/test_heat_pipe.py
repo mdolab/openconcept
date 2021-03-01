@@ -26,7 +26,7 @@ class HeatPipeIntegrationTestCase(unittest.TestCase):
 
         assert_near_equal(prob['q_max'], np.ones(nn)*2807.04869547, tolerance=1e-5)
         assert_near_equal(prob['weight'], 0.51463886, tolerance=1e-5)
-        assert_near_equal(prob['T_cond'], np.ones(nn)*29.93440845, tolerance=1e-5)
+        assert_near_equal(prob['T_cond'], np.ones(nn)*29.9441105, tolerance=1e-5)
 
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -47,7 +47,7 @@ class HeatPipeIntegrationTestCase(unittest.TestCase):
 
         assert_near_equal(prob['q_max'], np.array([4936.75193703, 5022.29454826, 5074.04485581, 5095.29546816, 5081.04977578]), tolerance=1e-5)
         assert_near_equal(prob['weight'], 0.51463886, tolerance=1e-5)
-        assert_near_equal(prob['T_cond'], np.array([29.93440845, 37.40981609, 44.88522609, 52.36063752, 59.83604972]), tolerance=1e-5)
+        assert_near_equal(prob['T_cond'], np.array([29.9441105, 37.4231564, 44.90220466, 52.38125436, 59.86030483]), tolerance=1e-5)
 
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -100,7 +100,7 @@ class HeatPipeThermalResistanceTestCase(unittest.TestCase):
         p.setup(check=True, force_alloc_complex=True)
         p.run_model()
 
-        assert_near_equal(p['thermal_resistance'], np.ones(nn)*0.000898000112, tolerance=1e-5)
+        assert_near_equal(p['thermal_resistance'], np.ones(nn)*0.00076513, tolerance=1e-5)
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
