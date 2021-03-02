@@ -49,7 +49,7 @@ class HeatPipe(Group):
     wick_conduct : float
         Thermal conductivity of wick liner, default 4 (scalar, W/(m-K))
         Note: default is from wick resistance on slide 21 of https://www.youtube.com/watch?v=JnS0ui8Pt64 and backs out
-              thermal conductivity using an assumed thickness of ~0.005" (rough estimate based on the x-section picture)
+        thermal conductivity using an assumed thickness of ~0.005" (rough estimate based on the x-section picture)
     yield_stress : float
         Yield stress of the heat pipe materia;, default 7075 aluminum (scalar, MPa)
     rho_wall : float
@@ -176,7 +176,7 @@ class HeatPipeThermalResistance(ExplicitComponent):
     wick_conduct : float
         Thermal conductivity of wick liner, default 4 (scalar, W/(m-K))
         Note: default is from wick resistance on slide 21 of https://www.youtube.com/watch?v=JnS0ui8Pt64 and backs out
-              thermal conductivity using an assumed thickness of ~0.005" (rough estimate based on the x-section picture)
+        thermal conductivity using an assumed thickness of ~0.005" (rough estimate based on the x-section picture)
     vapor_resistance : bool
         Set to true to include vapor resistance (usually negligible) in calculation, default false. If set to true,
         the q and temp inputs MUST be connected
