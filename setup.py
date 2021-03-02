@@ -49,7 +49,7 @@ setup(
         'six',
         'scipy>=1.0.0',
         'numpy>=1.14.0',
-        'openmdao>=3.7.0',
+        'openmdao>=3.5.0',
     ],
     extras_require = {
         'testing':  ["pytest", "openmdao[docs]"]
