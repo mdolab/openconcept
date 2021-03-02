@@ -376,8 +376,7 @@ class TestIntegratorDuplicateStateName(unittest.TestCase):
     def test_asserts(self):
         with self.assertRaises(ValueError) as cm:
             self.p.setup(force_alloc_complex=True)
-        self.assertEqual('{}'.format(cm.exception), 
-                         "Integrator (ic.ode_integ): Variable name 'f_final' already exists.")
+        self.assertIn("Variable name 'f_final' already exists.", '{}'.format(cm.exception))
 
 class TestIntegratorOutsideofPhase(unittest.TestCase):
     def setUp(self):

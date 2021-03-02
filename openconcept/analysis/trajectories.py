@@ -9,7 +9,7 @@ def find_integrators_in_model(system, abs_namespace, timevars, states):
 
     # check if we are a group or not
     if isinstance(system, om.Group):
-        for subsys in system._subsystems_allprocs:
+        for subsys, _ in system._subsystems_allprocs.values():
             if not abs_namespace:
                 next_namespace = subsys.name
             else:
@@ -45,12 +45,10 @@ class PhaseGroup(om.Group):
         prob_meta.update({'oc_num_nodes': self._oc_num_nodes})
         super(PhaseGroup, self)._setup_procs(pathname, comm, mode, prob_meta)
     
-    def _configure(self):
-        super(PhaseGroup, self)._configure()
+    def configure(self):
         # check child subsys for variables to be integrated and add them all
         timevars = []
         states = []
-        # TODO revisit this approach once var data in configure is officially supported
         find_integrators_in_model(self, '', timevars, states)
         self._setup_var_data()
 
@@ -89,54 +87,54 @@ class IntegratorGroup(om.Group):
 
         super(IntegratorGroup, self)._setup_procs(pathname, comm, mode, prob_meta)
 
-    def _configure(self):
-        super(IntegratorGroup, self)._configure()
-        # TODO revisit this when variable data available by default in configure
+    def configure(self):
         self._setup_var_data()
-        for subsys in self._subsystems_allprocs:
+        parent_meta_dict = self.get_io_metadata(iotypes='output', tags='integrate')
+        for subsys, _ in self._subsystems_allprocs.values():
+            # exclude any group subclasses, they don't have real outputs
             if not isinstance(subsys, om.Group):
-                for var in subsys._var_rel_names['output']:
-                    # check if there are any variables to integrate
-                    tags = subsys._var_rel2meta[var]['tags']
-                    if 'integrate' in tags:
-                        state_name = None
-                        state_units = None
-                        state_val = 0.0
-                        state_lower = -1e30
-                        state_upper = 1e30
-                        state_promotes = False
-                        # TODO Check for duplicates otherwise generic Openmdao duplicate output/input error raised
+                # find any variables that have an 'integrate tag
+                child_meta_dict = subsys.get_io_metadata(iotypes='output', tags='integrate')
+                for var in child_meta_dict.keys():
+                    tags = child_meta_dict[var]['tags']
+                    state_name = None
+                    state_units = None
+                    state_val = 0.0
+                    state_lower = -1e30
+                    state_upper = 1e30
+                    state_promotes = False
+                    # TODO Check for duplicates otherwise generic Openmdao duplicate output/input error raised
 
-                        for tag in tags:
-                            split_tag = tag.split(':')
-                            if split_tag[0] == 'state_name':
-                                state_name = split_tag[-1]
-                            elif split_tag[0] == 'state_units':
-                                state_units = split_tag[-1]
-                            elif split_tag[0] == 'state_val':
-                                state_val = eval(split_tag[-1])
-                            elif split_tag[0] == 'state_lower':
-                                state_lower = float(split_tag[-1])
-                            elif split_tag[0] == 'state_upper':
-                                state_upper = float(split_tag[-1])
-                            elif split_tag[0] == 'state_promotes':
-                                state_promotes = eval(split_tag[-1])
-                        if state_name is None:
-                            raise ValueError('Must provide a state_name tag for integrated variable '+subsys.name+'.'+var)
-                        if state_units is None:
-                            warnings.warn('OpenConcept integration variable '+subsys.name+'.'+var+' '+'has no units specified. This can be dangerous.')
-                        self.ode_integ.add_integrand(state_name, rate_name=var, val=state_val,
-                                        units=state_units, lower=state_lower, upper=state_upper)
-                        # make the rate connection
-                        rate_var_abs_address = subsys.name+'.'+var
-                        if self.pathname:
-                            rate_var_abs_address = self.pathname + '.' + rate_var_abs_address
-                        rate_var_prom_address = self._var_abs2prom['output'][rate_var_abs_address]
-                        self.connect(rate_var_prom_address, 'ode_integ'+'.'+var)
-                        if state_promotes:
-                            self.ode_integ._var_promotes['output'].append(state_name)
-                            self.ode_integ._var_promotes['output'].append(state_name+'_final')
-                            self.ode_integ._var_promotes['input'].append(state_name+'_initial')
+                    for tag in tags:
+                        split_tag = tag.split(':')
+                        if split_tag[0] == 'state_name':
+                            state_name = split_tag[-1]
+                        elif split_tag[0] == 'state_units':
+                            state_units = split_tag[-1]
+                        elif split_tag[0] == 'state_val':
+                            state_val = eval(split_tag[-1])
+                        elif split_tag[0] == 'state_lower':
+                            state_lower = float(split_tag[-1])
+                        elif split_tag[0] == 'state_upper':
+                            state_upper = float(split_tag[-1])
+                        elif split_tag[0] == 'state_promotes':
+                            state_promotes = eval(split_tag[-1])
+                    if state_name is None:
+                        raise ValueError('Must provide a state_name tag for integrated variable '+subsys.name+'.'+var)
+                    if state_units is None:
+                        warnings.warn('OpenConcept integration variable '+subsys.name+'.'+var+' '+'has no units specified. This can be dangerous.')
+                    self.ode_integ.add_integrand(state_name, rate_name=var, val=state_val,
+                                    units=state_units, lower=state_lower, upper=state_upper)
+                    # make the rate connection
+                    rate_var_abs_address = subsys.name+'.'+var
+                    # if self.pathname:
+                    #     rate_var_abs_address = self.pathname + '.' + rate_var_abs_address
+                    rate_var_prom_address = parent_meta_dict[rate_var_abs_address]['prom_name']
+                    self.connect(rate_var_prom_address, 'ode_integ'+'.'+var)
+                    if state_promotes:
+                        self.ode_integ._var_promotes['output'].append((state_name, None))
+                        self.ode_integ._var_promotes['output'].append((state_name+'_final',None))
+                        self.ode_integ._var_promotes['input'].append((state_name+'_initial',None))
 
 class TrajectoryGroup(om.Group):
     def __init__(self, **kwargs):
