@@ -23,8 +23,6 @@ from openconcept.components.heat_sinks import LiquidCooledBattery
 from openconcept.components.ducts import ImplicitCompressibleDuct_ExternalHX, ExplicitIncompressibleDuct
 from openconcept.components.heat_exchanger import HXGroup
 
-# TODO run an engine sweep at positive net shaft power offtake 
-
 class HybridSingleAisleModel(oc.IntegratorGroup):
     """
     Model for NASA twin hybrid single aisle study
@@ -70,7 +68,7 @@ class HybridSingleAisleModel(oc.IntegratorGroup):
 
         iv = self.add_subsystem('iv',om.IndepVarComp(), promotes_outputs=['*'])
         iv.add_output('mdot_coolant', val=6.0*np.ones((nn,)), units='kg/s')
-        iv.add_output('rho_coolant', val=997*np.ones((nn,)),units='kg/m**3')
+        iv.add_output('rho_coolant', val=1020*np.ones((nn,)),units='kg/m**3')
         iv.add_output('eff_factor', val=0.40)
         iv.add_output('bypass_heat_pump', val=np.ones((nn,)))
 
@@ -247,8 +245,8 @@ def configure_problem():
     prob.model.nonlinear_solver = om.NewtonSolver(iprint=2,solve_subsystems=True)
     prob.model.linear_solver = om.DirectSolver()
     prob.model.nonlinear_solver.options['maxiter'] = 20
-    prob.model.nonlinear_solver.options['atol'] = 1e-7
-    prob.model.nonlinear_solver.options['rtol'] = 1e-7
+    prob.model.nonlinear_solver.options['atol'] = 5e-8
+    prob.model.nonlinear_solver.options['rtol'] = 5e-8
     prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
     prob.model.nonlinear_solver.linesearch.options['print_bound_enforce'] = True
     return prob
@@ -284,8 +282,8 @@ def set_values(prob, num_nodes):
     prob.set_val('groundroll.duct2.sta1.M', 0.2)
     prob.set_val('groundroll.duct2.nozzle.nozzle_pressure_ratio', 0.85)
     prob.set_val('groundroll.duct2.convergence_hack', -500, units='Pa')
-    # prob.set_val('groundroll.bypass_heat_pump', np.zeros((num_nodes,)))
-    # prob.set_val('climb.bypass_heat_pump', np.zeros((num_nodes,)))
+    prob.set_val('groundroll.bypass_heat_pump', np.zeros((num_nodes,)))
+    prob.set_val('climb.bypass_heat_pump', np.zeros((num_nodes,)))
 
     prob.set_val('groundroll.area_nozzle_start', 60, units='inch**2')
     prob.set_val('groundroll.area_nozzle_end', 60, units='inch**2')
@@ -329,12 +327,13 @@ def run_hybrid_sa_analysis(plots=True):
     prob = configure_problem()
     prob.model.add_design_var('ac|propulsion|thermal|hx|n_wide_cold', 2, 1500, scaler=0.005, units=None)
     prob.model.add_design_var('cruise.hx.n_long_cold', lower=7., upper=75., scaler=0.05)
-    prob.model.add_design_var('ac|propulsion|battery|weight', lower=2000, upper=15000, scaler=0.001)
+    prob.model.add_design_var('ac|propulsion|battery|weight', lower=2000, upper=15000, scaler=0.0001)
     prob.model.add_constraint('descent.battery.SOC_final', lower=0.05, scaler=10)
     prob.model.add_constraint('descent.hx.width_overall', upper=1.2)
-    prob.model.add_constraint('descent.hx.xs_area_cold', lower=70, units='inch**2', scaler=0.1)
-    prob.model.add_objective('descent.margin', scaler=-0.001)
-    # prob.model.add_design_var('climb.refrig.control.Wdot_start', lower=0.2, upper=1.0, units=None, scaler=2.)
+    prob.model.add_constraint('descent.hx.xs_area_cold', lower=70, units='inch**2', scaler=0.01)
+    prob.model.add_objective('descent.margin', scaler=-0.0001)
+    prob.model.add_design_var('climb.refrig.control.Wdot_start', lower=0.01, upper=1.0, units=None, scaler=2.)
+    prob.model.add_design_var('ac|propulsion|thermal|heatpump|power_rating', lower=5.0, upper=50., units='kW', scaler=0.1)
     # prob.model.add_design_var('climb.refrig.control.Wdot_end', lower=0.2, upper=1.0, units=None, scaler=2.)
     # prob.model.add_design_var('cruise.refrig.control.Wdot_start', lower=0.2, upper=1.0, units=None, scaler=2.)
     # prob.model.add_design_var('cruise.refrig.control.Wdot_end', lower=0.2, upper=1.0, units=None, scaler=2.)
@@ -348,13 +347,19 @@ def run_hybrid_sa_analysis(plots=True):
         prob.model.add_design_var(phase+'.area_nozzle_start', lower=10., upper=150., scaler=0.5, units='inch**2')
         prob.model.add_design_var(phase+'.area_nozzle_end', lower=6.5, upper=150., scaler=0.5, units='inch**2')
         prob.model.add_constraint(phase+'.batteryheatsink.T',  indices=[20], upper=35, scaler=0.1, units='degC')
+    
+    # prob.driver = om.pyOptSparseDriver(optimizer='IPOPT')
+    # prob.driver.opt_settings['limited_memory_max_history'] = 1000
+    # prob.driver.opt_settings['print_level'] = 5
+
+
     prob.driver = om.pyOptSparseDriver(optimizer='SNOPT')
     prob.driver.opt_settings['Major iterations limit'] = 100
     prob.driver.opt_settings['Function precision'] = 0.00001
     prob.driver.opt_settings['Major optimality tolerance'] = 5e-9
     prob.driver.opt_settings['Hessian frequency'] = 10
-    # prob.driver.opt_settings['Linesearch tolerance'] = 0.99
-    # prob.driver.opt_settings['Penalty parameter'] = 5.
+    prob.driver.opt_settings['Linesearch tolerance'] = 0.99
+    prob.driver.opt_settings['Penalty parameter'] = 5.
 
     prob.driver.options['debug_print'] = ['desvars','objs']
     prob.setup(check=True, mode='fwd', force_alloc_complex=True)
@@ -372,15 +377,15 @@ def run_hybrid_sa_analysis(plots=True):
     prob.run_driver()   
 
     
-    prob.model.list_inputs(includes=['*hx.*T_in*','*batteryheatsink*','*oewcalc*'], excludes=['*duct*'], print_arrays=True)
-    prob.model.list_outputs(includes=['*refrig*','*heat_transfer*','*fluid_combine*'], units=True,  print_arrays=True)
+    prob.model.list_inputs(includes=['*cruise.hx*'], excludes=['*duct*'], print_arrays=True)
+    prob.model.list_outputs(includes=['*cruise.hx*'], units=True,  print_arrays=True)
     prob.list_problem_vars(print_arrays=True)
-    # prob.check_partials(show_only_incorrect=True, compact_print=True, method='cs',excludes=['*engine*'])
-    # prob.check_totals(compact_print=True)
+    # prob.check_partials(show_only_incorrect=False, compact_print=True, method='cs',excludes=['*engine*'])
+    # prob.check_totals(compact_print=True, step=1e-3)
     if plots:
         show_outputs(prob)
     return prob
 
 
 if __name__ == "__main__":
-    run_hybrid_sa_analysis(plots=True)    
+    run_hybrid_sa_analysis(plots=False)    
