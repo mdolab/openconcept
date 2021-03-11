@@ -14,28 +14,35 @@ try:
         import pycycle.api as pyc
     
         class PyCycleDuct(pyc.Cycle):
-
-            def initialize(self):
-                self.options.declare('design', types=bool, default=True)
+            """
+            This is tested with pycycle master as of 10 March 2021
+            (commit 2cca1bdee53f6f5cd0d340ee2a12b62d49f7721d)
+            """
 
             def setup(self):
-
-                thermo_spec = pyc.species_data.janaf
                 design = self.options['design']
 
-                self.pyc_add_element('fc', pyc.FlightConditions(thermo_data=thermo_spec,
-                                                        elements=pyc.AIR_MIX))
+                USE_TABULAR = False
+                if USE_TABULAR: 
+                    self.options['thermo_method'] = 'TABULAR'
+                    self.options['thermo_data'] = pyc.AIR_JETA_TAB_SPEC
+                else: 
+                    self.options['thermo_method'] = 'CEA'
+                    self.options['thermo_data'] = pyc.species_data.janaf
+                    FUEL_TYPE = 'JP-7'
+
+                self.add_subsystem('fc', pyc.FlightConditions())
                 # ram_recovery | ram_recovery
                 # MN | area
-                self.pyc_add_element('inlet', pyc.Inlet(design=design, thermo_data=thermo_spec, elements=pyc.AIR_MIX))
+                self.add_subsystem('inlet', pyc.Inlet())
                 # dPqP | s_dPqP
                 # Q_dot | Q_dot
                 # MN | area
-                self.pyc_add_element('duct', pyc.Duct(design=design, thermo_data=thermo_spec, elements=pyc.AIR_MIX))
+                self.add_subsystem('duct', pyc.Duct())
                 # Ps_exhaust
                 # dPqP
-                self.pyc_add_element('nozz', pyc.Nozzle(lossCoef='Cfg',thermo_data=thermo_spec, elements=pyc.AIR_MIX))
-                self.pyc_add_element('perf', pyc.Performance(num_nozzles=1, num_burners=0))
+                self.add_subsystem('nozz', pyc.Nozzle(lossCoef='Cfg'))
+                self.add_subsystem('perf', pyc.Performance(num_nozzles=1, num_burners=0))
 
 
                 balance = om.BalanceComp()
@@ -78,6 +85,7 @@ try:
                 # newton.linesearch.options['print_bound_enforce'] = True
                 # newton.linesearch.options['iprint'] = -1
                 self.linear_solver = om.DirectSolver(assemble_jac=True)
+                super().setup()
             
         def viewer(prob, pt):
             """
@@ -106,7 +114,11 @@ try:
         class MPDuct(pyc.MPCycle):
 
             def setup(self):
-                design = self.pyc_add_pnt('design', PyCycleDuct(design=True))
+
+                self.options['thermo_method'] = 'CEA'
+                self.options['thermo_data'] = pyc.species_data.janaf
+
+                design = self.pyc_add_pnt('design', PyCycleDuct(design=True, thermo_method='CEA'))
                 
                 # define the off-design conditions we want to run
                 self.od_pts = []
@@ -123,6 +135,7 @@ try:
                 # self.pyc_use_default_des_od_conns()
 
                 # self.pyc_connect_des_od('nozz.Throat:stat:area', 'balance.rhs:W')
+                super().setup()
 
         
 
