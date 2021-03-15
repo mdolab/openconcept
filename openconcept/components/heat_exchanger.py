@@ -1227,9 +1227,9 @@ class HXGroup(Group):
 
         #iv.add_output('T_in_cold', val=np.ones(nn)*45, units='degC')
         #iv.add_output('T_in_hot', val=np.ones(nn)*90, units='degC')
-        iv.add_output('n_long_cold', val=3)
+        # iv.add_output('n_long_cold', val=3)
         # iv.add_output('n_wide_cold', val=430)
-        iv.add_output('n_tall', val=19)
+        # iv.add_output('n_tall', val=19)
 
         iv.add_output('channel_height_cold', val=14, units='mm')
         iv.add_output('channel_width_cold', val=1.35, units='mm')
@@ -1245,7 +1245,9 @@ class HXGroup(Group):
         iv.add_output('k_hot', val=0.405, units='W/m/K')
         iv.add_output('mu_hot', val=1.68e-3, units='kg/m/s')
 
-        dvlist = [['ac|propulsion|thermal|hx|n_wide_cold', 'n_wide_cold', 430, None]]
+        dvlist = [['ac|propulsion|thermal|hx|n_wide_cold', 'n_wide_cold', 430, None],
+                  ['ac|propulsion|thermal|hx|n_long_cold', 'n_long_cold', 3, None],
+                  ['ac|propulsion|thermal|hx|n_tall', 'n_tall', 19, None]]
 
         self.add_subsystem('dvpassthru',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
 
