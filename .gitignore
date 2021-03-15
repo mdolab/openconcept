@@ -20,3 +20,4 @@ coloring_files/total_coloring.pkl
 openconcept/.coverage
 .coverage
 scratch/
+*.out
