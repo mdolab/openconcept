@@ -1,6 +1,9 @@
 import openmdao.api as om 
 import numpy as np
 from openconcept.utilities.math.integrals import Integrator
+from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
+from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
+
 import warnings 
 
 # OpenConcept PhaseGroup will be used to hold analysis phases with time integration
@@ -69,6 +72,70 @@ class IntegratorGroup(om.Group):
         time_units = kwargs.pop('time_units', 's')
         super(IntegratorGroup, self).__init__(**kwargs)
         self._oc_time_units = time_units
+        self._n_auto_comps = 0
+
+
+
+    def promote_add(self, sources, prom_name, promoted_sources=[], factors=None, vec_size=1, units=None, length=1, val=1.0,
+                     res_units=None, desc='', lower=None, upper=None, ref=1.0,
+                     ref0=0.0, res_ref=None):
+        """Helper function called during setup"""
+        add_index = self._n_auto_comps
+        self._n_auto_comps += 1
+        adder = AddSubtractComp()
+        n_inputs = len(sources) + len(promoted_sources)
+        if factors is None:
+            factors = np.ones(n_inputs)
+        adder.add_equation(output_name=prom_name,
+                           input_names=['_temp'+str(i) for i in range(n_inputs)],
+                           scaling_factors=factors,
+                           vec_size=vec_size,
+                           units=units,
+                           length=length,
+                           val=val,
+                           res_units=res_units,
+                           desc=desc,
+                           lower=lower,
+                           upper=upper,
+                           ref=ref,
+                           ref0=ref0,
+                           res_ref=res_ref)
+        adder_name = 'add'+str(add_index)
+        prom_in = []
+        for i, promoted_source in enumerate(promoted_sources):
+            prom_in.append(('_temp'+str(i+len(sources)), promoted_source))
+
+        self.add_subsystem(adder_name, adder, promotes_inputs=prom_in, promotes_outputs=['*'])
+        for i, source in enumerate(sources):
+            self.connect(source, adder_name+'._temp'+str(i))
+
+    def promote_mult(self, source, prom_name, factor, vec_size=1, units=None, length=1, val=1.0,
+                     res_units=None, desc='', lower=None, upper=None, ref=1.0,
+                     ref0=0.0, res_ref=None,
+                     divide=None, input_units=None, tags=None):
+        """Helper function called during setup"""
+        mult_index = self._n_auto_comps
+        self._n_auto_comps += 1
+        mult = ElementMultiplyDivideComp(output_name=prom_name,
+                                         input_names=['_temp'],
+                                         scaling_factor=factor,
+                                         input_units=[units],
+                                         vec_size=vec_size,
+                                         length=length,
+                                         val=val,
+                                         res_units=res_units,
+                                         desc=desc,
+                                         lower=lower,
+                                         upper=upper,
+                                         ref=ref,
+                                         ref0=ref0,
+                                         res_ref=res_ref,
+                                         divide=divide,
+                                         tags=tags)
+        mult_name = 'mult'+str(mult_index)
+        self.add_subsystem(mult_name, mult, promotes_outputs=['*'])
+        self.connect(source, mult_name+'._temp')
+
 
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         time_units = self._oc_time_units
