@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import Problem, NewtonSolver, DirectSolver
-import openconcept.components.TMS as TMS
+import openconcept.components.tests.TMS as TMS
 
 class SimpleTMSTestCase(unittest.TestCase):
     """

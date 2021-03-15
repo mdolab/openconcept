@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 import openmdao.api as om
-from openconcept.components.heat_sinks import LiquidCooledBattery, LiquidCooledMotor
+from openconcept.components.heat_sinks import LiquidCooledBattery, LiquidCooledMotor, SimpleHose, SimplePump
 
 class QuasiSteadyBatteryCoolingTestCase(unittest.TestCase):
     """
@@ -158,7 +158,7 @@ class QuasiSteadyMotorCoolingTestCase(unittest.TestCase):
         ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes_outputs=['*'])
         ivc.add_output('q_in', val=np.ones((nn,))*10000, units='W')
         ivc.add_output('T_in', 25.*np.ones((nn,)), units='degC')
-        ivc.add_output('mdot_coolant', 1.0*np.ones((nn,)), units='kg/s')
+        ivc.add_output('mdot_coolant', 3.0*np.ones((nn,)), units='kg/s')
         ivc.add_output('motor_weight', 40, units='kg')
         ivc.add_output('power_rating', 200, units='kW')
         prob.model.add_subsystem('lcm', LiquidCooledMotor(num_nodes=nn, quasi_steady=True), promotes_inputs=['*'])
@@ -170,9 +170,19 @@ class QuasiSteadyMotorCoolingTestCase(unittest.TestCase):
     def test_scalar(self):
         prob = self.generate_model(nn=1)
         prob.run_model()
+        power_rating = 200000
+        mdot_coolant = 3.0
+        q_generated = power_rating * 0.05
+        cp_coolant = 3801
+        UA = 1100/650000*power_rating
+        Cmin = cp_coolant * mdot_coolant # cp * mass flow rate
+        NTU = UA/Cmin
+        T_in = 298.15
+        effectiveness = 1 - np.exp(-NTU)
+        delta_T = q_generated / effectiveness / Cmin
         assert_near_equal(prob.get_val('lcm.dTdt'), 0.0, tolerance=1e-14)
-        assert_near_equal(prob.get_val('lcm.T', units='K'), 327.69545455, tolerance=1e-10)
-        assert_near_equal(prob.get_val('lcm.T_out', units='K'), 300.78088661, tolerance=1e-10)
+        assert_near_equal(prob.get_val('lcm.T', units='K'), T_in + delta_T, tolerance=1e-10)
+        assert_near_equal(prob.get_val('lcm.T_out', units='K'), T_in + q_generated / Cmin, tolerance=1e-10)
         partials = prob.check_partials(method='cs',compact_print=True)
         # prob.model.list_outputs(print_arrays=True, units=True)
         assert_check_partials(partials)
@@ -180,9 +190,19 @@ class QuasiSteadyMotorCoolingTestCase(unittest.TestCase):
     def test_vector(self):
         prob = self.generate_model(nn=11)
         prob.run_model()
+        power_rating = 200000
+        mdot_coolant = 3.0
+        q_generated = power_rating * 0.05
+        cp_coolant = 3801
+        UA = 1100/650000*power_rating
+        Cmin = cp_coolant * mdot_coolant # cp * mass flow rate
+        NTU = UA/Cmin
+        T_in = 298.15
+        effectiveness = 1 - np.exp(-NTU)
+        delta_T = q_generated / effectiveness / Cmin
         assert_near_equal(prob.get_val('lcm.dTdt'), np.zeros((11,)), tolerance=1e-14)
-        assert_near_equal(prob.get_val('lcm.T', units='K'), np.ones((11,))*327.69545455, tolerance=1e-10)
-        assert_near_equal(prob.get_val('lcm.T_out', units='K'), np.ones((11,))*300.78088661, tolerance=1e-10)
+        assert_near_equal(prob.get_val('lcm.T', units='K'), np.ones((11,))*(T_in + delta_T), tolerance=1e-10)
+        assert_near_equal(prob.get_val('lcm.T_out', units='K'), np.ones((11,))*(T_in + q_generated / Cmin), tolerance=1e-10)
         # prob.model.list_outputs(print_arrays=True, units='True')
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -208,7 +228,7 @@ class UnsteadyMotorCoolingTestCase(unittest.TestCase):
                 ivc = self.add_subsystem('ivc', om.IndepVarComp(), promotes_outputs=['*'])
                 ivc.add_output('q_in', val=np.ones((num_nodes,))*10000, units='W')
                 ivc.add_output('T_in', 25.*np.ones((num_nodes,)), units='degC')
-                ivc.add_output('mdot_coolant', 1.0*np.ones((num_nodes,)), units='kg/s')
+                ivc.add_output('mdot_coolant', 3.0*np.ones((num_nodes,)), units='kg/s')
                 ivc.add_output('motor_weight', 40, units='kg')
                 ivc.add_output('power_rating', 200, units='kW')
                 self.add_subsystem('lcm', LiquidCooledMotor(num_nodes=num_nodes, quasi_steady=False), promotes_inputs=['*'])
@@ -246,15 +266,143 @@ class UnsteadyMotorCoolingTestCase(unittest.TestCase):
     def test_vector(self):
         prob = self.generate_model(nn=11)
         prob.run_model()
+        power_rating = 200000
+        mdot_coolant = 3.0
+        q_generated = power_rating * 0.05
+        cp_coolant = 3801
+        UA = 1100/650000*power_rating
+        Cmin = cp_coolant * mdot_coolant # cp * mass flow rate
+        NTU = UA/Cmin
+        T_in = 298.15
+        effectiveness = 1 - np.exp(-NTU)
+        delta_T = q_generated / effectiveness / Cmin
+
         assert_near_equal(prob.get_val('phase1.vm.lcm.T', units='K'),
-                          np.array([300.        , 318.88835729, 324.35258729, 326.63242967,
-                             327.29196734, 327.56714645, 327.64675326, 327.67996764,
-                             327.68957626, 327.69358526, 327.69474503]), tolerance=1e-10)
+                          np.array([300.        , 319.02071102, 324.65196197, 327.0073297 ,
+                           327.7046573 , 327.99632659, 328.08267788, 328.11879579,
+                           328.12948882, 328.13396137, 328.1352855]), tolerance=1e-10)
         assert_near_equal(prob.get_val('phase1.vm.lcm.T_out', units='K'), 
-                          np.array([298.31473398, 299.99665517, 300.48321968, 300.68622914,
-                             300.74495793, 300.76946136, 300.77654998, 300.77950757,
-                             300.78036317, 300.78072016, 300.78082343]), tolerance=1e-10)
-        # prob.model.list_outputs(print_arrays=True, units='True')
+                          np.array([298.2041044 , 298.76037687, 298.92506629, 298.99395048,
+                           299.01434425, 299.0228743 , 299.0253997 , 299.02645599,
+                           299.02676872, 299.02689952, 299.02693824]), tolerance=1e-10)
+        assert_near_equal(prob.get_val('phase1.vm.lcm.T', units='K')[0],
+                          np.array([300.]), tolerance=1e-10)
+        # at the end of the period the unsteady value should be approx the quasi-steady value
+        assert_near_equal(prob.get_val('phase1.vm.lcm.T', units='K')[-1],
+                          np.array([T_in + delta_T]), tolerance=1e-5)
+        assert_near_equal(prob.get_val('phase1.vm.lcm.T_out', units='K')[-1], 
+                          np.array([T_in + q_generated / Cmin]), tolerance=1e-5)
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+
+class TestHose(unittest.TestCase):
+    """
+    Test the coolant hose component
+    """
+
+    def generate_model(self, nn):
+        prob = om.Problem()
+
+        hose_diam = 0.02
+        hose_length = 16.
+        hose_design_pressure = 1e6
+        mdot_coolant = np.linspace(0.6, 1.2, nn)
+        rho_coolant = 1020*np.ones((nn,))
+        mu_coolant = 1.68e-3
+        sigma = 2.07e6
+        rho_hose = 1356.3
+
+        ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes_outputs=['*'])
+        ivc.add_output('hose_diameter', val=hose_diam, units='m')
+        ivc.add_output('hose_length', val=hose_length, units='m')
+        ivc.add_output('hose_design_pressure', val=hose_design_pressure, units='Pa')
+        ivc.add_output('mdot_coolant', val=mdot_coolant, units='kg/s')
+        ivc.add_output('rho_coolant', val=rho_coolant, units='kg/m**3')
+        ivc.add_output('mu_coolant', val=mu_coolant, units='kg/m/s')
+        prob.model.add_subsystem('hose', SimpleHose(num_nodes=nn), promotes_inputs=['*'])
+        prob.setup(check=True, force_alloc_complex=True)
+        
+        xs_area = np.pi * (hose_diam / 2 )**2
+        U = mdot_coolant / rho_coolant / xs_area
+        Redh = rho_coolant * U * hose_diam / mu_coolant
+        f = 0.3164 * Redh ** (-1/4)
+        dp = f * rho_coolant / 2 * hose_length * U ** 2 / hose_diam
+
+        wall_thickness = hose_design_pressure * (hose_diam / 2) / sigma
+        hose_weight = wall_thickness * np.pi * (hose_diam + wall_thickness) * rho_hose * hose_length
+        fluid_weight = xs_area * rho_coolant[0] * hose_length
+        return prob, dp, (hose_weight + fluid_weight)
+
+    def test_scalar(self):
+        prob, dp, weight = self.generate_model(nn=1)
+        prob.run_model()
+        assert_near_equal(prob.get_val('hose.delta_p', units='Pa'),
+                          dp, tolerance=1e-10)
+        assert_near_equal(prob.get_val('hose.component_weight', units='kg'),
+                          weight, tolerance=1e-10)
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+
+    def test_vector(self):
+        prob, dp, weight = self.generate_model(nn=11)
+        prob.run_model()
+        assert_near_equal(prob.get_val('hose.delta_p', units='Pa'),
+                          dp, tolerance=1e-10)
+        assert_near_equal(prob.get_val('hose.component_weight', units='kg'),
+                          weight, tolerance=1e-10)
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)   
+
+class TestPump(unittest.TestCase):
+    """
+    Test the coolant pump component
+    """
+
+    def generate_model(self, nn):
+        prob = om.Problem()
+
+        efficiency = 0.35
+        spec_power = 1 / 450
+        rho_coolant = 1020*np.ones(nn)
+        mdot_coolant = np.linspace(0.6, 1.2, nn)
+        delta_p = np.linspace(2e4, 4e4, nn)
+        power_rating = 1000
+        ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes_outputs=['*'])
+        ivc.add_output('power_rating', val=power_rating, units='W')
+        ivc.add_output('delta_p', val=delta_p, units='Pa')
+        ivc.add_output('mdot_coolant', val=mdot_coolant, units='kg/s')
+        ivc.add_output('rho_coolant', val=rho_coolant, units='kg/m**3')
+        prob.model.add_subsystem('pump', SimplePump(num_nodes=nn), promotes_inputs=['*'])
+        prob.setup(check=True, force_alloc_complex=True)
+        
+        fluid_power = (mdot_coolant / rho_coolant) * delta_p
+        weight = power_rating * spec_power
+        elec_load = fluid_power / efficiency
+        margin = elec_load / power_rating
+
+        return prob, elec_load, weight, margin
+
+    def test_scalar(self):
+        prob, elec_load, weight, margin = self.generate_model(nn=1)
+        prob.run_model()
+        assert_near_equal(prob.get_val('pump.elec_load', units='W'),
+                          elec_load, tolerance=1e-10)
+        assert_near_equal(prob.get_val('pump.component_weight', units='kg'),
+                          weight, tolerance=1e-10)
+        assert_near_equal(prob.get_val('pump.component_sizing_margin', units=None),
+                          margin, tolerance=1e-10)
+        partials = prob.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+
+    def test_scalar(self):
+        prob, elec_load, weight, margin = self.generate_model(nn=11)
+        prob.run_model()
+        assert_near_equal(prob.get_val('pump.elec_load', units='W'),
+                          elec_load, tolerance=1e-10)
+        assert_near_equal(prob.get_val('pump.component_weight', units='kg'),
+                          weight, tolerance=1e-10)
+        assert_near_equal(prob.get_val('pump.component_sizing_margin', units=None),
+                          margin, tolerance=1e-10)
         partials = prob.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 

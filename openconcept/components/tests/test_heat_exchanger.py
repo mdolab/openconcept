@@ -307,7 +307,6 @@ class TestHXByHand(unittest.TestCase):
         assert_near_equal(prob['osfgeometry.width_overall'], width_overall / 1000, tolerance=1e-6)
         length_overall = n_cold_long * l_f_c
         assert_near_equal(prob['osfgeometry.length_overall'], length_overall / 1000, tolerance=1e-6)
-        # TODO do I need to compute a contraction factor based on the frontal vs xs area?
         frontal_area =  width_overall*height_overall
         assert_near_equal(prob['osfgeometry.frontal_area'], frontal_area / 1000 ** 2, tolerance=1e-6)
 
