@@ -1065,7 +1065,7 @@ class ImplicitCompressibleDuct_ExternalHX(Group):
 
         self.add_subsystem('pexit',AddSubtractComp(output_name='p_exit',input_names=['p_inf','convergence_hack'],vec_size=[nn,1],units='Pa'),promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('nozzle', OutletNozzle(num_nodes=nn),
-                                                  promotes_inputs=['p_exit',('area','area_nozzle')],
+                                                  promotes_inputs=['mdot','p_exit',('area','area_nozzle')],
                                                   promotes_outputs=['mdot_actual'])
         self.connect('sta3.pt_out','nozzle.pt_in')
         self.connect('sta3.Tt_out','nozzle.Tt')
