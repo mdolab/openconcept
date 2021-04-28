@@ -553,7 +553,7 @@ class GroundRollPhase(oc.PhaseGroup):
             #reverse the order of the accelerations so the last one is first (and make them negative)
             self.add_subsystem('flipaccel', FlipVectorComp(num_nodes=nn, units='m/s**2', negative=True), promotes_inputs=[('vec_in','accel_horiz')])
             #integrate the timesteps in reverse from near zero speed.
-            ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, method='simpson', diff_units='s',time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
+            ode_integ = self.add_subsystem('ode_integ_phase', Integrator(num_nodes=nn, method='simpson', diff_units='s',time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
             ode_integ.add_integrand('vel_q', units='m/s', rate_name='vel_dqdt', start_name='zero_speed', end_name='fltcond|Utrue_initial', lower=1.5)            
             self.connect('flipaccel.vec_out','vel_dqdt')
             #flip the result of the reverse integration again so the flight condition is forward and consistent with everythign else
@@ -564,7 +564,7 @@ class GroundRollPhase(oc.PhaseGroup):
                                        promotes_inputs=['*'],promotes_outputs=['duration'])
         else:
             # forward shooting for these acceleration segmentes
-            ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, method='simpson', diff_units='s',time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
+            ode_integ = self.add_subsystem('ode_integ_phase', Integrator(num_nodes=nn, method='simpson', diff_units='s',time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
             ode_integ.add_integrand('fltcond|Utrue', units='m/s', rate_name='accel_horiz', start_name='fltcond|Utrue_initial', end_name='fltcond|Utrue_final', lower=1.5)
             if flight_phase == 'v0v1':
                 self.connect('zero_speed','fltcond|Utrue_initial')
@@ -762,7 +762,7 @@ class SteadyFlightPhase(oc.PhaseGroup):
         ivcomp.add_output('fltcond|vs',val=np.ones((nn,))*1, units='m/s')
         ivcomp.add_output('zero_accel',val=np.zeros((nn,)),units='m/s**2')
         
-        integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', time_setup='duration', method='simpson'), promotes_inputs=['fltcond|vs', 'fltcond|groundspeed'], promotes_outputs=['fltcond|h', 'range'])
+        integ = self.add_subsystem('ode_integ_phase', Integrator(num_nodes=nn, diff_units='s', time_setup='duration', method='simpson'), promotes_inputs=['fltcond|vs', 'fltcond|groundspeed'], promotes_outputs=['fltcond|h', 'range'])
         integ.add_integrand('fltcond|h', rate_name='fltcond|vs', val=1.0, units='m')
         self.add_subsystem('atmos', ComputeAtmosphericProperties(num_nodes=nn, true_airspeed_in=False), promotes_inputs=['*'], promotes_outputs=['*'])
         self.add_subsystem('gs',Groundspeeds(num_nodes=nn),promotes_inputs=['*'],promotes_outputs=['*'])

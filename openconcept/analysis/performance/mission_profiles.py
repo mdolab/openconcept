@@ -71,7 +71,7 @@ class MissionWithReserve(oc.TrajectoryGroup):
             phase1 = self.add_subsystem('climb',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='climb'),promotes_inputs=['ac|*'])
             # set the climb time such that the specified initial cruise altitude is exactly reached
             phase1.add_subsystem('climbdt',om.BalanceComp(name='duration',units='s',eq_units='m',val=120,upper=2000,lower=0,rhs_name='cruise|h0',lhs_name='fltcond|h_final'),promotes_outputs=['duration'])
-            phase1.connect('ode_integ.fltcond|h_final','climbdt.fltcond|h_final')
+            phase1.connect('ode_integ_phase.fltcond|h_final','climbdt.fltcond|h_final')
             self.connect('cruise|h0', 'climb.climbdt.cruise|h0')
 
             phase2 = self.add_subsystem('cruise',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='cruise'),promotes_inputs=['ac|*'])
@@ -81,15 +81,15 @@ class MissionWithReserve(oc.TrajectoryGroup):
             phase3 = self.add_subsystem('descent',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='descent'),promotes_inputs=['ac|*'])
             # set the descent time so that the final altitude is sea level again
             phase3.add_subsystem('descentdt',om.BalanceComp(name='duration',units='s',eq_units='m', val=120, upper=8000, lower=0,rhs_name='takeoff|h',lhs_name='fltcond|h_final'),promotes_outputs=['duration'])
-            self.connect('descent.ode_integ.range_final','cruise.cruisedt.range_final')
+            self.connect('descent.ode_integ_phase.range_final','cruise.cruisedt.range_final')
             self.connect('takeoff|h', 'descent.descentdt.takeoff|h')
-            phase3.connect('ode_integ.fltcond|h_final','descentdt.fltcond|h_final')
+            phase3.connect('ode_integ_phase.fltcond|h_final','descentdt.fltcond|h_final')
 
             # add the climb, cruise, and descent segments for the reserve mission
             phase4 = self.add_subsystem('reserve_climb',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='reserve_climb'),promotes_inputs=['ac|*'])
             # set the climb time such that the specified initial cruise altitude is exactly reached
             phase4.add_subsystem('reserve_climbdt',om.BalanceComp(name='duration',units='s',eq_units='m',val=120,upper=2000,lower=0,rhs_name='reserve|h0',lhs_name='fltcond|h_final'),promotes_outputs=['duration'])
-            phase4.connect('ode_integ.fltcond|h_final','reserve_climbdt.fltcond|h_final')
+            phase4.connect('ode_integ_phase.fltcond|h_final','reserve_climbdt.fltcond|h_final')
             self.connect('reserve|h0', 'reserve_climb.reserve_climbdt.reserve|h0')
 
             phase5 = self.add_subsystem('reserve_cruise',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='reserve_cruise'),promotes_inputs=['ac|*'])
@@ -100,7 +100,7 @@ class MissionWithReserve(oc.TrajectoryGroup):
             phase6 = self.add_subsystem('reserve_descent',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='reserve_descent'),promotes_inputs=['ac|*'])
             # set the reserve_descent time so that the final altitude is sea level again
             phase6.add_subsystem('reserve_descentdt',om.BalanceComp(name='duration',units='s',eq_units='m', val=120, upper=8000, lower=0,rhs_name='takeoff|h',lhs_name='fltcond|h_final'),promotes_outputs=['duration'])
-            phase6.connect('ode_integ.fltcond|h_final','reserve_descentdt.fltcond|h_final')
+            phase6.connect('ode_integ_phase.fltcond|h_final','reserve_descentdt.fltcond|h_final')
             self.connect('takeoff|h', 'reserve_descent.reserve_descentdt.takeoff|h')
 
             reserverange = om.ExecComp('reserverange=rangef-rangeo',
@@ -108,23 +108,23 @@ class MissionWithReserve(oc.TrajectoryGroup):
                                     rangeo={'value': 0., 'units': 'NM'},
                                     rangef={'value': 100., 'units': 'NM'})
             self.add_subsystem('resrange', reserverange)
-            self.connect('descent.ode_integ.range_final', 'resrange.rangeo')
-            self.connect('reserve_descent.ode_integ.range_final', 'resrange.rangef')
+            self.connect('descent.ode_integ_phase.range_final', 'resrange.rangeo')
+            self.connect('reserve_descent.ode_integ_phase.range_final', 'resrange.rangef')
             self.connect('resrange.reserverange','reserve_cruise.reserve_cruisedt.range_final')
             # self.connect('reserve_descent.range_final', 'reserve_cruisedt.range_final')
 
             phase7 = self.add_subsystem('loiter',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='loiter'),promotes_inputs=['ac|*'])
             dvlist = [['duration_in', 'duration', 300, 's']]
             phase7.add_subsystem('loiter_dt', oc.DVLabel(dvlist), promotes_inputs=["*"], promotes_outputs=["*"])
-            self.connect('loiter|h0','loiter.ode_integ.fltcond|h_initial')
+            self.connect('loiter|h0','loiter.ode_integ_phase.fltcond|h_initial')
             self.connect('loiter_duration','loiter.duration_in')
 
             self.link_phases(phase1, phase2)
             self.link_phases(phase2, phase3)
-            self.link_phases(phase3, phase4, states_to_skip=['ode_integ.fltcond|h'])
+            self.link_phases(phase3, phase4, states_to_skip=['ode_integ_phase.fltcond|h'])
             self.link_phases(phase4, phase5)
             self.link_phases(phase5, phase6)
-            self.link_phases(phase6, phase7, states_to_skip=['ode_integ.fltcond|h'])
+            self.link_phases(phase6, phase7, states_to_skip=['ode_integ_phase.fltcond|h'])
 
 class BasicMission(oc.TrajectoryGroup):
     """
@@ -194,9 +194,9 @@ class BasicMission(oc.TrajectoryGroup):
             phase1 = self.add_subsystem('climb',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='climb'),promotes_inputs=['ac|*'])
             # set the climb time such that the specified initial cruise altitude is exactly reached
             phase1.add_subsystem('climbdt',om.BalanceComp(name='duration',units='s',eq_units='m',val=120,upper=2000,lower=0,rhs_name='cruise|h0',lhs_name='fltcond|h_final'),promotes_outputs=['duration'])
-            phase1.connect('ode_integ.fltcond|h_final','climbdt.fltcond|h_final')
+            phase1.connect('ode_integ_phase.fltcond|h_final','climbdt.fltcond|h_final')
             self.connect('cruise|h0', 'climb.climbdt.cruise|h0')
-            self.connect('takeoff|h', 'climb.ode_integ.fltcond|h_initial')
+            self.connect('takeoff|h', 'climb.ode_integ_phase.fltcond|h_initial')
 
             phase2 = self.add_subsystem('cruise',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='cruise'),promotes_inputs=['ac|*'])
             # set the cruise time such that the desired design range is flown by the end of the mission
@@ -206,9 +206,9 @@ class BasicMission(oc.TrajectoryGroup):
             phase3 = self.add_subsystem('descent',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='descent'),promotes_inputs=['ac|*'])
             # set the descent time so that the final altitude is sea level again
             phase3.add_subsystem('descentdt',om.BalanceComp(name='duration',units='s',eq_units='m', val=120, upper=8000, lower=0,rhs_name='takeoff|h',lhs_name='fltcond|h_final'),promotes_outputs=['duration'])
-            self.connect('descent.ode_integ.range_final','cruise.cruisedt.range_final')
+            self.connect('descent.ode_integ_phase.range_final','cruise.cruisedt.range_final')
             self.connect('takeoff|h', 'descent.descentdt.takeoff|h')
-            phase3.connect('ode_integ.fltcond|h_final','descentdt.fltcond|h_final')
+            phase3.connect('ode_integ_phase.fltcond|h_final','descentdt.fltcond|h_final')
 
             if grflag:
                 self.link_phases(phase0, phase1, states_to_skip=['fltcond|h'])
@@ -316,7 +316,7 @@ class FullMissionAnalysis(oc.TrajectoryGroup):
             climb = self.add_subsystem('climb',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='climb'),promotes_inputs=['ac|*'])
             # set the climb time such that the specified initial cruise altitude is exactly reached
             climb.add_subsystem('climbdt',om.BalanceComp(name='duration',units='s',eq_units='m',val=120,lower=0,upper=3000,rhs_name='cruise|h0',lhs_name='fltcond|h_final'), promotes_outputs=['duration'])
-            climb.connect('ode_integ.fltcond|h_final','climbdt.fltcond|h_final')
+            climb.connect('ode_integ_phase.fltcond|h_final','climbdt.fltcond|h_final')
             self.connect('cruise|h0', 'climb.climbdt.cruise|h0')
 
             cruise = self.add_subsystem('cruise',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='cruise'),promotes_inputs=['ac|*'])
@@ -328,8 +328,8 @@ class FullMissionAnalysis(oc.TrajectoryGroup):
             # set the descent time so that the final altitude is sea level again
             descent.add_subsystem('descentdt',om.BalanceComp(name='duration',units='s',eq_units='m', val=120, lower=0,upper=3000,rhs_name='takeoff|h',lhs_name='fltcond|h_final'),promotes_outputs=['duration'])
             self.connect('takeoff|h','descent.descentdt.takeoff|h')
-            self.connect('descent.ode_integ.range_final','cruise.cruisedt.range_final')
-            self.connect('descent.ode_integ.fltcond|h_final','descent.descentdt.fltcond|h_final')
+            self.connect('descent.ode_integ_phase.range_final','cruise.cruisedt.range_final')
+            self.connect('descent.ode_integ_phase.fltcond|h_final','descent.descentdt.fltcond|h_final')
 
             # connect range, fuel burn, and altitude from the end of each segment to the beginning of the next, in order
             self.link_phases(v0v1, v1vr, states_to_skip=['fltcond|Utrue','range'])
@@ -338,5 +338,5 @@ class FullMissionAnalysis(oc.TrajectoryGroup):
             self.link_phases(rotate, climb)
             self.link_phases(climb, cruise)
             self.link_phases(cruise, descent)
-            self.connect('rotate.range_final','climb.ode_integ.range_initial')
-            self.connect('rotate.fltcond|h_final','climb.ode_integ.fltcond|h_initial')
+            self.connect('rotate.range_final','climb.ode_integ_phase.range_initial')
+            self.connect('rotate.fltcond|h_final','climb.ode_integ_phase.fltcond|h_initial')
