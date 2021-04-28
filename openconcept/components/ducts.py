@@ -59,7 +59,7 @@ class ExplicitIncompressibleDuct(ExplicitComponent):
         self.add_input('area_nozzle', shape=(nn,), units='m**2')
         self.add_input('delta_p_hex',  shape=(nn,), units='Pa')
 
-        self.add_output('mdot', shape=(nn,),  units='kg/s')
+        self.add_output('mdot', shape=(nn,),  lower=0.001, units='kg/s')
         self.add_output('drag', shape=(nn,), units='N')
 
         # self.declare_partials(['drag','mdot'],['fltcond|Utrue','fltcond|rho','delta_p_hex'],rows=np.arange(nn),cols=np.arange(nn))
@@ -980,7 +980,7 @@ class FlowMatcher(ImplicitComponent):
     def setup(self):
         nn = self.options['num_nodes']
         self.add_input('mdot_actual', shape=(nn,), units='kg/s')
-        self.add_output('mdot', shape=(nn,), units='kg/s', lower=0.005, upper=10.0, val=9.0)
+        self.add_output('mdot', shape=(nn,), units='kg/s', lower=0.005, upper=15.0, val=9.0)
         arange = np.arange(0, nn)
         self.declare_partials(['mdot'], ['mdot_actual'], rows=arange, cols=arange, val=np.ones((nn, )))
         self.declare_partials(['mdot'], ['mdot'], rows=arange, cols=arange, val=-np.ones((nn, )))
