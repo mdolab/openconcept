@@ -437,6 +437,9 @@ class LiquidCooledMotor(om.Group):
         Number of analysis points to run
     quasi_steady : bool
         Whether or not to treat the component as having thermal mass
+    case_cooling_coefficient : float
+        Watts of heat transfer per square meter of case surface area per K
+        temperature differential (default 1100 W/m^2/K)
     """
 
     def initialize(self):
@@ -444,13 +447,15 @@ class LiquidCooledMotor(om.Group):
         self.options.declare('coolant_specific_heat', default=3801, desc='Specific heat in J/kg/K')
         self.options.declare('quasi_steady', default=False, desc='Treat the component as quasi-steady or with thermal mass')
         self.options.declare('num_nodes', default=1, desc='Number of quasi-steady points to runs')
+        self.options.declare('case_cooling_coefficient', default=1100.)
 
     def setup(self):
         nn = self.options['num_nodes']
         quasi_steady = self.options['quasi_steady']
         self.add_subsystem('hex',
                            MotorCoolingJacket(num_nodes=nn, coolant_specific_heat=self.options['coolant_specific_heat'],
-                                              motor_specific_heat=self.options['motor_specific_heat']),
+                                              motor_specific_heat=self.options['motor_specific_heat'],
+                                              case_cooling_coefficient=self.options['case_cooling_coefficient']),
                            promotes_inputs=['q_in','T_in', 'T','power_rating','mdot_coolant','motor_weight'],
                            promotes_outputs=['T_out', 'dTdt'])
         if not quasi_steady:
