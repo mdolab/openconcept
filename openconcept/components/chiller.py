@@ -8,8 +8,38 @@ from openconcept.components.thermal import PerfectHeatTransferComp
 
 class LinearSelector(om.ExplicitComponent):
     """
-    Averages thermal parameters given bypass"""
+    Averages thermal parameters given bypass
 
+    Inputs
+    ------
+    T_in_hot : float
+        Incoming coolant temperature on the hot side (vector, K)
+    T_in_cold : float
+        Incoming coolant temperature on the cold side (vector, K)
+    T_out_refrig_cold : float
+        Coolant temperature in chiller outlet on the cold side (vector, K)
+    T_out_refrig_hot : float
+        Coolant temperature in chiller outlet on the hot side (vector, K)
+    power_rating : float
+        Rated electric power (scalar, W)
+    bypass : float
+        Bypass parameter in range 0 - 1 (inclusive); 0 represents full
+        refrig and no bypass, 1 all bypass no refrig (vector, None)
+    
+    Outputs
+    -------
+    T_out_cold : float
+        Outgoing coolant temperature on the cold side (vector, K)
+    T_out_hot : float
+        Outgoing coolant temperature on the hot side (vector, K)
+    elec_load : float
+        Electrical load (vector, W)
+    
+    Options
+    -------
+    num_nodes : int
+        The number of analysis points to run
+    """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of analysis points')
 
@@ -110,11 +140,12 @@ class HeatPumpWeight(om.ExplicitComponent):
     
 
 class HeatPumpWithIntegratedCoolantLoop(om.Group):
-    """
-    SimpleHeatPump connected to two PerfectHeatTransferComp components on either side. This setup
-    takes in the refrigerator mechanical power, along with other inputs, and solves for
-    the remaining variables including hot and cold side outlet temperatures.
-    
+    """ 
+    Models chiller with integrated coolant inputs and outputs
+    on the hot and cold sides. Can bypass the chiller using
+    control.bypass_start and control.bypass_end outputs
+    (0 is full refrigerator, 1 is full bypass).
+
     Inputs
     ------
     T_in_hot : float
@@ -194,13 +225,34 @@ class HeatPumpWithIntegratedCoolantLoop(om.Group):
         self.connect('bypass', 'bypass_comp.bypass')
 
 class COPExplicit(om.ExplicitComponent):
+    """
+    Computes "soft" coefficient of performance (COP) that
+    doesn't blow up as T_h - T_c approaches zero
+
+    Inputs
+    ------
+    T_c : float
+        Cold side temperature (vector, K)
+    T_h : float
+        Hot side temperature (vector, K)
+    eff_factor : float
+        Efficiency factor (scalar, None)
+    
+    Outputs
+    -------
+    COP : float
+        Coefficient of performance (vector, None)
+    
+    Options
+    -------
+    num_nodes : int
+        The number of analysis points to run
+    """
     def initialize(self):
         self.options.declare('num_nodes',default=1)
-        self.options.declare('eff_factor',default=0.4)
 
     def setup(self):
         nn = self.options['num_nodes']
-        arange = np.arange(0, nn)
 
         self.add_input('T_c', units='K', shape=(nn,))
         self.add_input('T_h', units='K', shape=(nn,))
