@@ -61,7 +61,6 @@ def plot_trajectory_grid(cases, x_var, x_unit, y_vars, y_units, phases, x_label=
 
         row_no = counter_within_file // grid_layout[1]
         col_no = counter_within_file % grid_layout[1]
-        print(row_no, col_no, y_var)
         for j, case in enumerate(cases):
             val_list = []
             for phase in phases:
