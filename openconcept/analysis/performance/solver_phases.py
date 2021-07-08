@@ -755,12 +755,17 @@ class SteadyFlightPhase(oc.PhaseGroup):
 
     def setup(self):
         nn = self.options['num_nodes']
+        # propulsor_active only exists in some aircraft models, so set_input_defaults
+        # can't be used since it throws an error when it can't find an input
         ivcomp = self.add_subsystem('const_settings', IndepVarComp(), promotes_outputs=["*"])
         ivcomp.add_output('propulsor_active', val=np.ones(nn))
-        ivcomp.add_output('braking', val=np.zeros(nn))
-        ivcomp.add_output('fltcond|Ueas',val=np.ones((nn,))*90, units='m/s')
-        ivcomp.add_output('fltcond|vs',val=np.ones((nn,))*1, units='m/s')
-        ivcomp.add_output('zero_accel',val=np.zeros((nn,)),units='m/s**2')
+        
+        # Use set_input_defaults as opposed to independent variable component to enable
+        # users to connect linear interpolators to these inputs for "trajectory optimization"
+        self.set_input_defaults('braking', np.zeros(nn))
+        self.set_input_defaults('fltcond|Ueas', np.ones((nn,))*90, units='m/s')
+        self.set_input_defaults('fltcond|vs', np.ones((nn,))*1, units='m/s')
+        self.set_input_defaults('zero_accel', np.zeros((nn,)), units='m/s**2')
         
         integ = self.add_subsystem('ode_integ_phase', Integrator(num_nodes=nn, diff_units='s', time_setup='duration', method='simpson'), promotes_inputs=['fltcond|vs', 'fltcond|groundspeed'], promotes_outputs=['fltcond|h', 'range'])
         integ.add_integrand('fltcond|h', rate_name='fltcond|vs', val=1.0, units='m')
