@@ -143,8 +143,9 @@ class HeatPumpWithIntegratedCoolantLoop(om.Group):
     """ 
     Models chiller with integrated coolant inputs and outputs
     on the hot and cold sides. Can bypass the chiller using
-    control.bypass_start and control.bypass_end outputs
-    (0 is full refrigerator, 1 is full bypass).
+    linearly interpolated control points control.bypass_start
+    and control.bypass_end outputs (0 is full refrigerator,
+    1 is full bypass, continuous in between).
 
     Inputs
     ------
@@ -155,7 +156,11 @@ class HeatPumpWithIntegratedCoolantLoop(om.Group):
     mdot_coolant : float
         Coolant mass flow rate (vector, kg/s)
     power_rating : float
-        Rated electric power (scalar, W)
+        Rated electric power, default 1 kW (scalar, W)
+    specific_power : float
+        Heat pump power per weight, default 200 W/kg (scalar, W/kg)
+    eff_factor : float
+        Heat pump Carnot efficiency factor, default 0.4 (scalar, None)
 
     Outputs
     -------
@@ -174,14 +179,6 @@ class HeatPumpWithIntegratedCoolantLoop(om.Group):
         The number of analysis points to run
     specific_heat : float
         Specific heat of the coolant (scalar, J/kg/K, default 3801 glycol/water)
-    motor_efficiency : float
-        Compressor motor efficiency (default 0.95)
-    heat_pump_efficiency : float
-        Heat pump efficiency compared to carnot (default 0.4)
-    weight_inc : float
-        Weight per unit rated power (default 1/750, kg/W)
-    weight_base : float
-        Base weight (default 0, kg)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of analysis points')
