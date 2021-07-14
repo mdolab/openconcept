@@ -34,7 +34,7 @@ class BandolierCoolingSystem(om.ExplicitComponent):
     battery_weight : float
         Weight of the battery (overall). Default 100kg (scalar)
     n_cpb : float
-        Number of cells long per "bandolier" actual count is 2x (scalar, default 21, Tesla)
+        Number of cells long per "bandolier" actual count is 2x (scalar, default 82, Tesla)
     t_channel : float
         Thickness (width) of the cooling channel in the bandolier
         (scalar, default 1mm)
@@ -94,7 +94,7 @@ class BandolierCoolingSystem(om.ExplicitComponent):
         self.add_input('T_battery', shape=(nn,), units='K', val=300.)
         self.add_input('mdot_coolant', shape=(nn,), units='kg/s', val=0.20)
         self.add_input('battery_weight', units='kg', val=478.)
-        self.add_input('n_cpb', units=None, val=21.)
+        self.add_input('n_cpb', units=None, val=82.)
         self.add_input('t_channel', units='m', val=0.0005)
 
         self.add_output('dTdt', shape=(nn,), units='K/s', tags=['integrate', 'state_name:T_battery', 'state_units:K', 'state_val:300.0', 'state_promotes:True'])
@@ -169,7 +169,7 @@ class LiquidCooledBattery(om.Group):
     battery_weight : float
         Battery weight (scalar, kg)
     n_cpb : float
-        Number of cells long per "bandolier" actual count is 2x (scalar, default 21, Tesla)
+        Number of cells long per "bandolier" actual count is 2x (scalar, default 82, Tesla)
     t_channel : float
         Thickness (width) of the cooling channel in the bandolier
         (scalar, default 1mm)
