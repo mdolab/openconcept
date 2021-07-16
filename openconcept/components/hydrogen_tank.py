@@ -1,31 +1,28 @@
 from __future__ import division
 import numpy as np
-from openmdao.api import ExplicitComponent, Problem, NewtonSolver, Group, MetaModelStructuredComp, ExecComp, n2
-from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
-from math import sin, cos, radians
+import openmdao.api as om
 
-class TankCompositeThickness(ExplicitComponent):
+class CompositeOverwrap(om.ExplicitComponent):
     """
     Computes the wall thickness and composite weight of a cylindrical composite overwrap
     pressure vessel (COPV) with hemispherical end caps given a design pressure,
     geometry, safety factor, and fiber direction parameters.
 
-    The pressure vessel is assumed to have a windings in the hoop direction and in
-    the +/- alpha direction where the angle is defined from the hoop winding
-    direction. The layer thicknesses are sized using a netting analysis, which
-    ignores the contribution of the resin to the yielding.
+    The pressure vessel is assumed to have a windings in the hoop direction and
+    helical windings at +/- theta. The layer thicknesses are sized using a netting
+    analysis, which ignores the contribution of the resin to the yielding. With
+    this procedure, the angle of the helical winding ends up dropping out of the
+    total composite thickness equation, which is why it is not an input.
 
     The liner is assumed to bear no loads and is not considered in determining
     the thickness of the composite layers.
 
     Inputs
     ------
-    alpha : float
-        Angle from vertical of the helical windings (scalar, radians)
     design_pressure : float
         Maximum expected operating pressure (MEOP) (scalar, Pa)
     radius : float
-        Radius of the cylinder and hemispherical end caps (scalar, m)
+        Inner radius of the cylinder and hemispherical end caps (scalar, m)
     length : float
         Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
     
@@ -33,7 +30,7 @@ class TankCompositeThickness(ExplicitComponent):
     -------
     thickness : float
         Total thickness of composite layers (scalar, m)
-    composite_weight : float
+    weight : float
         Weight of composite layers (scalar, kg)
     
     Options
@@ -60,19 +57,17 @@ class TankCompositeThickness(ExplicitComponent):
         self.options.declare('fiber_volume_fraction', default=0.586, desc='Fraction of volume taken up by fibers')
     
     def setup(self):
-        self.add_input('alpha', val=45.*np.pi/180., units='rad')
         self.add_input('design_pressure', val=70e6, units='Pa')
         self.add_input('radius', val=0.5, units='m')
         self.add_input('length', val=2., units='m')
 
         self.add_output('thickness', lower=0., units='m')
-        self.add_output('composite_weight', lower=0., units='kg')
+        self.add_output('weight', lower=0., units='kg')
 
-        self.declare_partials('thickness', ['alpha', 'design_pressure', 'radius'])
-        self.declare_partials('composite_weight', ['alpha', 'design_pressure', 'radius', 'length'])
+        self.declare_partials('thickness', ['design_pressure', 'radius'])
+        self.declare_partials('weight', ['design_pressure', 'radius', 'length'])
 
     def compute(self, inputs, outputs):
-        alpha = inputs['alpha']
         p = inputs['design_pressure']
         r = inputs['radius']
         L = inputs['length']
@@ -81,15 +76,14 @@ class TankCompositeThickness(ExplicitComponent):
         density = self.options['density']
         vol_frac = self.options['fiber_volume_fraction']
 
-        helical_fiber_thickness = p*r*SF / (2*yield_stress*np.sin(alpha)**2)
-        hoop_fiber_thickness = p*r*SF / yield_stress - helical_fiber_thickness*np.cos(alpha)**2
-        outputs['thickness'] = (helical_fiber_thickness + hoop_fiber_thickness) / vol_frac
+        fiber_thickness = 3*p*r*SF / (2*yield_stress)
+        outputs['thickness'] = fiber_thickness / vol_frac
 
-        composite_volume = outputs['thickness'] * (2*np.pi*r*L + 4*np.pi*r**2)
-        outputs['composite_weight'] = composite_volume * density
+        composite_volume = (4/3*np.pi*(r + outputs['thickness'])**3 + np.pi*(r + outputs['thickness'])**2*L) - \
+                           (4/3*np.pi*r**3 + np.pi*r**2*L)
+        outputs['weight'] = composite_volume * density
     
     def compute_partials(self, inputs, J):
-        alpha = inputs['alpha']
         p = inputs['design_pressure']
         r = inputs['radius']
         L = inputs['length']
@@ -98,17 +92,139 @@ class TankCompositeThickness(ExplicitComponent):
         density = self.options['density']
         vol_frac = self.options['fiber_volume_fraction']
 
-        sin_a = np.sin(alpha)
-        cos_a = np.cos(alpha)
-        surf_area = 2*np.pi*r*L + 4*np.pi*r**2
-        helical_fiber_thickness = p*r*SF / (2*yield_stress*sin_a**2)
-        hoop_fiber_thickness = p*r*SF / yield_stress - helical_fiber_thickness*cos_a**2
-        thickness = (helical_fiber_thickness + hoop_fiber_thickness) / vol_frac
+        fiber_thickness = 3*p*r*SF / (2*yield_stress)
+        thickness = fiber_thickness / vol_frac
 
-        J['thickness', 'alpha'] = p*r*SF / (2*yield_stress*vol_frac) * (-2*cos_a / sin_a**3 + 2*cos_a/sin_a**3)
-        J['thickness', 'design_pressure'] = (r*SF / (2*yield_stress*sin_a**2) + r*SF / yield_stress - r*SF / (2*yield_stress*sin_a**2)*cos_a**2) / vol_frac
-        J['thickness', 'radius'] = (p*SF / (2*yield_stress*sin_a**2) + p*SF / yield_stress - p*SF / (2*yield_stress*sin_a**2)*cos_a**2) / vol_frac
-        J['composite_weight', 'alpha'] = J['thickness', 'alpha'] * surf_area * density
-        J['composite_weight', 'design_pressure'] = J['thickness', 'design_pressure'] * surf_area * density
-        J['composite_weight', 'radius'] = (J['thickness', 'radius'] * surf_area + thickness * (2*np.pi*L + 8*np.pi*r)) * density
-        J['composite_weight', 'length'] = thickness * 2*np.pi*r * density
+        J['thickness', 'design_pressure'] = 3*r*SF / (2*yield_stress*vol_frac)
+        J['thickness', 'radius'] = 3*p*SF / (2*yield_stress*vol_frac)
+        J['weight', 'design_pressure'] = J['thickness', 'design_pressure'] * (4*np.pi*(r + thickness)**2 + 2*np.pi*(r + thickness)*L) * density
+        J['weight', 'radius'] = density * ((1 + J['thickness', 'radius']) * (4*np.pi*(r + thickness)**2 + 2*np.pi*(r + thickness)*L) - (4*np.pi*r**2 + 2*np.pi*r*L))
+        J['weight', 'length'] = density * (np.pi*(r + thickness)**2 - np.pi*r**2)
+
+
+class COPVLinerWeight(om.ExplicitComponent):
+    """
+    Computes the weight of the metallic pressure vessel liner used
+    to prevent leakage through the pressure vessel. This model assumes
+    the liner is not load-bearing, so it has no effect on the sizing
+    of the composite overwrap.
+
+    This component is uses a simple surface area calculation of a
+    cylindrical pressure vessel with hemispherical end caps. That
+    surface area is multiplied by the thickness of the liner and
+    its density to find the weight.
+
+    Inputs
+    ------
+    radius : float
+        Inner radius of the cylinder and hemispherical end caps (scalar, m)
+    length : float
+        Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
+    
+    Outputs
+    -------
+    weight : float
+        Weight of the liner (scalar, kg)
+    
+    Options
+    -------
+    density : float
+        Density of the liner material (kg/m^3); default 2700 kg/m^3 aluminum 6061
+    thickness : float
+        Liner thickness (m); default 0.5 mm
+    """
+    def initialize(self):
+        self.options.declare('density', default=2700., desc='Liner material density (kg/m^3)')
+        self.options.declare('thickness', default=0.5e-3, desc='Liner thickness (m))')
+    
+    def setup(self):
+        self.add_input('radius', val=0.5, units='m')
+        self.add_input('length', val=2., units='m')
+        self.add_output('weight', lower=0., units='kg')
+        self.declare_partials('weight', ['radius', 'length'])
+
+    def compute(self, inputs, outputs):
+        r = inputs['radius']
+        L = inputs['length']
+        outputs['weight'] = (2*np.pi*r*L + 4*np.pi*r**2) * self.options['density'] * self.options['thickness']
+    
+    def compute_partials(self, inputs, J):
+        r = inputs['radius']
+        L = inputs['length']
+        J['weight', 'radius'] = (2*np.pi*L + 8*np.pi*r) * self.options['density'] * self.options['thickness']
+        J['weight', 'length'] = 2*np.pi*r * self.options['density'] * self.options['thickness']
+
+
+class COPVInsulationWeight(om.ExplicitComponent):
+    """
+    Computes the weight of the insulation outside the composite overwrap.
+    Unlike the liner weight this calculation does not assume the
+    insulation is thin, since it computes the total volume and
+    subtracts out the inner volume.
+
+    Inputs
+    ------
+    radius : float
+        Inner radius of the cylinder and hemispherical end caps (scalar, m)
+    length : float
+        Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
+    thickness : float
+        Thickness of the insulation layer (scalar, m)
+    
+    Outputs
+    -------
+    weight : float
+        Weight of the liner (scalar, kg)
+    
+    Options
+    -------
+    density : float
+        Density of the insulation material (kg/m^3); default 32.1 kg/m^3 rigid open cell
+        polyurethane, other options listed on page 16 of
+        https://ntrs.nasa.gov/api/citations/20020085127/downloads/20020085127.pdf
+    """
+    def initialize(self):
+        self.options.declare('density', default=32.1, desc='Insulation material density (kg/m^3)')
+    
+    def setup(self):
+        self.add_input('radius', val=0.5, units='m')
+        self.add_input('length', val=2., units='m')
+        self.add_input('thickness', val=0.05, units='m')
+        self.add_output('weight', lower=0., units='kg')
+        self.declare_partials('weight', ['radius', 'length', 'thickness'])
+
+    def compute(self, inputs, outputs):
+        r = inputs['radius']
+        L = inputs['length']
+        t = inputs['thickness']
+        volume = (np.pi*L*(r + t)**2 + 4/3*np.pi*(r + t)**3) - (np.pi*L*r**2 + 4/3*np.pi*r**3)
+        outputs['weight'] = volume * self.options['density']
+    
+    def compute_partials(self, inputs, J):
+        r = inputs['radius']
+        L = inputs['length']
+        t = inputs['thickness']
+        J['weight', 'radius'] = ((2*np.pi*L*(r + t) + 4*np.pi*(r + t)**2) - (2*np.pi*L*r + 4*np.pi*r**2)) * self.options['density']
+        J['weight', 'length'] = (np.pi*(r + t)**2 - np.pi*r**2) * self.options['density']
+        J['weight', 'thickness'] = (2*np.pi*L*(r + t) + 4*np.pi*(r + t)**2) * self.options['density']
+
+
+if __name__ == "__main__":
+    from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
+    p = om.Problem()
+    p.model.add_subsystem('composite', CompositeOverwrap(safety_factor=1.), promotes_inputs=['design_pressure', 'radius', 'length'], promotes_outputs=[('weight', 'w_composite')])
+    p.model.add_subsystem('liner', COPVLinerWeight(thickness=0.0008, density=4500.), promotes_inputs=['radius', 'length'], promotes_outputs=[('weight', 'w_liner')])
+    p.model.add_subsystem('insulation', COPVInsulationWeight(), promotes_inputs=['radius', 'length'], promotes_outputs=[('weight', 'w_insulation')])
+    add = AddSubtractComp()
+    add.add_equation('weight', ['w_composite', 'w_liner', 'w_insulation'])
+    p.model.add_subsystem('total', add, promotes=['w_composite', 'w_liner', 'w_insulation', 'weight'])
+
+    p.setup()
+    
+    p.set_val('radius', 21., units='cm')
+    p.set_val('length', 35., units='cm')
+    p.set_val('insulation.thickness', 1., units='inch')
+    p.set_val('design_pressure', 57.2e6, units='Pa')
+
+    p.run_model()
+    p.model.list_outputs()
