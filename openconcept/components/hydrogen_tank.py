@@ -38,9 +38,9 @@ class CompositeOverwrap(om.ExplicitComponent):
     safety_factor : float
         Safety factor for sizing composite thicknesses, applied to MEOP; default 3
     yield_stress : float
-        Tensile yield stress of composite filament fiber direction (Pa); default 7 GPa
-        from Toray T1100G carbon fiber
-        https://www.toraycma.com/wp-content/uploads/T1100G-Technical-Data-Sheet-1.pdf.pdf
+        Tensile yield stress of composite in fiber direction (Pa); default 3.896 GPa
+        from Toray T1100G UD carbon fiber
+        https://www.toraycma.com/wp-content/uploads/3960-PREPREG-SYSTEM.pdf
     density : float
         Density of composite (kg/m^3); default 1.58 g/cm^3 computed from Toray 3960 material
         system with T1100G fibers assuming fiber density of 1.79 g/cm^3, resin density
@@ -52,7 +52,7 @@ class CompositeOverwrap(om.ExplicitComponent):
     """
     def initialize(self):
         self.options.declare('safety_factor', default=3., desc='Safety factor on composite thickness')
-        self.options.declare('yield_stress', default=7e9, desc='Tensile yield stress of fibers in Pa')
+        self.options.declare('yield_stress', default=3.896e9, desc='Tensile yield stress in fiber direction in Pa')
         self.options.declare('density', default=1580., desc='Density of composite in kg/m^3')
         self.options.declare('fiber_volume_fraction', default=0.586, desc='Fraction of volume taken up by fibers')
     
@@ -109,7 +109,7 @@ class COPVLinerWeight(om.ExplicitComponent):
     the liner is not load-bearing, so it has no effect on the sizing
     of the composite overwrap.
 
-    This component is uses a simple surface area calculation of a
+    This component uses a simple surface area calculation of a
     cylindrical pressure vessel with hemispherical end caps. That
     surface area is multiplied by the thickness of the liner and
     its density to find the weight.
@@ -210,21 +210,29 @@ class COPVInsulationWeight(om.ExplicitComponent):
 
 
 if __name__ == "__main__":
+    # Validation from Argonne National Lab 149 L, 700 bar hydrogen tank
+    # https://www1.eere.energy.gov/hydrogenandfuelcells/pdfs/compressedtank_storage.pdf
     from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
     p = om.Problem()
-    p.model.add_subsystem('composite', CompositeOverwrap(safety_factor=1.), promotes_inputs=['design_pressure', 'radius', 'length'], promotes_outputs=[('weight', 'w_composite')])
-    p.model.add_subsystem('liner', COPVLinerWeight(thickness=0.0008, density=4500.), promotes_inputs=['radius', 'length'], promotes_outputs=[('weight', 'w_liner')])
+    p.model.add_subsystem('composite', CompositeOverwrap(safety_factor=2.25, yield_stress=2.55e9, fiber_volume_fraction=0.6),
+                          promotes_inputs=['design_pressure', 'radius', 'length'], promotes_outputs=[('weight', 'w_composite')])
+    p.model.add_subsystem('liner', COPVLinerWeight(density=970, thickness=0.005),  # 5 mm HDPE liner
+                          promotes_inputs=['radius', 'length'], promotes_outputs=[('weight', 'w_liner')])
     p.model.add_subsystem('insulation', COPVInsulationWeight(), promotes_inputs=['radius', 'length'], promotes_outputs=[('weight', 'w_insulation')])
     add = AddSubtractComp()
-    add.add_equation('weight', ['w_composite', 'w_liner', 'w_insulation'])
+    add.add_equation('weight', ['w_composite', 'w_liner', 'w_insulation'], units='kg')
     p.model.add_subsystem('total', add, promotes=['w_composite', 'w_liner', 'w_insulation', 'weight'])
 
     p.setup()
     
-    p.set_val('radius', 21., units='cm')
-    p.set_val('length', 35., units='cm')
-    p.set_val('insulation.thickness', 1., units='inch')
-    p.set_val('design_pressure', 57.2e6, units='Pa')
+    # Radius and length computed based on 149 L volume and length-to-diameter ratio of 3
+    p.set_val('radius', 0.20718, units='m')
+    p.set_val('length', 0.828716, units='m')
+    p.set_val('insulation.thickness', 0., units='inch')  # no insulation (gaseous hydrogen)
+    p.set_val('design_pressure', 700., units='bar')
 
     p.run_model()
-    p.model.list_outputs()
+    p.model.list_outputs(units=True)
+
+    # The true tank weight is 108.6 kg; this estimation is 9.5% low,
+    # which is good enough for our purposes
