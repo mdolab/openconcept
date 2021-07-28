@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import Problem, NewtonSolver, DirectSolver
-from openconcept.components.hydrogen.hydrogen_tank import CompositeOverwrap, COPVLinerWeight, COPVInsulationWeight
+from openconcept.components.hydrogen.tank.structural import CompositeOverwrap, COPVLinerWeight, COPVInsulationWeight
 
 class CompositeOverwrapTestCase(unittest.TestCase):
     def test_defaults(self):
