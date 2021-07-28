@@ -17,6 +17,15 @@ class CompositeOverwrap(om.ExplicitComponent):
     The liner is assumed to bear no loads and is not considered in determining
     the thickness of the composite layers.
 
+          |--- length ---| 
+         . -------------- .         ---
+      ,'                    `.       | radius
+     /                        \      |
+    |                          |    ---
+     \                        /
+      `.                    ,'
+         ` -------------- '
+
     Inputs
     ------
     design_pressure : float
@@ -114,6 +123,15 @@ class COPVLinerWeight(om.ExplicitComponent):
     surface area is multiplied by the thickness of the liner and
     its density to find the weight.
 
+          |--- length ---| 
+         . -------------- .         ---
+      ,'                    `.       | radius
+     /                        \      |
+    |                          |    ---
+     \                        /
+      `.                    ,'
+         ` -------------- '
+
     Inputs
     ------
     radius : float
@@ -162,10 +180,20 @@ class COPVInsulationWeight(om.ExplicitComponent):
     insulation is thin, since it computes the total volume and
     subtracts out the inner volume.
 
+          |--- length ---| 
+         . -------------- .         ---
+      ,'                    `.       | radius
+     /                        \      |
+    |                          |    ---
+     \                        /
+      `.                    ,'
+         ` -------------- '
+
     Inputs
     ------
     radius : float
-        Inner radius of the cylinder and hemispherical end caps (scalar, m)
+        Inner radius of insulation in the cylinder and hemispherical
+        end caps; usually inner tank radius + composite thickness (scalar, m)
     length : float
         Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
     thickness : float
