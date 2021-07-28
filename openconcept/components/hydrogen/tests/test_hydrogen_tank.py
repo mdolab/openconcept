@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import Problem, NewtonSolver, DirectSolver
-from openconcept.components.hydrogen_tank import CompositeOverwrap, COPVLinerWeight, COPVInsulationWeight
+from openconcept.components.hydrogen.hydrogen_tank import CompositeOverwrap, COPVLinerWeight, COPVInsulationWeight
 
 class CompositeOverwrapTestCase(unittest.TestCase):
     def test_defaults(self):
@@ -18,8 +18,8 @@ class CompositeOverwrapTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('thickness', units='m'), 0.0383959044, tolerance=1e-9)
-        assert_near_equal(p.get_val('weight', units='kg'), 601.40471471, tolerance=1e-9)
+        assert_near_equal(p.get_val('thickness', units='m'), 0.068986481277726, tolerance=1e-9)
+        assert_near_equal(p.get_val('weight', units='kg'), 1123.952851354024688, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
