@@ -133,7 +133,7 @@ class COPVInsulationWeightTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('weight', units='kg'), 16.1520274, tolerance=1e-9)
+        assert_near_equal(p.get_val('weight', units='kg'), 30.12155895, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -150,7 +150,7 @@ class COPVInsulationWeightTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('weight', units='kg'), 30.37118991, tolerance=1e-9)
+        assert_near_equal(p.get_val('weight', units='kg'), 56.1390355, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -167,7 +167,7 @@ class COPVInsulationWeightTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('weight', units='kg'), 21.44639639, tolerance=1e-9)
+        assert_near_equal(p.get_val('weight', units='kg'), 39.92222847, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -184,7 +184,7 @@ class COPVInsulationWeightTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('weight', units='kg'), 268.9203311, tolerance=1e-9)
+        assert_near_equal(p.get_val('weight', units='kg'), 301.69342571, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -201,7 +201,7 @@ class COPVInsulationWeightTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('weight', units='kg'), 21.13349379, tolerance=1e-9)
+        assert_near_equal(p.get_val('weight', units='kg'), 35.10302534, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)

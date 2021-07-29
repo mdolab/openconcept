@@ -210,9 +210,13 @@ class COPVInsulationWeight(om.ExplicitComponent):
         Density of the insulation material (kg/m^3); default 32.1 kg/m^3 rigid open cell
         polyurethane, other options listed on page 16 of
         https://ntrs.nasa.gov/api/citations/20020085127/downloads/20020085127.pdf
+    fairing_areal_density : float
+        If insulation is included, a fairing must be used to prevent damage to the insulation
+        layer, default 1.304 kg/m^2 from https://www.mdpi.com/1996-1073/11/1/105 (scalar, kg/m^2)
     """
     def initialize(self):
         self.options.declare('density', default=32.1, desc='Insulation material density (kg/m^3)')
+        self.options.declare('fairing_areal_density', default=1.304, desc='Mass of fairing per area (kg/m^2)')
     
     def setup(self):
         self.add_input('radius', val=0.5, units='m')
@@ -226,15 +230,19 @@ class COPVInsulationWeight(om.ExplicitComponent):
         L = inputs['length']
         t = inputs['thickness']
         volume = (np.pi*L*(r + t)**2 + 4/3*np.pi*(r + t)**3) - (np.pi*L*r**2 + 4/3*np.pi*r**3)
-        outputs['weight'] = volume * self.options['density']
+        surf_area = 2*np.pi*(r + t)*L + 4*np.pi*(r + t)**2
+        outputs['weight'] = volume * self.options['density'] + surf_area * self.options['fairing_areal_density']
     
     def compute_partials(self, inputs, J):
         r = inputs['radius']
         L = inputs['length']
         t = inputs['thickness']
-        J['weight', 'radius'] = ((2*np.pi*L*(r + t) + 4*np.pi*(r + t)**2) - (2*np.pi*L*r + 4*np.pi*r**2)) * self.options['density']
-        J['weight', 'length'] = (np.pi*(r + t)**2 - np.pi*r**2) * self.options['density']
-        J['weight', 'thickness'] = (2*np.pi*L*(r + t) + 4*np.pi*(r + t)**2) * self.options['density']
+        J['weight', 'radius'] = ((2*np.pi*L*(r + t) + 4*np.pi*(r + t)**2) - (2*np.pi*L*r + 4*np.pi*r**2)) * self.options['density'] + \
+                                (2*np.pi*L + 8*np.pi*(r + t)) * self.options['fairing_areal_density']
+        J['weight', 'length'] = (np.pi*(r + t)**2 - np.pi*r**2) * self.options['density'] + \
+                                2*np.pi*(r + t)*self.options['fairing_areal_density']
+        J['weight', 'thickness'] = (2*np.pi*L*(r + t) + 4*np.pi*(r + t)**2) * self.options['density'] + \
+                                   (2*np.pi*L + 8*np.pi*(r + t)) * self.options['fairing_areal_density']
 
 
 if __name__ == "__main__":
@@ -246,7 +254,7 @@ if __name__ == "__main__":
                           promotes_inputs=['design_pressure', 'radius', 'length'], promotes_outputs=[('weight', 'w_composite')])
     p.model.add_subsystem('liner', COPVLinerWeight(density=970, thickness=0.005),  # 5 mm HDPE liner
                           promotes_inputs=['radius', 'length'], promotes_outputs=[('weight', 'w_liner')])
-    p.model.add_subsystem('insulation', COPVInsulationWeight(), promotes_inputs=['radius', 'length'], promotes_outputs=[('weight', 'w_insulation')])
+    p.model.add_subsystem('insulation', COPVInsulationWeight(fairing_areal_density=0), promotes_inputs=['radius', 'length'], promotes_outputs=[('weight', 'w_insulation')])
     add = AddSubtractComp()
     add.add_equation('weight', ['w_composite', 'w_liner', 'w_insulation'], units='kg')
     p.model.add_subsystem('total', add, promotes=['w_composite', 'w_liner', 'w_insulation', 'weight'])
