@@ -139,8 +139,58 @@ class COPVHeatFromWallsIntoPropellantTestCase(unittest.TestCase):
 
         p.run_model()
 
-        # assert_near_equal(p.get_val('R_cylinder', units='K/W'), 1.19677354195816, tolerance=1e-9)
-        # assert_near_equal(p.get_val('R_sphere', units='K/W'), 2.00474898539084, tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_into_liquid', units='W'), 40., tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_into_vapor', units='W'), 13.33333333, tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_total', units='W'), 53.3333333333, tolerance=1e-9)
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+    
+    def test_nearly_full(self):
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = COPVHeatFromWallsIntoPropellant()
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('fill_level', 0.99)
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('heat_into_liquid', units='W'), 76.33234342, tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_into_vapor', units='W'), 7.633997741861e-3, tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_total', units='W'), 76.33997741862, tolerance=1e-9)
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+    
+    def test_nearly_empty(self):
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = COPVHeatFromWallsIntoPropellant()
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('fill_level', 0.01)
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('heat_into_liquid', units='W'), 3.667656579121, tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_into_vapor', units='W'), 180.6366941305, tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_total', units='W'), 184.3043507096, tolerance=1e-9)
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+
+
+class FillLevelCalcTestCase(unittest.TestCase):
+    def test_defaults(self):
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = FillLevelCalc()
+        p.setup(force_alloc_complex=True)
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('fill_level'), .3546891722881, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)

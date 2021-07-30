@@ -553,7 +553,7 @@ class FillLevelCalc(om.ExplicitComponent):
     def setup(self):
         nn = self.options['num_nodes']
 
-        self.add_input('W_liquid', val=np.ones(nn)*100, units='kg', shape=(nn,))
+        self.add_input('W_liquid', val=np.ones(nn)*1000, units='kg', shape=(nn,))
         self.add_input('radius', val=2., units='m')
         self.add_input('length', val=.5, units='m')
         self.add_output('fill_level', val=0.5, shape=(nn,), lower=0.01, upper=0.99)
