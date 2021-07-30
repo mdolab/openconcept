@@ -10,9 +10,10 @@ class COPVThermalResistance(om.ExplicitComponent):
     to contents). This resistance does not include the transfer of heat
     to and from the walls due to the convection of fluids on either side.
     In other words, it only includes the thermal resistance from conduction
-    through the three layers of the wall in the tank.
+    through the three layers of the wall in the tank. It also ignores the
+    fairing/skin on the outside of the tank to protect the insulation.
 
-          |--- length ---| 
+          |--- length ---|
          . -------------- .         ---
       ,'                    `.       | radius
      /                        \      |
@@ -60,8 +61,6 @@ class COPVThermalResistance(om.ExplicitComponent):
         self.options.declare('insulation_cond', default=0.0112, desc='Thermal conductivity of insulation W/(m-K)')
     
     def setup(self):
-        nn = self.options['num_nodes']
-
         self.add_input('radius', val=0.5, units='m')
         self.add_input('length', val=2., units='m')
         self.add_input('composite_thickness', val=0.05, units='m')
@@ -70,11 +69,11 @@ class COPVThermalResistance(om.ExplicitComponent):
         self.add_output('R_cylinder', lower=0., units='K/W')
         self.add_output('R_sphere', lower=0., units='K/W')
 
-        self.declare_partials('R_cylinder' ['radius', 'length',
-                                            'composite_thickness',
-                                            'insulation_thickness'])
-        self.declare_partials('R_sphere' ['radius', 'composite_thickness',
-                                          'insulation_thickness'])
+        self.declare_partials('R_cylinder', ['radius', 'length',
+                                             'composite_thickness',
+                                             'insulation_thickness'])
+        self.declare_partials('R_sphere', ['radius', 'composite_thickness',
+                                           'insulation_thickness'])
     
     def compute(self, inputs, outputs):
         # Unpack variables for easier use
@@ -107,14 +106,39 @@ class COPVThermalResistance(om.ExplicitComponent):
     
     def compute_partials(self, inputs, J):
         # Unpack variables for easier use
-        r = inputs['radius']
+        r_inner = inputs['radius']
         L = inputs['length']
         t_liner = self.options['liner_thickness']
         k_liner = self.options['liner_cond']
-        t_comp = inputs['composite_thickness']
-        k_comp = self.options['composite_cond']
+        t_com = inputs['composite_thickness']
+        k_com = self.options['composite_cond']
         t_ins = inputs['insulation_thickness']
         k_ins = self.options['insulation_cond']
+
+        # Radii of interfaces between layers
+        r_com_liner = r_inner + t_liner
+        r_ins_com = r_com_liner + t_com
+        r_outer = r_ins_com + t_ins
+
+        a = r_com_liner + t_ins
+        b = r_com_liner
+
+        J['R_cylinder', 'radius'] = (-t_liner/r_inner**2) / (r_com_liner/r_inner) / (2*np.pi*L*k_liner) + \
+                                    (-t_com/r_com_liner**2) / (r_ins_com/r_com_liner) / (2*np.pi*L*k_com) + \
+                                    (-t_ins/r_ins_com**2) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
+        J['R_cylinder', 'length'] = -np.log(r_com_liner/r_inner) / (2*np.pi*L**2*k_liner) - \
+                                    np.log(r_ins_com/r_com_liner) / (2*np.pi*L**2*k_com) - \
+                                    np.log(r_outer/r_ins_com) / (2*np.pi*L**2*k_ins)
+        J['R_cylinder', 'composite_thickness'] = (1/r_com_liner) / (r_ins_com/r_com_liner) / (2*np.pi*L*k_com) + \
+                                                 (-t_ins/r_ins_com**2) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
+        J['R_cylinder', 'insulation_thickness'] = (1/r_ins_com) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
+
+        J['R_sphere', 'radius'] = (-1/r_inner**2 + 1/r_com_liner**2) / (4*np.pi*k_liner) + \
+                                  (-1/r_com_liner**2 + 1/r_ins_com**2) / (4*np.pi*k_com) + \
+                                  (-1/r_ins_com**2 + 1/r_outer**2) / (4*np.pi*k_ins)
+        J['R_sphere', 'composite_thickness'] = 1/r_ins_com**2 / (4*np.pi*k_com) + \
+                                               (-1/r_ins_com**2 + 1/r_outer**2) / (4*np.pi*k_ins)
+        J['R_sphere', 'insulation_thickness'] = 1/r_outer**2 / (4*np.pi*k_ins)
 
 
 class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
@@ -174,11 +198,16 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
         estimated from https://www.engineeringtoolbox.com/air-properties-viscosity-conductivity-heat-capacity-d_1509.html
     liner_thickness : float
         Thickness of liner, default 0.5 mm (scalar, m)
+    surface_emissivity : float
+        Surface emissivity of outside layer of tank; rough guess for thermal emissivity of
+        foam-like material or plastic is probably 0.6-0.9, default 0.6 (scalar, dimensionless)
+        https://www.thermoworks.com/emissivity-table
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of design points to run')
         self.options.declare('air_cond', default=0.0245, desc='Thermal conductivity of air W/(m-K)')
         self.options.declare('liner_thickness', default=0.5e-3, desc='Liner thickness (m)')
+        self.options.declare('surface_emissivity', default=0.6, desc='Thermal radiation emissivity of tank surface')
 
     def setup(self):
         nn = self.options['num_nodes']
@@ -209,6 +238,7 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
         T_surf = inputs['T_surface']
         T_inf = inputs['T_inf']
         k_air = self.options['air_cond']
+        eps_surface = self.options['surface_emissivity']
 
         # Compute outer radius
         r_outer = r_inner + t_liner + t_com + t_ins
@@ -230,7 +260,13 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
         A_cyl = np.pi * D * L
         A_sph = 4 * np.pi * r_outer**2
 
-        outputs['heat_into_walls'] = (T_inf - T_surf) * (h_cyl * A_cyl + h_sph * A_sph)
+        Q_convection = (T_inf - T_surf) * (h_cyl * A_cyl + h_sph * A_sph)
+
+        # Radiation effects
+        sig = 5.67e-8  # Stefan-Boltzmann constant (W/(m^2 K^4))
+        Q_radiation = sig*eps_surface*(A_cyl + A_sph)*(T_inf**4 - T_surf**4)
+
+        outputs['heat_into_walls'] = Q_convection + Q_radiation
     
     def compute_partials(self, inputs, J):
         # Unpack variables for easier use
@@ -242,3 +278,61 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
         T_surf = inputs['T_surface']
         T_inf = inputs['T_inf']
         k_air = self.options['air_cond']
+        eps_surface = self.options['surface_emissivity']
+        sig = 5.67e-8  # Stefan-Boltzmann constant (W/(m^2 K^4))
+
+        # Compute outer radius
+        r_outer = r_inner + t_liner + t_com + t_ins
+        D = 2*r_outer  # diameter of tank
+
+        # Rayleigh and Prandtl numbers
+        alpha = -3.119e-6 + 3.541e-8*T_inf + 1.679e-10*T_inf**2  # air diffusivity
+        nu = -2.079e-6 + 2.777e-8*T_inf + 1.077e-10*T_inf**2  # air viscosity
+        Pr = nu/alpha  # Prandtl number
+        R_ad = 9.807 * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha)
+
+        # Nusselt numbers for cylinder and sphere
+        Nu_cyl_sqrt = 0.6 + 0.387 * R_ad**(1/6) / (1 + (0.559/Pr)**(9/16))**(8/27)
+        Nu_cyl = Nu_cyl_sqrt**2
+        Nu_sph = 2 + 0.589 * R_ad**(1/4) / (1 + (0.469/Pr)**(9/16))**(4/9)
+
+        h_cyl = Nu_cyl * k_air / D
+        h_sph = Nu_sph * k_air / D
+
+        A_cyl = np.pi * D * L
+        A_sph = 4 * np.pi * r_outer**2
+
+        # Use reverse-AD style approach
+        d_Q_rad = 1
+        d_Q_conv = 1
+        d_A_sph = d_Q_conv * (T_inf - T_surf) * h_sph + d_Q_rad * sig*eps_surface*(T_inf**4 - T_surf**4)
+        d_A_cyl = d_Q_conv * (T_inf - T_surf) * h_cyl + d_Q_rad * sig*eps_surface*(T_inf**4 - T_surf**4)
+        d_h_sph = d_Q_conv * (T_inf - T_surf) * A_sph
+        d_h_cyl = d_Q_conv * (T_inf - T_surf) * A_cyl
+        d_Nu_sph = d_h_sph * k_air / D
+        d_Nu_cyl = d_h_cyl * k_air / D
+        d_R_ad = d_Nu_sph * 0.589 * 1/4 * R_ad**(-3/4) / (1 + (0.469/Pr)**(9/16))**(4/9) + \
+                 d_Nu_cyl * 2*Nu_cyl_sqrt * 0.387 * 1/6 * R_ad**(-5/6) / (1 + (0.559/Pr)**(9/16))**(8/27)
+        d_Pr = d_Nu_cyl * 2*Nu_cyl_sqrt * 0.387 * R_ad**(1/6) * (-8/27) * (1 + (Pr/0.559)**(-9/16))**(-35/27) * \
+                                          (-9/16)*(Pr/0.559)**(-25/16) / 0.559 + \
+               d_Nu_sph * (-4/9) * 0.589 * R_ad**(1/4) * (1 + (Pr/0.469)**(-9/16))**(-13/9) * \
+                          (-9/16) * (Pr/0.469)**(-25/16) / 0.469
+        d_alpha = d_R_ad * (-9.807) * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha**2) + \
+                  d_Pr * (-nu) / alpha**2
+        d_nu = d_R_ad * (-9.807) * (T_inf - T_surf) / T_inf * D**3 / (nu**2 * alpha) + d_Pr / alpha
+        d_D = d_R_ad * 9.807 * (T_inf - T_surf) / T_inf * 3*D**2 / (nu * alpha) + d_A_cyl * np.pi * L - \
+              d_h_cyl * Nu_cyl * k_air / D**2 - d_h_sph * Nu_sph * k_air / D**2
+        d_r_outer = d_A_sph * 8 * np.pi * r_outer + d_D * 2
+
+        J['heat_into_walls', 'T_inf'] = d_Q_rad * sig*eps_surface*(A_cyl + A_sph)*4*T_inf**3 + \
+                                        d_Q_conv * (h_cyl * A_cyl + h_sph * A_sph) + \
+                                        d_R_ad * 9.807 * T_surf / T_inf**2 * D**3 / (nu * alpha) + \
+                                        d_alpha * (3.541e-8 + 2*1.679e-10*T_inf) + \
+                                        d_nu * (2.777e-8 + 2*1.077e-10*T_inf)
+        J['heat_into_walls', 'T_surface'] = d_Q_rad * sig*eps_surface*(A_cyl + A_sph)*(-4)*T_surf**3 - \
+                                            d_Q_conv * (h_cyl * A_cyl + h_sph * A_sph) - \
+                                            d_R_ad * 9.807 / T_inf * D**3 / (nu * alpha)
+        J['heat_into_walls', 'radius'] = d_r_outer
+        J['heat_into_walls', 'length'] = d_A_cyl * np.pi * D
+        J['heat_into_walls', 'composite_thickness'] = d_r_outer
+        J['heat_into_walls', 'insulation_thickness'] = d_r_outer
