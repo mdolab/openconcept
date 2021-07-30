@@ -14,8 +14,7 @@ class COPVThermalResistanceTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('R_cylinder', units='K/W'), 1.19677354195816, tolerance=1e-9)
-        assert_near_equal(p.get_val('R_sphere', units='K/W'), 2.00474898539084, tolerance=1e-9)
+        assert_near_equal(p.get_val('thermal_resistance', units='K/W'), 0.7494029867002, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -33,8 +32,7 @@ class COPVThermalResistanceTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('R_cylinder', units='K/W'), 1.13552377444205e-6, tolerance=1e-9)
-        assert_near_equal(p.get_val('R_sphere', units='K/W'), 1.29626114262823e-6, tolerance=1e-9)
+        assert_near_equal(p.get_val('thermal_resistance', units='K/W'), 6.05290104e-7, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -52,8 +50,7 @@ class COPVThermalResistanceTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('R_cylinder', units='K/W'), 0.08698069868092, tolerance=1e-9)
-        assert_near_equal(p.get_val('R_sphere', units='K/W'), 0.03469947887178, tolerance=1e-9)
+        assert_near_equal(p.get_val('thermal_resistance', units='K/W'), 2.480424483950e-02, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -71,8 +68,7 @@ class COPVThermalResistanceTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('R_cylinder', units='K/W'), 1.30489279939595, tolerance=1e-9)
-        assert_near_equal(p.get_val('R_sphere', units='K/W'), 0.57387599672558, tolerance=1e-9)
+        assert_near_equal(p.get_val('thermal_resistance', units='K/W'), 0.39858372, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -133,6 +129,22 @@ class COPVHeatFromEnvironmentIntoTankWallsTestCase(unittest.TestCase):
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
+
+class COPVHeatFromWallsIntoPropellantTestCase(unittest.TestCase):
+    def test_defaults(self):
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = COPVHeatFromWallsIntoPropellant()
+        p.setup(force_alloc_complex=True)
+
+        p.run_model()
+
+        # assert_near_equal(p.get_val('R_cylinder', units='K/W'), 1.19677354195816, tolerance=1e-9)
+        # assert_near_equal(p.get_val('R_sphere', units='K/W'), 2.00474898539084, tolerance=1e-9)
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+
 
 if __name__ == "__main__":
     unittest.main()

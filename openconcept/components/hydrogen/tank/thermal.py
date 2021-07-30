@@ -27,7 +27,7 @@ class COPVThermalResistance(om.ExplicitComponent):
     radius : float
         Radius inside of tank for the cylinder and hemispherical end caps (scalar, m)
     length : float
-        Length of JUST THE CYLINDRICAL part of the tank
+        Length of JUST THE CYLINDRICAL part of the tank (scalar, m)
     composite_thickness : float
         Thickness of the composite overwrap (scalar, m)
     insulation_thickness : float
@@ -35,10 +35,8 @@ class COPVThermalResistance(om.ExplicitComponent):
     
     Outputs
     -------
-    R_cylinder : float
-        Effective thermal resistance of the cylindrical portion of the tank (scalar, K/W)
-    R_sphere : float
-        Effective total thermal resistance of the two end caps of the tank (scalar, K/W)
+    thermal_resistance : float
+        Effective thermal resistance of the tank (scalar, K/W)
     
     Options
     -------
@@ -66,14 +64,11 @@ class COPVThermalResistance(om.ExplicitComponent):
         self.add_input('composite_thickness', val=0.05, units='m')
         self.add_input('insulation_thickness', val=0.1, units='m')
 
-        self.add_output('R_cylinder', lower=0., units='K/W')
-        self.add_output('R_sphere', lower=0., units='K/W')
+        self.add_output('thermal_resistance', lower=0., units='K/W')
 
-        self.declare_partials('R_cylinder', ['radius', 'length',
+        self.declare_partials('thermal_resistance', ['radius', 'length',
                                              'composite_thickness',
                                              'insulation_thickness'])
-        self.declare_partials('R_sphere', ['radius', 'composite_thickness',
-                                           'insulation_thickness'])
     
     def compute(self, inputs, outputs):
         # Unpack variables for easier use
@@ -95,13 +90,15 @@ class COPVThermalResistance(om.ExplicitComponent):
         R_liner = np.log(r_com_liner/r_inner) / (2*np.pi*L*k_liner)
         R_com = np.log(r_ins_com/r_com_liner) / (2*np.pi*L*k_com)
         R_ins = np.log(r_outer/r_ins_com) / (2*np.pi*L*k_ins)
-        outputs['R_cylinder'] = R_liner + R_com + R_ins
+        R_cyl = R_liner + R_com + R_ins
 
         # Thermal resistance of spherical portion (two end caps)
         R_liner = (1/r_inner - 1/r_com_liner) / (4*np.pi*k_liner)
         R_com = (1/r_com_liner - 1/r_ins_com) / (4*np.pi*k_com)
         R_ins = (1/r_ins_com - 1/r_outer) / (4*np.pi*k_ins)
-        outputs['R_sphere'] = R_liner + R_com + R_ins
+        R_sph = R_liner + R_com + R_ins
+
+        outputs['thermal_resistance'] = 1 / (1/R_cyl + 1/R_sph)
 
     
     def compute_partials(self, inputs, J):
@@ -120,25 +117,42 @@ class COPVThermalResistance(om.ExplicitComponent):
         r_ins_com = r_com_liner + t_com
         r_outer = r_ins_com + t_ins
 
-        a = r_com_liner + t_ins
-        b = r_com_liner
+        # Thermal resistance of cylindrical portion
+        R_liner = np.log(r_com_liner/r_inner) / (2*np.pi*L*k_liner)
+        R_com = np.log(r_ins_com/r_com_liner) / (2*np.pi*L*k_com)
+        R_ins = np.log(r_outer/r_ins_com) / (2*np.pi*L*k_ins)
+        R_cyl = R_liner + R_com + R_ins
 
-        J['R_cylinder', 'radius'] = (-t_liner/r_inner**2) / (r_com_liner/r_inner) / (2*np.pi*L*k_liner) + \
-                                    (-t_com/r_com_liner**2) / (r_ins_com/r_com_liner) / (2*np.pi*L*k_com) + \
-                                    (-t_ins/r_ins_com**2) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
-        J['R_cylinder', 'length'] = -np.log(r_com_liner/r_inner) / (2*np.pi*L**2*k_liner) - \
-                                    np.log(r_ins_com/r_com_liner) / (2*np.pi*L**2*k_com) - \
-                                    np.log(r_outer/r_ins_com) / (2*np.pi*L**2*k_ins)
-        J['R_cylinder', 'composite_thickness'] = (1/r_com_liner) / (r_ins_com/r_com_liner) / (2*np.pi*L*k_com) + \
-                                                 (-t_ins/r_ins_com**2) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
-        J['R_cylinder', 'insulation_thickness'] = (1/r_ins_com) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
+        # Thermal resistance of spherical portion (two end caps)
+        R_liner = (1/r_inner - 1/r_com_liner) / (4*np.pi*k_liner)
+        R_com = (1/r_com_liner - 1/r_ins_com) / (4*np.pi*k_com)
+        R_ins = (1/r_ins_com - 1/r_outer) / (4*np.pi*k_ins)
+        R_sph = R_liner + R_com + R_ins
 
-        J['R_sphere', 'radius'] = (-1/r_inner**2 + 1/r_com_liner**2) / (4*np.pi*k_liner) + \
-                                  (-1/r_com_liner**2 + 1/r_ins_com**2) / (4*np.pi*k_com) + \
-                                  (-1/r_ins_com**2 + 1/r_outer**2) / (4*np.pi*k_ins)
-        J['R_sphere', 'composite_thickness'] = 1/r_ins_com**2 / (4*np.pi*k_com) + \
-                                               (-1/r_ins_com**2 + 1/r_outer**2) / (4*np.pi*k_ins)
-        J['R_sphere', 'insulation_thickness'] = 1/r_outer**2 / (4*np.pi*k_ins)
+        d_R_cyl_d_r = (-t_liner/r_inner**2) / (r_com_liner/r_inner) / (2*np.pi*L*k_liner) + \
+                      (-t_com/r_com_liner**2) / (r_ins_com/r_com_liner) / (2*np.pi*L*k_com) + \
+                      (-t_ins/r_ins_com**2) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
+        d_R_cyl_d_L = -np.log(r_com_liner/r_inner) / (2*np.pi*L**2*k_liner) - \
+                       np.log(r_ins_com/r_com_liner) / (2*np.pi*L**2*k_com) - \
+                       np.log(r_outer/r_ins_com) / (2*np.pi*L**2*k_ins)
+        d_R_cyl_d_t_com = (1/r_com_liner) / (r_ins_com/r_com_liner) / (2*np.pi*L*k_com) + \
+                          (-t_ins/r_ins_com**2) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
+        d_R_cyl_d_t_ins = (1/r_ins_com) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
+
+        d_R_sph_d_r = (-1/r_inner**2 + 1/r_com_liner**2) / (4*np.pi*k_liner) + \
+                      (-1/r_com_liner**2 + 1/r_ins_com**2) / (4*np.pi*k_com) + \
+                      (-1/r_ins_com**2 + 1/r_outer**2) / (4*np.pi*k_ins)
+        d_R_sph_d_t_com = 1/r_ins_com**2 / (4*np.pi*k_com) + \
+                          (-1/r_ins_com**2 + 1/r_outer**2) / (4*np.pi*k_ins)
+        d_R_sph_d_t_ins = 1/r_outer**2 / (4*np.pi*k_ins)
+
+        J['thermal_resistance', 'radius'] = (R_cyl**(-1) + R_sph**(-1))**(-2) * \
+                                            (R_cyl**(-2)*d_R_cyl_d_r + R_sph**(-2)*d_R_sph_d_r)
+        J['thermal_resistance', 'length'] = (R_cyl**(-1) + R_sph**(-1))**(-2) * (R_cyl**(-2)*d_R_cyl_d_L)
+        J['thermal_resistance', 'composite_thickness'] = (R_cyl**(-1) + R_sph**(-1))**(-2) * \
+                                                         (R_cyl**(-2)*d_R_cyl_d_t_com + R_sph**(-2)*d_R_sph_d_t_com)
+        J['thermal_resistance', 'insulation_thickness'] = (R_cyl**(-1) + R_sph**(-1))**(-2) * \
+                                                          (R_cyl**(-2)*d_R_cyl_d_t_ins + R_sph**(-2)*d_R_sph_d_t_ins)
 
 
 class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
@@ -177,7 +191,7 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
     radius : float
         Radius inside of tank for the cylinder and hemispherical end caps (scalar, m)
     length : float
-        Length of JUST THE CYLINDRICAL part of the tank
+        Length of JUST THE CYLINDRICAL part of the tank (scalar, m)
     composite_thickness : float
         Thickness of the composite overwrap (scalar, m)
     insulation_thickness : float
@@ -191,7 +205,7 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
     
     Options
     -------
-    num_nodes : float
+    num_nodes : int
         Number of analysis points to run (scalar, dimensionless)
     air_cond : float
         Thermal conductivity of air surrounding tank, default 0.0245 W/(m-K) (scalar, W/(m-K))
@@ -338,33 +352,230 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
         J['heat_into_walls', 'insulation_thickness'] = d_r_outer
 
 
-if __name__ == "__main__":
-    p = om.Problem()
-    p.model.linear_solver = om.DirectSolver()
-    p.model = COPVThermalResistance(liner_cond=200., liner_thickness=1.6e-3)
-    p.setup(force_alloc_complex=True)
+class COPVHeatFromWallsIntoPropellant(om.ExplicitComponent):
+    """
+    Computes the amount of heat entering the propellant from
+    the tank walls. Calculates the heat transfer to just the
+    liquid assuming the entire inside wall is at the temperature
+    of the liquid and then multiply by the fraction of the
+    internal surface area covered by liquid. It then
+    uses a rough curve fit based on data from
+    https://arc.aiaa.org/doi/10.2514/6.1992-818 to estimate
+    the heat to the vapor for the given fill level.
 
-    p.set_val('radius', 0.7, units='m')
-    p.set_val('length', 1.6, units='m')
-    p.set_val('composite_thickness', 0., units='m')
-    p.set_val('insulation_thickness', 0., units='m')
+    Note that this approach only works when there is some liquid
+    in the tank (if there is no liquid, it will vastly overestimate
+    the amount of heat entering the tank).
 
-    p.run_model()
+          |--- length ---| 
+         . -------------- .         ---
+      ,'                    `.       | radius
+     /                        \      |
+    |                          |    ---
+     \                        /
+      `.                    ,'
+         ` -------------- '
 
-    p.model.list_outputs(units=True)
+    Inputs
+    ------
+    T_surface : float
+        Temperature of the tank's outer surface (vector, K)
+    T_liquid : float
+        Temperature of the liquid propellant in the tank (vector, K)
+    fill_level : float
+        Fraction of tank (in range 0-1) filled with liquid propellant; assumes
+        tank is oriented horizontally as shown above (vector, dimensionless)
+    radius : float
+        Radius inside of tank for the cylinder and hemispherical end caps (scalar, m)
+    length : float
+        Length of JUST THE CYLINDRICAL part of the tank (scalar, m)
+    thermal_resistance : float
+        Thermal resistance of the tank walls (scalar, K/W)
     
-    nn = 1
-    p = om.Problem()
-    p.model = COPVHeatFromEnvironmentIntoTankWalls(num_nodes=nn)
-
-    p.setup()
+    Outputs
+    -------
+    heat_into_liquid : float
+        Heat entering the liquid propellant; positive is heat going
+        INTO liquid (vector, W)
+    heat_into_vapor : float
+        Heat entering the vapor in the ullage; positive is heat
+        going INTO vapor (vector, W)
+    heat_total : float
+        Total heat entering the contents of the tank; positive
+        is heat entering vapor and liquid (vector, W)
     
-    p.set_val('radius', 4, units='ft')
-    p.set_val('length', 0, units='ft')
-    p.set_val('T_surface', np.ones(nn)*290, units='K')
-    p.set_val('T_inf', np.ones(nn)*300, units='K')
-    p.set_val('composite_thickness', 2, units='inch')
-    p.set_val('insulation_thickness', 4.6, units='inch')
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (scalar, dimensionless)
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of design points to run')
+    
+    def setup(self):
+        nn = self.options['num_nodes']
 
-    p.run_model()
-    p.model.list_outputs(units=True, print_arrays=True)
+        self.add_input('T_surface', val=100., units='K', shape=(nn,))
+        self.add_input('T_liquid', val=20., units='K', shape=(nn,))
+        self.add_input('fill_level', val=0.5, shape=(nn,))
+        self.add_input('radius', val=0.5, units='m')
+        self.add_input('length', val=2., units='m')
+        self.add_input('thermal_resistance', val=1., units='K/W')
+
+        self.add_output('heat_into_liquid', units='W', shape=(nn,))
+        self.add_output('heat_into_vapor', units='W', shape=(nn,))
+        self.add_output('heat_total', units='W', shape=(nn,))
+
+        self.declare_partials('heat_into_liquid', ['T_liquid', 'T_surface'],
+                              rows=np.arange(nn), cols=np.arange(nn))
+        self.declare_partials('heat_into_liquid', ['radius', 'length',
+                                                  'thermal_resistance',
+                                                  'fill_level'],
+                              rows=np.arange(nn), cols=np.zeros(nn))
+        self.declare_partials('heat_into_vapor', ['T_liquid', 'T_surface'],
+                              rows=np.arange(nn), cols=np.arange(nn))
+        self.declare_partials('heat_into_vapor', ['radius', 'length',
+                                                  'thermal_resistance',
+                                                  'fill_level'],
+                              rows=np.arange(nn), cols=np.zeros(nn))
+        self.declare_partials('heat_total', ['T_liquid', 'T_surface'],
+                              rows=np.arange(nn), cols=np.arange(nn))
+        self.declare_partials('heat_total', ['radius', 'length',
+                                             'thermal_resistance',
+                                             'fill_level'],
+                              rows=np.arange(nn), cols=np.zeros(nn))
+    
+    def compute(self, inputs, outputs):
+        T_surf = inputs['T_surface']
+        T_liq = inputs['T_liquid']
+        R = inputs['thermal_resistance']
+        r = inputs['radius']
+        L = inputs['length']
+        fill_level = inputs['fill_level']
+
+        Q_if_all_liquid = (T_surf - T_liq) / R
+        h_liquid = 2*r*fill_level  # volume assuming the fluid height in the tank is linear
+                                   # with fill level is never off by more than 10%
+        cylinder_central_angle = 2*np.arccos(1 - h_liquid/r)
+        A_liquid = 2*np.pi*r*h_liquid + cylinder_central_angle*r*L  # spherical cap + sector * length
+        A_total = 4*np.pi*r**2 + 2*np.pi*r*L
+        Q_liquid = Q_if_all_liquid * A_liquid / A_total
+        outputs['heat_into_liquid'] = Q_liquid
+
+        heat_liquid_frac = -fill_level**2 + 2*fill_level  # rough curve fit that follows trend for
+                                                          # fraction of total heating going to liquid in
+                                                          # https://arc.aiaa.org/doi/10.2514/6.1992-818
+        heat_vapor_frac = 1 - heat_liquid_frac
+        Q_total = Q_liquid / heat_liquid_frac
+        outputs['heat_total'] = Q_total
+        outputs['heat_into_vapor'] = Q_total * heat_vapor_frac
+
+    def compute_partials(self, inputs, J):
+        T_surf = inputs['T_surface']
+        T_liq = inputs['T_liquid']
+        R = inputs['thermal_resistance']
+        r = inputs['radius']
+        L = inputs['length']
+        fill_level = inputs['fill_level']
+
+        Q_if_all_liquid = (T_surf - T_liq) / R
+        h_liquid = 2*r*fill_level  # volume assuming the fluid height in the tank is linear
+                                   # with fill level is never off by more than 10%
+        cylinder_central_angle = 2*np.arccos(1 - h_liquid/r)
+        d_angle_d_r = -2/np.sqrt(1 - (1 - h_liquid/r)**2) * (-2*fill_level/r + h_liquid/r**2)
+        A_liquid = 2*np.pi*r*h_liquid + cylinder_central_angle*r*L  # spherical cap + sector * length
+        A_total = 4*np.pi*r**2 + 2*np.pi*r*L
+        Q_liquid = Q_if_all_liquid * A_liquid / A_total
+
+        heat_liquid_frac = -fill_level**2 + 2*fill_level  # rough curve fit that follows trend for
+                                                          # fraction of total heating going to liquid in
+                                                          # https://arc.aiaa.org/doi/10.2514/6.1992-818
+        heat_vapor_frac = 1 - heat_liquid_frac
+
+        J['heat_into_liquid', 'T_surface'] = A_liquid / A_total / R
+        J['heat_into_vapor', 'T_surface'] = heat_vapor_frac / heat_liquid_frac * J['heat_into_liquid', 'T_surface']
+        J['heat_total', 'T_surface'] = J['heat_into_liquid', 'T_surface'] / heat_liquid_frac
+        J['heat_into_liquid', 'T_liquid'] = -A_liquid / A_total / R
+        J['heat_into_vapor', 'T_liquid'] = heat_vapor_frac / heat_liquid_frac * J['heat_into_liquid', 'T_liquid']
+        J['heat_total', 'T_liquid'] = J['heat_into_liquid', 'T_liquid'] / heat_liquid_frac
+        J['heat_into_liquid', 'thermal_resistance'] = (T_liq - T_surf) / R**2 * A_liquid / A_total
+        J['heat_into_vapor', 'thermal_resistance'] = heat_vapor_frac / heat_liquid_frac * \
+                                                     J['heat_into_liquid', 'thermal_resistance']
+        J['heat_total', 'thermal_resistance'] = J['heat_into_liquid', 'thermal_resistance'] / heat_liquid_frac
+        J['heat_into_liquid', 'radius'] = Q_if_all_liquid / A_total * (2*np.pi*h_liquid + 2*np.pi*r*2*fill_level + \
+                                                                       cylinder_central_angle*L + r*L*d_angle_d_r) - \
+                                          Q_if_all_liquid * A_liquid / A_total**2 * (8*np.pi*r + 2*np.pi*L)
+        J['heat_into_vapor', 'radius'] = heat_vapor_frac / heat_liquid_frac * J['heat_into_liquid', 'radius']
+        J['heat_total', 'radius'] = J['heat_into_liquid', 'radius'] / heat_liquid_frac
+        J['heat_into_liquid', 'length'] = Q_if_all_liquid / A_total * cylinder_central_angle*r - \
+                                          Q_if_all_liquid * A_liquid / A_total**2 * 2*np.pi*r
+        J['heat_into_vapor', 'length'] = heat_vapor_frac / heat_liquid_frac * J['heat_into_liquid', 'length']
+        J['heat_total', 'length'] = J['heat_into_liquid', 'length'] / heat_liquid_frac
+        J['heat_into_liquid', 'fill_level'] = Q_if_all_liquid / A_total * (4*np.pi*r**2 + \
+                                              r*L*2/np.sqrt(1 - (1 - h_liquid/r)**2)*2)
+        J['heat_into_vapor', 'fill_level'] = J['heat_into_liquid', 'fill_level'] * heat_vapor_frac / heat_liquid_frac - \
+                                             Q_liquid / heat_liquid_frac**2 * (-2*fill_level + 2)
+        J['heat_total', 'fill_level'] = J['heat_into_liquid', 'fill_level'] / heat_liquid_frac - \
+                                             Q_liquid / heat_liquid_frac**2 * (-2*fill_level + 2)
+
+
+class FillLevelCalc(om.ExplicitComponent):
+    """
+    Computes the fill level in the tank given the
+    weight of the liquid.
+
+    Inputs
+    ------
+    W_liquid : float
+        Weight of the liquid (vector, kg)
+    radius : float
+        Radius inside of tank for the cylinder and hemispherical end caps (scalar, m)
+    length : float
+        Length of JUST THE CYLINDRICAL part of the tank (scalar, m)
+    
+    Outputs
+    -------
+    fill_level : float
+        Fraction of tank (in range 0-1) filled with liquid propellant; assumes
+        tank is oriented horizontally as shown above (vector, dimensionless)
+    
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (scalar, dimensionless)
+    density : float
+        Density of the liquid, default 70.85 kg/m^3 hydrogen (scalar, kg/m^3)
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of design points to run')
+        self.options.declare('density', default=70.85, desc='Density of liquid, kg/m^3')
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+
+        self.add_input('W_liquid', val=np.ones(nn)*100, units='kg', shape=(nn,))
+        self.add_input('radius', val=2., units='m')
+        self.add_input('length', val=.5, units='m')
+        self.add_output('fill_level', val=0.5, shape=(nn,), lower=0.01, upper=0.99)
+
+        self.declare_partials('fill_level', 'W_liquid', rows=np.arange(nn), cols=np.arange(nn))
+        self.declare_partials('fill_level', ['radius', 'length'],
+                              rows=np.arange(nn), cols=np.zeros(nn))
+    
+    def compute(self, inputs, outputs):
+        r = inputs['radius']
+        L = inputs['length']
+        V = inputs['W_liquid'] / self.options['density']
+        V_tank = 4/3*np.pi*r**3 + np.pi*r**2*L
+        outputs['fill_level'] = V / V_tank
+    
+    def compute_partials(self, inputs, J):
+        rho = self.options['density']
+        r = inputs['radius']
+        L = inputs['length']
+        V = inputs['W_liquid'] / rho
+        V_tank = 4/3*np.pi*r**3 + np.pi*r**2*L
+
+        J['fill_level', 'W_liquid'] = (rho * V_tank)**(-1)
+        J['fill_level', 'radius'] = -V / V_tank**2 * (4*np.pi*r**2 + 2*np.pi*r*L)
+        J['fill_level', 'length'] = -V / V_tank**2 * np.pi*r**2
