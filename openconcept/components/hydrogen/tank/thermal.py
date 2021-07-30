@@ -336,3 +336,35 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
         J['heat_into_walls', 'length'] = d_A_cyl * np.pi * D
         J['heat_into_walls', 'composite_thickness'] = d_r_outer
         J['heat_into_walls', 'insulation_thickness'] = d_r_outer
+
+
+if __name__ == "__main__":
+    p = om.Problem()
+    p.model.linear_solver = om.DirectSolver()
+    p.model = COPVThermalResistance(liner_cond=200., liner_thickness=1.6e-3)
+    p.setup(force_alloc_complex=True)
+
+    p.set_val('radius', 0.7, units='m')
+    p.set_val('length', 1.6, units='m')
+    p.set_val('composite_thickness', 0., units='m')
+    p.set_val('insulation_thickness', 0., units='m')
+
+    p.run_model()
+
+    p.model.list_outputs(units=True)
+    
+    nn = 1
+    p = om.Problem()
+    p.model = COPVHeatFromEnvironmentIntoTankWalls(num_nodes=nn)
+
+    p.setup()
+    
+    p.set_val('radius', 4, units='ft')
+    p.set_val('length', 0, units='ft')
+    p.set_val('T_surface', np.ones(nn)*290, units='K')
+    p.set_val('T_inf', np.ones(nn)*300, units='K')
+    p.set_val('composite_thickness', 2, units='inch')
+    p.set_val('insulation_thickness', 4.6, units='inch')
+
+    p.run_model()
+    p.model.list_outputs(units=True, print_arrays=True)
