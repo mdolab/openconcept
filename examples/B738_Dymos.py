@@ -118,39 +118,73 @@ class B738AnalysisGroup(om.Group):
                                                           aircraft_model=B738AirplaneModel),
                                       promotes_inputs=['*'], promotes_outputs=['*'])
 
-# def configure_problem():
-#     prob = om.Problem()
-#     prob.model = B738AnalysisGroup()
-#     prob.model.nonlinear_solver = om.NewtonSolver(iprint=2,solve_subsystems=True)
-#     prob.model.linear_solver = om.DirectSolver()
-#     prob.model.nonlinear_solver.options['maxiter'] = 20
-#     prob.model.nonlinear_solver.options['atol'] = 1e-6
-#     prob.model.nonlinear_solver.options['rtol'] = 1e-6
-#     prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
-#     return prob
+def configure_problem():
+    prob = om.Problem()
+    prob.model = B738AnalysisGroup()
+    prob.model.nonlinear_solver = om.NewtonSolver(iprint=2,solve_subsystems=True)
+    prob.model.linear_solver = om.DirectSolver()
+    prob.model.nonlinear_solver.options['maxiter'] = 20
+    prob.model.nonlinear_solver.options['atol'] = 1e-6
+    prob.model.nonlinear_solver.options['rtol'] = 1e-6
+    prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
+    return prob
 
-# def set_values(prob, num_nodes):
-#     # set some (required) mission parameters. Each pahse needs a vertical and air-speed
-#     # the entire mission needs a cruise altitude and range
-#     prob.set_val('climb.fltcond|vs', np.linspace(2300.,  600.,num_nodes), units='ft/min')
-#     prob.set_val('climb.fltcond|Ueas', np.linspace(230, 220,num_nodes), units='kn')
-#     prob.set_val('cruise.fltcond|vs', np.ones((num_nodes,)) * 4., units='ft/min')
-#     prob.set_val('cruise.fltcond|Ueas', np.linspace(265, 258, num_nodes), units='kn')
-#     prob.set_val('descent.fltcond|vs', np.linspace(-1000, -150, num_nodes), units='ft/min')
-#     prob.set_val('descent.fltcond|Ueas', np.ones((num_nodes,)) * 250, units='kn')
-#     prob.set_val('reserve_climb.fltcond|vs', np.linspace(3000.,  2300.,num_nodes), units='ft/min')
-#     prob.set_val('reserve_climb.fltcond|Ueas', np.linspace(230, 230,num_nodes), units='kn')
-#     prob.set_val('reserve_cruise.fltcond|vs', np.ones((num_nodes,)) * 4., units='ft/min')
-#     prob.set_val('reserve_cruise.fltcond|Ueas', np.linspace(250, 250, num_nodes), units='kn')
-#     prob.set_val('reserve_descent.fltcond|vs', np.linspace(-800, -800, num_nodes), units='ft/min')
-#     prob.set_val('reserve_descent.fltcond|Ueas', np.ones((num_nodes,)) * 250, units='kn')
-#     prob.set_val('loiter.fltcond|vs', np.linspace(0.0, 0.0, num_nodes), units='ft/min')
-#     prob.set_val('loiter.fltcond|Ueas', np.ones((num_nodes,)) * 200, units='kn')
-#     prob.set_val('cruise|h0',33000.,units='ft')
-#     prob.set_val('reserve|h0',15000.,units='ft')
-#     prob.set_val('mission_range',2050,units='NM')
+def set_values(prob, num_nodes):
+    # set some (required) mission parameters. Each pahse needs a vertical and air-speed
+    # the entire mission needs a cruise altitude and range
+    prob.set_val('climb.fltcond|vs', np.linspace(2300.,  600.,num_nodes), units='ft/min')
+    prob.set_val('climb.fltcond|Ueas', np.linspace(230, 220,num_nodes), units='kn')
+    prob.set_val('cruise.fltcond|vs', np.ones((num_nodes,)) * 4., units='ft/min')
+    prob.set_val('cruise.fltcond|Ueas', np.linspace(265, 258, num_nodes), units='kn')
+    prob.set_val('descent.fltcond|vs', np.linspace(-1000, -150, num_nodes), units='ft/min')
+    prob.set_val('descent.fltcond|Ueas', np.ones((num_nodes,)) * 250, units='kn')
+    prob.set_val('reserve_climb.fltcond|vs', np.linspace(3000.,  2300.,num_nodes), units='ft/min')
+    prob.set_val('reserve_climb.fltcond|Ueas', np.linspace(230, 230,num_nodes), units='kn')
+    prob.set_val('reserve_cruise.fltcond|vs', np.ones((num_nodes,)) * 4., units='ft/min')
+    prob.set_val('reserve_cruise.fltcond|Ueas', np.linspace(250, 250, num_nodes), units='kn')
+    prob.set_val('reserve_descent.fltcond|vs', np.linspace(-800, -800, num_nodes), units='ft/min')
+    prob.set_val('reserve_descent.fltcond|Ueas', np.ones((num_nodes,)) * 250, units='kn')
+    prob.set_val('loiter.fltcond|vs', np.linspace(0.0, 0.0, num_nodes), units='ft/min')
+    prob.set_val('loiter.fltcond|Ueas', np.ones((num_nodes,)) * 200, units='kn')
+    prob.set_val('cruise|h0',33000.,units='ft')
+    prob.set_val('reserve|h0',15000.,units='ft')
+    prob.set_val('mission_range',2050,units='NM')
 
+def show_outputs(prob):
+    # print some outputs
+    vars_list = ['descent.fuel_used_final','loiter.fuel_used_final']
+    units = ['lb','lb']
+    nice_print_names = ['Block fuel', 'Total fuel']
+    print("=======================================================================")
+    for i, thing in enumerate(vars_list):
+        print(nice_print_names[i]+': '+str(prob.get_val(thing,units=units[i])[0])+' '+units[i])
+
+    # plot some stuff
+    plots = True
+    if plots:
+        x_var = 'range'
+        x_unit = 'NM'
+        y_vars = ['fltcond|h','fltcond|Ueas','fuel_used','throttle','fltcond|vs','fltcond|M','fltcond|CL']
+        y_units = ['ft','kn','lbm',None,'ft/min', None, None]
+        x_label = 'Range (nmi)'
+        y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)', 'Mach number', 'CL']
+        phases = ['climb', 'cruise', 'descent','reserve_climb','reserve_cruise','reserve_descent','loiter']
+        oc.plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
+                        x_label=x_label, y_labels=y_labels, marker='-',
+                        plot_title='737-800 Mission Profile')
+    # prob.model.list_outputs()
+
+def run_738_analysis(plots=False):
+    num_nodes = 11
+    prob = configure_problem()
+    prob.setup(check=True, mode='fwd')
+    set_values(prob, num_nodes)
+    prob.run_model()
+    prob.model.list_outputs()
+    if plots:
+        show_outputs(prob)
+    return prob
 
 
 if __name__ == "__main__":
-    run_738_analysis(plots=True)    
+    run_738_analysis(plots=True)
