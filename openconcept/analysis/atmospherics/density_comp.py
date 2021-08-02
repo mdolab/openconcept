@@ -13,6 +13,23 @@ class DensityComp(ExplicitComponent):
     Adapted from:
     J.P. Jasa, J.T. Hwang, and J.R.R.A. Martins: Design and Trajectory Optimization of a Morphing Wing Aircraft
     2018 AIAA/ASCE/AHS/ASC Structures, Structural Dynamics, and Materials Conference; AIAA SciTech Forum, January 2018
+
+    Inputs
+    ------
+    fltcond|p : float
+        Pressure at flight condition (vector, Pa)
+    fltcond|T : float
+        Temperature at flight condition (vector, K)
+    
+    Outputs
+    -------
+    fltcond|rho : float
+        Density at flight condition (vector, kg/m^3)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run, i.e. length of vector inputs (scalar, dimensionless)
     '''
 
     def initialize(self):

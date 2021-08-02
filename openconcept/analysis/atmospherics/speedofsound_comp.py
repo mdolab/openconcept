@@ -15,6 +15,21 @@ class SpeedOfSoundComp(ExplicitComponent):
     Adapted from:
     J.P. Jasa, J.T. Hwang, and J.R.R.A. Martins: Design and Trajectory Optimization of a Morphing Wing Aircraft
     2018 AIAA/ASCE/AHS/ASC Structures, Structural Dynamics, and Materials Conference; AIAA SciTech Forum, January 2018
+
+    Inputs
+    ------
+    fltcond|T : float
+        Temperature at flight condition (vector, K)
+    
+    Outputs
+    -------
+    fltcond|a : float
+        Speed of sound (vector, m/s)
+    
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run, i.e. length of vector inputs (scalar, dimensionless)
     '''
 
 
