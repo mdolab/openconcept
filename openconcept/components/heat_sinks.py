@@ -304,6 +304,8 @@ class MotorCoolingJacket(om.ExplicitComponent):
         Mass flow rate of the coolant (vector, kg/s)
     power_rating : float
         Rated steady state power of the motor (scalar, W)
+    motor_weight : float
+        Weight of electric motor (scalar, kg)
 
     Outputs
     -------
@@ -491,6 +493,8 @@ class SimplePump(om.ExplicitComponent):
         Electricity used by the pump (vector, W)
     component_weight : float
         Pump weight (scalar, kg)
+    component_sizing_margin : float
+        Fraction of total power rating used via elec_load (vector, dimensionless)
 
     Options
     -------
@@ -498,12 +502,16 @@ class SimplePump(om.ExplicitComponent):
         Number of analysis points to run (sets vec length; default 1)
     efficiency : float
         Pump electrical + mech efficiency. Sensible range 0.0 to 1.0 (default 0.35)
+    weight_base : float
+        Base weight of pump, doesn't change with power rating (default 0)
+    weight_inc : float
+        Incremental weight of pump, scales linearly with power rating (default 1/450 kg/W)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
         self.options.declare('efficiency', default=0.35, desc='Efficiency (dimensionless)')
         self.options.declare('weight_base', default=0.0, desc='Pump base weight')
-        self.options.declare('weight_inc', default=1/450, desc='Pump base weight (kg/W)')
+        self.options.declare('weight_inc', default=1/450, desc='Incremental pump weight (kg/W)')
 
     def setup(self):
         nn = self.options['num_nodes']
