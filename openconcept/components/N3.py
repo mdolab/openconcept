@@ -6,7 +6,8 @@ from openconcept.utilities.surrogates.cached_kriging_surrogate import KrigingSur
 
 def N3Hybrid(num_nodes=1, plot=False):
     """
-    Computes fuel savings attributable to hybridization
+    Returns OpenMDAO component for thrust deck
+    for optimized N+3 GTF with hybridization.
 
     Inputs
     ------
@@ -238,7 +239,8 @@ def N3Hybrid(num_nodes=1, plot=False):
 
 def N3(num_nodes=1, plot=False):
     """
-    Thrust deck for optimized N+3 GTF without hybridization
+    Returns OpenMDAO component for thrust deck
+    for optimized N+3 GTF without hybridization.
 
     Inputs
     ------

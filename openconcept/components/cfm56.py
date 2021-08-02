@@ -6,9 +6,8 @@ from openconcept.utilities.surrogates.cached_kriging_surrogate import KrigingSur
 
 def CFM56(num_nodes=1, plot=False):
     """
-    A simple turboshaft which generates shaft power consumes fuel.
-
-    This model assumes constant power specific fuel consumption (PSFC).
+    Returns OpenMDAO component for engine deck
+    to model CFM56 turbofan.
 
     Inputs
     ------

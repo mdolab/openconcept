@@ -74,12 +74,14 @@ class COPHeatPump(om.ExplicitComponent):
         Coeff of performance set by optimizer (vector, dimensionless)
     power_rating : float
         Shaft work in the refrigerator (scalar, W)
+
     Outputs
     -------
     q_in_1 : float
         Heat transfer rate INTO side 1 (vector, W)
     q_in_2 : float
         Heat transfer rate INTO side 2 (vector, W)
+
     Options
     -------
     num_nodes : int
@@ -118,11 +120,6 @@ class HeatPumpWeight(om.ExplicitComponent):
     -------
     component_weight : float
         Component weight (including coolants + motor) (scalar, kg)
-
-    Options
-    -------
-    num_nodes : int
-        The number of analysis points to run
     """
     def setup(self):
         self.add_input('power_rating', val=1000.0, units='W')
@@ -161,6 +158,14 @@ class HeatPumpWithIntegratedCoolantLoop(om.Group):
         Heat pump power per weight, default 200 W/kg (scalar, W/kg)
     eff_factor : float
         Heat pump Carnot efficiency factor, default 0.4 (scalar, None)
+    control.bypass_start : float
+        Bypass value (in range 0-1) at beginning used for linear interpolation,
+        0 is full refrigerator and 1 is full bypass; must access via
+        control component (i.e. with "control.bypass_start") (scalar, None)
+    control.bypass_end : float
+        Bypass value (in range 0-1) at end used for linear interpolation,
+        0 is full refrigerator and 1 is full bypass; must access via
+        control component (i.e. with "control.bypass_end") (scalar, None)
 
     Outputs
     -------
