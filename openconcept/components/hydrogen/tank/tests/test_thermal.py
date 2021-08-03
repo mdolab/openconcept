@@ -129,6 +129,25 @@ class COPVHeatFromEnvironmentIntoTankWallsTestCase(unittest.TestCase):
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
+    
+    def test_T_inf_less_than_T_surface(self):
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = COPVHeatFromEnvironmentIntoTankWalls(num_nodes=4)
+        p.setup(force_alloc_complex=True)
+
+        # Mix in one T_inf > T_surf to make sure indexing is correct
+        p.set_val('T_surface', np.array([300., 300., 300., 300.]), units='K')
+        p.set_val('T_inf', np.array([200., 299., 305., 290.]), units='K')
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('heat_into_walls', units='W'),
+                          np.array([-14252.58526491, -65.76729809, 381.65602934,
+                                    -806.02771188]), tolerance=1e-9)
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
 
 class COPVHeatFromWallsIntoPropellantTestCase(unittest.TestCase):
     def test_defaults(self):

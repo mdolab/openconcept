@@ -371,14 +371,14 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
 
         self.add_output('heat_into_walls', units='W', shape=(nn,))
 
-        # self.declare_partials('heat_into_walls', ['T_inf', 'T_surface'],
-        #                       rows=np.arange(nn), cols=np.arange(nn))
-        # self.declare_partials('heat_into_walls', ['radius', 'length',
-        #                                           'composite_thickness',
-        #                                           'insulation_thickness'],
-        #                       rows=np.arange(nn), cols=np.zeros(nn))
+        self.declare_partials('heat_into_walls', ['T_inf', 'T_surface'],
+                              rows=np.arange(nn), cols=np.arange(nn))
+        self.declare_partials('heat_into_walls', ['radius', 'length',
+                                                  'composite_thickness',
+                                                  'insulation_thickness'],
+                              rows=np.arange(nn), cols=np.zeros(nn))
 
-        self.declare_partials(['*'], ['*'], method='cs')
+        # self.declare_partials(['*'], ['*'], method='cs')
     
     def compute(self, inputs, outputs):
         # Unpack variables for easier use
@@ -399,9 +399,13 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
         # Rayleigh and Prandtl numbers
         alpha = -3.119e-6 + 3.541e-8*T_inf + 1.679e-10*T_inf**2  # air diffusivity
         nu = -2.079e-6 + 2.777e-8*T_inf + 1.077e-10*T_inf**2  # air viscosity
-        Pr = np.abs(nu/alpha)  # Prandtl number
-        R_ad = np.abs(9.807 * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha))  # take abs b/c we're
-                                                                               # interested in temp diff
+        Pr = nu/alpha
+        R_ad = 9.807 * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha)
+        
+        # Take absolute value of physical (positive) constants
+        # in a way that plays well with complex step for derivative check
+        Pr[np.where(np.real(Pr) < 0)] = -Pr[np.where(np.real(Pr) < 0)]
+        R_ad[np.where(np.real(R_ad) < 0)] = -R_ad[np.where(np.real(R_ad) < 0)]
 
         # Nusselt numbers for cylinder and sphere
         Nu_cyl = (0.6 + 0.387 * R_ad**(1/6) / (1 + (0.559/Pr)**(9/16))**(8/27))**2
@@ -420,77 +424,102 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
         Q_radiation = sig*eps_surface*(A_cyl + A_sph)*(T_inf**4 - T_surf**4)
 
         outputs['heat_into_walls'] = Q_convection + Q_radiation
-
-        # print(f"Heat into walls = {outputs['heat_into_walls']} W")
     
-    # def compute_partials(self, inputs, J):
-    #     # Unpack variables for easier use
-    #     r_inner = inputs['radius']
-    #     L = inputs['length']
-    #     t_liner = self.options['liner_thickness']
-    #     t_com = inputs['composite_thickness']
-    #     t_ins = inputs['insulation_thickness']
-    #     T_surf = inputs['T_surface']
-    #     T_inf = inputs['T_inf']
-    #     k_air = self.options['air_cond']
-    #     eps_surface = self.options['surface_emissivity']
-    #     sig = 5.67e-8  # Stefan-Boltzmann constant (W/(m^2 K^4))
+    def compute_partials(self, inputs, J):
+        # Unpack variables for easier use
+        r_inner = inputs['radius']
+        L = inputs['length']
+        t_liner = self.options['liner_thickness']
+        t_com = inputs['composite_thickness']
+        t_ins = inputs['insulation_thickness']
+        T_surf = inputs['T_surface']
+        T_inf = inputs['T_inf']
+        k_air = self.options['air_cond']
+        eps_surface = self.options['surface_emissivity']
+        sig = 5.67e-8  # Stefan-Boltzmann constant (W/(m^2 K^4))
 
-    #     # Compute outer radius
-    #     r_outer = r_inner + t_liner + t_com + t_ins
-    #     D = 2*r_outer  # diameter of tank
+        # Compute outer radius
+        r_outer = r_inner + t_liner + t_com + t_ins
+        D = 2*r_outer  # diameter of tank
 
-    #     # Rayleigh and Prandtl numbers
-    #     alpha = -3.119e-6 + 3.541e-8*T_inf + 1.679e-10*T_inf**2  # air diffusivity
-    #     nu = -2.079e-6 + 2.777e-8*T_inf + 1.077e-10*T_inf**2  # air viscosity
-    #     Pr = nu/alpha  # Prandtl number
-    #     R_ad = 9.807 * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha)
+        # Rayleigh and Prandtl numbers
+        alpha = -3.119e-6 + 3.541e-8*T_inf + 1.679e-10*T_inf**2  # air diffusivity
+        nu = -2.079e-6 + 2.777e-8*T_inf + 1.077e-10*T_inf**2  # air viscosity
+        Pr = nu/alpha
+        R_ad = 9.807 * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha)
+        
+        # Take absolute value of physical (positive) constants
+        # in a way that plays well with complex step for derivative check
+        Pr_flip = np.where(np.real(Pr) < 0)  # indicies to multiply Pr by -1
+        R_ad_flip = np.where(np.real(R_ad) < 0)   # indicies to multiply R_ad by -1
+        Pr[Pr_flip] = -Pr[Pr_flip]
+        R_ad[R_ad_flip] = -R_ad[R_ad_flip]
 
-    #     # Nusselt numbers for cylinder and sphere
-    #     Nu_cyl_sqrt = 0.6 + 0.387 * R_ad**(1/6) / (1 + (0.559/Pr)**(9/16))**(8/27)
-    #     Nu_cyl = Nu_cyl_sqrt**2
-    #     Nu_sph = 2 + 0.589 * R_ad**(1/4) / (1 + (0.469/Pr)**(9/16))**(4/9)
+        # Nusselt numbers for cylinder and sphere
+        Nu_cyl_sqrt = 0.6 + 0.387 * R_ad**(1/6) / (1 + (0.559/Pr)**(9/16))**(8/27)
+        Nu_cyl = Nu_cyl_sqrt**2
+        Nu_sph = 2 + 0.589 * R_ad**(1/4) / (1 + (0.469/Pr)**(9/16))**(4/9)
 
-    #     h_cyl = Nu_cyl * k_air / D
-    #     h_sph = Nu_sph * k_air / D
+        h_cyl = Nu_cyl * k_air / D
+        h_sph = Nu_sph * k_air / D
 
-    #     A_cyl = np.pi * D * L
-    #     A_sph = 4 * np.pi * r_outer**2
+        A_cyl = np.pi * D * L
+        A_sph = 4 * np.pi * r_outer**2
 
-    #     # Use reverse-AD style approach
-    #     d_Q_rad = 1
-    #     d_Q_conv = 1
-    #     d_A_sph = d_Q_conv * (T_inf - T_surf) * h_sph + d_Q_rad * sig*eps_surface*(T_inf**4 - T_surf**4)
-    #     d_A_cyl = d_Q_conv * (T_inf - T_surf) * h_cyl + d_Q_rad * sig*eps_surface*(T_inf**4 - T_surf**4)
-    #     d_h_sph = d_Q_conv * (T_inf - T_surf) * A_sph
-    #     d_h_cyl = d_Q_conv * (T_inf - T_surf) * A_cyl
-    #     d_Nu_sph = d_h_sph * k_air / D
-    #     d_Nu_cyl = d_h_cyl * k_air / D
-    #     d_R_ad = d_Nu_sph * 0.589 * 1/4 * R_ad**(-3/4) / (1 + (0.469/Pr)**(9/16))**(4/9) + \
-    #              d_Nu_cyl * 2*Nu_cyl_sqrt * 0.387 * 1/6 * R_ad**(-5/6) / (1 + (0.559/Pr)**(9/16))**(8/27)
-    #     d_Pr = d_Nu_cyl * 2*Nu_cyl_sqrt * 0.387 * R_ad**(1/6) * (-8/27) * (1 + (Pr/0.559)**(-9/16))**(-35/27) * \
-    #                                       (-9/16)*(Pr/0.559)**(-25/16) / 0.559 + \
-    #            d_Nu_sph * (-4/9) * 0.589 * R_ad**(1/4) * (1 + (Pr/0.469)**(-9/16))**(-13/9) * \
-    #                       (-9/16) * (Pr/0.469)**(-25/16) / 0.469
-    #     d_alpha = d_R_ad * (-9.807) * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha**2) + \
-    #               d_Pr * (-nu) / alpha**2
-    #     d_nu = d_R_ad * (-9.807) * (T_inf - T_surf) / T_inf * D**3 / (nu**2 * alpha) + d_Pr / alpha
-    #     d_D = d_R_ad * 9.807 * (T_inf - T_surf) / T_inf * 3*D**2 / (nu * alpha) + d_A_cyl * np.pi * L - \
-    #           d_h_cyl * Nu_cyl * k_air / D**2 - d_h_sph * Nu_sph * k_air / D**2
-    #     d_r_outer = d_A_sph * 8 * np.pi * r_outer + d_D * 2
+        # Use reverse-AD style approach
+        d_Q_rad = 1
+        d_Q_conv = 1
+        d_A_sph = d_Q_conv * (T_inf - T_surf) * h_sph + d_Q_rad * sig*eps_surface*(T_inf**4 - T_surf**4)
+        d_A_cyl = d_Q_conv * (T_inf - T_surf) * h_cyl + d_Q_rad * sig*eps_surface*(T_inf**4 - T_surf**4)
+        d_h_sph = d_Q_conv * (T_inf - T_surf) * A_sph
+        d_h_cyl = d_Q_conv * (T_inf - T_surf) * A_cyl
+        d_Nu_sph = d_h_sph * k_air / D
+        d_Nu_cyl = d_h_cyl * k_air / D
+        d_R_ad = d_Nu_sph * 0.589 * 1/4 * R_ad**(-3/4) / (1 + (0.469/Pr)**(9/16))**(4/9) + \
+                 d_Nu_cyl * 2*Nu_cyl_sqrt * 0.387 * 1/6 * R_ad**(-5/6) / (1 + (0.559/Pr)**(9/16))**(8/27)
+        d_Pr = d_Nu_cyl * 2*Nu_cyl_sqrt * 0.387 * R_ad**(1/6) * (-8/27) * (1 + (Pr/0.559)**(-9/16))**(-35/27) * \
+                                          (-9/16)*(Pr/0.559)**(-25/16) / 0.559 + \
+               d_Nu_sph * (-4/9) * 0.589 * R_ad**(1/4) * (1 + (Pr/0.469)**(-9/16))**(-13/9) * \
+                          (-9/16) * (Pr/0.469)**(-25/16) / 0.469
 
-    #     J['heat_into_walls', 'T_inf'] = d_Q_rad * sig*eps_surface*(A_cyl + A_sph)*4*T_inf**3 + \
-    #                                     d_Q_conv * (h_cyl * A_cyl + h_sph * A_sph) + \
-    #                                     d_R_ad * 9.807 * T_surf / T_inf**2 * D**3 / (nu * alpha) + \
-    #                                     d_alpha * (3.541e-8 + 2*1.679e-10*T_inf) + \
-    #                                     d_nu * (2.777e-8 + 2*1.077e-10*T_inf)
-    #     J['heat_into_walls', 'T_surface'] = d_Q_rad * sig*eps_surface*(A_cyl + A_sph)*(-4)*T_surf**3 - \
-    #                                         d_Q_conv * (h_cyl * A_cyl + h_sph * A_sph) - \
-    #                                         d_R_ad * 9.807 / T_inf * D**3 / (nu * alpha)
-    #     J['heat_into_walls', 'radius'] = d_r_outer
-    #     J['heat_into_walls', 'length'] = d_A_cyl * np.pi * D
-    #     J['heat_into_walls', 'composite_thickness'] = d_r_outer
-    #     J['heat_into_walls', 'insulation_thickness'] = d_r_outer
+        # Some were flipped and derivatives need to reflect that
+        d_alpha_R_ad_part = (-9.807) * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha**2)
+        d_alpha_R_ad_part[R_ad_flip] = -d_alpha_R_ad_part[R_ad_flip]
+        d_alpha_Pr_part = (-nu) / alpha**2
+        d_alpha_Pr_part[Pr_flip] = -d_alpha_Pr_part[Pr_flip]
+        d_alpha = d_R_ad * d_alpha_R_ad_part + d_Pr * d_alpha_Pr_part
+
+        d_nu_R_ad_part = (-9.807) * (T_inf - T_surf) / T_inf * D**3 / (nu**2 * alpha)
+        d_nu_R_ad_part[R_ad_flip] = -d_nu_R_ad_part[R_ad_flip]
+        d_nu_Pr_part = 1 / alpha
+        d_nu_Pr_part[Pr_flip] = -d_nu_Pr_part[Pr_flip]
+        d_nu = d_R_ad * d_nu_R_ad_part + d_Pr * d_nu_Pr_part
+
+        d_D_R_ad_part = 9.807 * (T_inf - T_surf) / T_inf * 3*D**2 / (nu * alpha)
+        d_D_R_ad_part[R_ad_flip] = -d_D_R_ad_part[R_ad_flip]
+        d_D = d_R_ad * d_D_R_ad_part + d_A_cyl * np.pi * L - \
+              d_h_cyl * Nu_cyl * k_air / D**2 - d_h_sph * Nu_sph * k_air / D**2
+
+        d_r_outer = d_A_sph * 8 * np.pi * r_outer + d_D * 2
+
+        d_T_inf_R_ad_part = 9.807 * T_surf / T_inf**2 * D**3 / (nu * alpha)
+        d_T_inf_R_ad_part[R_ad_flip] = -d_T_inf_R_ad_part[R_ad_flip]
+
+        d_T_surf_R_ad_part = 9.807 / T_inf * D**3 / (nu * alpha)
+        d_T_surf_R_ad_part[R_ad_flip] = -d_T_surf_R_ad_part[R_ad_flip]
+
+        J['heat_into_walls', 'T_inf'] = d_Q_rad * sig*eps_surface*(A_cyl + A_sph)*4*T_inf**3 + \
+                                        d_Q_conv * (h_cyl * A_cyl + h_sph * A_sph) + \
+                                        d_R_ad * d_T_inf_R_ad_part + \
+                                        d_alpha * (3.541e-8 + 2*1.679e-10*T_inf) + \
+                                        d_nu * (2.777e-8 + 2*1.077e-10*T_inf)
+        J['heat_into_walls', 'T_surface'] = d_Q_rad * sig*eps_surface*(A_cyl + A_sph)*(-4)*T_surf**3 - \
+                                            d_Q_conv * (h_cyl * A_cyl + h_sph * A_sph) - \
+                                            d_R_ad * d_T_surf_R_ad_part
+        J['heat_into_walls', 'radius'] = d_r_outer
+        J['heat_into_walls', 'length'] = d_A_cyl * np.pi * D
+        J['heat_into_walls', 'composite_thickness'] = d_r_outer
+        J['heat_into_walls', 'insulation_thickness'] = d_r_outer
 
 
 class COPVHeatFromWallsIntoPropellant(om.ExplicitComponent):
