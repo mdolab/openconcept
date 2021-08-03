@@ -2,6 +2,142 @@ from __future__ import division
 import numpy as np
 import openmdao.api as om
 
+class HeatTransfer(om.Group):
+    """
+    Computes the heat transfer into the hydrogen tank.
+
+    Inputs
+    ------
+    radius : float
+        Radius inside of tank for the cylinder and hemispherical end caps (scalar, m)
+    length : float
+        Length of JUST THE CYLINDRICAL part of the tank (scalar, m)
+    T_liquid : float
+        Temperature of the liquid propellant in the tank (vector, K)
+    T_inf : float
+        Temperature of the "freestream" (but stationary) air in
+        which the tank is sitting (vector, K)
+    composite_thickness : float
+        Thickness of the composite overwrap (scalar, m)
+    insulation_thickness : float
+        Thickness of tank insulation (scalar, m)
+    fill_level : float
+        Fraction of tank (in range 0-1) filled with liquid propellant; assumes
+        tank is oriented horizontally as shown above (vector, dimensionless)
+    
+    Outputs
+    -------
+    heat_into_liquid : float
+        Heat entering the liquid propellant; positive is heat going
+        INTO liquid (vector, W)
+    heat_into_vapor : float
+        Heat entering the vapor in the ullage; positive is heat
+        going INTO vapor (vector, W)
+    
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (scalar, dimensionless)
+    T_surf_guess : float
+        Guess for surface temperature of tank, default 150 K (scalar, K)
+        If convergence problems, set this parameter to a few degrees below the
+        lowest expected T_inf value to give the solver a good initial guess!
+        If no convergence problems, no need to touch this (it won't affect
+        the solution).
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of design points to run')
+        self.options.declare('T_surf_guess', default=150., desc='Guess for tank surface temperature (K)')
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+
+        # Model heat entering tank
+        self.add_subsystem('calc_resist', COPVThermalResistance(),
+                           promotes_inputs=['radius', 'length', 'composite_thickness',
+                                            'insulation_thickness'])
+        self.add_subsystem('Q_wall', COPVHeatFromEnvironmentIntoTankWalls(num_nodes=nn),
+                           promotes_inputs=['radius', 'length', 'insulation_thickness', 'T_inf',
+                                            'composite_thickness'])
+        self.add_subsystem('Q_LH2', COPVHeatFromWallsIntoPropellant(num_nodes=nn),
+                           promotes_inputs=['radius', 'length', 'fill_level', 'T_liquid'],
+                           promotes_outputs=['heat_into_vapor', 'heat_into_liquid'])
+        self.connect('calc_resist.thermal_resistance', 'Q_LH2.thermal_resistance')
+
+        # Assume liquid hydrogen is stored at saturation temperature (boiling point)
+        self.set_input_defaults('T_liquid', val=20.28*np.ones(nn), units='K')
+
+        # Find the temperature of the surface of the tank so that the heat entering the surface
+        # is equal to the heat entering the contents (make it satisfy steady problem)
+        self.add_subsystem('calc_T_surf', om.BalanceComp('T_surface', eq_units='W', lhs_name='Q_wall', \
+                                                            rhs_name='Q_contents', val=np.ones(nn)*150., units='K'))
+        self.connect('calc_T_surf.T_surface', ['Q_wall.T_surface', 'Q_LH2.T_surface'])
+        self.connect('Q_wall.heat_into_walls', 'calc_T_surf.Q_wall')
+        self.connect('Q_LH2.heat_total', 'calc_T_surf.Q_contents')
+
+
+class FillLevelCalc(om.ExplicitComponent):
+    """
+    Computes the fill level in the tank given the
+    weight of the liquid.
+
+    Inputs
+    ------
+    W_liquid : float
+        Weight of the liquid (vector, kg)
+    radius : float
+        Radius inside of tank for the cylinder and hemispherical end caps (scalar, m)
+    length : float
+        Length of JUST THE CYLINDRICAL part of the tank (scalar, m)
+    
+    Outputs
+    -------
+    fill_level : float
+        Fraction of tank (in range 0-1) filled with liquid propellant; assumes
+        tank is oriented horizontally as shown above (vector, dimensionless)
+    
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (scalar, dimensionless)
+    density : float
+        Density of the liquid, default 70.85 kg/m^3 hydrogen (scalar, kg/m^3)
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of design points to run')
+        self.options.declare('density', default=70.85, desc='Density of liquid, kg/m^3')
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+
+        self.add_input('W_liquid', val=np.ones(nn)*1000, units='kg', shape=(nn,))
+        self.add_input('radius', val=2., units='m')
+        self.add_input('length', val=.5, units='m')
+        self.add_output('fill_level', val=0.5, shape=(nn,), lower=0.01, upper=0.99)
+
+        self.declare_partials('fill_level', 'W_liquid', rows=np.arange(nn), cols=np.arange(nn))
+        self.declare_partials('fill_level', ['radius', 'length'],
+                              rows=np.arange(nn), cols=np.zeros(nn))
+    
+    def compute(self, inputs, outputs):
+        r = inputs['radius']
+        L = inputs['length']
+        V = inputs['W_liquid'] / self.options['density']
+        V_tank = 4/3*np.pi*r**3 + np.pi*r**2*L
+        outputs['fill_level'] = V / V_tank
+    
+    def compute_partials(self, inputs, J):
+        rho = self.options['density']
+        r = inputs['radius']
+        L = inputs['length']
+        V = inputs['W_liquid'] / rho
+        V_tank = 4/3*np.pi*r**3 + np.pi*r**2*L
+
+        J['fill_level', 'W_liquid'] = (rho * V_tank)**(-1)
+        J['fill_level', 'radius'] = -V / V_tank**2 * (4*np.pi*r**2 + 2*np.pi*r*L)
+        J['fill_level', 'length'] = -V / V_tank**2 * np.pi*r**2
+
+
 class COPVThermalResistance(om.ExplicitComponent):
     """
     Computes thermal resistance for heat going through walls
@@ -235,12 +371,14 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
 
         self.add_output('heat_into_walls', units='W', shape=(nn,))
 
-        self.declare_partials('heat_into_walls', ['T_inf', 'T_surface'],
-                              rows=np.arange(nn), cols=np.arange(nn))
-        self.declare_partials('heat_into_walls', ['radius', 'length',
-                                                  'composite_thickness',
-                                                  'insulation_thickness'],
-                              rows=np.arange(nn), cols=np.zeros(nn))
+        # self.declare_partials('heat_into_walls', ['T_inf', 'T_surface'],
+        #                       rows=np.arange(nn), cols=np.arange(nn))
+        # self.declare_partials('heat_into_walls', ['radius', 'length',
+        #                                           'composite_thickness',
+        #                                           'insulation_thickness'],
+        #                       rows=np.arange(nn), cols=np.zeros(nn))
+
+        self.declare_partials(['*'], ['*'], method='cs')
     
     def compute(self, inputs, outputs):
         # Unpack variables for easier use
@@ -261,8 +399,9 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
         # Rayleigh and Prandtl numbers
         alpha = -3.119e-6 + 3.541e-8*T_inf + 1.679e-10*T_inf**2  # air diffusivity
         nu = -2.079e-6 + 2.777e-8*T_inf + 1.077e-10*T_inf**2  # air viscosity
-        Pr = nu/alpha  # Prandtl number
-        R_ad = 9.807 * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha)
+        Pr = np.abs(nu/alpha)  # Prandtl number
+        R_ad = np.abs(9.807 * T_inf - T_surf / T_inf * D**3 / (nu * alpha))  # take abs b/c we're
+                                                                             # interested in temp diff
 
         # Nusselt numbers for cylinder and sphere
         Nu_cyl = (0.6 + 0.387 * R_ad**(1/6) / (1 + (0.559/Pr)**(9/16))**(8/27))**2
@@ -281,75 +420,77 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
         Q_radiation = sig*eps_surface*(A_cyl + A_sph)*(T_inf**4 - T_surf**4)
 
         outputs['heat_into_walls'] = Q_convection + Q_radiation
+
+        # print(f"Heat into walls = {outputs['heat_into_walls']} W")
     
-    def compute_partials(self, inputs, J):
-        # Unpack variables for easier use
-        r_inner = inputs['radius']
-        L = inputs['length']
-        t_liner = self.options['liner_thickness']
-        t_com = inputs['composite_thickness']
-        t_ins = inputs['insulation_thickness']
-        T_surf = inputs['T_surface']
-        T_inf = inputs['T_inf']
-        k_air = self.options['air_cond']
-        eps_surface = self.options['surface_emissivity']
-        sig = 5.67e-8  # Stefan-Boltzmann constant (W/(m^2 K^4))
+    # def compute_partials(self, inputs, J):
+    #     # Unpack variables for easier use
+    #     r_inner = inputs['radius']
+    #     L = inputs['length']
+    #     t_liner = self.options['liner_thickness']
+    #     t_com = inputs['composite_thickness']
+    #     t_ins = inputs['insulation_thickness']
+    #     T_surf = inputs['T_surface']
+    #     T_inf = inputs['T_inf']
+    #     k_air = self.options['air_cond']
+    #     eps_surface = self.options['surface_emissivity']
+    #     sig = 5.67e-8  # Stefan-Boltzmann constant (W/(m^2 K^4))
 
-        # Compute outer radius
-        r_outer = r_inner + t_liner + t_com + t_ins
-        D = 2*r_outer  # diameter of tank
+    #     # Compute outer radius
+    #     r_outer = r_inner + t_liner + t_com + t_ins
+    #     D = 2*r_outer  # diameter of tank
 
-        # Rayleigh and Prandtl numbers
-        alpha = -3.119e-6 + 3.541e-8*T_inf + 1.679e-10*T_inf**2  # air diffusivity
-        nu = -2.079e-6 + 2.777e-8*T_inf + 1.077e-10*T_inf**2  # air viscosity
-        Pr = nu/alpha  # Prandtl number
-        R_ad = 9.807 * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha)
+    #     # Rayleigh and Prandtl numbers
+    #     alpha = -3.119e-6 + 3.541e-8*T_inf + 1.679e-10*T_inf**2  # air diffusivity
+    #     nu = -2.079e-6 + 2.777e-8*T_inf + 1.077e-10*T_inf**2  # air viscosity
+    #     Pr = nu/alpha  # Prandtl number
+    #     R_ad = 9.807 * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha)
 
-        # Nusselt numbers for cylinder and sphere
-        Nu_cyl_sqrt = 0.6 + 0.387 * R_ad**(1/6) / (1 + (0.559/Pr)**(9/16))**(8/27)
-        Nu_cyl = Nu_cyl_sqrt**2
-        Nu_sph = 2 + 0.589 * R_ad**(1/4) / (1 + (0.469/Pr)**(9/16))**(4/9)
+    #     # Nusselt numbers for cylinder and sphere
+    #     Nu_cyl_sqrt = 0.6 + 0.387 * R_ad**(1/6) / (1 + (0.559/Pr)**(9/16))**(8/27)
+    #     Nu_cyl = Nu_cyl_sqrt**2
+    #     Nu_sph = 2 + 0.589 * R_ad**(1/4) / (1 + (0.469/Pr)**(9/16))**(4/9)
 
-        h_cyl = Nu_cyl * k_air / D
-        h_sph = Nu_sph * k_air / D
+    #     h_cyl = Nu_cyl * k_air / D
+    #     h_sph = Nu_sph * k_air / D
 
-        A_cyl = np.pi * D * L
-        A_sph = 4 * np.pi * r_outer**2
+    #     A_cyl = np.pi * D * L
+    #     A_sph = 4 * np.pi * r_outer**2
 
-        # Use reverse-AD style approach
-        d_Q_rad = 1
-        d_Q_conv = 1
-        d_A_sph = d_Q_conv * (T_inf - T_surf) * h_sph + d_Q_rad * sig*eps_surface*(T_inf**4 - T_surf**4)
-        d_A_cyl = d_Q_conv * (T_inf - T_surf) * h_cyl + d_Q_rad * sig*eps_surface*(T_inf**4 - T_surf**4)
-        d_h_sph = d_Q_conv * (T_inf - T_surf) * A_sph
-        d_h_cyl = d_Q_conv * (T_inf - T_surf) * A_cyl
-        d_Nu_sph = d_h_sph * k_air / D
-        d_Nu_cyl = d_h_cyl * k_air / D
-        d_R_ad = d_Nu_sph * 0.589 * 1/4 * R_ad**(-3/4) / (1 + (0.469/Pr)**(9/16))**(4/9) + \
-                 d_Nu_cyl * 2*Nu_cyl_sqrt * 0.387 * 1/6 * R_ad**(-5/6) / (1 + (0.559/Pr)**(9/16))**(8/27)
-        d_Pr = d_Nu_cyl * 2*Nu_cyl_sqrt * 0.387 * R_ad**(1/6) * (-8/27) * (1 + (Pr/0.559)**(-9/16))**(-35/27) * \
-                                          (-9/16)*(Pr/0.559)**(-25/16) / 0.559 + \
-               d_Nu_sph * (-4/9) * 0.589 * R_ad**(1/4) * (1 + (Pr/0.469)**(-9/16))**(-13/9) * \
-                          (-9/16) * (Pr/0.469)**(-25/16) / 0.469
-        d_alpha = d_R_ad * (-9.807) * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha**2) + \
-                  d_Pr * (-nu) / alpha**2
-        d_nu = d_R_ad * (-9.807) * (T_inf - T_surf) / T_inf * D**3 / (nu**2 * alpha) + d_Pr / alpha
-        d_D = d_R_ad * 9.807 * (T_inf - T_surf) / T_inf * 3*D**2 / (nu * alpha) + d_A_cyl * np.pi * L - \
-              d_h_cyl * Nu_cyl * k_air / D**2 - d_h_sph * Nu_sph * k_air / D**2
-        d_r_outer = d_A_sph * 8 * np.pi * r_outer + d_D * 2
+    #     # Use reverse-AD style approach
+    #     d_Q_rad = 1
+    #     d_Q_conv = 1
+    #     d_A_sph = d_Q_conv * (T_inf - T_surf) * h_sph + d_Q_rad * sig*eps_surface*(T_inf**4 - T_surf**4)
+    #     d_A_cyl = d_Q_conv * (T_inf - T_surf) * h_cyl + d_Q_rad * sig*eps_surface*(T_inf**4 - T_surf**4)
+    #     d_h_sph = d_Q_conv * (T_inf - T_surf) * A_sph
+    #     d_h_cyl = d_Q_conv * (T_inf - T_surf) * A_cyl
+    #     d_Nu_sph = d_h_sph * k_air / D
+    #     d_Nu_cyl = d_h_cyl * k_air / D
+    #     d_R_ad = d_Nu_sph * 0.589 * 1/4 * R_ad**(-3/4) / (1 + (0.469/Pr)**(9/16))**(4/9) + \
+    #              d_Nu_cyl * 2*Nu_cyl_sqrt * 0.387 * 1/6 * R_ad**(-5/6) / (1 + (0.559/Pr)**(9/16))**(8/27)
+    #     d_Pr = d_Nu_cyl * 2*Nu_cyl_sqrt * 0.387 * R_ad**(1/6) * (-8/27) * (1 + (Pr/0.559)**(-9/16))**(-35/27) * \
+    #                                       (-9/16)*(Pr/0.559)**(-25/16) / 0.559 + \
+    #            d_Nu_sph * (-4/9) * 0.589 * R_ad**(1/4) * (1 + (Pr/0.469)**(-9/16))**(-13/9) * \
+    #                       (-9/16) * (Pr/0.469)**(-25/16) / 0.469
+    #     d_alpha = d_R_ad * (-9.807) * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha**2) + \
+    #               d_Pr * (-nu) / alpha**2
+    #     d_nu = d_R_ad * (-9.807) * (T_inf - T_surf) / T_inf * D**3 / (nu**2 * alpha) + d_Pr / alpha
+    #     d_D = d_R_ad * 9.807 * (T_inf - T_surf) / T_inf * 3*D**2 / (nu * alpha) + d_A_cyl * np.pi * L - \
+    #           d_h_cyl * Nu_cyl * k_air / D**2 - d_h_sph * Nu_sph * k_air / D**2
+    #     d_r_outer = d_A_sph * 8 * np.pi * r_outer + d_D * 2
 
-        J['heat_into_walls', 'T_inf'] = d_Q_rad * sig*eps_surface*(A_cyl + A_sph)*4*T_inf**3 + \
-                                        d_Q_conv * (h_cyl * A_cyl + h_sph * A_sph) + \
-                                        d_R_ad * 9.807 * T_surf / T_inf**2 * D**3 / (nu * alpha) + \
-                                        d_alpha * (3.541e-8 + 2*1.679e-10*T_inf) + \
-                                        d_nu * (2.777e-8 + 2*1.077e-10*T_inf)
-        J['heat_into_walls', 'T_surface'] = d_Q_rad * sig*eps_surface*(A_cyl + A_sph)*(-4)*T_surf**3 - \
-                                            d_Q_conv * (h_cyl * A_cyl + h_sph * A_sph) - \
-                                            d_R_ad * 9.807 / T_inf * D**3 / (nu * alpha)
-        J['heat_into_walls', 'radius'] = d_r_outer
-        J['heat_into_walls', 'length'] = d_A_cyl * np.pi * D
-        J['heat_into_walls', 'composite_thickness'] = d_r_outer
-        J['heat_into_walls', 'insulation_thickness'] = d_r_outer
+    #     J['heat_into_walls', 'T_inf'] = d_Q_rad * sig*eps_surface*(A_cyl + A_sph)*4*T_inf**3 + \
+    #                                     d_Q_conv * (h_cyl * A_cyl + h_sph * A_sph) + \
+    #                                     d_R_ad * 9.807 * T_surf / T_inf**2 * D**3 / (nu * alpha) + \
+    #                                     d_alpha * (3.541e-8 + 2*1.679e-10*T_inf) + \
+    #                                     d_nu * (2.777e-8 + 2*1.077e-10*T_inf)
+    #     J['heat_into_walls', 'T_surface'] = d_Q_rad * sig*eps_surface*(A_cyl + A_sph)*(-4)*T_surf**3 - \
+    #                                         d_Q_conv * (h_cyl * A_cyl + h_sph * A_sph) - \
+    #                                         d_R_ad * 9.807 / T_inf * D**3 / (nu * alpha)
+    #     J['heat_into_walls', 'radius'] = d_r_outer
+    #     J['heat_into_walls', 'length'] = d_A_cyl * np.pi * D
+    #     J['heat_into_walls', 'composite_thickness'] = d_r_outer
+    #     J['heat_into_walls', 'insulation_thickness'] = d_r_outer
 
 
 class COPVHeatFromWallsIntoPropellant(om.ExplicitComponent):
@@ -517,65 +658,3 @@ class COPVHeatFromWallsIntoPropellant(om.ExplicitComponent):
                                              Q_liquid / heat_liquid_frac**2 * (-2*fill_level + 2)
         J['heat_total', 'fill_level'] = J['heat_into_liquid', 'fill_level'] / heat_liquid_frac - \
                                              Q_liquid / heat_liquid_frac**2 * (-2*fill_level + 2)
-
-
-class FillLevelCalc(om.ExplicitComponent):
-    """
-    Computes the fill level in the tank given the
-    weight of the liquid.
-
-    Inputs
-    ------
-    W_liquid : float
-        Weight of the liquid (vector, kg)
-    radius : float
-        Radius inside of tank for the cylinder and hemispherical end caps (scalar, m)
-    length : float
-        Length of JUST THE CYLINDRICAL part of the tank (scalar, m)
-    
-    Outputs
-    -------
-    fill_level : float
-        Fraction of tank (in range 0-1) filled with liquid propellant; assumes
-        tank is oriented horizontally as shown above (vector, dimensionless)
-    
-    Options
-    -------
-    num_nodes : int
-        Number of analysis points to run (scalar, dimensionless)
-    density : float
-        Density of the liquid, default 70.85 kg/m^3 hydrogen (scalar, kg/m^3)
-    """
-    def initialize(self):
-        self.options.declare('num_nodes', default=1, desc='Number of design points to run')
-        self.options.declare('density', default=70.85, desc='Density of liquid, kg/m^3')
-    
-    def setup(self):
-        nn = self.options['num_nodes']
-
-        self.add_input('W_liquid', val=np.ones(nn)*1000, units='kg', shape=(nn,))
-        self.add_input('radius', val=2., units='m')
-        self.add_input('length', val=.5, units='m')
-        self.add_output('fill_level', val=0.5, shape=(nn,), lower=0.01, upper=0.99)
-
-        self.declare_partials('fill_level', 'W_liquid', rows=np.arange(nn), cols=np.arange(nn))
-        self.declare_partials('fill_level', ['radius', 'length'],
-                              rows=np.arange(nn), cols=np.zeros(nn))
-    
-    def compute(self, inputs, outputs):
-        r = inputs['radius']
-        L = inputs['length']
-        V = inputs['W_liquid'] / self.options['density']
-        V_tank = 4/3*np.pi*r**3 + np.pi*r**2*L
-        outputs['fill_level'] = V / V_tank
-    
-    def compute_partials(self, inputs, J):
-        rho = self.options['density']
-        r = inputs['radius']
-        L = inputs['length']
-        V = inputs['W_liquid'] / rho
-        V_tank = 4/3*np.pi*r**3 + np.pi*r**2*L
-
-        J['fill_level', 'W_liquid'] = (rho * V_tank)**(-1)
-        J['fill_level', 'radius'] = -V / V_tank**2 * (4*np.pi*r**2 + 2*np.pi*r*L)
-        J['fill_level', 'length'] = -V / V_tank**2 * np.pi*r**2

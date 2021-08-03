@@ -7,10 +7,7 @@ from openconcept.utilities.math.integrals import Integrator
 from openconcept.components.hydrogen.tank.structural import CompositeOverwrap, \
                                                             COPVInsulationWeight, \
                                                             COPVLinerWeight
-from openconcept.components.hydrogen.tank.thermal import COPVThermalResistance, \
-                                                         COPVHeatFromEnvironmentIntoTankWalls, \
-                                                         COPVHeatFromWallsIntoPropellant, \
-                                                         FillLevelCalc
+from openconcept.components.hydrogen.tank.thermal import HeatTransfer, FillLevelCalc
 from openconcept.components.hydrogen.tank.boil_off import SimpleBoilOff
 
 class SimpleLH2Tank(om.Group):
@@ -86,30 +83,16 @@ class SimpleLH2Tank(om.Group):
         self.add_subsystem('liner', COPVLinerWeight(), promotes_inputs=['radius', 'length'])
 
         # Model heat entering tank
-        self.add_subsystem('Q_wall', COPVHeatFromEnvironmentIntoTankWalls(num_nodes=nn),
-                           promotes_inputs=['radius', 'length', 'insulation_thickness', 'T_inf'])
-        self.add_subsystem('calc_resist', COPVThermalResistance(),
-                           promotes_inputs=['radius', 'length', 'insulation_thickness'])
-        self.add_subsystem('Q_LH2', COPVHeatFromWallsIntoPropellant(num_nodes=nn),
-                           promotes_inputs=['radius', 'length'])
-        self.connect('composite.thickness', ['Q_wall.composite_thickness',\
-                                             'calc_resist.composite_thickness'])
-        self.connect('calc_resist.thermal_resistance', 'Q_LH2.thermal_resistance')
-
+        self.add_subsystem('heat', HeatTransfer(num_nodes=nn),
+                           promotes_inputs=['radius', 'length', 'T_inf', 'insulation_thickness'])
+        self.connect('composite.thickness', 'heat.composite_thickness')
+        
         # Assume liquid hydrogen is stored at saturation temperature (boiling point)
-        self.set_input_defaults('Q_LH2.T_liquid', val=20.28*np.ones(nn), units='K')
-
-        # Find the temperature of the surface of the tank so that the heat entering the surface
-        # is equal to the heat entering the contents (make it satisfy steady problem)
-        self.add_subsystem('calc_T_surf', om.BalanceComp('T_surface', eq_units='W', lhs_name='Q_wall', \
-                                                         rhs_name='Q_contents', val=np.ones(nn)*200., units='K'))
-        self.connect('calc_T_surf.T_surface', ['Q_wall.T_surface', 'Q_LH2.T_surface'])
-        self.connect('Q_wall.heat_into_walls', 'calc_T_surf.Q_wall')
-        self.connect('Q_LH2.heat_total', 'calc_T_surf.Q_contents')
+        self.set_input_defaults('heat.T_liquid', val=20.28*np.ones(nn), units='K')
 
         # Boil-off model
         self.add_subsystem('boil_off', SimpleBoilOff(num_nodes=nn), promotes_outputs=['m_boil_off'])
-        self.connect('Q_LH2.heat_into_liquid', 'boil_off.heat_into_liquid')
+        self.connect('heat.heat_into_liquid', 'boil_off.heat_into_liquid')
         self.add_subsystem('mass_flow', AddSubtractComp(output_name='m_dot_total',
                                                         input_names=['m_dot_usage', 'm_dot_boil_off'],
                                                         units='kg/s', vec_size=[nn, nn],
@@ -124,11 +107,6 @@ class SimpleLH2Tank(om.Group):
         self.connect('mass_flow.m_dot_total', 'LH2_mass_integrator.LH2_flow')
 
         # Total LH2 weight and fill level
-        self.add_subsystem('LH2_weight', AddSubtractComp(output_name='weight',
-                                                         input_names=['W_LH2_init', 'W_LH2_used'],
-                                                          units='kg', vec_size=[1, nn],
-                                                          scaling_factors=[1, -1]),
-                           promotes_outputs=[('weight', 'W_LH2')])
         self.add_subsystem('LH2_init', om.ExecComp('W_init = (4/3*pi*r**3 + pi*r**2*L)*fill_init*rho',
                                                    W_init={'units': 'kg'},
                                                    r={'units': 'm'},
@@ -136,12 +114,17 @@ class SimpleLH2Tank(om.Group):
                                                    fill_init={'value': self.options['init_fill_level']},
                                                    rho={'units': 'kg/m**3', 'value': 70.85}),  # density of LH2
                            promotes_inputs=[('r', 'radius'), ('L', 'length')])
+        self.add_subsystem('LH2_weight', AddSubtractComp(output_name='weight',
+                                                         input_names=['W_LH2_init', 'W_LH2_used'],
+                                                          units='kg', vec_size=[1, nn],
+                                                          scaling_factors=[1, -1]),
+                           promotes_outputs=[('weight', 'W_LH2')])
         self.add_subsystem('level_calc', FillLevelCalc(num_nodes=nn),
                            promotes_inputs=['radius', 'length'])
         self.connect('LH2_init.W_init', 'LH2_weight.W_LH2_init')
         self.connect('LH2_mass_integrator.LH2_used', 'LH2_weight.W_LH2_used')
         self.connect('W_LH2', 'level_calc.W_liquid')
-        self.connect('level_calc.fill_level', 'Q_LH2.fill_level')
+        self.connect('level_calc.fill_level', 'heat.fill_level')
 
         # Add weights
         self.add_subsystem('tank_weight', AddSubtractComp(output_name='weight',
@@ -164,20 +147,28 @@ class SimpleLH2Tank(om.Group):
 if __name__ == "__main__":
     nn = 11
     p = om.Problem()
-    p.model = SimpleLH2Tank(num_nodes=11)
+    p.model = SimpleLH2Tank(num_nodes=11, safety_factor=2.)
     p.model.linear_solver = om.DirectSolver()
     p.model.nonlinear_solver = om.NewtonSolver()
     p.model.nonlinear_solver.options['solve_subsystems'] = True
+    p.model.nonlinear_solver.options['maxiter'] = 10
 
     p.setup()
 
-    p.set_val('design_pressure', 2, units='bar')
-    p.set_val('radius', 2, units='m')
-    p.set_val('length', 0.5, units='m')
-    p.set_val('insulation_thickness', 5, units='inch')
-    p.set_val('T_inf', np.ones(nn)*300, units='K')
-    p.set_val('m_dot', np.ones(nn)*0, units='kg/s')
+    p.set_val('design_pressure', 2., units='bar')
+    p.set_val('m_dot', np.zeros(nn), units='kg/s')
+    p.set_val('radius', 2., units='m')
+    p.set_val('length', .5, units='m')
+    p.set_val('T_inf', 295.*np.ones(nn), units='K')
+    p.set_val('insulation_thickness', .127, units='m')
+    p.set_val('LH2_mass_integrator.duration', 30, units='min')
 
     p.run_model()
 
-    p.model.list_outputs(units=True, print_arrays=True)
+    om.n2(p, show_browser=False)
+
+    print(f"Heat into walls: {p.get_val('heat.Q_wall.heat_into_walls', units='W')} W")
+    print(f"Heat into propellant: {p.get_val('heat.Q_LH2.heat_total', units='W')} W")
+    print(f"Surface temperature: {p.get_val('heat.calc_T_surf.T_surface', units='K')} K")
+    print(f"Boil off flow rate: {p.get_val('boil_off.m_boil_off', units='kg/s')} kg/s")
+    print(f"Fill level: {p.get_val('level_calc.fill_level')}")
