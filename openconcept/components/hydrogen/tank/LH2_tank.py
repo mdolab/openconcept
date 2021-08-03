@@ -65,7 +65,9 @@ class SimpleLH2Tank(om.Group):
         Safety factor of composite overwrap, default 3. (scalar, dimensionless)
     init_fill_level : float
         Initial fill level (in range 0-1) of the tank, default 0.95
-        to leave space for gas expansion (scalar, dimensionless)
+        to leave space for gas expansion; this should never be higher
+        than 0.99 or so since it's not enough space for gas expansion and
+        the model behaves poorly with values very close to 1 (scalar, dimensionless)
     T_surf_guess : float
         If convergence problems, set this parameter to a few degrees below the
         lowest expected T_inf value to give the solver a good initial guess!
