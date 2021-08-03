@@ -400,8 +400,8 @@ class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
         alpha = -3.119e-6 + 3.541e-8*T_inf + 1.679e-10*T_inf**2  # air diffusivity
         nu = -2.079e-6 + 2.777e-8*T_inf + 1.077e-10*T_inf**2  # air viscosity
         Pr = np.abs(nu/alpha)  # Prandtl number
-        R_ad = np.abs(9.807 * T_inf - T_surf / T_inf * D**3 / (nu * alpha))  # take abs b/c we're
-                                                                             # interested in temp diff
+        R_ad = np.abs(9.807 * (T_inf - T_surf) / T_inf * D**3 / (nu * alpha))  # take abs b/c we're
+                                                                               # interested in temp diff
 
         # Nusselt numbers for cylinder and sphere
         Nu_cyl = (0.6 + 0.387 * R_ad**(1/6) / (1 + (0.559/Pr)**(9/16))**(8/27))**2
