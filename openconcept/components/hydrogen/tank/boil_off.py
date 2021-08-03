@@ -35,7 +35,7 @@ class SimpleBoilOff(om.ExplicitComponent):
         self.add_input('heat_into_liquid', val=100., units='W', shape=(nn,))
         self.add_output('m_boil_off', val=0.1, units='kg/s', shape=(nn,))
         self.declare_partials('m_boil_off', 'heat_into_liquid', val=np.ones(nn)/self.options['h_vap'],
-                              rows=np.arange(nn), cols=np.zeros(nn))
+                              rows=np.arange(nn), cols=np.arange(nn))
     
     def compute(self, inputs, outputs):
         outputs['m_boil_off'] = inputs['heat_into_liquid'] / self.options['h_vap']

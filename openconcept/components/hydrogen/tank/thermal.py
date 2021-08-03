@@ -70,7 +70,9 @@ class HeatTransfer(om.Group):
         # Find the temperature of the surface of the tank so that the heat entering the surface
         # is equal to the heat entering the contents (make it satisfy steady problem)
         self.add_subsystem('calc_T_surf', om.BalanceComp('T_surface', eq_units='W', lhs_name='Q_wall', \
-                                                            rhs_name='Q_contents', val=np.ones(nn)*150., units='K'))
+                                                            rhs_name='Q_contents',
+                                                            val=np.ones(nn)*self.options['T_surf_guess'],
+                                                            units='K'))
         self.connect('calc_T_surf.T_surface', ['Q_wall.T_surface', 'Q_LH2.T_surface'])
         self.connect('Q_wall.heat_into_walls', 'calc_T_surf.Q_wall')
         self.connect('Q_LH2.heat_total', 'calc_T_surf.Q_contents')

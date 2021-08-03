@@ -12,6 +12,7 @@ class HeatTransferTestCase(unittest.TestCase):
         p.model.linear_solver = DirectSolver()
         p.model.nonlinear_solver = NewtonSolver()
         p.model.nonlinear_solver.options['solve_subsystems'] = True
+        p.model.nonlinear_solver.options['err_on_non_converge'] = True
         p.setup(force_alloc_complex=True)
 
         p.set_val('radius', 2., units='m')
@@ -41,6 +42,7 @@ class HeatTransferTestCase(unittest.TestCase):
         p.model.linear_solver = DirectSolver()
         p.model.nonlinear_solver = NewtonSolver()
         p.model.nonlinear_solver.options['solve_subsystems'] = True
+        p.model.nonlinear_solver.options['err_on_non_converge'] = True
         p.setup(force_alloc_complex=True)
 
         p.set_val('radius', 2., units='m')
@@ -71,6 +73,7 @@ class HeatTransferTestCase(unittest.TestCase):
         p.model.nonlinear_solver = NewtonSolver()
         p.model.nonlinear_solver.options['solve_subsystems'] = True
         p.model.nonlinear_solver.options['maxiter'] = 20
+        p.model.nonlinear_solver.options['err_on_non_converge'] = True
         p.setup(force_alloc_complex=True)
 
         p.set_val('radius', 2., units='m')
