@@ -5,6 +5,160 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import Problem, NewtonSolver, DirectSolver
 from openconcept.components.hydrogen.tank.thermal import *
 
+class HeatTransferTestCase(unittest.TestCase):
+    def test_simple(self):
+        p = Problem()
+        p.model = HeatTransfer()
+        p.model.linear_solver = DirectSolver()
+        p.model.nonlinear_solver = NewtonSolver()
+        p.model.nonlinear_solver.options['solve_subsystems'] = True
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('radius', 2., units='m')
+        p.set_val('length', .5, units='m')
+        p.set_val('T_liquid', 20., units='K')
+        p.set_val('T_inf', 300., units='K')
+        p.set_val('composite_thickness', 6., units='inch')
+        p.set_val('insulation_thickness', 5., units='inch')
+        p.set_val('fill_level', 0.5)
+
+        p.run_model()
+
+        # Check that it has converged
+        assert_near_equal(p.get_val('Q_wall.heat_into_walls', units='W'),
+                          p.get_val('Q_LH2.heat_total', units='W'), tolerance=1e-6)
+
+        assert_near_equal(p.get_val('heat_into_liquid', units='W'), 819.94055824, tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_into_vapor', units='W'), 273.31351941, tolerance=1e-9)
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+    
+    def test_vectorized(self):
+        nn = 5
+        p = Problem()
+        p.model = HeatTransfer(num_nodes=nn)
+        p.model.linear_solver = DirectSolver()
+        p.model.nonlinear_solver = NewtonSolver()
+        p.model.nonlinear_solver.options['solve_subsystems'] = True
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('radius', 2., units='m')
+        p.set_val('length', .5, units='m')
+        p.set_val('T_liquid', 20.*np.ones(nn), units='K')
+        p.set_val('T_inf', 300.*np.ones(nn), units='K')
+        p.set_val('composite_thickness', 6., units='inch')
+        p.set_val('insulation_thickness', 5., units='inch')
+        p.set_val('fill_level', 0.5*np.ones(nn))
+
+        p.run_model()
+
+        # Check that it has converged
+        assert_near_equal(p.get_val('Q_wall.heat_into_walls', units='W'),
+                          p.get_val('Q_LH2.heat_total', units='W'), tolerance=1e-6)
+
+        assert_near_equal(p.get_val('heat_into_liquid', units='W'), 819.94055824*np.ones(nn), tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_into_vapor', units='W'), 273.31351941*np.ones(nn), tolerance=1e-9)
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+    
+    def test_big_range(self):
+        nn = 7
+        p = Problem()
+        p.model = HeatTransfer(num_nodes=nn)
+        p.model.linear_solver = DirectSolver()
+        p.model.nonlinear_solver = NewtonSolver()
+        p.model.nonlinear_solver.options['solve_subsystems'] = True
+        p.model.nonlinear_solver.options['maxiter'] = 20
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('radius', 2., units='m')
+        p.set_val('length', .5, units='m')
+        p.set_val('T_liquid', 20.*np.ones(nn), units='K')
+        p.set_val('T_inf', np.linspace(60, 500, nn), units='K')
+        p.set_val('composite_thickness', 6., units='inch')
+        p.set_val('insulation_thickness', 5., units='inch')
+        p.set_val('fill_level', np.linspace(0.95, 0.2, nn))
+
+        p.run_model()
+
+        # Check that it has converged
+        assert_near_equal(p.get_val('Q_wall.heat_into_walls', units='W'),
+                          p.get_val('Q_LH2.heat_total', units='W'), tolerance=1e-6)
+
+        assert_near_equal(p.get_val('heat_into_liquid', units='W'), np.array([220.95351724,
+                          534.85224979, 749.87818623, 869.11238398, 885.75283858,
+                          795.85394046, 597.19766925]), tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_into_vapor', units='W'), np.array([5.53768214e-01,
+                          1.68973309e+01, 7.41637767e+01, 1.91589229e+02, 3.84143704e+02,
+                          6.66105078e+02, 1.06168475e+03]), tolerance=1e-8)
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+
+
+class FillLevelCalcTestCase(unittest.TestCase):
+    def test_defaults(self):
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = FillLevelCalc()
+        p.setup(force_alloc_complex=True)
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('fill_level'), .3546891722881, tolerance=1e-9)
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+    
+    def test_vectorized(self):
+        nn = 5
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = FillLevelCalc(num_nodes=nn)
+        p.setup(force_alloc_complex=True)
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('fill_level'), .3546891722881*np.ones(nn), tolerance=1e-9)
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+    
+    def test_zero_fill(self):
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = FillLevelCalc()
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('W_liquid', 0., units='kg')
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('fill_level'), 0., tolerance=1e-9)
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+    
+    def test_full(self):
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = FillLevelCalc(density=1.)
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('radius', 2, units='m')
+        p.set_val('length', .5, units='m')
+        p.set_val('W_liquid', 4/3*np.pi*2**3 + np.pi*2**2*0.5, units='kg')
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('fill_level'), 1., tolerance=1e-9)
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+
+
 class COPVThermalResistanceTestCase(unittest.TestCase):
     def test_defaults(self):
         p = Problem()
@@ -165,6 +319,22 @@ class COPVHeatFromWallsIntoPropellantTestCase(unittest.TestCase):
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
     
+    def test_vectorized(self):
+        nn = 5
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = COPVHeatFromWallsIntoPropellant(num_nodes=nn)
+        p.setup(force_alloc_complex=True)
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('heat_into_liquid', units='W'), 40.*np.ones(nn), tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_into_vapor', units='W'), 13.33333333*np.ones(nn), tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_total', units='W'), 53.3333333333*np.ones(nn), tolerance=1e-9)
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+    
     def test_nearly_full(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
@@ -195,21 +365,6 @@ class COPVHeatFromWallsIntoPropellantTestCase(unittest.TestCase):
         assert_near_equal(p.get_val('heat_into_liquid', units='W'), 3.667656579121, tolerance=1e-9)
         assert_near_equal(p.get_val('heat_into_vapor', units='W'), 180.6366941305, tolerance=1e-9)
         assert_near_equal(p.get_val('heat_total', units='W'), 184.3043507096, tolerance=1e-9)
-
-        partials = p.check_partials(method='cs',compact_print=True)
-        assert_check_partials(partials)
-
-
-class FillLevelCalcTestCase(unittest.TestCase):
-    def test_defaults(self):
-        p = Problem()
-        p.model.linear_solver = DirectSolver()
-        p.model = FillLevelCalc()
-        p.setup(force_alloc_complex=True)
-
-        p.run_model()
-
-        assert_near_equal(p.get_val('fill_level'), .3546891722881, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)

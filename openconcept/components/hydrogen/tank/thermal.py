@@ -596,23 +596,20 @@ class COPVHeatFromWallsIntoPropellant(om.ExplicitComponent):
         self.add_output('heat_into_vapor', units='W', shape=(nn,))
         self.add_output('heat_total', units='W', shape=(nn,))
 
-        self.declare_partials('heat_into_liquid', ['T_liquid', 'T_surface'],
+        self.declare_partials('heat_into_liquid', ['T_liquid', 'T_surface', 'fill_level'],
                               rows=np.arange(nn), cols=np.arange(nn))
         self.declare_partials('heat_into_liquid', ['radius', 'length',
-                                                  'thermal_resistance',
-                                                  'fill_level'],
+                                                  'thermal_resistance'],
                               rows=np.arange(nn), cols=np.zeros(nn))
-        self.declare_partials('heat_into_vapor', ['T_liquid', 'T_surface'],
+        self.declare_partials('heat_into_vapor', ['T_liquid', 'T_surface', 'fill_level'],
                               rows=np.arange(nn), cols=np.arange(nn))
         self.declare_partials('heat_into_vapor', ['radius', 'length',
-                                                  'thermal_resistance',
-                                                  'fill_level'],
+                                                  'thermal_resistance'],
                               rows=np.arange(nn), cols=np.zeros(nn))
-        self.declare_partials('heat_total', ['T_liquid', 'T_surface'],
+        self.declare_partials('heat_total', ['T_liquid', 'T_surface', 'fill_level'],
                               rows=np.arange(nn), cols=np.arange(nn))
         self.declare_partials('heat_total', ['radius', 'length',
-                                             'thermal_resistance',
-                                             'fill_level'],
+                                             'thermal_resistance'],
                               rows=np.arange(nn), cols=np.zeros(nn))
     
     def compute(self, inputs, outputs):

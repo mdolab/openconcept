@@ -66,11 +66,18 @@ class SimpleLH2Tank(om.Group):
     init_fill_level : float
         Initial fill level (in range 0-1) of the tank, default 0.95
         to leave space for gas expansion (scalar, dimensionless)
+    T_surf_guess : float
+        If convergence problems, set this parameter to a few degrees below the
+        lowest expected T_inf value to give the solver a good initial guess!
+        If no convergence problems, no need to touch this (it won't affect
+        the solution).
+        Guess for surface temperature of tank, default 150 K (scalar, K)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of design points to run')
         self.options.declare('safety_factor', default=3., desc='Safety factor on composite thickness')
         self.options.declare('init_fill_level', default=0.95, desc='Initial fill level')
+        self.options.declare('T_surf_guess', default=150., desc='Guess for tank surface temperature (K)')
     
     def setup(self):
         nn = self.options['num_nodes']
@@ -83,7 +90,7 @@ class SimpleLH2Tank(om.Group):
         self.add_subsystem('liner', COPVLinerWeight(), promotes_inputs=['radius', 'length'])
 
         # Model heat entering tank
-        self.add_subsystem('heat', HeatTransfer(num_nodes=nn),
+        self.add_subsystem('heat', HeatTransfer(num_nodes=nn, T_surf_guess=self.options['T_surf_guess']),
                            promotes_inputs=['radius', 'length', 'T_inf', 'insulation_thickness'])
         self.connect('composite.thickness', 'heat.composite_thickness')
         
