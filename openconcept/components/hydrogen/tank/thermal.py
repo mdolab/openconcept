@@ -91,6 +91,8 @@ class FillLevelCalc(om.ExplicitComponent):
         Radius inside of tank for the cylinder and hemispherical end caps (scalar, m)
     length : float
         Length of JUST THE CYLINDRICAL part of the tank (scalar, m)
+    density : float
+        Density of the liquid, default 70.85 kg/m^3 hydrogen (vector, kg/m^3)
     
     Outputs
     -------
@@ -102,12 +104,9 @@ class FillLevelCalc(om.ExplicitComponent):
     -------
     num_nodes : int
         Number of analysis points to run (scalar, dimensionless)
-    density : float
-        Density of the liquid, default 70.85 kg/m^3 hydrogen (scalar, kg/m^3)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of design points to run')
-        self.options.declare('density', default=70.85, desc='Density of liquid, kg/m^3')
     
     def setup(self):
         nn = self.options['num_nodes']
@@ -115,27 +114,29 @@ class FillLevelCalc(om.ExplicitComponent):
         self.add_input('W_liquid', val=np.ones(nn)*1000, units='kg', shape=(nn,))
         self.add_input('radius', val=2., units='m')
         self.add_input('length', val=.5, units='m')
+        self.add_input('density', val=70.85, units='kg/m**3', shape=(nn,))
         self.add_output('fill_level', val=0.5, shape=(nn,), lower=0.01, upper=0.99)
 
-        self.declare_partials('fill_level', 'W_liquid', rows=np.arange(nn), cols=np.arange(nn))
+        self.declare_partials('fill_level', ['W_liquid', 'density'], rows=np.arange(nn), cols=np.arange(nn))
         self.declare_partials('fill_level', ['radius', 'length'],
                               rows=np.arange(nn), cols=np.zeros(nn))
     
     def compute(self, inputs, outputs):
         r = inputs['radius']
         L = inputs['length']
-        V = inputs['W_liquid'] / self.options['density']
+        V = inputs['W_liquid'] / inputs['density']
         V_tank = 4/3*np.pi*r**3 + np.pi*r**2*L
         outputs['fill_level'] = V / V_tank
     
     def compute_partials(self, inputs, J):
-        rho = self.options['density']
+        rho = inputs['density']
         r = inputs['radius']
         L = inputs['length']
         V = inputs['W_liquid'] / rho
         V_tank = 4/3*np.pi*r**3 + np.pi*r**2*L
 
         J['fill_level', 'W_liquid'] = (rho * V_tank)**(-1)
+        J['fill_level', 'density'] = -inputs['W_liquid'] / (rho * V_tank)**2 * V_tank
         J['fill_level', 'radius'] = -V / V_tank**2 * (4*np.pi*r**2 + 2*np.pi*r*L)
         J['fill_level', 'length'] = -V / V_tank**2 * np.pi*r**2
 

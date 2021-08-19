@@ -110,16 +110,6 @@ class LH2BoilOff(om.Group):
     def setup(self):
         nn = self.options['num_nodes']
 
-        # Fluid properties in vapor, liquid, saturated and actual
-        self.add_subsystem('GH2_prop', GH2Properties(num_nodes=nn))
-        self.add_subsystem('LH2_prop', LH2Properties(num_nodes=nn))
-        self.add_subsystem('H2_sat_prop', SaturatedH2Properties(num_nodes=nn))
-
-        # Governing equations of boil-off
-        self.add_subsystem('boil_off_ODE', LH2BoilOffODE(num_nodes=nn),
-                           promotes_inputs=['radius', 'length', 'fill_level',
-                                            'm_dot_liq', 'Q_vap', 'Q_liq'])
-
         integ = self.add_subsystem('integ', Integrator(num_nodes=nn, diff_units='s',
                                    time_setup='duration'), promotes_inputs=['m_dot_liq'], 
                                    promotes_outputs=['T_vap', 'T_liq'])
@@ -131,7 +121,12 @@ class LH2BoilOff(om.Group):
         integ.add_integrand('m_liq_used', rate_name='m_dot_liq', units='kg')
         integ.add_integrand('m_vap_vented', rate_name='m_dot_vent', units='kg')
 
-        # Track weight of hydrogen in liquid and vapor
+        # Governing equations of boil-off
+        self.add_subsystem('boil_off_ODE', LH2BoilOffODE(num_nodes=nn),
+                           promotes_inputs=['radius', 'length', 'fill_level',
+                                            'm_dot_liq', 'Q_vap', 'Q_liq'])
+
+        # Initial weights
         self.add_subsystem('GH2_init', om.ExecComp('W_init = (4/3*pi*r**3 + pi*r**2*L)*(1-fill_init)*P*P_frac*MW/R/T',
                                                    W_init={'units': 'kg'},
                                                    r={'units': 'm'},
@@ -150,16 +145,23 @@ class LH2BoilOff(om.Group):
                                                    fill_init={'value': self.options['init_fill_level']},
                                                    rho={'units': 'kg/m**3', 'value': 70.85}),  # density of LH2
                            promotes_inputs=[('r', 'radius'), ('L', 'length')])
+
+        # Fluid properties in vapor, liquid, saturated and actual
+        self.add_subsystem('GH2_prop', GH2Properties(num_nodes=nn), promotes_outputs=['P_vap'])
+        self.add_subsystem('LH2_prop', LH2Properties(num_nodes=nn), promotes_outputs=['P_liq'])
+        self.add_subsystem('H2_sat_prop', SaturatedH2Properties(num_nodes=nn))
+
+        # Track weight of hydrogen in liquid and vapor
         self.add_subsystem('LH2_weight', AddSubtractComp(output_name='weight',
                                                          input_names=['W_LH2_init', 'W_LH2_used', 'W_to_vap'],
                                                           units='kg', vec_size=[1, nn, nn],
-                                                          scaling_factors=[1, -1, -1]),
+                                                          scaling_factors=[1, -1, -1], val=100.),
                            promotes_outputs=[('weight', 'W_LH2')])
         self.add_subsystem('GH2_weight', AddSubtractComp(output_name='weight',
                                                         input_names=['W_GH2_init', 'W_GH2_vented',
                                                                      'W_from_liq'],
                                                         units='kg', vec_size=[1, nn, nn],
-                                                        scaling_factors=[1, -1, 1]),
+                                                        scaling_factors=[1, -1, 1], val=10.),
                            promotes_outputs=[('weight', 'W_GH2')])
         self.connect('LH2_init.W_init', 'LH2_weight.W_LH2_init')
         self.connect('integ.m_liq_used', 'LH2_weight.W_LH2_used')
@@ -170,15 +172,15 @@ class LH2BoilOff(om.Group):
 
         # Volumes
         self.add_subsystem('liq_vol', om.ExecComp('V_liq = (4/3*pi*r**3 + pi*r**2*L)*fill_init + delta_V_liq',
-                                                  V_liq={'units': 'm**3'},
+                                                  V_liq={'units': 'm**3', 'shape': (nn,)},
                                                   r={'units': 'm'},
                                                   L={'units': 'm'},
                                                   fill_init={'value': self.options['init_fill_level']},
-                                                  delta_V_liq={'units': 'm**3'}),
+                                                  delta_V_liq={'units': 'm**3', 'shape': (nn,)}),
                            promotes_inputs=[('r', 'radius'), ('L', 'length')])
         self.add_subsystem('vap_vol', om.ExecComp('V_vap = 4/3*pi*r**3 + pi*r**2*L - V_liq',
-                                                  V_vap={'units': 'm**3'},
-                                                  V_liq={'units': 'm**3'},
+                                                  V_vap={'units': 'm**3', 'shape': (nn,)},
+                                                  V_liq={'units': 'm**3', 'shape': (nn,)},
                                                   r={'units': 'm'},
                                                   L={'units': 'm'}),
                            promotes_inputs=[('r', 'radius'), ('L', 'length')])
@@ -196,6 +198,7 @@ class LH2BoilOff(om.Group):
 
         # Connect state variables back to fluid properties for ODE
         self.connect('T_vap', 'boil_off_ODE.T_vap')
+        self.connect('W_GH2', 'boil_off_ODE.m_vap')
         self.connect('T_liq', 'boil_off_ODE.T_liq')
         self.connect('liq_vol.V_liq', 'boil_off_ODE.V_liq')
 
@@ -206,15 +209,15 @@ class LH2BoilOff(om.Group):
         self.connect('T_liq', 'LH2_prop.T_liq')
 
         self.connect('T_vap', 'H2_sat_prop.T_vap')
-        self.connect('GH2_prop.P_vap', 'H2_sat_prop.P_vap')
+        self.connect('P_vap', 'H2_sat_prop.P_vap')
 
         # Connect fluid property components to ODE component
-        self.connect('GH2_prop.P_vap', 'boil_off_ODE.P_vap')
+        self.connect('P_vap', 'boil_off_ODE.P_vap')
         self.connect('GH2_prop.c_v_vap', 'boil_off_ODE.c_v_vap')
         self.connect('GH2_prop.u_vap', 'boil_off_ODE.u_vap')
         self.connect('GH2_prop.h_vap', 'boil_off_ODE.h_vap')
 
-        self.connect('LH2_prop.P_liq', 'boil_off_ODE.P_liq')
+        self.connect('P_liq', 'boil_off_ODE.P_liq')
         self.connect('LH2_prop.rho_liq', 'boil_off_ODE.rho_liq')
         self.connect('LH2_prop.u_liq', 'boil_off_ODE.u_liq')
         self.connect('LH2_prop.h_liq', 'boil_off_ODE.h_liq')
@@ -230,7 +233,8 @@ class LH2BoilOff(om.Group):
         self.connect('H2_sat_prop.rho_gsf', 'boil_off_ODE.rho_gsf')
 
         # Set input default for same variable promoted from multiple sources
-        self.set_input_defaults('m_dot_liq', 0, units='kg/s')
+        self.set_input_defaults('m_dot_liq', np.zeros(nn), units='kg/s')
+        self.set_input_defaults('integ.m_dot_vent', np.zeros(nn), units='kg/s')
 
 
 class LH2BoilOffODE(om.ExplicitComponent):
@@ -302,6 +306,8 @@ class LH2BoilOffODE(om.ExplicitComponent):
         Internal energy in vapor (vector, J/kg)
     P_vap : float
         Pressure of vapor in ullage (vector, Pa)
+    m_vap : float
+        Mass of vapor in ullage (vector, kg)
     
     # Change in liquid temperature
     Q_liq : float
@@ -341,24 +347,25 @@ class LH2BoilOffODE(om.ExplicitComponent):
 
         self.add_input('T_vap', val=50., units='K', shape=(nn,))
         self.add_input('T_sat', val=20., units='K', shape=(nn,))
-        self.add_input('c_p_gsf', units='J/(kg*K)', shape=(nn,))
+        self.add_input('c_p_gsf', val=10e3, units='J/(kg*K)', shape=(nn,))
         self.add_input('mu_gsf', units='kg/(m*s)', shape=(nn,))
         self.add_input('k_gsf', units='W/(m*K)', shape=(nn,))
         self.add_input('beta_gsf', units='1/K', shape=(nn,))
         self.add_input('rho_gsf', units='kg/m**3', shape=(nn,))
         self.add_input('radius', units='m')
         self.add_input('length', units='m')
-        self.add_input('fill_level', shape=(nn,))
+        self.add_input('fill_level', val=0.5, shape=(nn,))
         self.add_input('T_liq', val=50., units='K', shape=(nn,))
-        self.add_input('c_p_liq', units='J/(kg*K)', shape=(nn,))
+        self.add_input('c_p_liq', val=10e3, units='J/(kg*K)', shape=(nn,))
         self.add_input('h_sat', units='J/kg', shape=(nn,))
-        self.add_input('h_vap', units='J/kg', shape=(nn,))
-        self.add_input('h_vap_sat', units='J/kg', shape=(nn,))
+        self.add_input('h_vap', val=10e3, units='J/kg', shape=(nn,))
+        self.add_input('h_vap_sat', val=10e3, units='J/kg', shape=(nn,))
         self.add_input('rho_liq', units='kg/m**3', shape=(nn,))
         self.add_input('Q_vap', val=100., units='W', shape=(nn,))
-        self.add_input('c_v_vap', units='J/(kg*K)', shape=(nn,))
+        self.add_input('c_v_vap', val=10e3, units='J/(kg*K)', shape=(nn,))
         self.add_input('u_vap', units='J/kg', shape=(nn,))
         self.add_input('P_vap', units='Pa', shape=(nn,))
+        self.add_input('m_vap', units='kg', shape=(nn,))
         self.add_input('Q_liq', val=100., units='W', shape=(nn,))
         self.add_input('h_liq', units='J/kg', shape=(nn,))
         self.add_input('V_liq', units='m**3', shape=(nn,))
@@ -396,6 +403,7 @@ class LH2BoilOffODE(om.ExplicitComponent):
         c_v_vap = inputs['c_v_vap']
         u_vap = inputs['u_vap']
         P_vap = inputs['P_vap']
+        m_vap = inputs['m_vap']
         h_liq = inputs['h_liq']
         V_liq = inputs['V_liq']
         P_liq = inputs['P_liq']
@@ -426,7 +434,7 @@ class LH2BoilOffODE(om.ExplicitComponent):
         outputs['V_liq_dot'] = V_liq_dot
 
         outputs['T_vap_dot'] = (Q_vap - Q_vs + m_dot * h_vap - P_vap * V_vap_dot 
-                                - m_dot_vent * u_vap) / (m_dot * c_v_vap)
+                                - m_dot_vent * u_vap) / (m_vap * c_v_vap)
         outputs['T_liq_dot'] = (Q_liq - m_dot * h_liq + P_liq * V_liq_dot - m_dot_liq * u_liq) \
                                / (rho_liq * V_liq * c_p_liq)
 
@@ -483,7 +491,7 @@ class GH2Properties(om.ExplicitComponent):
 
         self.add_input('m_vap', units='kg', shape=(nn,))
         self.add_input('V_vap', val=10., units='m**3', shape=(nn,))
-        self.add_input('T_vap', val=100., units='K', shape=(nn,))
+        self.add_input('T_vap', val=25., units='K', shape=(nn,))
 
         self.add_output('P_vap', val=1e5, lower=0., units='Pa', shape=(nn,))
         self.add_output('c_v_vap', val=10e3, units='J/(kg*K)', shape=(nn,))
@@ -566,41 +574,46 @@ class LH2Properties(om.ExplicitComponent):
         self.add_input('T_liq', val=20., units='K', shape=(nn,))
 
         self.add_output('P_liq', val=1e5, lower=0., units='Pa', shape=(nn,))
-        self.add_output('rho_liq', val=10., lower=0., units='kg/m**3', shape=(nn,))
+        self.add_output('rho_liq', val=70.85, lower=0., units='kg/m**3', shape=(nn,))
         self.add_output('u_liq', units='J/kg', shape=(nn,))
         self.add_output('h_liq', units='J/kg', shape=(nn,))
         self.add_output('c_p_liq', val=10e3, units='J/(kg*K)', shape=(nn,))
 
-        self.declare_partials(['*'], 'T_liq', rows=np.arange(nn), cols=np.arange(nn))
+        # self.declare_partials(['*'], 'T_liq', rows=np.arange(nn), cols=np.arange(nn))
     
     def compute(self, inputs, outputs):
-        T = inputs['T_liq']
+        outputs['P_liq'] = 100e3
+        outputs['rho_liq'] = 70.85
+        outputs['u_liq'] = -4484
+        outputs['h_liq'] = -2050
+        outputs['c_p_liq'] = 9905
+        # T = inputs['T_liq']
 
-        outputs['P_liq'] = 0.0138 * T**5.2644
-        outputs['rho_liq'] = 115.53291 - 2.0067591*T - 0.1067411*(T-27.6691)**2 \
-                             - 0.0085915*(T-27.6691)**3 - 0.0019879*(T-27.6691)**4 \
-                             - 0.0003988*(T-27.6691)**5 - 2.7179e-5*(T-27.6691)**6
-        outputs['u_liq'] = -334268 + 15183.043*T + 614.10133*(T-27.6691)**2 \
-                           + 40.845478*(T-27.6691)**3 + 9.1394916*(T-27.6691)**4 \
-                           + 1.8297788*(T-27.6691)**5 + 0.1246228*(T-27.6691)**6
-        outputs['h_liq'] = -371985.2 + 16864.749*T + 893.59208*(T-27.6691)**2 \
-                           + 103.63758*(T-27.6691)**3 + 7.756004*(T-27.6691)**4
-        outputs['c_p_liq'] = 1/(0.0002684 - 7.6143e-6*T - 2.5759e-7*(T-27.6691)**2)
+        # outputs['P_liq'] = 0.0138 * T**5.2644
+        # outputs['rho_liq'] = 115.53291 - 2.0067591*T - 0.1067411*(T-27.6691)**2 \
+        #                      - 0.0085915*(T-27.6691)**3 - 0.0019879*(T-27.6691)**4 \
+        #                      - 0.0003988*(T-27.6691)**5 - 2.7179e-5*(T-27.6691)**6  # This fit seems off to me if the temperature isn't around 20 K
+        # outputs['u_liq'] = -334268 + 15183.043*T + 614.10133*(T-27.6691)**2 \
+        #                    + 40.845478*(T-27.6691)**3 + 9.1394916*(T-27.6691)**4 \
+        #                    + 1.8297788*(T-27.6691)**5 + 0.1246228*(T-27.6691)**6
+        # outputs['h_liq'] = -371985.2 + 16864.749*T + 893.59208*(T-27.6691)**2 \
+        #                    + 103.63758*(T-27.6691)**3 + 7.756004*(T-27.6691)**4
+        # outputs['c_p_liq'] = 1/(0.0002684 - 7.6143e-6*T - 2.5759e-7*(T-27.6691)**2)
     
-    def compute_partials(self, inputs, J):
-        T = inputs['T_liq']
+    # def compute_partials(self, inputs, J):
+    #     T = inputs['T_liq']
 
-        J['P_liq', 'T_liq'] = 5.2644 * 0.0138 * T**(5.2644 - 1)
-        J['rho_liq', 'T_liq'] = - 2.0067591 - 2*0.1067411*(T-27.6691) \
-                                - 3*0.0085915*(T-27.6691)**2 - 4*0.0019879*(T-27.6691)**3 \
-                                - 5*0.0003988*(T-27.6691)**4 - 6*2.7179e-5*(T-27.6691)**5
-        J['u_liq', 'T_liq'] = 15183.043 + 2*614.10133*(T-27.6691) \
-                              + 3*40.845478*(T-27.6691)**2 + 4*9.1394916*(T-27.6691)**3 \
-                              + 5*1.8297788*(T-27.6691)**4 + 6*0.1246228*(T-27.6691)**5
-        J['h_liq', 'T_liq'] = 16864.749 + 2*893.59208*(T-27.6691) \
-                              + 3*103.63758*(T-27.6691)**2 + 4*7.756004*(T-27.6691)**3
-        J['c_p_liq', 'T_liq'] = -1/(0.0002684 - 7.6143e-6*T - 2.5759e-7*(T-27.6691)**2)**2 * \
-                                (7.6143e-6 - 2*2.5759e-7*(T-27.6691))
+    #     J['P_liq', 'T_liq'] = 5.2644 * 0.0138 * T**(5.2644 - 1)
+    #     J['rho_liq', 'T_liq'] = - 2.0067591 - 2*0.1067411*(T-27.6691) \
+    #                             - 3*0.0085915*(T-27.6691)**2 - 4*0.0019879*(T-27.6691)**3 \
+    #                             - 5*0.0003988*(T-27.6691)**4 - 6*2.7179e-5*(T-27.6691)**5
+    #     J['u_liq', 'T_liq'] = 15183.043 + 2*614.10133*(T-27.6691) \
+    #                           + 3*40.845478*(T-27.6691)**2 + 4*9.1394916*(T-27.6691)**3 \
+    #                           + 5*1.8297788*(T-27.6691)**4 + 6*0.1246228*(T-27.6691)**5
+    #     J['h_liq', 'T_liq'] = 16864.749 + 2*893.59208*(T-27.6691) \
+    #                           + 3*103.63758*(T-27.6691)**2 + 4*7.756004*(T-27.6691)**3
+    #     J['c_p_liq', 'T_liq'] = -1/(0.0002684 - 7.6143e-6*T - 2.5759e-7*(T-27.6691)**2)**2 * \
+    #                             (-7.6143e-6 - 2*2.5759e-7*(T-27.6691))
 
 
 class SaturatedH2Properties(om.ExplicitComponent):
@@ -647,7 +660,7 @@ class SaturatedH2Properties(om.ExplicitComponent):
     def setup(self):
         nn = self.options['num_nodes']
 
-        self.add_input('T_vap', val=100., units='K', shape=(nn,))
+        self.add_input('T_vap', val=25., units='K', shape=(nn,))
         self.add_input('P_vap', val=1e5, units='Pa', shape=(nn,))
 
         self.add_output('T_sat', val=20., lower=0., units='K', shape=(nn,))
@@ -659,83 +672,95 @@ class SaturatedH2Properties(om.ExplicitComponent):
         self.add_output('beta_gsf', units='1/K', shape=(nn,))
         self.add_output('rho_gsf', units='kg/m**3', shape=(nn,))
 
-        self.declare_partials(['*'], 'P_vap', rows=np.arange(nn), cols=np.arange(nn))
-        self.declare_partials(['*_gsf'], 'T_vap', rows=np.arange(nn), cols=np.arange(nn))
+        # self.declare_partials(['*'], 'P_vap', rows=np.arange(nn), cols=np.arange(nn))
+        # self.declare_partials(['*_gsf'], 'T_vap', rows=np.arange(nn), cols=np.arange(nn))
     
     def compute(self, inputs, outputs):
-        T = inputs['T_vap']
-        P = inputs['P_vap']
+        # Computed at T = 21 K and P = 1 atm
+        outputs['T_sat'] = 20.28
+        outputs['h_sat'] = 130.7
+        outputs['h_vap_sat'] = 447888.
+        outputs['rho_gsf'] = 1.559
+        outputs['c_p_gsf'] = 12354.
+        outputs['k_gsf'] = 0.01776
+        outputs['mu_gsf'] = 1.1177e-6
+        outputs['beta_gsf'] = 0.04762
 
-        T_sat = 22.509518 + 9.5791e-6*P - 5.85e-12*(P-598825)**2 \
-                + 3.292e-18*(P-598825)**3 - 1.246e-24*(P-598825)**4 \
-                + 2.053e-29*(P-598825)**5 - 3.463e-35*(P-598825)**6
-        outputs['T_sat'] = T_sat
-        outputs['h_sat'] = -371985.2 + 16864.749*T_sat + 893.59208*(T_sat-27.6691)**2 \
-                           + 103.63758*(T_sat-27.6691)**3 + 7.756004*(T_sat-27.6691)**4
-        outputs['h_vap_sat'] = 577302.07 - 4284.432*T_sat - 1084.1238*(T_sat-27.6691)**2 \
-                               - 73.011186*(T_sat-27.6691)**3 - 15.407809*(T_sat-27.6691)**4 \
-                               - 2.9987887*(T_sat-27.6691)**5 - 0.2022147*(T_sat-27.6691)**6
+        # T = inputs['T_vap']
+        # P = inputs['P_vap']
+
+        # T_sat = 22.509518 + 9.5791e-6*P - 5.85e-12*(P-598825)**2 \
+        #         + 3.292e-18*(P-598825)**3 - 1.246e-24*(P-598825)**4 \
+        #         + 2.053e-29*(P-598825)**5 - 3.463e-35*(P-598825)**6
+        # outputs['T_sat'] = T_sat
+        # outputs['h_sat'] = -371985.2 + 16864.749*T_sat + 893.59208*(T_sat-27.6691)**2 \
+        #                    + 103.63758*(T_sat-27.6691)**3 + 7.756004*(T_sat-27.6691)**4
+        # outputs['h_vap_sat'] = 577302.07 - 4284.432*T_sat - 1084.1238*(T_sat-27.6691)**2 \
+        #                        - 73.011186*(T_sat-27.6691)**3 - 15.407809*(T_sat-27.6691)**4 \
+        #                        - 2.9987887*(T_sat-27.6691)**5 - 0.2022147*(T_sat-27.6691)**6
 
 
-        T = (T + T_sat) / 2  # switch temperature to mean film temperature
+        # T = (T + T_sat) / 2  # switch temperature to mean film temperature
 
-        outputs['rho_gsf'] = -28.97599 + 1.2864736*T + 0.1140157*(T-27.6691)**2 \
-                             + 0.0086723*(T-27.6691)**3 + 0.0019006*(T-27.6691)**4 \
-                             + 0.0003805*(T-27.6691)**5 + 2.5918e-5*(T-27.6691)**6
-        outputs['c_p_gsf'] = np.exp(6.445199 + 0.1249361*T + 0.0125811*(T-27.6691)**2
-                                    + 0.0027137*(T-27.6691)**3 + 0.0006249*(T-27.6691)**4
-                                    + 4.8352e-5*(T-27.6691)**5)
-        outputs['k_gsf'] = 1/(110.21937 - 2.6596443*T - 0.0153377*(T-27.6691)**2
-                              - 0.0088632*(T-27.6691)**3)
-        outputs['mu_gsf'] = 1/(1582670.2 - 34545.242*T - 211.73722*(T-27.6691)**2
-                               - 283.70972*(T-27.6691)**3 - 18.848797*(T-27.6691)**4)
-        outputs['beta_gsf'] = 1 / T
+        # outputs['rho_gsf'] = -28.97599 + 1.2864736*T + 0.1140157*(T-27.6691)**2 \
+        #                      + 0.0086723*(T-27.6691)**3 + 0.0019006*(T-27.6691)**4 \
+        #                      + 0.0003805*(T-27.6691)**5 + 2.5918e-5*(T-27.6691)**6
+        # outputs['c_p_gsf'] = np.exp(6.445199 + 0.1249361*T + 0.0125811*(T-27.6691)**2
+        #                             + 0.0027137*(T-27.6691)**3 + 0.0006249*(T-27.6691)**4
+        #                             + 4.8352e-5*(T-27.6691)**5)
+        # outputs['k_gsf'] = 1/(110.21937 - 2.6596443*T - 0.0153377*(T-27.6691)**2
+        #                       - 0.0088632*(T-27.6691)**3)
+        # outputs['mu_gsf'] = 1/(1582670.2 - 34545.242*T - 211.73722*(T-27.6691)**2
+        #                        - 283.70972*(T-27.6691)**3 - 18.848797*(T-27.6691)**4)
+        # outputs['beta_gsf'] = 1 / T
     
-    def compute_partials(self, inputs, J):
-        T = inputs['T_vap']
-        P = inputs['P_vap']
+    # def compute_partials(self, inputs, J):
+    #     T = inputs['T_vap']
+    #     P = inputs['P_vap']
 
-        T_sat = 22.509518 + 9.5791e-6*P - 5.85e-12*(P-598825)**2 \
-                + 3.292e-18*(P-598825)**3 - 1.246e-24*(P-598825)**4 \
-                + 2.053e-29*(P-598825)**5 - 3.463e-35*(P-598825)**6
+    #     T_sat = 22.509518 + 9.5791e-6*P - 5.85e-12*(P-598825)**2 \
+    #             + 3.292e-18*(P-598825)**3 - 1.246e-24*(P-598825)**4 \
+    #             + 2.053e-29*(P-598825)**5 - 3.463e-35*(P-598825)**6
 
-        J['T_sat', 'P_vap'] = 9.5791e-6 - 2*5.85e-12*(P-598825) \
-                              + 3*3.292e-18*(P-598825)**2 - 4*1.246e-24*(P-598825)**3 \
-                              + 5*2.053e-29*(P-598825)**4 - 6*3.463e-35*(P-598825)**5
-        J['h_sat', 'P_vap'] = J['T_sat', 'P_vap'] * (16864.749 + 2*893.59208*(T_sat-27.6691)
-                              + 3*103.63758*(T_sat-27.6691)**2 + 4*7.756004*(T_sat-27.6691)**3)
-        J['h_vap_sat', 'P_vap'] = J['T_sat', 'P_vap'] * (-4284.432 - 2*1084.1238*(T_sat-27.6691)
-                                  - 3*73.011186*(T_sat-27.6691)**2 - 4*15.407809*(T_sat-27.6691)**3
-                                  - 5*2.9987887*(T_sat-27.6691)**4 - 6*0.2022147*(T_sat-27.6691)**5)
+    #     J['T_sat', 'P_vap'] = 9.5791e-6 - 2*5.85e-12*(P-598825) \
+    #                           + 3*3.292e-18*(P-598825)**2 - 4*1.246e-24*(P-598825)**3 \
+    #                           + 5*2.053e-29*(P-598825)**4 - 6*3.463e-35*(P-598825)**5
+    #     J['h_sat', 'P_vap'] = J['T_sat', 'P_vap'] * (16864.749 + 2*893.59208*(T_sat-27.6691)
+    #                           + 3*103.63758*(T_sat-27.6691)**2 + 4*7.756004*(T_sat-27.6691)**3)
+    #     J['h_vap_sat', 'P_vap'] = J['T_sat', 'P_vap'] * (-4284.432 - 2*1084.1238*(T_sat-27.6691)
+    #                               - 3*73.011186*(T_sat-27.6691)**2 - 4*15.407809*(T_sat-27.6691)**3
+    #                               - 5*2.9987887*(T_sat-27.6691)**4 - 6*0.2022147*(T_sat-27.6691)**5)
 
-        d_T_d_T_vap = 1/2
-        d_T_d_P_vap = 1/2 * J['T_sat', 'P_vap']
+    #     d_T_d_T_vap = 1/2
+    #     d_T_d_P_vap = 1/2 * J['T_sat', 'P_vap']
 
-        T = (T + T_sat) / 2  # switch temperature to mean film temperature
+    #     T = (T + T_sat) / 2  # switch temperature to mean film temperature
 
-        d_rho_d_T = 1.2864736 + 2*0.1140157*(T-27.6691) \
-                    + 3*0.0086723*(T-27.6691)**2 + 4*0.0019006*(T-27.6691)**3 \
-                    + 5*0.0003805*(T-27.6691)**4 + 6*2.5918e-5*(T-27.6691)**5
-        d_c_p_d_T = np.exp(6.445199 + 0.1249361*T + 0.0125811*(T-27.6691)**2
-                           + 0.0027137*(T-27.6691)**3 + 0.0006249*(T-27.6691)**4
-                           + 4.8352e-5*(T-27.6691)**5) \
-                    * (0.1249361 + 2*0.0125811*(T-27.6691) + 3*0.0027137*(T-27.6691)**2 + 
-                       4*0.0006249*(T-27.6691)**3 + 5*4.8352e-5*(T-27.6691)**4)
-        d_k_d_T = -1/(110.21937 - 2.6596443*T - 0.0153377*(T-27.6691)**2 - 0.0088632*(T-27.6691)**3)**2 * \
-                  (-2.6596443 - 2*0.0153377*(T-27.6691) - 3*0.0088632*(T-27.6691)**2)
-        d_mu_d_T = -1/(1582670.2 - 34545.242*T - 211.73722*(T-27.6691)**2
-                       - 283.70972*(T-27.6691)**3 - 18.848797*(T-27.6691)**4)**2 \
-                   * (-34545.242 - 2*211.73722*(T-27.6691) - 3*283.70972*(T-27.6691)**2
-                      - 4*18.848797*(T-27.6691)**3)
-        d_beta_d_T = -1/T**2
+    #     d_rho_d_T = 1.2864736 + 2*0.1140157*(T-27.6691) \
+    #                 + 3*0.0086723*(T-27.6691)**2 + 4*0.0019006*(T-27.6691)**3 \
+    #                 + 5*0.0003805*(T-27.6691)**4 + 6*2.5918e-5*(T-27.6691)**5
+    #     d_c_p_d_T = np.exp(6.445199 + 0.1249361*T + 0.0125811*(T-27.6691)**2
+    #                        + 0.0027137*(T-27.6691)**3 + 0.0006249*(T-27.6691)**4
+    #                        + 4.8352e-5*(T-27.6691)**5) \
+    #                 * (0.1249361 + 2*0.0125811*(T-27.6691) + 3*0.0027137*(T-27.6691)**2 + 
+    #                    4*0.0006249*(T-27.6691)**3 + 5*4.8352e-5*(T-27.6691)**4)
+    #     d_k_d_T = -1/(110.21937 - 2.6596443*T - 0.0153377*(T-27.6691)**2 - 0.0088632*(T-27.6691)**3)**2 * \
+    #               (-2.6596443 - 2*0.0153377*(T-27.6691) - 3*0.0088632*(T-27.6691)**2)
+    #     d_mu_d_T = -1/(1582670.2 - 34545.242*T - 211.73722*(T-27.6691)**2
+    #                    - 283.70972*(T-27.6691)**3 - 18.848797*(T-27.6691)**4)**2 \
+    #                * (-34545.242 - 2*211.73722*(T-27.6691) - 3*283.70972*(T-27.6691)**2
+    #                   - 4*18.848797*(T-27.6691)**3)
+    #     d_beta_d_T = -1/T**2
         
-        J['rho_gsf', 'T_vap'] = d_rho_d_T * d_T_d_T_vap
-        J['rho_gsf', 'P_vap'] = d_rho_d_T * d_T_d_P_vap
-        J['c_p_gsf', 'T_vap'] = d_c_p_d_T * d_T_d_T_vap
-        J['c_p_gsf', 'P_vap'] = d_c_p_d_T * d_T_d_P_vap
-        J['k_gsf', 'T_vap'] = d_k_d_T * d_T_d_T_vap
-        J['k_gsf', 'P_vap'] = d_k_d_T * d_T_d_P_vap
-        J['mu_gsf', 'T_vap'] = d_mu_d_T * d_T_d_T_vap
-        J['mu_gsf', 'P_vap'] = d_mu_d_T * d_T_d_P_vap
-        J['beta_gsf', 'T_vap'] = d_beta_d_T * d_T_d_T_vap
-        J['beta_gsf', 'P_vap'] = d_beta_d_T * d_T_d_P_vap
+    #     J['rho_gsf', 'T_vap'] = d_rho_d_T * d_T_d_T_vap
+    #     J['rho_gsf', 'P_vap'] = d_rho_d_T * d_T_d_P_vap
+    #     J['c_p_gsf', 'T_vap'] = d_c_p_d_T * d_T_d_T_vap
+    #     J['c_p_gsf', 'P_vap'] = d_c_p_d_T * d_T_d_P_vap
+    #     J['c_p_gsf', 'T_vap'] = 0
+    #     J['c_p_gsf', 'P_vap'] = 0
+    #     J['k_gsf', 'T_vap'] = d_k_d_T * d_T_d_T_vap
+    #     J['k_gsf', 'P_vap'] = d_k_d_T * d_T_d_P_vap
+    #     J['mu_gsf', 'T_vap'] = d_mu_d_T * d_T_d_T_vap
+    #     J['mu_gsf', 'P_vap'] = d_mu_d_T * d_T_d_P_vap
+    #     J['beta_gsf', 'T_vap'] = d_beta_d_T * d_T_d_T_vap
+    #     J['beta_gsf', 'P_vap'] = d_beta_d_T * d_T_d_P_vap

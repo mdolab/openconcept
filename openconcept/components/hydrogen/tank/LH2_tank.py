@@ -8,7 +8,136 @@ from openconcept.components.hydrogen.tank.structural import CompositeOverwrap, \
                                                             COPVInsulationWeight, \
                                                             COPVLinerWeight
 from openconcept.components.hydrogen.tank.thermal import HeatTransfer, FillLevelCalc
-from openconcept.components.hydrogen.tank.boil_off import SimpleBoilOff
+from openconcept.components.hydrogen.tank.boil_off import LH2BoilOff, SimpleBoilOff
+
+class LH2Tank(om.Group):
+    """
+    Model of a liquid hydrogen storage tank that is
+    cylindrical with hemispherical end caps. It uses a thin
+    metallic liner on the inside, covered in carbon fiber for
+    structural stiffness, followed by a layer of foam insulation
+    to slow down boil-off. This model does not carefully handle
+    the interaction between the liquid and vapor, since it just
+    assumes any boil-off immediately exits the tank.
+
+          |--- length ---| 
+         . -------------- .         ---
+      ,'                    `.       | radius
+     /                        \      |
+    |                          |    ---
+     \                        /
+      `.                    ,'
+         ` -------------- '
+    
+    Inputs
+    ------
+    design_pressure : float
+        Maximum expected operating pressure (MEOP) (scalar, Pa)
+    radius : float
+        Inner radius of the cylinder and hemispherical end caps (scalar, m)
+    length : float
+        Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
+    insulation_thickness : float
+        Thickness of the insulation layer (scalar, m)
+    T_inf : float
+        Temperature of the "freestream" (but stationary) air in
+        which the tank is sitting (vector, K)
+    m_dot : float
+        Mass flow usage rate of liquid hydrogen,
+        i.e. for propulsion, etc.; positive m_dot indicates
+        hydrogen LEAVING the tank (vector, kg/s)
+    
+    Outputs
+    -------
+    W_LH2 : float
+        Mass of remaining liquid hydrogen (vector, kg)
+    weight : float
+        Total weight of the tank and its contents (vector, kg)
+    T_vap : float
+        Temperature of vapor in ullage of tank (vector, K)
+    T_liq : float
+        Temperature of liquid hydrogen in tank (vector, K)
+    P_vap : float
+        Pressure of vapor in ullage of tank (vector, K)
+    P_liq : float
+        Pressure of liquid hydrogen in tank (vector, K)
+    
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (scalar, dimensionless)
+    safety_factor : float
+        Safety factor of composite overwrap, default 3. (scalar, dimensionless)
+    init_fill_level : float
+        Initial fill level (in range 0-1) of the tank, default 0.95
+        to leave space for gas expansion; this should never be higher
+        than 0.99 or so since it's not enough space for gas expansion and
+        the model behaves poorly with values very close to 1 (scalar, dimensionless)
+    T_surf_guess : float
+        If convergence problems, set this parameter to a few degrees below the
+        lowest expected T_inf value to give the solver a good initial guess!
+        If no convergence problems, no need to touch this (it won't affect
+        the solution).
+        Guess for surface temperature of tank, default 150 K (scalar, K)
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of design points to run')
+        self.options.declare('safety_factor', default=3., desc='Safety factor on composite thickness')
+        self.options.declare('init_fill_level', default=0.95, desc='Initial fill level')
+        self.options.declare('T_surf_guess', default=150., desc='Guess for tank surface temperature (K)')
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+
+        # Size the structure of the tank and compute weights
+        self.add_subsystem('composite', CompositeOverwrap(safety_factor=self.options['safety_factor']),
+                           promotes_inputs=['radius', 'length', 'design_pressure'])
+        self.add_subsystem('insulation', COPVInsulationWeight(),
+                           promotes_inputs=['radius', 'length', ('thickness', 'insulation_thickness')])
+        self.add_subsystem('liner', COPVLinerWeight(), promotes_inputs=['radius', 'length'])
+
+        # Fill level
+        self.add_subsystem('level_calc', FillLevelCalc(num_nodes=nn),
+                           promotes_inputs=['radius', 'length'])
+
+        # Boil off model
+        self.add_subsystem('boil_off', LH2BoilOff(num_nodes=nn, init_fill_level=self.options['init_fill_level']),
+                           promotes_inputs=['radius', 'length', 'design_pressure', ('m_dot_liq', 'm_dot')],
+                           promotes_outputs=['W_LH2', 'T_vap', 'T_liq', 'P_vap', 'P_liq'])
+        self.connect('T_liq', 'heat.T_liquid')
+        self.connect('heat.heat_into_vapor', 'boil_off.Q_vap')
+        self.connect('heat.heat_into_liquid', 'boil_off.Q_liq')
+
+        # Model heat entering tank
+        self.add_subsystem('heat', HeatTransfer(num_nodes=nn, T_surf_guess=self.options['T_surf_guess']),
+                           promotes_inputs=['radius', 'length', 'T_inf', 'insulation_thickness'])
+        self.connect('composite.thickness', 'heat.composite_thickness')
+
+        # Fill level
+        self.connect('W_LH2', 'level_calc.W_liquid')
+        self.connect('boil_off.LH2_prop.rho_liq', 'level_calc.density')
+        self.connect('level_calc.fill_level', 'heat.fill_level')
+        self.connect('level_calc.fill_level', 'boil_off.fill_level')
+
+        # Add weights
+        self.add_subsystem('tank_weight', AddSubtractComp(output_name='weight',
+                                                          input_names=['W_composite', 'W_insulation', \
+                                                                       'W_liner', 'W_LH2', 'W_GH2'],
+                                                          units='kg', vec_size=[1, 1, 1, nn, nn],
+                                                          scaling_factors=[1, 1, 1, 1, 1]),
+                           promotes_outputs=['weight'])
+        self.connect('composite.weight', 'tank_weight.W_composite')
+        self.connect('insulation.weight', 'tank_weight.W_insulation')
+        self.connect('liner.weight', 'tank_weight.W_liner')
+        self.connect('W_LH2', 'tank_weight.W_LH2')
+        self.connect('boil_off.W_GH2', 'tank_weight.W_GH2')
+
+        # Set defaults for common promoted names
+        self.set_input_defaults('radius', 2., units='m')
+        self.set_input_defaults('length', .5, units='m')
+        self.set_input_defaults('insulation_thickness', 5., units='inch')
+        self.set_input_defaults('design_pressure', 2, units='bar')
+
 
 class SimpleLH2Tank(om.Group):
     """
@@ -111,7 +240,7 @@ class SimpleLH2Tank(om.Group):
 
         # Integrate total hydrogen usage
         integ = self.add_subsystem('LH2_mass_integrator', Integrator(num_nodes=nn,
-                                    diff_units='s', time_setup='duration'), promotes_inputs=['duration'])
+                                    diff_units='s', time_setup='duration'))
         integ.add_integrand('LH2_used', rate_name='LH2_flow', units='kg')
         self.connect('mass_flow.m_dot_total', 'LH2_mass_integrator.LH2_flow')
 
