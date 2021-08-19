@@ -82,7 +82,7 @@ class SeriesHybridTwinModel(Group):
                            promotes_outputs=['drag'])
 
         self.add_subsystem('OEW',TwinSeriesHybridEmptyWeight(),
-                           promotes_inputs=[('P_TO','ac|propulsion|engine|rating'),'*'],
+                           promotes_inputs=['*',('P_TO','ac|propulsion|engine|rating')],
                            promotes_outputs=['OEW'])
         self.connect('propmodel.propellers_weight', 'W_propeller')
         self.connect('propmodel.eng1.component_weight', 'W_engine')

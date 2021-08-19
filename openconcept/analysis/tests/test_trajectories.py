@@ -376,15 +376,18 @@ class TestIntegratorDuplicateStateName(unittest.TestCase):
     def test_asserts(self):
         with self.assertRaises(ValueError) as cm:
             self.p.setup(force_alloc_complex=True)
+        self.assertIn("Variable name 'f_final' already exists.", '{}'.format(cm.exception))
 
 class TestIntegratorOutsideofPhase(unittest.TestCase):
     def setUp(self):
         self.nn = 5
-        self.p = om.Problem(model=IntegratorTestDuplicateStateNames(num_nodes=self.nn))
+        self.p = om.Problem(model=IntegratorGroupTestBase(num_nodes=self.nn))
         
     def test_asserts(self):
         with self.assertRaises(NameError) as cm:
             self.p.setup(force_alloc_complex=True)
+        self.assertEqual('{}'.format(cm.exception),
+                         'Integrator group must be created within an OpenConcept phase or Dymos trajectory')
 
 class TestIntegratorNoIntegratedState(unittest.TestCase):
     def setUp(self):
@@ -399,6 +402,42 @@ class TestIntegratorNoIntegratedState(unittest.TestCase):
         
     def test_runs(self):
         self.p.run_model()
+
+class IntegratorGroupWithGroup(IntegratorGroupTestBase):
+    def setup(self):
+        super(IntegratorGroupWithGroup, self).setup()
+        self.add_subsystem('group', om.Group())
+
+class TestIntegratorWithGroup(unittest.TestCase):
+
+    class TestPhase(oc.PhaseGroup):
+        def initialize(self):
+            self.options.declare('num_nodes', default=1)
+
+        def setup(self):
+            nn = self.options['num_nodes']
+            self.add_subsystem('iv', om.IndepVarComp('duration', val=5.0, units='s'), promotes_outputs=['*'])
+            self.add_subsystem('ic', IntegratorGroupWithGroup(num_nodes=nn))
+
+    def setUp(self):
+        self.nn = 5
+        self.p = om.Problem(model=self.TestPhase(num_nodes=self.nn))
+        self.p.setup(force_alloc_complex=True)
+
+    def test_results(self):
+        self.p.run_model()
+        x = np.linspace(0, 5, self.nn)
+        f_exact = -10.2*x**3/3 + 4.2*x**2/2 -10.5*x
+        assert_near_equal(self.p['ic.ode_integ.f'], f_exact)
+        self.p['ic.ode_integ.f_initial'] = -2.0
+        self.p.run_model()
+        assert_near_equal(self.p['ic.ode_integ.f'], f_exact-2.0)
+
+    def test_partials(self):
+        self.p.run_model()
+        partials = self.p.check_partials(method='cs', out_stream=None)
+        assert_check_partials(partials)
+
 
 class IntegratorGroupTestPromotedRate(oc.IntegratorGroup):
     def initialize(self):

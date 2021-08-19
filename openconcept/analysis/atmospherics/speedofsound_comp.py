@@ -24,19 +24,19 @@ class SpeedOfSoundComp(ExplicitComponent):
     def setup(self):
         num_points = self.options['num_nodes']
 
-        self.add_input('T_1e2_K', shape=num_points)
-        self.add_output('a_1e2_ms', shape=num_points)
+        self.add_input('fltcond|T', shape=num_points, units='K')
+        self.add_output('fltcond|a', shape=num_points, units='m/s')
 
         arange = np.arange(num_points)
-        self.declare_partials('a_1e2_ms', 'T_1e2_K', rows=arange, cols=arange)
+        self.declare_partials('fltcond|a', 'fltcond|T', rows=arange, cols=arange)
 
     def compute(self, inputs, outputs):
-        T_K = inputs['T_1e2_K'] * 1e2
+        T_K = inputs['fltcond|T']
 
-        outputs['a_1e2_ms'] = np.sqrt(gamma * R * T_K) / 1e2
+        outputs['fltcond|a'] = np.sqrt(gamma * R * T_K)
 
     def compute_partials(self, inputs, partials):
-        T_K = inputs['T_1e2_K'] * 1e2
+        T_K = inputs['fltcond|T']
 
         data = 0.5 * np.sqrt(gamma * R / T_K)
-        partials['a_1e2_ms', 'T_1e2_K'] = data
+        partials['fltcond|a', 'fltcond|T'] = data
