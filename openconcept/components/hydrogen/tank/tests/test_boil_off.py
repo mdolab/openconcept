@@ -35,5 +35,57 @@ class SimpleBoilOffTestCase(unittest.TestCase):
         assert_check_partials(partials)
 
 
+class LH2BoilOffODETestCase(unittest.TestCase):
+    def test_defaults(self):
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = LH2BoilOffODE()
+        p.setup(force_alloc_complex=True)
+
+        p.run_model()
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+
+
+class GH2PropertiesTestCase(unittest.TestCase):
+    def test_defaults(self):
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = GH2Properties()
+        p.setup(force_alloc_complex=True)
+
+        p.run_model()
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+
+
+class LH2PropertiesTestCase(unittest.TestCase):
+    def test_defaults(self):
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = LH2Properties()
+        p.setup(force_alloc_complex=True)
+
+        p.run_model()
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+
+
+class SaturatedH2PropertiesTestCase(unittest.TestCase):
+    def test_defaults(self):
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = SaturatedH2Properties()
+        p.setup(force_alloc_complex=True)
+
+        p.run_model()
+
+        partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+
+
 if __name__ == "__main__":
     unittest.main()
