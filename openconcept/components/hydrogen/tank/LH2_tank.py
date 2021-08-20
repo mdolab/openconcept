@@ -107,6 +107,7 @@ class LH2Tank(om.Group):
         self.connect('boil_off.m_boil_off', 'ullage.m_dot_in')
         self.connect('heat.heat_into_vapor', 'ullage.Q_dot')
 
+        # TODO: connect venting mass flow to here
         self.add_subsystem('mass_flow', AddSubtractComp(output_name='m_dot_total',
                                                         input_names=['m_dot_usage', 'm_dot_vent'],
                                                         units='kg/s', vec_size=[nn, nn],
@@ -130,10 +131,25 @@ class LH2Tank(om.Group):
         self.connect('ullage_V_dot.V_dot', 'ullage.V_dot')
 
         # Integrate total hydrogen usage
-        integ = self.add_subsystem('LH2_mass_integrator', Integrator(num_nodes=nn,
-                                    diff_units='s', time_setup='duration'))
+        integ = self.add_subsystem('mass_integ', Integrator(num_nodes=nn,
+                                   diff_units='s', time_setup='duration'),
+                                   promotes_inputs=[('GH2_use_rate', 'm_dot')])
         integ.add_integrand('LH2_boil_off', rate_name='LH2_flow', units='kg')
-        self.connect('boil_off.m_boil_off', 'LH2_mass_integrator.LH2_flow')
+        integ.add_integrand('GH2_used', rate_name='GH2_use_rate', units='kg')
+        integ.add_integrand('GH2_vent', rate_name='GH2_vent_rate', units='kg')
+        self.connect('boil_off.m_boil_off', 'mass_integ.LH2_flow')
+        # TODO: connect venting mass flow to here
+
+        # GH2 weight in ullage
+        self.add_subsystem('GH2_weight', AddSubtractComp(output_name='weight',
+                                                         input_names=['W_LH2_boil_off', 'W_used', 'W_vent'],
+                                                          units='kg', vec_size=[nn, nn, nn],
+                                                          scaling_factors=[1, -1, -1]),
+                           promotes_outputs=[('weight', 'W_GH2')])
+        self.connect('mass_integ.LH2_boil_off', 'GH2_weight.W_LH2_boil_off')
+        self.connect('mass_integ.GH2_used', 'GH2_weight.W_used')
+        self.connect('mass_integ.GH2_vent', 'GH2_weight.W_vent')
+        self.connect('W_GH2', 'ullage.m')
 
         # Total LH2 weight and fill level
         self.add_subsystem('LH2_init', om.ExecComp('W_init = (4/3*pi*r**3 + pi*r**2*L)*fill_init*rho',
@@ -151,7 +167,7 @@ class LH2Tank(om.Group):
         self.add_subsystem('level_calc', FillLevelCalc(num_nodes=nn),
                            promotes_inputs=['radius', 'length'])
         self.connect('LH2_init.W_init', 'LH2_weight.W_LH2_init')
-        self.connect('LH2_mass_integrator.LH2_used', 'LH2_weight.W_LH2_used')
+        self.connect('mass_integ.LH2_boil_off', 'LH2_weight.W_LH2_boil_off')
         self.connect('W_LH2', 'level_calc.W_liquid')
         self.connect('level_calc.fill_level', 'heat.fill_level')
 
@@ -172,3 +188,4 @@ class LH2Tank(om.Group):
         self.set_input_defaults('length', .5, units='m')
         self.set_input_defaults('insulation_thickness', 5., units='inch')
         self.set_input_defaults('mass_flow.m_dot_vent', 0.*np.ones(nn), units='kg/s')
+        self.set_input_defaults('m_dot', 0.*np.ones(nn), units='kg/s')
