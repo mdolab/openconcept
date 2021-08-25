@@ -226,10 +226,13 @@ class COPVThermalResistance(om.ExplicitComponent):
         r_outer = r_ins_com + t_ins
 
         # Thermal resistance of cylindrical portion
-        R_liner = np.log(r_com_liner/r_inner) / (2*np.pi*L*k_liner)
-        R_com = np.log(r_ins_com/r_com_liner) / (2*np.pi*L*k_com)
-        R_ins = np.log(r_outer/r_ins_com) / (2*np.pi*L*k_ins)
-        R_cyl = R_liner + R_com + R_ins
+        if np.real(L) <= 0:  # case for when tank is spherical
+            R_cyl = np.inf
+        else:
+            R_liner = np.log(r_com_liner/r_inner) / (2*np.pi*L*k_liner)
+            R_com = np.log(r_ins_com/r_com_liner) / (2*np.pi*L*k_com)
+            R_ins = np.log(r_outer/r_ins_com) / (2*np.pi*L*k_ins)
+            R_cyl = R_liner + R_com + R_ins
 
         # Thermal resistance of spherical portion (two end caps)
         R_liner = (1/r_inner - 1/r_com_liner) / (4*np.pi*k_liner)
@@ -257,10 +260,13 @@ class COPVThermalResistance(om.ExplicitComponent):
         r_outer = r_ins_com + t_ins
 
         # Thermal resistance of cylindrical portion
-        R_liner = np.log(r_com_liner/r_inner) / (2*np.pi*L*k_liner)
-        R_com = np.log(r_ins_com/r_com_liner) / (2*np.pi*L*k_com)
-        R_ins = np.log(r_outer/r_ins_com) / (2*np.pi*L*k_ins)
-        R_cyl = R_liner + R_com + R_ins
+        if L <= 0:  # case for when tank is spherical
+            R_cyl = np.inf
+        else:
+            R_liner = np.log(r_com_liner/r_inner) / (2*np.pi*L*k_liner)
+            R_com = np.log(r_ins_com/r_com_liner) / (2*np.pi*L*k_com)
+            R_ins = np.log(r_outer/r_ins_com) / (2*np.pi*L*k_ins)
+            R_cyl = R_liner + R_com + R_ins
 
         # Thermal resistance of spherical portion (two end caps)
         R_liner = (1/r_inner - 1/r_com_liner) / (4*np.pi*k_liner)
@@ -268,15 +274,21 @@ class COPVThermalResistance(om.ExplicitComponent):
         R_ins = (1/r_ins_com - 1/r_outer) / (4*np.pi*k_ins)
         R_sph = R_liner + R_com + R_ins
 
-        d_R_cyl_d_r = (-t_liner/r_inner**2) / (r_com_liner/r_inner) / (2*np.pi*L*k_liner) + \
-                      (-t_com/r_com_liner**2) / (r_ins_com/r_com_liner) / (2*np.pi*L*k_com) + \
-                      (-t_ins/r_ins_com**2) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
-        d_R_cyl_d_L = -np.log(r_com_liner/r_inner) / (2*np.pi*L**2*k_liner) - \
-                       np.log(r_ins_com/r_com_liner) / (2*np.pi*L**2*k_com) - \
-                       np.log(r_outer/r_ins_com) / (2*np.pi*L**2*k_ins)
-        d_R_cyl_d_t_com = (1/r_com_liner) / (r_ins_com/r_com_liner) / (2*np.pi*L*k_com) + \
-                          (-t_ins/r_ins_com**2) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
-        d_R_cyl_d_t_ins = (1/r_ins_com) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
+        if np.real(L) <= 0: # case for when tank is spherical
+            d_R_cyl_d_r = 0
+            d_R_cyl_d_L = 0
+            d_R_cyl_d_t_com = 0
+            d_R_cyl_d_t_ins = 0
+        else:
+            d_R_cyl_d_r = (-t_liner/r_inner**2) / (r_com_liner/r_inner) / (2*np.pi*L*k_liner) + \
+                        (-t_com/r_com_liner**2) / (r_ins_com/r_com_liner) / (2*np.pi*L*k_com) + \
+                        (-t_ins/r_ins_com**2) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
+            d_R_cyl_d_L = -np.log(r_com_liner/r_inner) / (2*np.pi*L**2*k_liner) - \
+                        np.log(r_ins_com/r_com_liner) / (2*np.pi*L**2*k_com) - \
+                        np.log(r_outer/r_ins_com) / (2*np.pi*L**2*k_ins)
+            d_R_cyl_d_t_com = (1/r_com_liner) / (r_ins_com/r_com_liner) / (2*np.pi*L*k_com) + \
+                            (-t_ins/r_ins_com**2) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
+            d_R_cyl_d_t_ins = (1/r_ins_com) / (r_outer/r_ins_com) / (2*np.pi*L*k_ins)
 
         d_R_sph_d_r = (-1/r_inner**2 + 1/r_com_liner**2) / (4*np.pi*k_liner) + \
                       (-1/r_com_liner**2 + 1/r_ins_com**2) / (4*np.pi*k_com) + \

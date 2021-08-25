@@ -2,7 +2,6 @@ from __future__ import division
 import numpy as np
 import openmdao.api as om
 from openconcept.utilities.math.integrals import Integrator
-from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
 
 class GH2Reservoir(om.Group):
     """
@@ -42,14 +41,14 @@ class GH2Reservoir(om.Group):
     num_nodes : int
         Number of analysis points to run (scalar, dimensionless)
     T_init : float
-        Initial temperature of the gaseous hydrogen, default 25 K (scalar, K)
+        Initial temperature of the gaseous hydrogen, default 90 K (scalar, K)
     vector_V : bool
         Whether to have the volume be a vector (True)
         or scalar (False) input, default False
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of design points to run')
-        self.options.declare('T_init', default=25, desc='Initial temp of GH2 (scalar, K)')
+        self.options.declare('T_init', default=90, desc='Initial temp of GH2 (scalar, K)')
         self.options.declare('vector_V', default=False, desc='If volume is vector input')
     
     def setup(self):

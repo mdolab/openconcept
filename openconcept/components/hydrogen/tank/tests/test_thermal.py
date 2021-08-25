@@ -147,11 +147,12 @@ class FillLevelCalcTestCase(unittest.TestCase):
     def test_full(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = FillLevelCalc(density=1.)
+        p.model = FillLevelCalc()
         p.setup(force_alloc_complex=True)
 
         p.set_val('radius', 2, units='m')
         p.set_val('length', .5, units='m')
+        p.set_val('density', 1., units='kg/m**3')
         p.set_val('W_liquid', 4/3*np.pi*2**3 + np.pi*2**2*0.5, units='kg')
 
         p.run_model()
@@ -174,6 +175,21 @@ class COPVThermalResistanceTestCase(unittest.TestCase):
         assert_near_equal(p.get_val('thermal_resistance', units='K/W'), 0.7494029867002, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
+        assert_check_partials(partials)
+    
+    def test_sphere(self):
+        p = Problem()
+        p.model.linear_solver = DirectSolver()
+        p.model = COPVThermalResistance()
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('length', 0., units='m')
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('thermal_resistance', units='K/W'), 2.0047489854, tolerance=1e-9)
+
+        partials = p.check_partials(method='cs', compact_print=True)
         assert_check_partials(partials)
     
     def test_only_liner(self):
