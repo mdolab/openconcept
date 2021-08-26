@@ -26,8 +26,8 @@ class GH2ReservoirTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('T', units='K'), 25., tolerance=1e-9)
-        assert_near_equal(p.get_val('P', units='Pa'), 44126.88492063, tolerance=1e-9)
+        assert_near_equal(p.get_val('T', units='K'), 90., tolerance=1e-9)
+        assert_near_equal(p.get_val('P', units='Pa'), 158856.78571429, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -54,10 +54,10 @@ class GH2ReservoirTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('T', units='K'), np.array([25., 41.37473978, 46.73800223,
-                          47.59213426, 47.58480581]), tolerance=1e-9)
-        assert_near_equal(p.get_val('P', units='Pa'), np.array([44126.88492063, 73029.53523841,
-                          82496.09783474, 84003.70525818, 83990.76999958]), tolerance=1e-9)
+        assert_near_equal(p.get_val('T', units='K'), np.array([90., 59.88838369,
+            50.36978025, 49.0379504, 49.11183131]), tolerance=1e-9)
+        assert_near_equal(p.get_val('P', units='Pa'), np.array([158856.78571429,
+            105707.51261441, 88906.45986877, 86555.6797673, 86686.08514129]), tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)

@@ -1,10 +1,10 @@
 from __future__ import division
 import numpy as np
-from openconcept.components.hydrogen.tank.GH2_reservoir import GH2ReservoirODE
 import openmdao.api as om
 
 from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
+from openconcept.utilities.linearinterp import LinearInterpolator
 from openconcept.components.hydrogen.tank.structural import CompositeOverwrap, \
                                                             COPVInsulationWeight, \
                                                             COPVLinerWeight
@@ -19,8 +19,23 @@ class LH2Tank(om.Group):
     metallic liner on the inside, covered in carbon fiber for
     structural stiffness, followed by a layer of foam insulation
     to slow down boil-off. This model captures the boil off vapor
-    by containing it in a tank and tracking its properties, venting
-    as necessary to remain under design pressure.
+    by containing it in a tank and tracking its properties, with
+    venting capabilities to remain under design pressure.
+
+    NOTE: For the best result, the venting mass flow rate control
+          points must be set by an optimizer to keep the pressure
+          in the ullage under the design pressure. Additionally,
+          heat may need to be added to the tank to maintain sufficient
+          gaseous hydrogen. To do this, drive the model with a optimizer
+          and include something like this:
+
+            prob.model.add_design_var('m_dot_vent_start', lower=0.)
+            prob.model.add_design_var('m_dot_vent_end', lower=0.)
+            prob.model.add_design_var('LH2_heat_added_start', lower=0.)
+            prob.model.add_design_var('LH2_heat_added_end', lower=0.)
+            prob.model.add_constraint('ullage_P_residual', lower=0., scaler=1e-7)
+            prob.model.add_constraint('W_GH2', lower=0.)
+
 
           |--- length ---| 
          . -------------- .         ---
@@ -48,13 +63,31 @@ class LH2Tank(om.Group):
         Mass flow usage rate of gaseous hydrogen,
         i.e. for propulsion, etc.; positive m_dot indicates
         hydrogen LEAVING the tank (vector, kg/s)
+    m_dot_vent_start : float
+        Initial GH2 venting mass flow rate (scalar, kg/s)
+        See note in description above!
+    m_dot_vent_end : float
+        Final GH2 venting mass flow rate (scalar, kg/s)
+        See note in description above!
+    LH2_heat_added_start : float
+        Initial extra heat added to LH2 to boil into GH2 (vector, W)
+        See note in description above!
+    LH2_heat_added_start : float
+        Final extra heat added to LH2 to boil into GH2 (vector, W)
+        See note in description above!
     
     Outputs
     -------
     W_LH2 : float
         Mass of remaining liquid hydrogen (vector, kg)
+    W_GH2 : float
+        Mass of remaining gaseous hydrogen (vector, kg)
     weight : float
         Total weight of the tank and its contents (vector, kg)
+    ullage_P_residual : float
+        Ullage pressure residual: design_pressure - ullage_pressure;
+        Should always be positive! See note above for how to 
+        use an optimizer to enforce this (vector, Pa)
     
     Options
     -------
@@ -75,6 +108,10 @@ class LH2Tank(om.Group):
         Guess for surface temperature of tank, default 150 K (scalar, K)
     rho_LH2 : float
         Density of liquid hydrogen, default 70.85 kg/m^3 at boiling point and 1 atm (scalar, kg/m^3)
+    ullage_T_init : float
+        Initial temperature of gas in ullage, default 90 K (scalar, K)
+    ullage_P_init : float
+        Initial pressure of gas in ullage, default 1 atm (scalar, Pa)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of design points to run')
@@ -82,6 +119,8 @@ class LH2Tank(om.Group):
         self.options.declare('init_fill_level', default=0.95, desc='Initial fill level')
         self.options.declare('T_surf_guess', default=150., desc='Guess for tank surface temperature (K)')
         self.options.declare('rho_LH2', default=70.85, desc='Liquid hydrogen density (kg/m^3)')
+        self.options.declare('ullage_T_init', default=90, desc='Initial ullage temp (K)')
+        self.options.declare('ullage_P_init', default=101325, desc='Initial ullage pressure (Pa)')
     
     def setup(self):
         nn = self.options['num_nodes']
@@ -94,8 +133,8 @@ class LH2Tank(om.Group):
         self.add_subsystem('liner', COPVLinerWeight(), promotes_inputs=['radius', 'length'])
 
         # Compute the LH2 weight and how much of the tank it fills up (fill level)
-        self.add_subsystem('LH2_init', om.ExecComp('W_init = (4/3*pi*r**3 + pi*r**2*L)*fill_init*rho',
-                                                   W_init={'units': 'kg'},
+        self.add_subsystem('LH2_init', om.ExecComp('W = (4/3*pi*r**3 + pi*r**2*L)*fill_init*rho',
+                                                   W={'units': 'kg'},
                                                    r={'units': 'm'},
                                                    L={'units': 'm'},
                                                    fill_init={'value': self.options['init_fill_level']},
@@ -108,7 +147,7 @@ class LH2Tank(om.Group):
                            promotes_outputs=[('weight', 'W_LH2')])
         self.add_subsystem('level_calc', FillLevelCalc(num_nodes=nn),
                            promotes_inputs=['radius', 'length'])
-        self.connect('LH2_init.W_init', 'LH2_weight.W_LH2_init')
+        self.connect('LH2_init.W', 'LH2_weight.W_LH2_init')
         self.connect('W_LH2', 'level_calc.W_liquid')
 
         # Model heat entering tank
@@ -124,6 +163,19 @@ class LH2Tank(om.Group):
         self.add_subsystem('boil_off', SimpleBoilOff(num_nodes=nn))
         self.connect('heat.heat_into_liquid', 'boil_off.heat_into_liquid')
 
+        # Linear interpolators for venting and heat addition
+        self.add_subsystem('vent_interp', LinearInterpolator(units='kg/s', num_nodes=nn),
+                           promotes_inputs=[('start_val', 'm_dot_vent_start'),
+                                            ('end_val', 'm_dot_vent_end')])
+        self.add_subsystem('heat_add_interp', LinearInterpolator(units='W', num_nodes=nn),
+                           promotes_inputs=[('start_val', 'LH2_heat_added_start'),
+                                            ('end_val', 'LH2_heat_added_end')])
+        self.connect('heat_add_interp.vec', 'boil_off.LH2_heat_added')
+        self.set_input_defaults('m_dot_vent_start', 0., units='kg/s')
+        self.set_input_defaults('m_dot_vent_end', 0., units='kg/s')
+        self.set_input_defaults('LH2_heat_added_start', 0., units='W')
+        self.set_input_defaults('LH2_heat_added_end', 0., units='W')
+
         # Integrate total gaseous and liquid hydrogen flows
         integ = self.add_subsystem('mass_integ', Integrator(num_nodes=nn,
                                    diff_units='s', time_setup='duration'),
@@ -133,7 +185,7 @@ class LH2Tank(om.Group):
         integ.add_integrand('GH2_vent', rate_name='GH2_vent_rate', units='kg')
         self.connect('boil_off.m_boil_off', 'mass_integ.LH2_flow')
         self.connect('mass_integ.LH2_boil_off', 'LH2_weight.W_LH2_boil_off')
-        # TODO: connect venting mass flow to here
+        self.connect('vent_interp.vec', 'mass_integ.GH2_vent_rate')
 
         # Sum output mass flows from ullage
         self.add_subsystem('mass_flow', AddSubtractComp(output_name='m_dot_total',
@@ -141,7 +193,7 @@ class LH2Tank(om.Group):
                                                         units='kg/s', vec_size=[nn, nn],
                                                         scaling_factors=[1, 1]),
                            promotes_inputs=[('m_dot_usage', 'm_dot')])
-        # TODO: connect venting mass flow to here
+        self.connect('vent_interp.vec', 'mass_flow.m_dot_vent')
 
         # Ullage volume and rate of change of volume
         self.add_subsystem('ullage_volume', om.ExecComp('V = 4/3*pi*r**3 + pi*r**2*L - W_LH2/rho',
@@ -158,7 +210,8 @@ class LH2Tank(om.Group):
         self.connect('boil_off.m_boil_off', 'ullage_V_dot.m_dot_boil_off')
 
         # Ullage gas property tracking
-        self.add_subsystem('ullage', GH2Reservoir(num_nodes=nn, vector_V=True),
+        self.add_subsystem('ullage', GH2Reservoir(num_nodes=nn, T_init=self.options['ullage_T_init'],
+                                                  vector_V=True),
                            promotes_inputs=['duration'])
         self.connect('mass_flow.m_dot_total', 'ullage.m_dot_out')
         self.connect('boil_off.m_boil_off', 'ullage.m_dot_in')
@@ -167,12 +220,14 @@ class LH2Tank(om.Group):
         self.connect('ullage_V_dot.V_dot', 'ullage.V_dot')
 
         # GH2 weight in ullage
-        self.add_subsystem('GH2_init', om.ExecComp('W_init = (4/3*pi*r**3 + pi*r**2*L)*(1 - fill_init)*rho',
-                                                   W_init={'units': 'kg'},
+        self.add_subsystem('GH2_init', om.ExecComp('W = (4/3*pi*r**3 + pi*r**2*L)*(1-fill_init)*P/T/R_H2',
+                                                   W={'units': 'kg'},
                                                    r={'units': 'm'},
                                                    L={'units': 'm'},
                                                    fill_init={'value': self.options['init_fill_level']},
-                                                   rho={'units': 'kg/m**3', 'value': 0.08376}),  # GH2, 1 atm 20 C
+                                                   P={'value': self.options['ullage_P_init'], 'units': 'Pa'},
+                                                   T={'value': self.options['ullage_T_init'], 'units': 'K'},
+                                                   R_H2={'value': 8.314/2.016e-3, 'units': 'J/(kg*K)'}),
                            promotes_inputs=[('r', 'radius'), ('L', 'length')])
         self.add_subsystem('GH2_weight', AddSubtractComp(output_name='weight',
                                                          input_names=['W_GH2_init', 'W_LH2_boil_off',
@@ -183,10 +238,18 @@ class LH2Tank(om.Group):
         self.connect('mass_integ.LH2_boil_off', 'GH2_weight.W_LH2_boil_off')
         self.connect('mass_integ.GH2_used', 'GH2_weight.W_used')
         self.connect('mass_integ.GH2_vent', 'GH2_weight.W_vent')
-        self.connect('GH2_init.W_init', 'GH2_weight.W_GH2_init')
+        self.connect('GH2_init.W', 'GH2_weight.W_GH2_init')
         self.connect('W_GH2', 'ullage.m')
 
-        # Total LH2 weight and fill level
+        # Ullage pressure residual
+        self.add_subsystem('ullage_constraint', AddSubtractComp(output_name='residual',
+                                                          input_names=['design_pressure',
+                                                                       'ullage_pressure'],
+                                                          units='Pa', vec_size=[1, nn],
+                                                          scaling_factors=[1, -1]),
+                           promotes_inputs=['design_pressure'],
+                           promotes_outputs=[('residual', 'ullage_P_residual')])
+        self.connect('ullage.P', 'ullage_constraint.ullage_pressure')
 
         # Sum components of tank weight
         self.add_subsystem('tank_weight', AddSubtractComp(output_name='weight',
@@ -204,5 +267,5 @@ class LH2Tank(om.Group):
         self.set_input_defaults('radius', 2., units='m')
         self.set_input_defaults('length', .5, units='m')
         self.set_input_defaults('insulation_thickness', 5., units='inch')
-        self.set_input_defaults('mass_flow.m_dot_vent', 0.*np.ones(nn), units='kg/s')
+        self.set_input_defaults('design_pressure', 3., units='bar')
         self.set_input_defaults('m_dot', 0.*np.ones(nn), units='kg/s')
