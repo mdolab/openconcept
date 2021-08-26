@@ -90,12 +90,12 @@ class HeatTransferTestCase(unittest.TestCase):
         assert_near_equal(p.get_val('Q_wall.heat_into_walls', units='W'),
                           p.get_val('Q_LH2.heat_total', units='W'), tolerance=1e-6)
 
-        assert_near_equal(p.get_val('heat_into_liquid', units='W'), np.array([220.95351724,
-                          534.85224979, 749.87818623, 869.11238398, 885.75283858,
-                          795.85394046, 597.19766925]), tolerance=1e-9)
-        assert_near_equal(p.get_val('heat_into_vapor', units='W'), np.array([5.53768214e-01,
-                          1.68973309e+01, 7.41637767e+01, 1.91589229e+02, 3.84143704e+02,
-                          6.66105078e+02, 1.06168475e+03]), tolerance=1e-8)
+        assert_near_equal(p.get_val('heat_into_liquid', units='W'), np.array([223.38323324,
+                          542.00909991, 758.03210165, 873.624113, 881.83826926,
+                          779.61896958, 567.28669575]), tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_into_vapor', units='W'), np.array([5.59857727e-01,
+                          1.71234338e+01, 7.49702079e+01, 1.92583805e+02, 3.82445988e+02,
+                          6.52516910e+02, 1.00850968e+03]), tolerance=1e-8)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -364,9 +364,9 @@ class COPVHeatFromWallsIntoPropellantTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('heat_into_liquid', units='W'), 76.33234342, tolerance=1e-9)
-        assert_near_equal(p.get_val('heat_into_vapor', units='W'), 7.633997741861e-3, tolerance=1e-9)
-        assert_near_equal(p.get_val('heat_total', units='W'), 76.33997741862, tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_into_liquid', units='W'), 79.2, tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_into_vapor', units='W'), 7.9207920792e-3, tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_total', units='W'), 79.20792079, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -381,9 +381,9 @@ class COPVHeatFromWallsIntoPropellantTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('heat_into_liquid', units='W'), 3.667656579121, tolerance=1e-9)
-        assert_near_equal(p.get_val('heat_into_vapor', units='W'), 180.6366941305, tolerance=1e-9)
-        assert_near_equal(p.get_val('heat_total', units='W'), 184.3043507096, tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_into_liquid', units='W'), 0.8, tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_into_vapor', units='W'), 39.40100503, tolerance=1e-9)
+        assert_near_equal(p.get_val('heat_total', units='W'), 40.20100503, tolerance=1e-9)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)

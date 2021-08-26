@@ -60,7 +60,7 @@ class HeatTransfer(om.Group):
                            promotes_inputs=['radius', 'length', 'insulation_thickness', 'T_inf',
                                             'composite_thickness'])
         self.add_subsystem('Q_LH2', COPVHeatFromWallsIntoPropellant(num_nodes=nn),
-                           promotes_inputs=['radius', 'length', 'fill_level', 'T_liquid'],
+                           promotes_inputs=['fill_level', 'T_liquid'],
                            promotes_outputs=['heat_into_vapor', 'heat_into_liquid'])
         self.connect('calc_resist.thermal_resistance', 'Q_LH2.thermal_resistance')
 
@@ -542,24 +542,15 @@ class COPVHeatFromWallsIntoPropellant(om.ExplicitComponent):
     Computes the amount of heat entering the propellant from
     the tank walls. Calculates the heat transfer to just the
     liquid assuming the entire inside wall is at the temperature
-    of the liquid and then multiply by the fraction of the
-    internal surface area covered by liquid. It then
-    uses a rough curve fit based on data from
+    of the liquid and then multiply by an approximation of the
+    fraction of the internal surface area covered by liquid.
+    It then uses a rough curve fit based on data from
     https://arc.aiaa.org/doi/10.2514/6.1992-818 to estimate
     the heat to the vapor for the given fill level.
 
     Note that this approach only works when there is some liquid
     in the tank (if there is no liquid, it will vastly overestimate
     the amount of heat entering the tank).
-
-          |--- length ---| 
-         . -------------- .         ---
-      ,'                    `.       | radius
-     /                        \      |
-    |                          |    ---
-     \                        /
-      `.                    ,'
-         ` -------------- '
 
     Inputs
     ------
@@ -570,10 +561,6 @@ class COPVHeatFromWallsIntoPropellant(om.ExplicitComponent):
     fill_level : float
         Fraction of tank (in range 0-1) filled with liquid propellant; assumes
         tank is oriented horizontally as shown above (vector, dimensionless)
-    radius : float
-        Radius inside of tank for the cylinder and hemispherical end caps (scalar, m)
-    length : float
-        Length of JUST THE CYLINDRICAL part of the tank (scalar, m)
     thermal_resistance : float
         Thermal resistance of the tank walls (scalar, K/W)
     
@@ -603,8 +590,6 @@ class COPVHeatFromWallsIntoPropellant(om.ExplicitComponent):
         self.add_input('T_surface', val=100., units='K', shape=(nn,))
         self.add_input('T_liquid', val=20., units='K', shape=(nn,))
         self.add_input('fill_level', val=0.5, shape=(nn,))
-        self.add_input('radius', val=0.5, units='m')
-        self.add_input('length', val=2., units='m')
         self.add_input('thermal_resistance', val=1., units='K/W')
 
         self.add_output('heat_into_liquid', units='W', shape=(nn,))
@@ -613,35 +598,25 @@ class COPVHeatFromWallsIntoPropellant(om.ExplicitComponent):
 
         self.declare_partials('heat_into_liquid', ['T_liquid', 'T_surface', 'fill_level'],
                               rows=np.arange(nn), cols=np.arange(nn))
-        self.declare_partials('heat_into_liquid', ['radius', 'length',
-                                                  'thermal_resistance'],
+        self.declare_partials('heat_into_liquid', ['thermal_resistance'],
                               rows=np.arange(nn), cols=np.zeros(nn))
         self.declare_partials('heat_into_vapor', ['T_liquid', 'T_surface', 'fill_level'],
                               rows=np.arange(nn), cols=np.arange(nn))
-        self.declare_partials('heat_into_vapor', ['radius', 'length',
-                                                  'thermal_resistance'],
+        self.declare_partials('heat_into_vapor', ['thermal_resistance'],
                               rows=np.arange(nn), cols=np.zeros(nn))
         self.declare_partials('heat_total', ['T_liquid', 'T_surface', 'fill_level'],
                               rows=np.arange(nn), cols=np.arange(nn))
-        self.declare_partials('heat_total', ['radius', 'length',
-                                             'thermal_resistance'],
+        self.declare_partials('heat_total', ['thermal_resistance'],
                               rows=np.arange(nn), cols=np.zeros(nn))
     
     def compute(self, inputs, outputs):
         T_surf = inputs['T_surface']
         T_liq = inputs['T_liquid']
         R = inputs['thermal_resistance']
-        r = inputs['radius']
-        L = inputs['length']
         fill_level = inputs['fill_level']
 
         Q_if_all_liquid = (T_surf - T_liq) / R
-        h_liquid = 2*r*fill_level  # volume assuming the fluid height in the tank is linear
-                                   # with fill level is never off by more than 10%
-        cylinder_central_angle = 2*np.arccos(1 - h_liquid/r)
-        A_liquid = 2*np.pi*r*h_liquid + cylinder_central_angle*r*L  # spherical cap + sector * length
-        A_total = 4*np.pi*r**2 + 2*np.pi*r*L
-        Q_liquid = Q_if_all_liquid * A_liquid / A_total
+        Q_liquid = Q_if_all_liquid * fill_level
         outputs['heat_into_liquid'] = Q_liquid
 
         heat_liquid_frac = -fill_level**2 + 2*fill_level  # rough curve fit that follows trend for
@@ -656,46 +631,30 @@ class COPVHeatFromWallsIntoPropellant(om.ExplicitComponent):
         T_surf = inputs['T_surface']
         T_liq = inputs['T_liquid']
         R = inputs['thermal_resistance']
-        r = inputs['radius']
-        L = inputs['length']
         fill_level = inputs['fill_level']
 
         Q_if_all_liquid = (T_surf - T_liq) / R
-        h_liquid = 2*r*fill_level  # volume assuming the fluid height in the tank is linear
-                                   # with fill level is never off by more than 10%
-        cylinder_central_angle = 2*np.arccos(1 - h_liquid/r)
-        d_angle_d_r = -2/np.sqrt(1 - (1 - h_liquid/r)**2) * (-2*fill_level/r + h_liquid/r**2)
-        A_liquid = 2*np.pi*r*h_liquid + cylinder_central_angle*r*L  # spherical cap + sector * length
-        A_total = 4*np.pi*r**2 + 2*np.pi*r*L
-        Q_liquid = Q_if_all_liquid * A_liquid / A_total
+        Q_liquid = Q_if_all_liquid * fill_level
 
         heat_liquid_frac = -fill_level**2 + 2*fill_level  # rough curve fit that follows trend for
                                                           # fraction of total heating going to liquid in
                                                           # https://arc.aiaa.org/doi/10.2514/6.1992-818
         heat_vapor_frac = 1 - heat_liquid_frac
+        Q_total = Q_liquid / heat_liquid_frac
 
-        J['heat_into_liquid', 'T_surface'] = A_liquid / A_total / R
-        J['heat_into_vapor', 'T_surface'] = heat_vapor_frac / heat_liquid_frac * J['heat_into_liquid', 'T_surface']
+        J['heat_into_liquid', 'T_surface'] = fill_level / R
+        J['heat_into_liquid', 'T_liquid'] = -fill_level / R
+        J['heat_into_liquid', 'fill_level'] = Q_if_all_liquid
+        J['heat_into_liquid', 'thermal_resistance'] = -Q_liquid / R
+
         J['heat_total', 'T_surface'] = J['heat_into_liquid', 'T_surface'] / heat_liquid_frac
-        J['heat_into_liquid', 'T_liquid'] = -A_liquid / A_total / R
-        J['heat_into_vapor', 'T_liquid'] = heat_vapor_frac / heat_liquid_frac * J['heat_into_liquid', 'T_liquid']
         J['heat_total', 'T_liquid'] = J['heat_into_liquid', 'T_liquid'] / heat_liquid_frac
-        J['heat_into_liquid', 'thermal_resistance'] = (T_liq - T_surf) / R**2 * A_liquid / A_total
-        J['heat_into_vapor', 'thermal_resistance'] = heat_vapor_frac / heat_liquid_frac * \
-                                                     J['heat_into_liquid', 'thermal_resistance']
         J['heat_total', 'thermal_resistance'] = J['heat_into_liquid', 'thermal_resistance'] / heat_liquid_frac
-        J['heat_into_liquid', 'radius'] = Q_if_all_liquid / A_total * (2*np.pi*h_liquid + 2*np.pi*r*2*fill_level + \
-                                                                       cylinder_central_angle*L + r*L*d_angle_d_r) - \
-                                          Q_if_all_liquid * A_liquid / A_total**2 * (8*np.pi*r + 2*np.pi*L)
-        J['heat_into_vapor', 'radius'] = heat_vapor_frac / heat_liquid_frac * J['heat_into_liquid', 'radius']
-        J['heat_total', 'radius'] = J['heat_into_liquid', 'radius'] / heat_liquid_frac
-        J['heat_into_liquid', 'length'] = Q_if_all_liquid / A_total * cylinder_central_angle*r - \
-                                          Q_if_all_liquid * A_liquid / A_total**2 * 2*np.pi*r
-        J['heat_into_vapor', 'length'] = heat_vapor_frac / heat_liquid_frac * J['heat_into_liquid', 'length']
-        J['heat_total', 'length'] = J['heat_into_liquid', 'length'] / heat_liquid_frac
-        J['heat_into_liquid', 'fill_level'] = Q_if_all_liquid / A_total * (4*np.pi*r**2 + \
-                                              r*L*2/np.sqrt(1 - (1 - h_liquid/r)**2)*2)
-        J['heat_into_vapor', 'fill_level'] = J['heat_into_liquid', 'fill_level'] * heat_vapor_frac / heat_liquid_frac - \
-                                             Q_liquid / heat_liquid_frac**2 * (-2*fill_level + 2)
-        J['heat_total', 'fill_level'] = J['heat_into_liquid', 'fill_level'] / heat_liquid_frac - \
-                                             Q_liquid / heat_liquid_frac**2 * (-2*fill_level + 2)
+        J['heat_total', 'fill_level'] = J['heat_into_liquid', 'fill_level'] / heat_liquid_frac \
+                                        - Q_liquid / heat_liquid_frac**2 * (-2*fill_level + 2)
+
+        J['heat_into_vapor', 'T_surface'] = J['heat_total', 'T_surface'] * heat_vapor_frac
+        J['heat_into_vapor', 'T_liquid'] = J['heat_total', 'T_liquid'] * heat_vapor_frac
+        J['heat_into_vapor', 'thermal_resistance'] = J['heat_total', 'thermal_resistance'] * heat_vapor_frac
+        J['heat_into_vapor', 'fill_level'] = J['heat_total', 'fill_level'] * heat_vapor_frac + \
+                                             Q_total * (2*fill_level - 2)
