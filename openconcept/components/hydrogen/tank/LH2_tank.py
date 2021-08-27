@@ -137,8 +137,8 @@ class LH2Tank(om.Group):
                                                    W={'units': 'kg'},
                                                    r={'units': 'm'},
                                                    L={'units': 'm'},
-                                                   fill_init={'value': self.options['init_fill_level']},
-                                                   rho={'units': 'kg/m**3', 'value': self.options['rho_LH2']}),
+                                                   fill_init={'val': self.options['init_fill_level']},
+                                                   rho={'units': 'kg/m**3', 'val': self.options['rho_LH2']}),
                            promotes_inputs=[('r', 'radius'), ('L', 'length')])
         self.add_subsystem('LH2_weight', AddSubtractComp(output_name='weight',
                                                          input_names=['W_LH2_init', 'W_LH2_boil_off'],
@@ -201,12 +201,12 @@ class LH2Tank(om.Group):
                                                         r={'units': 'm'},
                                                         L={'units': 'm'},
                                                         W_LH2={'units': 'kg', 'shape': (nn,)},
-                                                        rho={'units': 'kg/m**3', 'value': self.options['rho_LH2']}),
+                                                        rho={'units': 'kg/m**3', 'val': self.options['rho_LH2']}),
                            promotes_inputs=[('r', 'radius'), ('L', 'length'), 'W_LH2'])
         self.add_subsystem('ullage_V_dot', om.ExecComp('V_dot = m_dot_boil_off / rho',
                                                        V_dot={'units': 'm**3/s', 'shape': (nn,)},
                                                        m_dot_boil_off={'units': 'kg/s', 'shape': (nn,)},
-                                                       rho={'units': 'kg/m**3', 'value': self.options['rho_LH2']}))
+                                                       rho={'units': 'kg/m**3', 'val': self.options['rho_LH2']}))
         self.connect('boil_off.m_boil_off', 'ullage_V_dot.m_dot_boil_off')
 
         # Ullage gas property tracking
@@ -224,10 +224,10 @@ class LH2Tank(om.Group):
                                                    W={'units': 'kg'},
                                                    r={'units': 'm'},
                                                    L={'units': 'm'},
-                                                   fill_init={'value': self.options['init_fill_level']},
-                                                   P={'value': self.options['ullage_P_init'], 'units': 'Pa'},
-                                                   T={'value': self.options['ullage_T_init'], 'units': 'K'},
-                                                   R_H2={'value': 8.314/2.016e-3, 'units': 'J/(kg*K)'}),
+                                                   fill_init={'val': self.options['init_fill_level']},
+                                                   P={'val': self.options['ullage_P_init'], 'units': 'Pa'},
+                                                   T={'val': self.options['ullage_T_init'], 'units': 'K'},
+                                                   R_H2={'val': 8.314/2.016e-3, 'units': 'J/(kg*K)'}),
                            promotes_inputs=[('r', 'radius'), ('L', 'length')])
         self.add_subsystem('GH2_weight', AddSubtractComp(output_name='weight',
                                                          input_names=['W_GH2_init', 'W_LH2_boil_off',
