@@ -615,7 +615,7 @@ class SimpleHose(om.ExplicitComponent):
 
         self.declare_partials(['delta_p'], ['rho_coolant', 'mdot_coolant'], rows=np.arange(nn), cols=np.arange(nn))
         self.declare_partials(['delta_p'], ['hose_diameter', 'hose_length', 'mu_coolant'], rows=np.arange(nn), cols=np.zeros(nn))
-        self.declare_partials(['component_weight'], ['hose_design_pressure','hose_length','hose_diameter'], method='cs')
+        self.declare_partials(['component_weight'], ['hose_design_pressure','hose_length','hose_diameter'], rows=[0], cols=[0])
         self.declare_partials(['component_weight'], ['rho_coolant'], rows=[0], cols=[0])
 
 
@@ -646,8 +646,21 @@ class SimpleHose(om.ExplicitComponent):
         nn = self.options['num_nodes']
         sigma = self.options['hose_operating_stress']
         rho_hose = self.options['hose_density']
+        thickness = inputs['hose_diameter'] * inputs['hose_design_pressure'] / 2 / sigma
+
+        d_thick_d_diam = inputs['hose_design_pressure'] / 2 / sigma
+        d_thick_d_press = inputs['hose_diameter'] / 2 / sigma
 
         J['component_weight','rho_coolant'] = (inputs['hose_diameter'] / 2) ** 2 * np.pi * inputs['hose_length']
+        J['component_weight', 'hose_design_pressure'] = (inputs['hose_diameter'] + thickness) * np.pi * d_thick_d_press * \
+                                                        rho_hose * inputs['hose_length'] + np.pi * thickness * rho_hose * \
+                                                        inputs['hose_length'] * d_thick_d_press
+        J['component_weight', 'hose_length'] = (inputs['hose_diameter'] + thickness) * np.pi * thickness * rho_hose + \
+                                               (inputs['hose_diameter'] / 2) ** 2 * np.pi * inputs['rho_coolant'][0]
+        J['component_weight', 'hose_diameter'] = (inputs['hose_diameter'] + thickness) * np.pi * d_thick_d_diam * rho_hose * \
+                                                 inputs['hose_length'] + (1 + d_thick_d_diam) * np.pi * thickness * rho_hose * \
+                                                 inputs['hose_length'] + inputs['hose_diameter'] / 2 * np.pi * \
+                                                 inputs['rho_coolant'][0] * inputs['hose_length']
 
         # use a colored complex step approach
         cs_step = 1e-30
