@@ -22,11 +22,11 @@ class OffsetStripFinGeometry(ExplicitComponent):
     fin_length_hot : float
         Length of each offset strip fin on the hot side (scalar, m)
     channel_width_cold : float
-        Width of each finned flow channel on the hot side (scalar, m)
+        Width of each finned flow channel on the cold side (scalar, m)
     channel_height_cold : float
-        Height of each finned flow channel on the hot side (scalar, m)
+        Height of each finned flow channel on the cold side (scalar, m)
     fin_length_cold : float
-        Length of each offset strip fin on the hot side (scalar, m)
+        Length of each offset strip fin on the cold side (scalar, m)
     fin_thickness : float
         Thickness of fin material (scalar, m)
     plate_thickness : float
@@ -157,7 +157,9 @@ class OffsetStripFinGeometry(ExplicitComponent):
         outputs['frontal_area'] = outputs['width_overall'] * outputs['height_overall']
 
         # compute cold side geometric properties
-        outputs['dh_cold'] = 2 * w_c * h_c / (w_c + h_c)
+        # outputs['dh_cold'] = 2 * w_c * h_c / (w_c + h_c)
+        # special formula for dh (maybe accounts for bend radii?) from Manglik and Bergles paper
+        outputs['dh_cold'] = 4 * w_c * h_c * l_c / (2 * (w_c * l_c + h_c * l_c + t_f * h_c) + t_f * w_c)
         outputs['xs_area_cold'] = w_c * h_c * n_wide_c * n_tall
         outputs['heat_transfer_area_cold'] = 2 * (w_c + h_c) * l_c * n_long_c * n_wide_c * n_tall
         outputs['fin_area_ratio_cold'] = h_c / (h_c + w_c)
@@ -258,7 +260,8 @@ class OffsetStripFinData(ExplicitComponent):
         jc_2 = inputs['alpha_cold']**0.504 * inputs['delta_cold']**0.456 * inputs['gamma_cold']**-1.055
         fc_1 = inputs['alpha_cold']**-0.1856 * inputs['delta_cold']**0.3053 * inputs['gamma_cold']**-0.2659
         fc_2 = inputs['alpha_cold']**0.92 * inputs['delta_cold']**3.767 * inputs['gamma_cold']**0.236
-
+        if np.min(inputs['Re_dh_cold']) <= 0.0:
+            raise ValueError(self.msginfo, inputs['Re_dh_cold'])
         outputs['j_cold'] = (0.6522*inputs['Re_dh_cold']**-0.5403 * jc_1 *
                              (1 + 5.269e-5*inputs['Re_dh_cold']**1.34 * jc_2)**0.1)
         outputs['f_cold'] = (9.6243*inputs['Re_dh_cold']**-0.7422 * fc_1 *
@@ -357,8 +360,8 @@ class HydraulicDiameterReynoldsNumber(ExplicitComponent):
         self.add_input('xs_area_hot', units='m**2')
         self.add_input('dh_hot', units='m')
 
-        self.add_output('Re_dh_cold', shape=(nn,), lower=1e-10)
-        self.add_output('Re_dh_hot', shape=(nn,), lower=1e-10)
+        self.add_output('Re_dh_cold', shape=(nn,), lower=0.01)
+        self.add_output('Re_dh_hot', shape=(nn,))
         arange = np.arange(0, nn)
         self.declare_partials(['Re_dh_cold'], ['mdot_cold'], rows=arange, cols=arange)
         self.declare_partials(['Re_dh_cold'], ['mu_cold', 'xs_area_cold', 'dh_cold'], rows=arange, cols=np.zeros((nn,), dtype=np.int32))
@@ -435,7 +438,7 @@ class NusseltFromColburnJ(ExplicitComponent):
         self.add_input('mu_hot', units='kg/m/s')
         self.add_input('cp_hot', units='J/kg/K')
 
-        self.add_output('Nu_dh_cold', shape=(nn,))
+        self.add_output('Nu_dh_cold', shape=(nn,), lower=0.001)
         self.add_output('Nu_dh_hot', shape=(nn,))
         arange = np.arange(0, nn)
         self.declare_partials(['Nu_dh_cold'], ['j_cold', 'Re_dh_cold'], rows=arange, cols=arange)
@@ -517,8 +520,8 @@ class ConvectiveCoefficient(ExplicitComponent):
         self.add_input('dh_hot', units='m')
         self.add_input('k_hot', units='W/m/K')
 
-        self.add_output('h_conv_cold', shape=(nn,), units='W/m**2/K', lower=1e-10)
-        self.add_output('h_conv_hot', shape=(nn,), units='W/m**2/K', lower=1e-10)
+        self.add_output('h_conv_cold', shape=(nn,), units='W/m**2/K', lower=1.0)
+        self.add_output('h_conv_hot', shape=(nn,), units='W/m**2/K')
         arange = np.arange(0, nn)
         self.declare_partials(['h_conv_cold'], ['Nu_dh_cold'], rows=arange, cols=arange)
         self.declare_partials(['h_conv_cold'], ['dh_cold','k_cold'], rows=arange, cols=np.zeros((nn,), dtype=np.int32))
@@ -528,7 +531,8 @@ class ConvectiveCoefficient(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['h_conv_cold'] = inputs['Nu_dh_cold'] * inputs['k_cold'] / inputs['dh_cold']
         outputs['h_conv_hot'] = inputs['Nu_dh_hot'] * inputs['k_hot'] / inputs['dh_hot']
-
+        if np.min(outputs['h_conv_cold']) <= 0.0:
+            raise ValueError(self.msginfo)
     def compute_partials(self, inputs, J):
         J['h_conv_cold', 'Nu_dh_cold'] = inputs['k_cold'] / inputs['dh_cold']
         J['h_conv_cold', 'k_cold'] = inputs['Nu_dh_cold'] / inputs['dh_cold']
@@ -612,6 +616,8 @@ class FinEfficiency(ExplicitComponent):
         h_c = inputs['h_conv_cold']
 
         m_cold = np.sqrt(2 * h_c / k / t_f)
+        if np.min(h_c) <= 0.0:
+            raise ValueError(self.msginfo)
         eta_f_cold = 2* np.tanh(m_cold * l_f_c / 2) / m_cold / l_f_c
         outputs['eta_overall_cold'] = 1 - inputs['fin_area_ratio_cold'] * (1 - eta_f_cold)
 
@@ -813,7 +819,7 @@ class NTUMethod(ExplicitComponent):
         self.add_input('T_in_hot', shape=(nn,), units='K')
         self.add_input('cp_hot', units='J/kg/K')
 
-        self.add_output('NTU', shape=(nn,), lower=1e-10)
+        self.add_output('NTU', shape=(nn,), lower=0.1)
         self.add_output('heat_max', shape=(nn,), units='W')
         self.add_output('C_ratio', shape=(nn,))
 
@@ -1195,7 +1201,7 @@ class HXGroup(Group):
     rho_cold : float
         Inflow density of the cold side (air) (vector, kg/m**3)
     mdot_hot : float
-        Mass flow rate of the hot die (liquid) (vector, kg/s)
+        Mass flow rate of the hot side (liquid) (vector, kg/s)
     T_in_hot : float
         Inflow temperature of the hot side (liquid) (vector, kg/s)
     rho_hot : float
@@ -1221,9 +1227,9 @@ class HXGroup(Group):
 
         #iv.add_output('T_in_cold', val=np.ones(nn)*45, units='degC')
         #iv.add_output('T_in_hot', val=np.ones(nn)*90, units='degC')
-        iv.add_output('n_long_cold', val=3)
+        # iv.add_output('n_long_cold', val=3)
         # iv.add_output('n_wide_cold', val=430)
-        iv.add_output('n_tall', val=19)
+        # iv.add_output('n_tall', val=19)
 
         iv.add_output('channel_height_cold', val=14, units='mm')
         iv.add_output('channel_width_cold', val=1.35, units='mm')
@@ -1239,7 +1245,9 @@ class HXGroup(Group):
         iv.add_output('k_hot', val=0.405, units='W/m/K')
         iv.add_output('mu_hot', val=1.68e-3, units='kg/m/s')
 
-        dvlist = [['ac|propulsion|thermal|hx|n_wide_cold', 'n_wide_cold', 430, None]]
+        dvlist = [['ac|propulsion|thermal|hx|n_wide_cold', 'n_wide_cold', 430, None],
+                  ['ac|propulsion|thermal|hx|n_long_cold', 'n_long_cold', 3, None],
+                  ['ac|propulsion|thermal|hx|n_tall', 'n_tall', 19, None]]
 
         self.add_subsystem('dvpassthru',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
 

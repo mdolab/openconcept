@@ -1,6 +1,9 @@
 import openmdao.api as om 
 import numpy as np
 from openconcept.utilities.math.integrals import Integrator
+from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
+from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
+
 import warnings 
 
 # OpenConcept PhaseGroup will be used to hold analysis phases with time integration
@@ -9,7 +12,7 @@ def find_integrators_in_model(system, abs_namespace, timevars, states):
 
     # check if we are a group or not
     if isinstance(system, om.Group):
-        for subsys in system._subsystems_allprocs:
+        for subsys, _ in system._subsystems_allprocs.values():
             if not abs_namespace:
                 next_namespace = subsys.name
             else:
@@ -45,12 +48,10 @@ class PhaseGroup(om.Group):
         prob_meta.update({'oc_num_nodes': self._oc_num_nodes})
         super(PhaseGroup, self)._setup_procs(pathname, comm, mode, prob_meta)
     
-    def _configure(self):
-        super(PhaseGroup, self)._configure()
+    def configure(self):
         # check child subsys for variables to be integrated and add them all
         timevars = []
         states = []
-        # TODO revisit this approach once var data in configure is officially supported
         find_integrators_in_model(self, '', timevars, states)
         self._setup_var_data()
 
@@ -71,25 +72,98 @@ class IntegratorGroup(om.Group):
         time_units = kwargs.pop('time_units', 's')
         super(IntegratorGroup, self).__init__(**kwargs)
         self._oc_time_units = time_units
+        self._n_auto_comps = 0
+
+
+
+    def promote_add(self, sources, prom_name, promoted_sources=[], factors=None, vec_size=1, units=None, length=1, val=1.0,
+                     res_units=None, desc='', lower=None, upper=None, ref=1.0,
+                     ref0=0.0, res_ref=None):
+        """Helper function called during setup"""
+        add_index = self._n_auto_comps
+        self._n_auto_comps += 1
+        adder = AddSubtractComp()
+        n_inputs = len(sources) + len(promoted_sources)
+        if factors is None:
+            factors = np.ones(n_inputs)
+        adder.add_equation(output_name=prom_name,
+                           input_names=['_temp'+str(i) for i in range(n_inputs)],
+                           scaling_factors=factors,
+                           vec_size=vec_size,
+                           units=units,
+                           length=length,
+                           val=val,
+                           res_units=res_units,
+                           desc=desc,
+                           lower=lower,
+                           upper=upper,
+                           ref=ref,
+                           ref0=ref0,
+                           res_ref=res_ref)
+        adder_name = 'add'+str(add_index)
+        prom_in = []
+        for i, promoted_source in enumerate(promoted_sources):
+            prom_in.append(('_temp'+str(i+len(sources)), promoted_source))
+
+        self.add_subsystem(adder_name, adder, promotes_inputs=prom_in, promotes_outputs=['*'])
+        for i, source in enumerate(sources):
+            self.connect(source, adder_name+'._temp'+str(i))
+
+    def promote_mult(self, source, prom_name, factor, vec_size=1, units=None, length=1, val=1.0,
+                     res_units=None, desc='', lower=None, upper=None, ref=1.0,
+                     ref0=0.0, res_ref=None,
+                     divide=None, input_units=None, tags=None):
+        """Helper function called during setup"""
+        mult_index = self._n_auto_comps
+        self._n_auto_comps += 1
+        mult = ElementMultiplyDivideComp(output_name=prom_name,
+                                         input_names=['_temp'],
+                                         scaling_factor=factor,
+                                         input_units=[units],
+                                         vec_size=vec_size,
+                                         length=length,
+                                         val=val,
+                                         res_units=res_units,
+                                         desc=desc,
+                                         lower=lower,
+                                         upper=upper,
+                                         ref=ref,
+                                         ref0=ref0,
+                                         res_ref=res_ref,
+                                         divide=divide,
+                                         tags=tags)
+        mult_name = 'mult'+str(mult_index)
+        self.add_subsystem(mult_name, mult, promotes_outputs=['*'])
+        self.connect(source, mult_name+'._temp')
+
 
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         time_units = self._oc_time_units
+        self._under_dymos = False
+        self._under_openconcept = False
         try:
             num_nodes = prob_meta['oc_num_nodes']
+            self._under_openconcept = True
         except KeyError:
-            raise NameError('Integrator group must be created within an OpenConcept phase')
-        self.add_subsystem('ode_integ', Integrator(time_setup='duration', method='simpson',diff_units=time_units, num_nodes=num_nodes))
+            # TODO test_if_under_dymos
+            if not self._under_dymos:
+                raise NameError('Integrator group must be created within an OpenConcept phase or Dymos trajectory')            
+
+        if self._under_openconcept:
+            self.add_subsystem('ode_integ', Integrator(time_setup='duration', method='simpson',diff_units=time_units, num_nodes=num_nodes))
+
         super(IntegratorGroup, self)._setup_procs(pathname, comm, mode, prob_meta)
 
-    def _configure(self):
-        super(IntegratorGroup, self)._configure()
-        # TODO revisit this when variable data available by default in configure
+    def configure(self):
         self._setup_var_data()
-        for subsys in self._subsystems_allprocs:
-            for var in subsys._var_rel_names['output']:
-                # check if there are any variables to integrate
-                tags = subsys._var_rel2meta[var]['tags']
-                if 'integrate' in tags:
+        parent_meta_dict = self.get_io_metadata(iotypes='output', tags='integrate')
+        for subsys, _ in self._subsystems_allprocs.values():
+            # exclude any group subclasses, they don't have real outputs
+            if not isinstance(subsys, om.Group):
+                # find any variables that have an 'integrate tag
+                child_meta_dict = subsys.get_io_metadata(iotypes='output', tags='integrate')
+                for var in child_meta_dict.keys():
+                    tags = child_meta_dict[var]['tags']
                     state_name = None
                     state_units = None
                     state_val = 0.0
@@ -117,17 +191,17 @@ class IntegratorGroup(om.Group):
                     if state_units is None:
                         warnings.warn('OpenConcept integration variable '+subsys.name+'.'+var+' '+'has no units specified. This can be dangerous.')
                     self.ode_integ.add_integrand(state_name, rate_name=var, val=state_val,
-                                       units=state_units, lower=state_lower, upper=state_upper)
+                                    units=state_units, lower=state_lower, upper=state_upper)
                     # make the rate connection
                     rate_var_abs_address = subsys.name+'.'+var
-                    if self.pathname:
-                        rate_var_abs_address = self.pathname + '.' + rate_var_abs_address
-                    rate_var_prom_address = self._var_abs2prom['output'][rate_var_abs_address]
+                    # if self.pathname:
+                    #     rate_var_abs_address = self.pathname + '.' + rate_var_abs_address
+                    rate_var_prom_address = parent_meta_dict[rate_var_abs_address]['prom_name']
                     self.connect(rate_var_prom_address, 'ode_integ'+'.'+var)
                     if state_promotes:
-                        self.ode_integ._var_promotes['output'].append(state_name)
-                        self.ode_integ._var_promotes['output'].append(state_name+'_final')
-                        self.ode_integ._var_promotes['input'].append(state_name+'_initial')
+                        self.ode_integ._var_promotes['output'].append((state_name, None))
+                        self.ode_integ._var_promotes['output'].append((state_name+'_final',None))
+                        self.ode_integ._var_promotes['input'].append((state_name+'_initial',None))
 
 class TrajectoryGroup(om.Group):
     def __init__(self, **kwargs):

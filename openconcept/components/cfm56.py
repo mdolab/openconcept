@@ -6,9 +6,8 @@ from openconcept.utilities.surrogates.cached_kriging_surrogate import KrigingSur
 
 def CFM56(num_nodes=1, plot=False):
     """
-    A simple turboshaft which generates shaft power consumes fuel.
-
-    This model assumes constant power specific fuel consumption (PSFC).
+    Returns OpenMDAO component for engine deck
+    to model CFM56 turbofan.
 
     Inputs
     ------
@@ -48,7 +47,8 @@ def CFM56(num_nodes=1, plot=False):
             for kthrot, throttle in enumerate(np.array([10, 9, 8, 7, 6, 5, 4, 3, 2])*0.1):
                 thrustijk = thrustdata[ialt, jmach, kthrot]
                 if thrustijk > 0.0:
-                    krigedata.append(np.array([throttle, altitude, mach, thrustijk.copy(), fuelburndata[ialt, jmach, kthrot].copy(), t4data[ialt, jmach, kthrot].copy()]))
+                    if not (mach > 0.5 and altitude == 0.0):
+                        krigedata.append(np.array([throttle, altitude, mach, thrustijk.copy(), fuelburndata[ialt, jmach, kthrot].copy(), t4data[ialt, jmach, kthrot].copy()]))
 
     a = np.array(krigedata)
     comp = om.MetaModelUnStructuredComp(vec_size=num_nodes)
@@ -58,13 +58,13 @@ def CFM56(num_nodes=1, plot=False):
 
     comp.add_output('thrust', np.ones((num_nodes,))*10000.,
                     training_data=a[:,3], units='lbf',
-                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename='cfm56thrust.pkl'))
+                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+'cfm56thrust.pkl'))
     comp.add_output('fuel_flow', np.ones((num_nodes,))*3.0,
                     training_data=a[:,4], units='lbm/s',
-                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename='cfm56fuelburn.pkl'))
+                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+'cfm56fuelburn.pkl'))
     comp.add_output('T4', np.ones((num_nodes,))*3000.,
                     training_data=a[:,5], units='R',
-                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename='cfm56T4.pkl'))
+                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+'cfm56T4.pkl'))
     comp.options['default_surrogate'] = KrigingSurrogate(lapack_driver='gesvd', cache_trained_model=True)
 
     if plot:
@@ -79,7 +79,7 @@ def CFM56(num_nodes=1, plot=False):
         pred = np.zeros((25, 25, 3))
         for i in range(25):
             for j in range(25):
-                prob['comp.throttle'] = 0.95
+                prob['comp.throttle'] = 1.0
                 prob['comp.fltcond|h'] = alts[i,j]
                 prob['comp.fltcond|M'] = machs[i,j]
                 prob.run_model()
@@ -90,7 +90,7 @@ def CFM56(num_nodes=1, plot=False):
         plt.ylabel('Altitude')
         plt.title('SFC (lb / hr lb) OM')
         # plt.contourf(machs, alts, pred[:,:,0])
-        plt.contourf(machs, alts, (pred[:,:,1] / pred[:,:,0])*60*60, levels=np.linspace(0.3,1.2,20))
+        plt.contourf(machs, alts, (pred[:,:,1] / pred[:,:,0])*60*60)
         plt.colorbar()
         plt.figure()
         plt.xlabel('Mach')

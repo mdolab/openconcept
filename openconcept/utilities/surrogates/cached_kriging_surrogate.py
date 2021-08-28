@@ -43,6 +43,10 @@ class KrigingSurrogate(om.KrigingSurrogate):
         super(om.KrigingSurrogate, self).train(x, y)
 
         if not cached_model:
+            if cache_model:
+                msg = "Training surrogate {0} from scratch (no cache data found). This may take a long time.'"\
+                .format(cached_model_filename)
+                print(msg)
             x, y = np.atleast_2d(x, y)
 
             self.n_samples, self.n_dims = x.shape
