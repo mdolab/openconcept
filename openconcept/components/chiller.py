@@ -55,7 +55,13 @@ class LinearSelector(om.ExplicitComponent):
         self.add_output('elec_load', val=np.ones((nn,))*1, units='W')
         self.add_output('T_out_cold', val=290*np.ones((nn,)), units='K')
         self.add_output('T_out_hot', val=310*np.ones((nn,)), units='K')
-        self.declare_partials(['*'],['*'],method='cs')
+
+        self.declare_partials('T_out_cold', ['bypass', 'T_in_hot', 'T_out_refrig_cold'],
+                              rows=np.arange(nn), cols=np.arange(nn))
+        self.declare_partials('T_out_hot', ['bypass', 'T_in_cold', 'T_out_refrig_hot'],
+                              rows=np.arange(nn), cols=np.arange(nn))
+        self.declare_partials('elec_load', 'bypass', rows=np.arange(nn), cols=np.arange(nn))
+        self.declare_partials('elec_load', 'power_rating', rows=np.arange(nn), cols=np.zeros(nn))
 
     def compute(self, inputs, outputs):
         bypass_side = inputs['bypass']
@@ -63,6 +69,24 @@ class LinearSelector(om.ExplicitComponent):
         outputs['T_out_cold'] = bypass_side * inputs['T_in_hot'] + refrig_side * inputs['T_out_refrig_cold']
         outputs['T_out_hot'] = bypass_side * inputs['T_in_cold'] + refrig_side * inputs['T_out_refrig_hot']
         outputs['elec_load'] = refrig_side * inputs['power_rating'] / 0.95
+    
+    def compute_partials(self, inputs, J):
+        T_in_hot = inputs['T_in_hot']
+        T_out_hot = inputs['T_out_refrig_hot']
+        T_in_cold = inputs['T_in_cold']
+        T_out_cold = inputs['T_out_refrig_cold']
+        power_rating = inputs['power_rating']
+        bypass = inputs['bypass']
+
+        J['T_out_cold', 'bypass'] = T_in_hot - T_out_cold
+        J['T_out_cold', 'T_in_hot'] = bypass
+        J['T_out_cold', 'T_out_refrig_cold'] = 1 - bypass
+        J['T_out_hot', 'bypass'] = T_in_cold - T_out_hot
+        J['T_out_hot', 'T_in_cold'] = bypass
+        J['T_out_hot', 'T_out_refrig_hot'] = 1 - bypass
+        J['elec_load', 'bypass'] = -power_rating / 0.95
+        J['elec_load', 'power_rating'] = (1 - bypass) / 0.95
+        
 
 class COPHeatPump(om.ExplicitComponent):
     """
@@ -97,12 +121,23 @@ class COPHeatPump(om.ExplicitComponent):
 
         self.add_output('q_in_1', val=np.zeros((nn,)), units='W', shape=(nn,))
         self.add_output('q_in_2', val=np.zeros((nn,)), units='W', shape=(nn,))
-        self.declare_partials(['*'],['*'],method='cs')
+
+        self.declare_partials(['q_in_1', 'q_in_2'], 'COP', rows=np.arange(nn), cols=np.arange(nn))
+        self.declare_partials(['q_in_1', 'q_in_2'], 'power_rating', rows=np.arange(nn), cols=np.zeros(nn))
 
     def compute(self, inputs, outputs):
         nn = self.options['num_nodes']
         outputs['q_in_1'] = - inputs['COP']*inputs['power_rating']
         outputs['q_in_2'] = (inputs['COP'] + 1)*inputs['power_rating']
+    
+    def compute_partials(self, inputs, J):
+        COP = inputs['COP']
+        power_rating = inputs['power_rating']
+
+        J['q_in_1', 'COP'] = -power_rating
+        J['q_in_1', 'power_rating'] = -COP
+        J['q_in_2', 'COP'] = power_rating
+        J['q_in_2', 'power_rating'] = COP + 1
 
 class HeatPumpWeight(om.ExplicitComponent):
     """

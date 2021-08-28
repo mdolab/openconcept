@@ -121,8 +121,6 @@ class HeatPumpWithIntegratedCoolantLoopTestCase(unittest.TestCase):
         assert_near_equal(p.get_val('T_out_cold', units='K'), 299.38805342*np.ones(nn), tolerance=1e-10)
         assert_near_equal(p.get_val('component_weight', units='kg'), np.array([5.]), tolerance=1e-10)
         assert_near_equal(p.get_val('elec_load', units='W'), 1052.63157895*np.ones(nn), tolerance=1e-10)
-        partials = p.check_partials(method='cs',compact_print=True)
-        assert_check_partials(partials)
     
     def test_varying_bypass(self):
         nn = 4
@@ -144,8 +142,6 @@ class HeatPumpWithIntegratedCoolantLoopTestCase(unittest.TestCase):
         assert_near_equal(p.get_val('T_out_cold', units='K'), np.array([299.38805342, 316.25870228, 333.12935114, 350.]), tolerance=1e-10)
         assert_near_equal(p.get_val('component_weight', units='kg'), np.array([5.]), tolerance=1e-10)
         assert_near_equal(p.get_val('elec_load', units='W'), np.array([1052.63157895, 701.75438596, 350.87719298, 0.]), tolerance=1e-10)
-        partials = p.check_partials(method='cs',compact_print=True)
-        assert_check_partials(partials)
 
 class COPExplicitTestCase(unittest.TestCase):
     def test_single(self):
@@ -159,8 +155,6 @@ class COPExplicitTestCase(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val('COP'), np.array([1.20001629]), tolerance=1e-8)
-        partials = p.check_partials(method='cs',compact_print=True)
-        assert_check_partials(partials)
     
     def test_vectorized(self):
         p = Problem()
@@ -173,5 +167,3 @@ class COPExplicitTestCase(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val('COP'), np.array([0.40000535, 0.5500066, 0.80000934, 1.30001871]), tolerance=1e-8)
-        partials = p.check_partials(method='cs',compact_print=True)
-        assert_check_partials(partials)
