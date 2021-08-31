@@ -23,7 +23,7 @@ def aydelott_validation(case):
     p.setup()
 
     p.set_val('design_pressure', 3., units='bar')
-    p.set_val('m_dot', np.zeros(nn), units='kg/s')
+    p.set_val('m_dot_gas', np.zeros(nn), units='kg/s')
     p.set_val('radius', 23/2, units='cm')
     p.set_val('length', 0., units='m')
     p.set_val('insulation_thickness', .5, units='inch')
@@ -60,7 +60,7 @@ def MHTB_validation(case):
     p.setup()
 
     p.set_val('design_pressure', 3., units='bar')
-    p.set_val('m_dot', np.zeros(nn), units='kg/s')
+    p.set_val('m_dot_gas', np.zeros(nn), units='kg/s')
     p.set_val('radius', 3.05/2, units='m')
     p.set_val('length', 3.05, units='m')
     p.set_val('insulation_thickness', 1000., units='inch')
@@ -97,7 +97,7 @@ def Ball_HALE_validation(T_inf, Q_dot, boil_off):
 
     p.set_val('design_pressure', 95*6895., units='Pa')
     p.set_val('T_inf', T_inf*np.ones(nn), units='K')
-    p.set_val('m_dot', np.zeros(nn), units='kg/s')
+    p.set_val('m_dot_gas', np.zeros(nn), units='kg/s')
     p.set_val('radius', 4, units='ft')
     p.set_val('length', 0., units='m')
     p.set_val('insulation_thickness', 4.6, units='inch')

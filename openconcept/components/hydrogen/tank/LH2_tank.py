@@ -59,9 +59,13 @@ class LH2Tank(om.Group):
     T_inf : float
         Temperature of the "freestream" (but stationary) air in
         which the tank is sitting (vector, K)
-    m_dot : float
+    m_dot_gas : float
         Mass flow usage rate of gaseous hydrogen,
-        i.e. for propulsion, etc.; positive m_dot indicates
+        i.e. for propulsion, etc.; positive m_dot_gas indicates
+        hydrogen LEAVING the tank (vector, kg/s)
+    m_dot_liq : float
+        Mass flow usage rate of liquid hydrogen,
+        i.e. for propulsion, etc.; positive m_dot_liq indicates
         hydrogen LEAVING the tank (vector, kg/s)
     m_dot_vent_start : float
         Initial GH2 venting mass flow rate (scalar, kg/s)
@@ -141,9 +145,9 @@ class LH2Tank(om.Group):
                                                    rho={'units': 'kg/m**3', 'val': self.options['rho_LH2']}),
                            promotes_inputs=[('r', 'radius'), ('L', 'length')])
         self.add_subsystem('LH2_weight', AddSubtractComp(output_name='weight',
-                                                         input_names=['W_LH2_init', 'W_LH2_boil_off'],
-                                                          units='kg', vec_size=[1, nn],
-                                                          scaling_factors=[1, -1]),
+                                                         input_names=['W_LH2_init', 'W_LH2_boil_off', 'W_LH2_used'],
+                                                          units='kg', vec_size=[1, nn, nn],
+                                                          scaling_factors=[1, -1, -1]),
                            promotes_outputs=[('weight', 'W_LH2')])
         self.add_subsystem('level_calc', FillLevelCalc(num_nodes=nn),
                            promotes_inputs=['radius', 'length'])
@@ -179,20 +183,23 @@ class LH2Tank(om.Group):
         # Integrate total gaseous and liquid hydrogen flows
         integ = self.add_subsystem('mass_integ', Integrator(num_nodes=nn,
                                    diff_units='s', time_setup='duration'),
-                                   promotes_inputs=[('GH2_use_rate', 'm_dot'), 'duration'])
+                                   promotes_inputs=[('GH2_use_rate', 'm_dot_gas'), ('LH2_use_rate', 'm_dot_liq'),
+                                                    'duration'])
         integ.add_integrand('LH2_boil_off', rate_name='LH2_flow', units='kg')
         integ.add_integrand('GH2_used', rate_name='GH2_use_rate', units='kg')
+        integ.add_integrand('LH2_used', rate_name='LH2_use_rate', units='kg')
         integ.add_integrand('GH2_vent', rate_name='GH2_vent_rate', units='kg')
         self.connect('boil_off.m_boil_off', 'mass_integ.LH2_flow')
         self.connect('mass_integ.LH2_boil_off', 'LH2_weight.W_LH2_boil_off')
         self.connect('vent_interp.vec', 'mass_integ.GH2_vent_rate')
+        self.connect('mass_integ.LH2_used', 'LH2_weight.W_LH2_used')
 
         # Sum output mass flows from ullage
         self.add_subsystem('mass_flow', AddSubtractComp(output_name='m_dot_total',
                                                         input_names=['m_dot_usage', 'm_dot_vent'],
                                                         units='kg/s', vec_size=[nn, nn],
                                                         scaling_factors=[1, 1]),
-                           promotes_inputs=[('m_dot_usage', 'm_dot')])
+                           promotes_inputs=[('m_dot_usage', 'm_dot_gas')])
         self.connect('vent_interp.vec', 'mass_flow.m_dot_vent')
 
         # Ullage volume and rate of change of volume
@@ -203,10 +210,12 @@ class LH2Tank(om.Group):
                                                         W_LH2={'units': 'kg', 'shape': (nn,)},
                                                         rho={'units': 'kg/m**3', 'val': self.options['rho_LH2']}),
                            promotes_inputs=[('r', 'radius'), ('L', 'length'), 'W_LH2'])
-        self.add_subsystem('ullage_V_dot', om.ExecComp('V_dot = m_dot_boil_off / rho',
+        self.add_subsystem('ullage_V_dot', om.ExecComp('V_dot = (m_dot_boil_off + m_dot_liq) / rho',
                                                        V_dot={'units': 'm**3/s', 'shape': (nn,)},
                                                        m_dot_boil_off={'units': 'kg/s', 'shape': (nn,)},
-                                                       rho={'units': 'kg/m**3', 'val': self.options['rho_LH2']}))
+                                                       m_dot_liq={'units': 'kg/s', 'shape': (nn,)},
+                                                       rho={'units': 'kg/m**3', 'val': self.options['rho_LH2']}),
+                           promotes_inputs=['m_dot_liq'])
         self.connect('boil_off.m_boil_off', 'ullage_V_dot.m_dot_boil_off')
 
         # Ullage gas property tracking
@@ -268,4 +277,5 @@ class LH2Tank(om.Group):
         self.set_input_defaults('length', .5, units='m')
         self.set_input_defaults('insulation_thickness', 5., units='inch')
         self.set_input_defaults('design_pressure', 3., units='bar')
-        self.set_input_defaults('m_dot', 0.*np.ones(nn), units='kg/s')
+        self.set_input_defaults('m_dot_gas', np.zeros(nn), units='kg/s')
+        self.set_input_defaults('m_dot_liq', np.zeros(nn), units='kg/s')
