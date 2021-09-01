@@ -130,7 +130,7 @@ class GH2ReservoirODE(om.ExplicitComponent):
         self.add_input('Q_dot', val=0., units='W', shape=(nn,))
 
         self.add_output('T_dot', units='K/s', shape=(nn,))
-        self.add_output('P', units='Pa', shape=(nn,))
+        self.add_output('P', units='Pa', shape=(nn,), lower=1e-10)
 
         if self.options['vector_V']:
             self.declare_partials('T_dot', 'V', rows=np.arange(nn), cols=np.arange(nn))
