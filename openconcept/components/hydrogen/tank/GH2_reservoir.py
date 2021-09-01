@@ -57,7 +57,7 @@ class GH2Reservoir(om.Group):
         integ = self.add_subsystem('integ', Integrator(num_nodes=nn, diff_units='s',
                                    time_setup='duration'), promotes_inputs=['duration'],
                                    promotes_outputs=['T'])
-        integ.add_integrand('T', rate_name='T_dot', units='K', start_val=self.options['T_init'])
+        integ.add_integrand('T', rate_name='T_dot', units='K', start_val=self.options['T_init'], lower=1.)
 
         self.add_subsystem('GH2_ODE', GH2ReservoirODE(num_nodes=nn, vector_V=self.options['vector_V']),
                            promotes_inputs=['V', 'V_dot', 'T', 'm', 'm_dot_out',
