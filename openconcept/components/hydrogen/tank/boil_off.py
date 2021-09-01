@@ -38,7 +38,7 @@ class SimpleBoilOff(om.ExplicitComponent):
 
         self.add_input('heat_into_liquid', val=100., units='W', shape=(nn,))
         self.add_input('LH2_heat_added', val=0., units='W', shape=(nn,))
-        self.add_output('m_boil_off', val=0.1, units='kg/s', shape=(nn,))
+        self.add_output('m_boil_off', val=0.1, units='kg/s', shape=(nn,), lower=0.)
         self.declare_partials('m_boil_off', ['heat_into_liquid', 'LH2_heat_added'],
                               val=np.ones(nn)/self.options['h_vap'],
                               rows=np.arange(nn), cols=np.arange(nn))

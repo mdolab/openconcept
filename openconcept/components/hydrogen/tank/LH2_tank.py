@@ -185,10 +185,10 @@ class LH2Tank(om.Group):
                                    diff_units='s', time_setup='duration'),
                                    promotes_inputs=[('GH2_use_rate', 'm_dot_gas'), ('LH2_use_rate', 'm_dot_liq'),
                                                     'duration'])
-        integ.add_integrand('LH2_boil_off', rate_name='LH2_flow', units='kg')
-        integ.add_integrand('GH2_used', rate_name='GH2_use_rate', units='kg')
-        integ.add_integrand('LH2_used', rate_name='LH2_use_rate', units='kg')
-        integ.add_integrand('GH2_vent', rate_name='GH2_vent_rate', units='kg')
+        integ.add_integrand('LH2_boil_off', rate_name='LH2_flow', units='kg', lower=0.)
+        integ.add_integrand('GH2_used', rate_name='GH2_use_rate', units='kg', lower=0.)
+        integ.add_integrand('LH2_used', rate_name='LH2_use_rate', units='kg', lower=0.)
+        integ.add_integrand('GH2_vent', rate_name='GH2_vent_rate', units='kg', lower=0.)
         self.connect('boil_off.m_boil_off', 'mass_integ.LH2_flow')
         self.connect('mass_integ.LH2_boil_off', 'LH2_weight.W_LH2_boil_off')
         self.connect('vent_interp.vec', 'mass_integ.GH2_vent_rate')
