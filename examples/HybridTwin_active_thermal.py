@@ -62,7 +62,7 @@ class SeriesHybridTwinModel(Group):
                                            promotes_inputs=[('start_val', 'hybridization'),
                                                             ('end_val', 'hybridization')])
 
-        propulsion_promotes_outputs = ['fuel_flow','thrust', 'bypass_refrig']
+        propulsion_promotes_outputs = ['fuel_flow','thrust']
         propulsion_promotes_inputs = ["fltcond|*", "ac|propulsion|*", "throttle", "propulsor_active",
                                       "ac|weights*", 'duration']
 
@@ -100,7 +100,7 @@ class SeriesHybridTwinModel(Group):
         self.connect('propmodel.duct.drag','hxadder.drag_hx')
         self.connect('propmodel.hx.frontal_area','hxadder.hx_frontal_area')
         self.add_subsystem('nozzle_area', MaxComp(num_nodes=nn, units='m**2'))
-        self.connect('propmodel.refrig.hot_side_balance_param', 'nozzle_area.array')
+        self.connect('propmodel.area_nozzle', 'nozzle_area.array')
         self.connect('nozzle_area.max','hxadder.nozzle_area')
         intfuel = self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson', diff_units='s',
                                                               time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
@@ -206,7 +206,7 @@ def configure_problem():
     prob.model.nonlinear_solver.options['atol'] = 1e-8
     prob.model.nonlinear_solver.options['rtol'] = 1e-8
     prob.model.nonlinear_solver.linesearch = BoundsEnforceLS()
-    # prob.model.nonlinear_solver.linesearch.options['print_bound_enforce'] = True
+    prob.model.nonlinear_solver.linesearch.options['print_bound_enforce'] = True
     return prob
 
 def set_values(prob, num_nodes, design_range, spec_energy):
@@ -223,16 +223,14 @@ def set_values(prob, num_nodes, design_range, spec_energy):
     prob.set_val('mission_range',design_range,units='NM')
     prob.set_val('payload',1000,units='lb')
     prob.set_val('ac|propulsion|battery|specific_energy', spec_energy, units='W*h/kg')
-    prob.set_val('climb.propmodel.refrig_T_h_set', np.linspace(550, 450, num_nodes), units='K')
-    prob.set_val('cruise.propmodel.refrig_T_h_set', np.linspace(250, 250, num_nodes), units='K')
-    prob.set_val('descent.propmodel.refrig_T_h_set', np.linspace(400, 400, num_nodes), units='K')
     # set some airplane-specific values
     prob['analysis.cruise.acmodel.OEW.const.structural_fudge'] = 2.0
     prob['ac|propulsion|propeller|diameter'] = 2.2
     prob['ac|propulsion|engine|rating'] = 1117.2
 
     # Turn off the refrigerator during certain segments
-    prob['analysis.cruise.acmodel.propmodel.bypass_refrig'] = np.ones((num_nodes,), dtype=int)
+    prob['analysis.cruise.acmodel.propmodel.refrig.control.bypass_start'] = 1
+    prob['analysis.cruise.acmodel.propmodel.refrig.control.bypass_end'] = 1
 
     # set the initial battery SOC to match the HybridTwin_thermal after takeoff
     prob.set_val('climb.propmodel.batt1.SOC_initial', 0.8611499461827815, units=None)
