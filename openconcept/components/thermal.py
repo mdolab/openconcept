@@ -125,56 +125,6 @@ class ThermalComponentWithMass(ExplicitComponent):
         J['dTdt','q_in'] = 1 / inputs['mass'] / spec_heat
         J['dTdt','q_out'] = - 1 / inputs['mass'] / spec_heat
 
-class CoolantReservoirRate(ExplicitComponent):
-    """
-    Computes dT/dt of a coolant reservoir based on inflow and current temps and flow rate
-
-    Inputs
-    ------
-    T_in : float
-        Coolant stream in (vector, K)
-    T_out : float
-        Temperature of the reservoir (vector, K)
-    mass : float
-        Total quantity of coolant (scalar, kg)
-    mdot_coolant : float
-        Mass flow rate of the coolant (vector, kg/s)
-
-    Outputs
-    -------
-    dTdt : float
-        First derivative of temperature (vector, K/s)
-
-    Options
-    -------
-    num_nodes : int
-        The number of analysis points to run
-    """
-    def initialize(self):
-        self.options.declare('num_nodes', default=1)
-
-    def setup(self):
-        nn_tot = self.options['num_nodes']
-        arange = np.arange(0, nn_tot)
-
-        self.add_input('T_in', units='K', shape=(nn_tot,))
-        self.add_input('T_out', units='K', shape=(nn_tot,))
-        self.add_input('mdot_coolant', units='kg/s', shape=(nn_tot,))
-        self.add_input('mass', units='kg')
-        self.add_output('dTdt', units='K/s', shape=(nn_tot,))
-
-        self.declare_partials(['dTdt'], ['T_in','T_out','mdot_coolant'], rows=arange, cols=arange)
-        self.declare_partials(['dTdt'], ['mass'], rows=arange, cols=np.zeros((nn_tot,)))
-
-    def compute(self, inputs, outputs):
-        outputs['dTdt'] = inputs['mdot_coolant'] / inputs['mass'] * (inputs['T_in'] - inputs['T_out'])
-
-    def compute_partials(self, inputs, J):
-        J['dTdt','mass'] = - inputs['mdot_coolant'] / inputs['mass']**2 * (inputs['T_in'] - inputs['T_out'])
-        J['dTdt','mdot_coolant'] = 1 / inputs['mass'] * (inputs['T_in'] - inputs['T_out'])
-        J['dTdt','T_in'] = inputs['mdot_coolant'] / inputs['mass']
-        J['dTdt','T_out'] = - inputs['mdot_coolant'] / inputs['mass']
-
 class ThermalComponentMassless(ImplicitComponent):
     """
     Computes thermal residual of a component with heating, cooling, and thermal mass
@@ -417,3 +367,53 @@ class CoolantReservoir(Group):
                                            promotes_outputs=['*'], promotes_inputs=['*'])
         ode_integ.add_integrand('T_out', rate_name='dTdt', start_name='T_initial', end_name='T_final', units='K', lower=1e-10)
         self.connect('rate.dTdt','dTdt')
+
+class CoolantReservoirRate(ExplicitComponent):
+    """
+    Computes dT/dt of a coolant reservoir based on inflow and current temps and flow rate
+
+    Inputs
+    ------
+    T_in : float
+        Coolant stream in (vector, K)
+    T_out : float
+        Temperature of the reservoir (vector, K)
+    mass : float
+        Total quantity of coolant (scalar, kg)
+    mdot_coolant : float
+        Mass flow rate of the coolant (vector, kg/s)
+
+    Outputs
+    -------
+    dTdt : float
+        First derivative of temperature (vector, K/s)
+
+    Options
+    -------
+    num_nodes : int
+        The number of analysis points to run
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1)
+
+    def setup(self):
+        nn_tot = self.options['num_nodes']
+        arange = np.arange(0, nn_tot)
+
+        self.add_input('T_in', units='K', shape=(nn_tot,))
+        self.add_input('T_out', units='K', shape=(nn_tot,))
+        self.add_input('mdot_coolant', units='kg/s', shape=(nn_tot,))
+        self.add_input('mass', units='kg')
+        self.add_output('dTdt', units='K/s', shape=(nn_tot,))
+
+        self.declare_partials(['dTdt'], ['T_in','T_out','mdot_coolant'], rows=arange, cols=arange)
+        self.declare_partials(['dTdt'], ['mass'], rows=arange, cols=np.zeros((nn_tot,)))
+
+    def compute(self, inputs, outputs):
+        outputs['dTdt'] = inputs['mdot_coolant'] / inputs['mass'] * (inputs['T_in'] - inputs['T_out'])
+
+    def compute_partials(self, inputs, J):
+        J['dTdt','mass'] = - inputs['mdot_coolant'] / inputs['mass']**2 * (inputs['T_in'] - inputs['T_out'])
+        J['dTdt','mdot_coolant'] = 1 / inputs['mass'] * (inputs['T_in'] - inputs['T_out'])
+        J['dTdt','T_in'] = inputs['mdot_coolant'] / inputs['mass']
+        J['dTdt','T_out'] = - inputs['mdot_coolant'] / inputs['mass']
