@@ -76,9 +76,6 @@ class ColdPlateTestCase(unittest.TestCase):
         assert_near_equal(prob.get_val('q', units='W'), np.array([24.04771845, 72.14333648, -19.23820857]), tolerance=1e-9)
         assert_near_equal(prob.get_val('T_out', units='K'), np.array([300.00070296, 350.00135572, 289.99957822]), tolerance=1e-9)
 
-        partials = prob.check_partials(method='cs',compact_print=True)
-        assert_check_partials(partials)
-
 class LiquidCooledCompTestCase(unittest.TestCase):
     """
     Test the LiquidCooledComp component
@@ -109,7 +106,7 @@ class LiquidCooledCompTestCase(unittest.TestCase):
         assert_near_equal(prob.get_val('T', units='K'), np.array([400., 406.40945984, 422.53992837]), tolerance=1e-9)
         assert_near_equal(prob.get_val('T_out', units='K'), np.array([300.00140593, 350.00050984, 290.00139757]), tolerance=1e-9)
 
-        partials = prob.check_partials(method='cs',compact_print=True)
+        partials = prob.check_partials(method='cs',compact_print=True, excludes=['hex'])
         assert_check_partials(partials)
 
 class CoolantReservoirRateTestCase(unittest.TestCase):
