@@ -362,8 +362,7 @@ class LiquidCooledComp(Group):
                                                         promotes_inputs=['q_in', 'mass'])
             ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
                                            promotes_outputs=['*'], promotes_inputs=['*'])
-            # TODO lower limit 0
-            ode_integ.add_integrand('T', rate_name='dTdt', units='K')
+            ode_integ.add_integrand('T', rate_name='dTdt', units='K', lower=1e-10)
             self.connect('base.dTdt','dTdt')
         else:
             self.add_subsystem('base',
@@ -416,6 +415,5 @@ class CoolantReservoir(Group):
 
         ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
                                            promotes_outputs=['*'], promotes_inputs=['*'])
-        # TODO lower limit 0
-        ode_integ.add_integrand('T_out', rate_name='dTdt', start_name='T_initial', end_name='T_final', units='K')
+        ode_integ.add_integrand('T_out', rate_name='dTdt', start_name='T_initial', end_name='T_final', units='K', lower=1e-10)
         self.connect('rate.dTdt','dTdt')

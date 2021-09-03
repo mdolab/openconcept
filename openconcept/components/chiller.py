@@ -291,13 +291,13 @@ class COPExplicit(om.ExplicitComponent):
     def setup(self):
         nn = self.options['num_nodes']
 
-        self.add_input('T_c', units='K', shape=(nn,))
-        self.add_input('T_h', units='K', shape=(nn,))
+        self.add_input('T_c', val=300., units='K', shape=(nn,))
+        self.add_input('T_h', val=400., units='K', shape=(nn,))
         self.add_input('eff_factor', units=None, val=0.4)
 
         self.add_output('COP', units=None, shape=(nn,), val=0.0)
 
-        self.declare_partials(['COP'], ['T_c','T_h','eff_factor'], method='fd')
+        self.declare_partials(['COP'], ['T_c','T_h','eff_factor'], method='cs')
 
     def compute(self, inputs, outputs):
         epsilon = 0.05
