@@ -10,7 +10,7 @@ from openconcept.components.hydrogen.tank.LH2_tank import *
 class LH2TankTestCase(unittest.TestCase):
     def test_simple(self):
         p = Problem()
-        p.model = LH2Tank()
+        p.model = LH2Tank(ullage_P_init=101325., init_fill_level=0.95)
         p.model.linear_solver = DirectSolver()
         p.model.nonlinear_solver = NewtonSolver()
         p.model.nonlinear_solver.options['err_on_non_converge'] = True
@@ -31,7 +31,7 @@ class LH2TankTestCase(unittest.TestCase):
     def test_vectorized(self):
         nn = 5
         p = Problem()
-        p.model = LH2Tank(num_nodes=nn)
+        p.model = LH2Tank(num_nodes=nn, ullage_P_init=101325., init_fill_level=0.95)
         p.model.linear_solver = DirectSolver()
         p.model.nonlinear_solver = NewtonSolver()
         p.model.nonlinear_solver.options['err_on_non_converge'] = True
@@ -64,7 +64,7 @@ class LH2TankTestCase(unittest.TestCase):
     def test_vent_and_heat_add(self):
         nn = 5
         p = Problem()
-        p.model = LH2Tank(num_nodes=nn)
+        p.model = LH2Tank(num_nodes=nn, ullage_P_init=101325., init_fill_level=0.95)
         p.model.linear_solver = DirectSolver()
         p.model.nonlinear_solver = NewtonSolver()
         p.model.nonlinear_solver.options['err_on_non_converge'] = True
@@ -140,7 +140,7 @@ class LH2TankTestCase(unittest.TestCase):
     def test_optimization(self):
         nn = 9
         p = Problem()
-        p.model = LH2Tank(num_nodes=nn, safety_factor=2.25, init_fill_level=0.9, ullage_T_init=50)
+        p.model = LH2Tank(num_nodes=nn, safety_factor=2.25, init_fill_level=0.9, ullage_T_init=50, ullage_P_init=101325.)
         p.model.linear_solver = DirectSolver()
         p.model.nonlinear_solver = NewtonSolver()
         p.model.nonlinear_solver.options['solve_subsystems'] = True
