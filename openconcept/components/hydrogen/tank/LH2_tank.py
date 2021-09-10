@@ -100,10 +100,8 @@ class LH2Tank(om.Group):
     safety_factor : float
         Safety factor of composite overwrap, default 3. (scalar, dimensionless)
     init_fill_level : float
-        Initial fill level (in range 0-1) of the tank, default 0.95
-        to leave space for gas expansion; this should never be higher
-        than 0.99 or so since it's not enough space for gas expansion and
-        the model behaves poorly with values very close to 1 (scalar, dimensionless)
+        Initial fill level (in range 0-1) of the tank, default 0.97
+        to leave space for boil off gas; 3% adopted from Cryoplane study (scalar, dimensionless)
     T_surf_guess : float
         If convergence problems, set this parameter to a few degrees below the
         lowest expected T_inf value to give the solver a good initial guess!
@@ -115,16 +113,17 @@ class LH2Tank(om.Group):
     ullage_T_init : float
         Initial temperature of gas in ullage, default 90 K (scalar, K)
     ullage_P_init : float
-        Initial pressure of gas in ullage, default 1 atm (scalar, Pa)
+        Initial pressure of gas in ullage, default 1.2 atm; ullage pressure must be higher than ambient
+        to prevent air leaking in and creating a combustible mixture (scalar, Pa)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of design points to run')
         self.options.declare('safety_factor', default=3., desc='Safety factor on composite thickness')
-        self.options.declare('init_fill_level', default=0.95, desc='Initial fill level')
+        self.options.declare('init_fill_level', default=0.97, desc='Initial fill level')
         self.options.declare('T_surf_guess', default=150., desc='Guess for tank surface temperature (K)')
         self.options.declare('rho_LH2', default=70.85, desc='Liquid hydrogen density (kg/m^3)')
         self.options.declare('ullage_T_init', default=90, desc='Initial ullage temp (K)')
-        self.options.declare('ullage_P_init', default=101325, desc='Initial ullage pressure (Pa)')
+        self.options.declare('ullage_P_init', default=101325*1.2, desc='Initial ullage pressure (Pa)')
     
     def setup(self):
         nn = self.options['num_nodes']
