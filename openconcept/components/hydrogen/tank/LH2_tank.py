@@ -29,8 +29,8 @@ class LH2Tank(om.Group):
           gaseous hydrogen. To do this, drive the model with a optimizer
           and include something like this:
 
-            prob.model.add_design_var('m_dot_vent_start', lower=0.)
-            prob.model.add_design_var('m_dot_vent_end', lower=0.)
+            prob.model.add_design_var('m_dot_vent_start', lower=0., ref=0.01)
+            prob.model.add_design_var('m_dot_vent_end', lower=0., ref=0.01)
             prob.model.add_design_var('LH2_heat_added_start', lower=0.)
             prob.model.add_design_var('LH2_heat_added_end', lower=0.)
             prob.model.add_constraint('ullage_P_residual', lower=0., scaler=1e-7)
