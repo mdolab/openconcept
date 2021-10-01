@@ -3,16 +3,129 @@ from __future__ import division
 import numpy as np
 import openmdao.api as om
 from time import time
+from copy import copy
 
 # OpenAeroStruct
-from openaerostruct.geometry.geometry_mesh_transformations import Rotate
-from openaerostruct.aerodynamics.aero_groups import AeroPoint
+try:
+    from openaerostruct.geometry.geometry_mesh_transformations import Rotate
+    from openaerostruct.aerodynamics.aero_groups import AeroPoint
+except ImportError:
+    raise ImportError("OpenAeroStruct must be installed to use the OASDragPolar aerodynamic component")
 
 # Atmospheric calculations
 from openconcept.analysis.atmospherics.temperature_comp import TemperatureComp
 from openconcept.analysis.atmospherics.pressure_comp import PressureComp
 from openconcept.analysis.atmospherics.density_comp import DensityComp
 from openconcept.analysis.atmospherics.speedofsound_comp import SpeedOfSoundComp
+
+
+class OASDragPolar(om.Group):
+    """
+    Drag polar generated using OpenAeroStruct's vortex lattice method and a surrogate
+    model to decrease the computational cost.
+
+    Inputs
+    ------
+    fltcond|CL : float
+        Lift coefficient (vector, dimensionless)
+    fltcond|q : float
+        Dynamic pressure (vector, Pascals)
+    ac|geom|S_ref : float
+        Full planform area (scalar, m^2)
+    ac|geom|AR : float
+        Aspect ratio (scalar, dimensionless)
+    ac|geom|taper : float
+        Taper ratio (must be >0 and <=1); tip chord / root chord (scalar, dimensionless)
+    ac|geom|c4sweep : float
+        Quarter chord sweep angle (scalar, degrees)
+    ac|geom|twist : float
+        List of twist angles at control points of spline (vector, degrees)
+        NOTE: length of vector is num_twist (set in options), NOT num_nodes
+    fltcond|TempIncrement : float
+        Temperature increment for non-standard day (scalar, degC)
+
+    Outputs
+    -------
+    drag : float
+        Drag force (vector, Newtons)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points per mission segment (scalar, dimensionless)
+    num_x : int
+        Number of points in x (streamwise) direction (scalar, dimensionless)
+    num_y : int
+        Number of points in y (spanwise) direction for one wing because
+        uses symmetry (scalar, dimensionless)
+    num_twist : int
+        Number of spline control points for twist (scalar, dimensionless)
+    alpha_train : list or ndarray
+        List of angle of attack values at which to train the model (ndarray, degrees)
+    Mach_train : list or ndarray
+        List of Mach numbers at which to train the model (ndarray, dimensionless)
+    alt_train : list or ndarray
+        List of altitude values at which to train the model (ndarray, m)
+    surf_options : dict
+        Dictionary of OpenAeroStruct surface options; any options provided here
+        will override the default ones; see the OpenAeroStruct documentation for more information
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points to run')
+        self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
+        self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
+        self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
+        self.options.declare('alpha_train', default=np.zeros((1,1,1)),
+                             desc='List of angle of attack training values (degrees)')
+        self.options.declare('Mach_train', default=np.zeros((1,1,1)),
+                             desc='List of Mach number training values (dimensionless)')
+        self.options.declare('alt_train', default=np.zeros((1,1,1)),
+                             desc='List of altitude training values (meters)')
+        self.options.declare('surf_options', default=None, desc="Dictionary of OpenAeroStruct surface options")
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+        n_alpha = self.options['alpha_train'].size
+        n_Mach = self.options['Mach_train'].size
+        n_alt = self.options['alt_train'].size
+
+        # Training data
+        self.add_subsystem('training_data', OASDataGen(num_x=self.options['num_x'], num_y=self.options['num_y'],
+                                                       num_twist=self.options['num_twist'], alpha_train=self.options['alpha_train'],
+                                                       Mach_train=self.options['Mach_train'], alt_train=self.options['alt_train'],
+                                                       surf_options=self.options['surf_options']),
+                           promotes_inputs=['ac|geom|S_ref', 'ac|geom|AR', 'ac|geom|taper', 'ac|geom|c4sweep',
+                                            'ac|geom|twist', 'fltcond|TempIncrement'])
+
+        # Surrogate model
+        interp = om.MetaModelStructuredComp(method='lagrange3', training_data_gradients=True)
+        interp.add_input('alpha', 0., shape=(nn,), units='deg', training_data=self.options['alpha_train'])
+        interp.add_input('fltcond|M', 0.1, shape=(nn,), training_data=self.options['Mach_train'])
+        interp.add_input('fltcond|h', 0., shape=(nn,), units='m', training_data=self.options['alt_train'])
+        interp.add_output('CL', shape=(nn,), training_data=np.zeros((n_alpha, n_Mach, n_alt)))
+        interp.add_output('CD', shape=(nn,), training_data=np.zeros((n_alpha, n_Mach, n_alt)))
+        self.add_subsystem('aero_surrogate', interp, promotes_inputs=['fltcond|M', 'fltcond|h'])
+        self.connect('training_data.CL_train', 'aero_surrogate.CL_train')
+        self.connect('training_data.CD_train', 'aero_surrogate.CD_train')
+
+        # Solve for angle of attack that meets input lift coefficient
+        self.add_subsystem("alpha_bal", om.BalanceComp('alpha', eq_units=None, lhs_name="CL_VLM",
+                                                       rhs_name="fltcond|CL", val=np.ones(nn),
+                                                       units="deg"),
+                           promotes_inputs=['fltcond|CL'])
+        self.connect("alpha_bal.alpha", "aero_surrogate.alpha")
+        self.connect("aero_surrogate.CL", "alpha_bal.CL_VLM")
+
+        # Compute drag force from drag coefficient
+        self.add_subsystem('drag_calc', om.ExecComp('drag = q * S * CD',
+                                                    drag={'units': 'N', 'shape': (nn,)},
+                                                    q={'units': 'Pa', 'shape': (nn,)},
+                                                    S={'units': 'm**2', 'shape': (nn,)},
+                                                    CD={'shape': (nn,)},),
+                           promotes_inputs=[('q', 'fltcond|q'), ('S', 'ac|geom|S_ref')],
+                           promotes_outputs=['drag'])
+        self.connect('aero_surrogate.CD', 'drag_calc.CD')
+
 
 class OASDataGen(om.ExplicitComponent):
     """
@@ -46,19 +159,22 @@ class OASDataGen(om.ExplicitComponent):
 
     Options
     -------
-    num_x: int
-        number of points in x (streamwise) direction (scalar, dimensionless)
-    num_y: int
-        number of points in y (spanwise) direction for one wing because
+    num_x : int
+        Number of points in x (streamwise) direction (scalar, dimensionless)
+    num_y : int
+        Number of points in y (spanwise) direction for one wing because
         uses symmetry (scalar, dimensionless)
     num_twist : int
-        number of spline control points for twist (scalar, dimensionless)
+        Number of spline control points for twist (scalar, dimensionless)
     alpha_train : list or ndarray
         List of angle of attack values at which to train the model (ndarray, degrees)
-    Mach_train : 3-dim ndarray
+    Mach_train : list or ndarray
         List of Mach numbers at which to train the model (ndarray, dimensionless)
-    alt_train : 3-dim ndarray
+    alt_train : list or ndarray
         List of altitude values at which to train the model (ndarray, m)
+    surf_options : dict
+        Dictionary of OpenAeroStruct surface options; any options provided here
+        will override the default ones; see the OpenAeroStruct documentation for more information
     """
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
@@ -70,6 +186,7 @@ class OASDataGen(om.ExplicitComponent):
                              desc='List of Mach number training values (dimensionless)')
         self.options.declare('alt_train', default=np.zeros((1,1,1)),
                              desc='List of altitude training values (meters)')
+        self.options.declare('surf_options', default=None, desc="Dictionary of OpenAeroStruct surface options")
     
     def setup(self):
         self.add_input('ac|geom|S_ref', units='m**2')
@@ -85,7 +202,7 @@ class OASDataGen(om.ExplicitComponent):
         self.add_output("CL_train", shape=(n_alpha, n_Mach, n_alt))
         self.add_output("CD_train", shape=(n_alpha, n_Mach, n_alt))
 
-        self.declare_partials(['*'], ['*'], method='cs')
+        self.declare_partials(['*'], ['*'], method='fd')
 
         # Generate grids and default cached values for training inputs and outputs
         self.S = -1
@@ -93,6 +210,7 @@ class OASDataGen(om.ExplicitComponent):
         self.taper = -1
         self.c4sweep = -1
         self.twist = -1*np.ones((self.options["num_twist"],))
+        self.temp_incr = -42
         self.alpha, self.Mach, self.alt = np.meshgrid(self.options['alpha_train'],
                                                       self.options['Mach_train'],
                                                       self.options['alt_train'],
@@ -106,6 +224,44 @@ class OASDataGen(om.ExplicitComponent):
         taper = inputs["ac|geom|taper"]
         sweep = inputs["ac|geom|c4sweep"]
         twist = inputs["ac|geom|twist"]
+        temp_incr = inputs["fltcond|TempIncrement"]
+
+        # If the inputs are unchaged, use the previously calculated values
+        if (S == self.S and
+           AR == self.AR and
+           taper == self.taper and
+           sweep == self.sweep and
+           np.all(twist == self.twist) and
+           temp_incr == self.temp_incr):
+            outputs['CL_train'] = self.CL
+            outputs['CD_train'] = self.CD
+            return
+
+        # Copy new values to cached ones
+        self.S = copy(S)
+        self.AR = copy(AR)
+        self.taper = copy(taper)
+        self.c4sweep = copy(sweep)
+        self.twist = copy(twist)
+        self.temp_incr = copy(temp_incr)
+        
+        # Compute new training values
+        train_in = {}
+        train_in['alpha_grid'] = self.alpha
+        train_in['Mach_number_grid'] = self.Mach
+        train_in['alt_grid'] = self.alt
+        train_in['TempIncrement'] = temp_incr
+        train_in['S_ref'] = S
+        train_in['AR'] = AR
+        train_in['taper'] = taper
+        train_in['c4sweep'] = sweep
+        train_in['twist'] = twist
+        train_in['num_x'] = self.options['num_x']
+        train_in['num_y'] = self.options['num_y']
+
+        data = compute_training_data(inputs, surf_dict=self.options['surf_options'])
+        self.CL = copy(data['CL'])
+        self.CD = copy(data['CD'])
 
 
 """
@@ -162,7 +318,8 @@ def compute_training_data(inputs, surf_dict=None):
     p = om.Problem()
     p.model.add_subsystem('aero_analysis', VLM(num_x=inputs['num_x'],
                                                num_y=inputs['num_y'],
-                                               num_twist=inputs['twist'].size),
+                                               num_twist=inputs['twist'].size,
+                                               surf_options=surf_dict),
                            promotes=['*'])
 
     # Set design variables
@@ -243,18 +400,22 @@ class VLM(om.Group):
     
     Options
     -------
-    num_x: int
-        number of points in x (streamwise) direction (scalar, dimensionless)
-    num_y: int
-        number of points in y (spanwise) direction for one wing because
+    num_x : int
+        Number of points in x (streamwise) direction (scalar, dimensionless)
+    num_y : int
+        Number of points in y (spanwise) direction for one wing because
         uses symmetry (scalar, dimensionless)
     num_twist : int
-        number of spline control points for twist (scalar, dimensionless)
+        Number of spline control points for twist (scalar, dimensionless)
+    surf_options : dict
+        Dictionary of OpenAeroStruct surface options; any options provided here
+        will override the default ones; see the OpenAeroStruct documentation for more information
     """
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
         self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
+        self.options.declare('surf_options', default=None, desc="Dictionary of OpenAeroStruct surface options")
     
     def setup(self):
         nx = int(self.options["num_x"])
@@ -344,6 +505,11 @@ class VLM(om.Group):
             'with_viscous' : True,  # if true, compute viscous drag
             'with_wave' : True,     # if true, compute wave drag
             }
+
+        # Overwrite any options in the surface dict with those provided in the options
+        if self.options['surf_options'] is not None:
+            for key in self.options['surf_options']:
+                surf_dict[key] = self.options['surf_options'][key]
 
         self.add_subsystem("aero_point", AeroPoint(surfaces=[surf_dict]),
                            promotes_inputs=[("Mach_number", "fltcond|M"), ("alpha", "fltcond|alpha")],
