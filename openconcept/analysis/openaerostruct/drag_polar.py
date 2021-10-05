@@ -99,11 +99,11 @@ class OASDragPolar(om.Group):
 
         # Surrogate model
         interp = om.MetaModelStructuredComp(method='lagrange3', training_data_gradients=True, vec_size=nn)
-        interp.add_input('alpha', 0., units='deg', training_data=self.options['alpha_train'])
         interp.add_input('fltcond|M', 0.1, training_data=self.options['Mach_train'])
+        interp.add_input('alpha', 0., units='deg', training_data=self.options['alpha_train'])
         interp.add_input('fltcond|h', 0., units='m', training_data=self.options['alt_train'])
-        interp.add_output('CL', training_data=np.zeros((n_alpha, n_Mach, n_alt)))
-        interp.add_output('CD', training_data=np.zeros((n_alpha, n_Mach, n_alt)))
+        interp.add_output('CL', training_data=np.zeros((n_Mach, n_alpha, n_alt)))
+        interp.add_output('CD', training_data=np.zeros((n_Mach, n_alpha, n_alt)))
         self.add_subsystem('aero_surrogate', interp, promotes_inputs=['fltcond|M', 'fltcond|h'])
         self.connect('training_data.CL_train', 'aero_surrogate.CL_train')
         self.connect('training_data.CD_train', 'aero_surrogate.CD_train')
@@ -166,10 +166,10 @@ class OASDataGen(om.ExplicitComponent):
         uses symmetry (scalar, dimensionless)
     num_twist : int
         Number of spline control points for twist (scalar, dimensionless)
-    alpha_train : list or ndarray
-        List of angle of attack values at which to train the model (ndarray, degrees)
     Mach_train : list or ndarray
         List of Mach numbers at which to train the model (ndarray, dimensionless)
+    alpha_train : list or ndarray
+        List of angle of attack values at which to train the model (ndarray, degrees)
     alt_train : list or ndarray
         List of altitude values at which to train the model (ndarray, m)
     surf_options : dict
@@ -180,10 +180,10 @@ class OASDataGen(om.ExplicitComponent):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
         self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
-        self.options.declare('alpha_train', default=np.zeros((1,1,1)),
-                             desc='List of angle of attack training values (degrees)')
         self.options.declare('Mach_train', default=np.zeros((1,1,1)),
                              desc='List of Mach number training values (dimensionless)')
+        self.options.declare('alpha_train', default=np.zeros((1,1,1)),
+                             desc='List of angle of attack training values (degrees)')
         self.options.declare('alt_train', default=np.zeros((1,1,1)),
                              desc='List of altitude training values (meters)')
         self.options.declare('surf_options', default=None, desc="Dictionary of OpenAeroStruct surface options")
@@ -196,11 +196,11 @@ class OASDataGen(om.ExplicitComponent):
         self.add_input('ac|geom|twist', shape=(self.options["num_twist"],), units='deg')
         self.add_input('fltcond|TempIncrement', val=0., units='degC')
 
-        n_alpha = self.options['alpha_train'].size
         n_Mach = self.options['Mach_train'].size
+        n_alpha = self.options['alpha_train'].size
         n_alt = self.options['alt_train'].size
-        self.add_output("CL_train", shape=(n_alpha, n_Mach, n_alt))
-        self.add_output("CD_train", shape=(n_alpha, n_Mach, n_alt))
+        self.add_output("CL_train", shape=(n_Mach, n_alpha, n_alt))
+        self.add_output("CD_train", shape=(n_Mach, n_alpha, n_alt))
 
         self.declare_partials('*', '*')
 
@@ -211,12 +211,12 @@ class OASDataGen(om.ExplicitComponent):
         self.c4sweep = -np.ones(1)
         self.twist = -1*np.ones((self.options["num_twist"],))
         self.temp_incr = -42*np.ones(1)
-        self.alpha, self.Mach, self.alt = np.meshgrid(self.options['alpha_train'],
-                                                      self.options['Mach_train'],
+        self.Mach, self.alpha, self.alt = np.meshgrid(self.options['Mach_train'],
+                                                      self.options['alpha_train'],
                                                       self.options['alt_train'],
                                                       indexing='ij')
-        self.CL = np.zeros((n_alpha, n_Mach, n_alt))
-        self.CD = np.zeros((n_alpha, n_Mach, n_alt))
+        self.CL = np.zeros((n_Mach, n_alpha, n_alt))
+        self.CD = np.zeros((n_Mach, n_alpha, n_alt))
         self.partials = None
     
     def compute(self, inputs, outputs):
@@ -249,8 +249,8 @@ class OASDataGen(om.ExplicitComponent):
         
         # Compute new training values
         train_in = {}
-        train_in['alpha_grid'] = self.alpha
         train_in['Mach_number_grid'] = self.Mach
+        train_in['alpha_grid'] = self.alpha
         train_in['alt_grid'] = self.alt
         train_in['TempIncrement'] = temp_incr
         train_in['S_ref'] = S
@@ -323,9 +323,9 @@ data : dict
 """
 def compute_training_data(inputs, surf_dict=None):
     # Initialize output arrays
-    CL = np.zeros(inputs['alpha_grid'].shape)
-    CD = np.zeros(inputs['alpha_grid'].shape)
-    jac_num_rows = np.product(np.array(inputs['alpha_grid'].shape))  # product of array dimensions
+    CL = np.zeros(inputs['Mach_number_grid'].shape)
+    CD = np.zeros(inputs['Mach_number_grid'].shape)
+    jac_num_rows = np.product(np.array(inputs['Mach_number_grid'].shape))  # product of array dimensions
     partials = {}
     partials['CL_train', 'ac|geom|S_ref'] = np.zeros((jac_num_rows, 1))
     partials['CD_train', 'ac|geom|S_ref'] = np.zeros((jac_num_rows, 1))
@@ -360,14 +360,19 @@ def compute_training_data(inputs, surf_dict=None):
 
     # Iterate through the training points and evaluate the model
     iter = 0
-    total = inputs['alpha_grid'].shape[0]*inputs['alpha_grid'].shape[1]*inputs['alpha_grid'].shape[2]
+    total = inputs['Mach_number_grid'].shape[0]*inputs['Mach_number_grid'].shape[1]*inputs['Mach_number_grid'].shape[2]
     jac_row = 0
-    for i in range(inputs['alpha_grid'].shape[0]):
-        for j in range(inputs['alpha_grid'].shape[1]):
-            for k in range(inputs['alpha_grid'].shape[2]):
+    for i in range(inputs['Mach_number_grid'].shape[0]):
+        for j in range(inputs['Mach_number_grid'].shape[1]):
+            for k in range(inputs['Mach_number_grid'].shape[2]):
+                # Problems were observed with derivatives due
+                # to a strange effect in OpenAeroStruct's wave drag calculation
+                # and setting up the problem fresh every time fixed it
+                p.setup()
+
                 # Set the values for the current training point in the model
-                p.set_val('fltcond|alpha', inputs['alpha_grid'][i,j,k], units='deg')
                 p.set_val('fltcond|M', inputs['Mach_number_grid'][i,j,k])
+                p.set_val('fltcond|alpha', inputs['alpha_grid'][i,j,k], units='deg')
                 p.set_val('fltcond|h', inputs['alt_grid'][i,j,k], units='m')
 
                 # Run the models and pull the lift and drag values out
@@ -388,7 +393,7 @@ def compute_training_data(inputs, surf_dict=None):
                         partials[of_out[n], u][jac_row, :] = deriv[f, u]
                 jac_row += 1
     
-    print("                                 ", end="\r")
+    print("                                          ", end="\r")
     data = {'CL': CL, 'CD': CD, 'partials': partials}
     return data
 
@@ -647,13 +652,28 @@ class PlanformMesh(om.ExplicitComponent):
         mesh[:, :, 1] = y_mesh
 
         outputs["mesh"] = mesh
+    
+    # def compute_partials(self, inputs, J):
+    #     S = inputs["S"]
+    #     AR = inputs["AR"]
+    #     taper = inputs["taper"]
+    #     sweep = inputs["sweep"]
+    #     nx = int(self.options["num_x"])
+    #     ny = int(self.options["num_y"])
+
+    #     # Compute absolute dimensions from wing geometry spec
+    #     half_span = np.sqrt(AR * S) / 2
+    #     c_root = S / (half_span * (1 + taper))
+
+    #     # Create baseline square mesh from 0 to 1 in each direction
+    #     x_mesh, y_mesh = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
 
 
 if __name__=="__main__":
     # Compare surrogate drag polar to using OpenAeroStruct directly
     # Do two drag polars, one at subsonic low altitudes and one
-    # transonic high altitude (both not on sample points for the surrogate)
-    nn = 200
+    # transonic high altitude
+    nn = 100
     S = 427.8
     AR = 9.82
     taper = 0.149
@@ -674,8 +694,8 @@ if __name__=="__main__":
     
     # Get exact data
     inputs = {}
-    inputs['alpha_grid'], inputs['Mach_number_grid'], inputs['alt_grid'] = np.meshgrid(alpha_list,
-                                                                                       M1,
+    inputs['Mach_number_grid'], inputs['alpha_grid'], inputs['alt_grid'] = np.meshgrid(M1,
+                                                                                       alpha_list,
                                                                                        h1,
                                                                                        indexing='ij')
     inputs['TempIncrement'] = 0
@@ -687,12 +707,12 @@ if __name__=="__main__":
     inputs['num_x'] = nx
     inputs['num_y'] = ny
     res = compute_training_data(inputs)
-    CL1_exact = copy(res['CL'][:,0,0])
-    CD1_exact = copy(res['CD'][:,0,0])
+    CL1_exact = copy(res['CL'][0,:,0])
+    CD1_exact = copy(res['CD'][0,:,0])
 
     inputs = {}
-    inputs['alpha_grid'], inputs['Mach_number_grid'], inputs['alt_grid'] = np.meshgrid(alpha_list,
-                                                                                       M2,
+    inputs['Mach_number_grid'], inputs['alpha_grid'], inputs['alt_grid'] = np.meshgrid(M2,
+                                                                                       alpha_list,
                                                                                        h2,
                                                                                        indexing='ij')
     inputs['TempIncrement'] = 0
@@ -704,17 +724,17 @@ if __name__=="__main__":
     inputs['num_x'] = nx
     inputs['num_y'] = ny
     res = compute_training_data(inputs)
-    CL2_exact = copy(res['CL'][:,0,0])
-    CD2_exact = copy(res['CD'][:,0,0])
+    CL2_exact = copy(res['CL'][0,:,0])
+    CD2_exact = copy(res['CD'][0,:,0])
 
     # Generate surrogate and get estimated data
     p = om.Problem()
-    alpha_train = np.linspace(-10, 10, 5)  # deg
-    Mach_train = np.linspace(0.1, 0.9, 5)
-    alt_train = np.linspace(0, 45000, 5)*0.3048  # m
+    Mach_train = np.array([0.1, 0.3, 0.6, 0.75, 0.8, 0.825, 0.85, 0.875, 0.9])#np.linspace(0.1, 0.9, 5)
+    alpha_train = np.linspace(-10, 10, 10)  # deg
+    alt_train = np.array([0., 1e3, 3e3, 8e3, 12e3])#np.linspace(0, 45000, 5)*0.3048  # m
     p.model = OASDragPolar(num_nodes=nn, num_x=nx, num_y=ny, num_twist=twist.size,
-                           alpha_train=alpha_train,
                            Mach_train=Mach_train,
+                           alpha_train=alpha_train,
                            alt_train=alt_train)
     p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, iprint=2)
     p.model.linear_solver = om.DirectSolver()
@@ -729,67 +749,24 @@ if __name__=="__main__":
     p.set_val('ac|geom|c4sweep', c4sweep)
     p.set_val('ac|geom|twist', twist)
 
-    p.check_partials(method='fd', compact_print=True, show_only_incorrect=True)
+    # p.check_partials(method='fd', compact_print=True, show_only_incorrect=True)
 
-    # p.run_model()
-    # CD1_est = copy(p.get_val('aero_surrogate.CD'))
+    p.run_model()
+    CD1_est = copy(p.get_val('aero_surrogate.CD'))
 
-    # p.set_val('fltcond|CL', CL2_exact)
-    # p.set_val('fltcond|M', M2)
-    # p.set_val('fltcond|h', h2)
-    # p.run_model()
-    # CD2_est = p.get_val('aero_surrogate.CD')
+    p.set_val('fltcond|CL', CL2_exact)
+    p.set_val('fltcond|M', M2)
+    p.set_val('fltcond|h', h2)
+    p.run_model()
+    CD2_est = p.get_val('aero_surrogate.CD')
 
-    # import matplotlib.pyplot as plt
-    # plt.plot(CD1_exact, CL1_exact, '--r')
-    # plt.plot(CD1_est, CL1_exact, 'r')
-    # plt.plot(CD2_exact, CL2_exact, '--k')
-    # plt.plot(CD2_est, CL2_exact, 'k')
-    # plt.xlabel('CD')
-    # plt.ylabel('CL')
-    # plt.legend([f"OAS, Mach {M1[0]}, {h1[0]/304.8:.1f}k ft", 'surrogate', f"OAS, Mach {M2[0]}, {h2[0]/304.8:.1f}k ft", 'surrogate'])
-    # plt.title(f"{alpha_train.size} angle of attack, {Mach_train.size} Mach number, and {alt_train.size} altitude samples\ntest")
-    # plt.show()
-
-
-
-
-    # alpha_list = np.linspace(-10, 10, 10)
-    # Mach_list = np.linspace(0.1, 0.9, 10)
-    # alt_list = 0.3048*np.linspace(0, 45000, 3)
-
-    # import pickle as pkl
-    
-    # inputs = {}
-    # inputs['alpha_grid'], inputs['Mach_number_grid'], inputs['alt_grid'] = np.meshgrid(alpha_list,
-    #                                                                                    Mach_list,
-    #                                                                                    alt_list,
-    #                                                                                    indexing='ij')
-    # inputs['TempIncrement'] = 0
-    # inputs['S_ref'] = 427.8
-    # inputs['AR'] = 9.82
-    # inputs['taper'] = 0.149
-    # inputs['c4sweep'] = 31.6
-    # inputs['twist'] = np.array([-3, 1.5, 6])
-    # inputs['num_x'] = 3
-    # inputs['num_y'] = 5
-
-    # res = compute_training_data(inputs)
-
-    # with open('train.pkl', 'wb') as f:
-    #     pkl.dump(res, f, pkl.HIGHEST_PROTOCOL)
-
-    # with open('train.pkl', 'rb') as f:
-    #     res = pkl.load(f)
-
-    # p = om.Problem()
-
-    # interp = p.model.add_subsystem('mm', om.MetaModelStructuredComp(method='lagrange3'))
-    # interp.add_input('alpha', 0., units='deg', training_data=alpha_list)
-    # interp.add_input('fltcond|M', 0.1, training_data=Mach_list)
-    # interp.add_input('fltcond|h', 0., units='m', training_data=alt_list)
-    # interp.add_output('CL', training_data=res['CL'])
-    # interp.add_output('CD', training_data=res['CD'])
-
-    # p.setup()
-    # p.final_setup()
+    import matplotlib.pyplot as plt
+    plt.plot(CD1_exact, CL1_exact, '--r')
+    plt.plot(CD1_est, CL1_exact, 'r')
+    plt.plot(CD2_exact, CL2_exact, '--k')
+    plt.plot(CD2_est, CL2_exact, 'k')
+    plt.xlabel('CD')
+    plt.ylabel('CL')
+    plt.legend([f"OAS, Mach {M1[0]}, {h1[0]/304.8:.1f}k ft", 'surrogate', f"OAS, Mach {M2[0]}, {h2[0]/304.8:.1f}k ft", 'surrogate'])
+    plt.title(f"{alpha_train.size} angle of attack, {Mach_train.size} Mach number, and {alt_train.size} altitude samples\ntest")
+    plt.show()
