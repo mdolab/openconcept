@@ -307,7 +307,9 @@ inputs : dict
     num_y: int
         number of points in y (spanwise) direction for one wing because
         uses symmetry (scalar, dimensionless)
-TODO: add optional surf_dict input? Add any addition options to the default surf_dict in the VLM group
+surf_dict : dict
+    Dictionary of OpenAeroStruct surface options; any options provided here
+    will override the default ones; see the OpenAeroStruct documentation for more information
 
 Outputs
 -------
@@ -321,7 +323,8 @@ data : dict
         Partial derivatives of the training data flattened in the proper OpenMDAO-style
         format for use as partial derivatives in the OASDataGen component
 """
-def compute_training_data(inputs, surf_dict=None):
+def compute_training_data(inputs, surf_dict=None, print_timing=False):
+    t_start = time()
     # Initialize output arrays
     CL = np.zeros(inputs['Mach_number_grid'].shape)
     CD = np.zeros(inputs['Mach_number_grid'].shape)
@@ -362,13 +365,18 @@ def compute_training_data(inputs, surf_dict=None):
     iter = 0
     total = inputs['Mach_number_grid'].shape[0]*inputs['Mach_number_grid'].shape[1]*inputs['Mach_number_grid'].shape[2]
     jac_row = 0
+    t_mod = 0
+    t_der = 0
+    t_set = 0
     for i in range(inputs['Mach_number_grid'].shape[0]):
         for j in range(inputs['Mach_number_grid'].shape[1]):
             for k in range(inputs['Mach_number_grid'].shape[2]):
                 # Problems were observed with derivatives due
                 # to a strange effect in OpenAeroStruct's wave drag calculation
                 # and setting up the problem fresh every time fixed it
+                t = time()
                 p.setup()
+                t_set += time() - t
 
                 # Set the values for the current training point in the model
                 p.set_val('fltcond|M', inputs['Mach_number_grid'][i,j,k])
@@ -378,7 +386,9 @@ def compute_training_data(inputs, surf_dict=None):
                 # Run the models and pull the lift and drag values out
                 print(f"Generating training data...{iter/total*100:.1f}%", end='\r')
                 iter += 1
+                t = time()
                 p.run_model()
+                t_mod += time() - t
                 CL[i,j,k] = p.get_val('fltcond|CL')
                 CD[i,j,k] = p.get_val('fltcond|CD')
 
@@ -387,13 +397,20 @@ def compute_training_data(inputs, surf_dict=None):
                 of_out = ['CL_train', 'CD_train']
                 wrt = ['ac|geom|S_ref', 'ac|geom|AR', 'ac|geom|taper',
                        'ac|geom|c4sweep', 'ac|geom|twist', 'fltcond|TempIncrement']
+                t = time()
                 deriv = p.compute_totals(of, wrt)
+                t_der += time() - t
                 for n, f in enumerate(of):
                     for u in wrt:
                         partials[of_out[n], u][jac_row, :] = deriv[f, u]
                 jac_row += 1
     
     print("                                          ", end="\r")
+    if print_timing:
+        print(f"Model time: {t_mod} sec")
+        print(f"Derivative time: {t_der} sec")
+        print(f"Setup time: {t_set} sec")
+        print(f"Total time: {time() - t_start} sec")
     data = {'CL': CL, 'CD': CD, 'partials': partials}
     return data
 
@@ -623,7 +640,7 @@ class PlanformMesh(om.ExplicitComponent):
 
         self.add_output("mesh", val=mesh, shape=(nx, ny, 3), units="m")
 
-        self.declare_partials("mesh", ["*"], method="fd")  # TODO: do this analytically
+        self.declare_partials("mesh", "*")
     
     def compute(self, inputs, outputs):
         S = inputs["S"]
@@ -653,32 +670,48 @@ class PlanformMesh(om.ExplicitComponent):
 
         outputs["mesh"] = mesh
     
-    # def compute_partials(self, inputs, J):
-    #     S = inputs["S"]
-    #     AR = inputs["AR"]
-    #     taper = inputs["taper"]
-    #     sweep = inputs["sweep"]
-    #     nx = int(self.options["num_x"])
-    #     ny = int(self.options["num_y"])
+    def compute_partials(self, inputs, J):
+        S = inputs["S"]
+        AR = inputs["AR"]
+        taper = inputs["taper"]
+        sweep = inputs["sweep"]
+        nx = int(self.options["num_x"])
+        ny = int(self.options["num_y"])
 
-    #     # Compute absolute dimensions from wing geometry spec
-    #     half_span = np.sqrt(AR * S) / 2
-    #     c_root = S / (half_span * (1 + taper))
+        # Compute absolute dimensions from wing geometry spec
+        half_span = np.sqrt(AR * S) / 2
+        c_root = S / (half_span * (1 + taper))
 
-    #     # Create baseline square mesh from 0 to 1 in each direction
-    #     x_mesh, y_mesh = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
+        # Create baseline square mesh from 0 to 1 in each direction
+        x_mesh, y_mesh = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
 
-    #     # Compute derivatives in a way analogous to forward AD
-    #     db_dAR = S / (4 * np.sqrt(AR * S))
-    #     db_dS = AR / (4 * np.sqrt(AR * S))
-    #     dcroot_dAR = -S / (half_span**2 * (1 + taper)) * db_dAR
-    #     dcroot_dS = 1 / (half_span * (1 + taper)) - S / (half_span**2 * (1 + taper)) * db_dS
-    #     dcroot_dtaper = -S / (half_span * (1 + taper)**2)
+        # Compute derivatives in a way analogous to forward AD
+        db_dS = AR / (4 * np.sqrt(AR * S))
+        db_dAR = S / (4 * np.sqrt(AR * S))
+        dcroot_dS = 1 / (half_span * (1 + taper)) - S / (half_span**2 * (1 + taper)) * db_dS
+        dcroot_dAR = -S / (half_span**2 * (1 + taper)) * db_dAR
+        dcroot_dtaper = -S / (half_span * (1 + taper)**2)
 
-    #     dx_dcroot = x_mesh
-    #     dy_db = y_mesh
+        dy_dS = y_mesh * db_dS
+        dy_dAR = y_mesh * db_dAR
 
-    #     dx_dtaper = 
+        dx_dS = x_mesh * np.linspace(taper, 1, ny).reshape(1, ny) * dcroot_dS
+        dx_dS -= np.linspace(dcroot_dS*taper, dcroot_dS, ny).reshape(1, ny)/4
+        dx_dS += np.linspace(db_dS, 0, ny).reshape(1, ny) * np.tan(np.deg2rad(sweep))
+        
+        dx_dAR = x_mesh * np.linspace(taper, 1, ny).reshape(1, ny) * dcroot_dAR
+        dx_dAR -= np.linspace(dcroot_dAR*taper, dcroot_dAR, ny).reshape(1, ny)/4
+        dx_dAR += np.linspace(db_dAR, 0, ny).reshape(1, ny) * np.tan(np.deg2rad(sweep))
+
+        dx_dtaper = x_mesh * c_root * np.linspace(1, 0, ny).reshape(1, ny) + x_mesh * np.linspace(taper, 1, ny).reshape(1, ny) * dcroot_dtaper
+        dx_dtaper -= np.linspace(c_root, 0, ny).reshape(1, ny)/4 + np.linspace(dcroot_dtaper*taper, dcroot_dtaper, ny).reshape(1, ny)/4
+
+        dx_dsweep = 0 * x_mesh + np.linspace(half_span, 0, ny).reshape(1, ny) / np.cos(np.deg2rad(sweep))**2 * np.pi/180.
+
+        J['mesh', 'S'] = np.dstack((dx_dS, dy_dS, np.zeros((nx, ny)))).flatten()
+        J['mesh', 'AR'] = np.dstack((dx_dAR, dy_dAR, np.zeros((nx, ny)))).flatten()
+        J['mesh', 'taper'] = np.dstack((dx_dtaper, np.zeros((nx, ny)), np.zeros((nx, ny)))).flatten()
+        J['mesh', 'sweep'] = np.dstack((dx_dsweep, np.zeros((nx, ny)), np.zeros((nx, ny)))).flatten()
 
 
 if __name__=="__main__":
