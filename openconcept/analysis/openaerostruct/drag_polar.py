@@ -75,11 +75,11 @@ class OASDragPolar(om.Group):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
         self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
-        self.options.declare('alpha_train', default=np.linspace(-15, 15, 5),
-                             desc='List of angle of attack training values (degrees)')
-        self.options.declare('Mach_train', default=np.linspace(0.1, 0.9, 5),
+        self.options.declare('Mach_train', default=np.array([0.1, 0.3, 0.45, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9]),
                              desc='List of Mach number training values (dimensionless)')
-        self.options.declare('alt_train', default=np.linspace(0, 12e3, 5),
+        self.options.declare('alpha_train', default=np.linspace(-10, 15, 6),
+                             desc='List of angle of attack training values (degrees)')
+        self.options.declare('alt_train', default=np.linspace(0, 12e3, 4),
                              desc='List of altitude training values (meters)')
         self.options.declare('surf_options', default=None, desc="Dictionary of OpenAeroStruct surface options")
     
@@ -98,7 +98,7 @@ class OASDragPolar(om.Group):
                                             'ac|geom|twist', 'fltcond|TempIncrement'])
 
         # Surrogate model
-        interp = om.MetaModelStructuredComp(method='lagrange3', training_data_gradients=True, vec_size=nn)
+        interp = om.MetaModelStructuredComp(method='scipy_cubic', training_data_gradients=True, vec_size=nn, extrapolate=True)
         interp.add_input('fltcond|M', 0.1, training_data=self.options['Mach_train'])
         interp.add_input('alpha', 0., units='deg', training_data=self.options['alpha_train'])
         interp.add_input('fltcond|h', 0., units='m', training_data=self.options['alt_train'])
@@ -668,12 +668,24 @@ class PlanformMesh(om.ExplicitComponent):
     #     # Create baseline square mesh from 0 to 1 in each direction
     #     x_mesh, y_mesh = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
 
+    #     # Compute derivatives in a way analogous to forward AD
+    #     db_dAR = S / (4 * np.sqrt(AR * S))
+    #     db_dS = AR / (4 * np.sqrt(AR * S))
+    #     dcroot_dAR = -S / (half_span**2 * (1 + taper)) * db_dAR
+    #     dcroot_dS = 1 / (half_span * (1 + taper)) - S / (half_span**2 * (1 + taper)) * db_dS
+    #     dcroot_dtaper = -S / (half_span * (1 + taper)**2)
+
+    #     dx_dcroot = x_mesh
+    #     dy_db = y_mesh
+
+    #     dx_dtaper = 
+
 
 if __name__=="__main__":
     # Compare surrogate drag polar to using OpenAeroStruct directly
     # Do two drag polars, one at subsonic low altitudes and one
     # transonic high altitude
-    nn = 100
+    nn = 50
     S = 427.8
     AR = 9.82
     taper = 0.149
@@ -682,10 +694,10 @@ if __name__=="__main__":
     nx = 3
     ny = 7
 
-    alpha_list = np.linspace(-9.9, 9.9, nn)
-    M1 = np.array([0.4])
-    M2 = np.array([0.81])
-    h1 = np.array([3e3])
+    alpha_list = np.linspace(-10, 15, nn)
+    M1 = np.array([0.65])
+    M2 = np.array([0.835])
+    h1 = np.array([2e3])
     h2 = np.array([10e3])
     CL1_exact = np.zeros(nn)
     CL2_exact = np.zeros(nn)
@@ -729,9 +741,9 @@ if __name__=="__main__":
 
     # Generate surrogate and get estimated data
     p = om.Problem()
-    Mach_train = np.array([0.1, 0.3, 0.6, 0.75, 0.8, 0.825, 0.85, 0.875, 0.9])#np.linspace(0.1, 0.9, 5)
-    alpha_train = np.linspace(-10, 10, 10)  # deg
-    alt_train = np.array([0., 1e3, 3e3, 8e3, 12e3])#np.linspace(0, 45000, 5)*0.3048  # m
+    Mach_train = np.array([0.1, 0.3, 0.45, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9])
+    alpha_train = np.linspace(-10, 15, 6)  # deg
+    alt_train = np.linspace(0, 45000, 4)*0.3048  # m
     p.model = OASDragPolar(num_nodes=nn, num_x=nx, num_y=ny, num_twist=twist.size,
                            Mach_train=Mach_train,
                            alpha_train=alpha_train,
@@ -741,6 +753,8 @@ if __name__=="__main__":
     p.setup()
 
     p.set_val('fltcond|CL', CL1_exact)
+    p.set_val('fltcond|M', M1)
+    p.set_val('fltcond|h', h1, units='m')
     p.set_val('fltcond|q', 6125.*np.ones(nn), units='Pa')
     p.set_val('fltcond|TempIncrement', 0, units='degC')
     p.set_val('ac|geom|S_ref', S, units='m**2')
@@ -756,7 +770,7 @@ if __name__=="__main__":
 
     p.set_val('fltcond|CL', CL2_exact)
     p.set_val('fltcond|M', M2)
-    p.set_val('fltcond|h', h2)
+    p.set_val('fltcond|h', h2, units='m')
     p.run_model()
     CD2_est = p.get_val('aero_surrogate.CD')
 
@@ -768,5 +782,5 @@ if __name__=="__main__":
     plt.xlabel('CD')
     plt.ylabel('CL')
     plt.legend([f"OAS, Mach {M1[0]}, {h1[0]/304.8:.1f}k ft", 'surrogate', f"OAS, Mach {M2[0]}, {h2[0]/304.8:.1f}k ft", 'surrogate'])
-    plt.title(f"{alpha_train.size} angle of attack, {Mach_train.size} Mach number, and {alt_train.size} altitude samples\ntest")
+    plt.title(f"{Mach_train.size} Mach number, {alpha_train.size} angle of attack, and {alt_train.size} altitude samples")
     plt.show()
