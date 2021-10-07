@@ -10,7 +10,7 @@ try:
     from openaerostruct.geometry.geometry_mesh_transformations import Rotate
     from openaerostruct.aerodynamics.aero_groups import AeroPoint
 except ImportError:
-    raise ImportError("OpenAeroStruct must be installed to use the OASDragPolar aerodynamic component")
+    raise ImportError("OpenAeroStruct must be installed to use the OASDragPolar component")
 
 # Atmospheric calculations
 from openconcept.analysis.atmospherics.temperature_comp import TemperatureComp
@@ -28,6 +28,10 @@ class OASDragPolar(om.Group):
     ------
     fltcond|CL : float
         Lift coefficient (vector, dimensionless)
+    fltcond|M : float
+        Mach number (vector, dimensionless)
+    fltcond|h : float
+        Altitude (vector, m)
     fltcond|q : float
         Dynamic pressure (vector, Pascals)
     ac|geom|wing|S_ref : float
@@ -190,11 +194,11 @@ class OASDataGen(om.ExplicitComponent):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
         self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
-        self.options.declare('Mach_train', default=np.zeros((1,1,1)),
+        self.options.declare('Mach_train', default=np.array([0.1, 0.3, 0.45, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9]),
                              desc='List of Mach number training values (dimensionless)')
-        self.options.declare('alpha_train', default=np.zeros((1,1,1)),
+        self.options.declare('alpha_train', default=np.linspace(-10, 15, 6),
                              desc='List of angle of attack training values (degrees)')
-        self.options.declare('alt_train', default=np.zeros((1,1,1)),
+        self.options.declare('alt_train', default=np.linspace(0, 12e3, 4),
                              desc='List of altitude training values (meters)')
         self.options.declare('surf_options', default=None, desc="Dictionary of OpenAeroStruct surface options")
     
@@ -599,7 +603,7 @@ class VLM(om.Group):
         elif surf_dict["t_over_c"].size == ny - 1:
             self.set_input_defaults(f"aero_point.{surf_dict['name']}_perf.t_over_c", val=surf_dict["t_over_c"])
         else:
-            raise ValueError(f"t_over_c_ in the surface dict must be either a number or an ndarray " \
+            raise ValueError(f"t_over_c in the surface dict must be either a number or an ndarray " \
                              f"with either one or ny-1 elements, not {surf_dict['t_over_c']}")
 
 

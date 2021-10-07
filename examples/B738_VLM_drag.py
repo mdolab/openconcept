@@ -55,11 +55,11 @@ class B738AirplaneModel(oc.IntegratorGroup):
         oas_surf_dict['t_over_c'] = acdata['ac']['geom']['wing']['toverc']['value']
         self.add_subsystem('drag', OASDragPolar(num_nodes=nn, num_x=3, num_y=7,
                                                 num_twist=3, surf_options=oas_surf_dict),
-                           promotes_inputs=['fltcond|CL', 'fltcond|q', 'ac|geom|wing|S_ref',
+                           promotes_inputs=['fltcond|CL', 'fltcond|M', 'fltcond|h', 'fltcond|q', 'ac|geom|wing|S_ref',
                                             'ac|geom|wing|AR', 'ac|geom|wing|taper', 'ac|geom|wing|c4sweep',
                                             'ac|geom|wing|twist', 'ac|aero|CD_nonwing'],
                            promotes_outputs=['drag'])
-        self.set_input_defaults('ac|aero|CD_nonwing', 0.016)  # based on matching fuel burn of B738.py example
+        self.set_input_defaults('ac|aero|CD_nonwing', 0.0145)  # based on matching fuel burn of B738.py example
 
         # generally the weights module will be custom to each airplane
         passthru = om.ExecComp('OEW=x',
@@ -128,11 +128,15 @@ def configure_problem():
     prob.model.nonlinear_solver.options['atol'] = 1e-6
     prob.model.nonlinear_solver.options['rtol'] = 1e-6
     prob.model.nonlinear_solver.options['err_on_non_converge'] = True
-    prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
+    prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=True)
 
     prob.driver = om.pyOptSparseDriver()
     prob.driver.options['optimizer'] = 'SNOPT'
     prob.driver.opt_settings['Major feasibility tolerance'] = 1e-6
+    prob.model.add_design_var('cruise|h0', upper=45e3, units='ft')
+    prob.model.add_constraint('climb.throttle', lower=0.01, upper=1.05)
+    prob.model.add_constraint('cruise.throttle', lower=0.01, upper=1.05)
+    prob.model.add_constraint('descent.throttle', lower=0.01, upper=1.05)
     # Find twist distribution that minimizes fuel burn; lock the twist tip in place
     # to prevent rigid rotation of the whole wing
     prob.model.add_design_var('ac|geom|wing|twist', lower=np.array([0, -10, -10]),
@@ -191,9 +195,19 @@ def run_738_analysis(plots=False):
     prob = configure_problem()
     prob.setup(check=True, mode='fwd')
     set_values(prob, num_nodes)
-    # prob.run_model()
+    prob.run_model()
+    prob.model.list_outputs()
+    if plots:
+        show_outputs(prob)
+    return prob
+
+def run_738_optimization(plots=False):
+    num_nodes = 11
+    prob = configure_problem()
+    prob.setup(check=True, mode='fwd')
+    set_values(prob, num_nodes)
     prob.run_driver()
-    # prob.model.list_outputs()
+    prob.model.list_outputs()
     if plots:
         show_outputs(prob)
     return prob

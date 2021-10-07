@@ -5,6 +5,7 @@ import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
 from examples.B738 import run_738_analysis
+from examples.B738_VLM_drag import run_738_analysis as run_738VLM_analysis
 from examples.TBM850 import run_tbm_analysis
 from examples.HybridTwin_thermal import run_hybrid_twin_thermal_analysis
 from examples.HybridTwin_active_thermal import run_hybrid_twin_active_thermal_analysis
@@ -128,6 +129,17 @@ class B738TestCase(unittest.TestCase):
         # total fuel
         assert_near_equal(prob.get_val('loiter.fuel_used_final', units='lbm'), 34424.68533072, tolerance=3e-4)
         # changelog: 9/2020 - previously 34555.313, updated CFM surrogate model to reject spurious high Mach, low altitude points
+
+class B738VLMTestCase(unittest.TestCase):
+    def setUp(self):
+        self.prob = run_738VLM_analysis()
+    
+    def test_values_B738(self):
+        prob = self.prob
+        # block fuel
+        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lbm'), 28442.26988485, tolerance=1e-5)
+        # total fuel
+        assert_near_equal(prob.get_val('loiter.fuel_used_final', units='lbm'), 34073.70284445, tolerance=1e-5)
 
 if __name__=="__main__":
     # unittest.main()
