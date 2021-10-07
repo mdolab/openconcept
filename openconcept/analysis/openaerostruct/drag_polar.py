@@ -30,19 +30,24 @@ class OASDragPolar(om.Group):
         Lift coefficient (vector, dimensionless)
     fltcond|q : float
         Dynamic pressure (vector, Pascals)
-    ac|geom|S_ref : float
+    ac|geom|wing|S_ref : float
         Full planform area (scalar, m^2)
-    ac|geom|AR : float
+    ac|geom|wing|AR : float
         Aspect ratio (scalar, dimensionless)
-    ac|geom|taper : float
+    ac|geom|wing|taper : float
         Taper ratio (must be >0 and <=1); tip chord / root chord (scalar, dimensionless)
-    ac|geom|c4sweep : float
+    ac|geom|wing|c4sweep : float
         Quarter chord sweep angle (scalar, degrees)
-    ac|geom|twist : float
+    ac|geom|wing|twist : float
         List of twist angles at control points of spline (vector, degrees)
         NOTE: length of vector is num_twist (set in options), NOT num_nodes
+    ac|aero|CD_nonwing : float
+        Drag coefficient of components other than the wing; e.g. fuselage,
+        tail, interference drag, etc.; this value is simply added to the
+        drag coefficient computed by OpenAeroStruct (scalar, dimensionless)
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
+        TODO fltcond|TempIncrement is a scalar in this component but a vector in OC
 
     Outputs
     -------
@@ -94,8 +99,8 @@ class OASDragPolar(om.Group):
                                                        num_twist=self.options['num_twist'], alpha_train=self.options['alpha_train'],
                                                        Mach_train=self.options['Mach_train'], alt_train=self.options['alt_train'],
                                                        surf_options=self.options['surf_options']),
-                           promotes_inputs=['ac|geom|S_ref', 'ac|geom|AR', 'ac|geom|taper', 'ac|geom|c4sweep',
-                                            'ac|geom|twist', 'fltcond|TempIncrement'])
+                           promotes_inputs=['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper', 'ac|geom|wing|c4sweep',
+                                            'ac|geom|wing|twist', 'ac|aero|CD_nonwing', 'fltcond|TempIncrement'])
 
         # Surrogate model
         interp = om.MetaModelStructuredComp(method='scipy_cubic', training_data_gradients=True, vec_size=nn, extrapolate=True)
@@ -122,7 +127,7 @@ class OASDragPolar(om.Group):
                                                     q={'units': 'Pa', 'shape': (nn,)},
                                                     S={'units': 'm**2'},
                                                     CD={'shape': (nn,)},),
-                           promotes_inputs=[('q', 'fltcond|q'), ('S', 'ac|geom|S_ref')],
+                           promotes_inputs=[('q', 'fltcond|q'), ('S', 'ac|geom|wing|S_ref')],
                            promotes_outputs=['drag'])
         self.connect('aero_surrogate.CD', 'drag_calc.CD')
 
@@ -136,17 +141,21 @@ class OASDataGen(om.ExplicitComponent):
 
     Inputs
     ------
-    ac|geom|S_ref : float
+    ac|geom|wing|S_ref : float
         Full planform area (scalar, m^2)
-    ac|geom|AR : float
+    ac|geom|wing|AR : float
         Aspect ratio (scalar, dimensionless)
-    ac|geom|taper : float
+    ac|geom|wing|taper : float
         Taper ratio (must be >0 and <=1); tip chord / root chord (scalar, dimensionless)
-    ac|geom|c4sweep : float
+    ac|geom|wing|c4sweep : float
         Quarter chord sweep angle (scalar, degrees)
-    ac|geom|twist : float
+    ac|geom|wing|twist : float
         List of twist angles at control points of spline (vector, degrees)
         NOTE: length of vector is num_twist (set in options)
+    ac|aero|CD_nonwing : float
+        Drag coefficient of components other than the wing; e.g. fuselage,
+        tail, interference drag, etc.; this value is simply added to the
+        drag coefficient computed by OpenAeroStruct (scalar, dimensionless)
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
 
@@ -175,6 +184,7 @@ class OASDataGen(om.ExplicitComponent):
     surf_options : dict
         Dictionary of OpenAeroStruct surface options; any options provided here
         will override the default ones; see the OpenAeroStruct documentation for more information
+    TODO: if surf_options changes, the model needs to be retrained
     """
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
@@ -189,11 +199,13 @@ class OASDataGen(om.ExplicitComponent):
         self.options.declare('surf_options', default=None, desc="Dictionary of OpenAeroStruct surface options")
     
     def setup(self):
-        self.add_input('ac|geom|S_ref', units='m**2')
-        self.add_input('ac|geom|AR')
-        self.add_input('ac|geom|taper')
-        self.add_input('ac|geom|c4sweep', units='deg')
-        self.add_input('ac|geom|twist', shape=(self.options["num_twist"],), units='deg')
+        self.add_input('ac|geom|wing|S_ref', units='m**2')
+        self.add_input('ac|geom|wing|AR')
+        self.add_input('ac|geom|wing|taper')
+        self.add_input('ac|geom|wing|c4sweep', units='deg')
+        self.add_input('ac|geom|wing|twist', val=np.zeros(self.options["num_twist"]),
+                       shape=(self.options["num_twist"],), units='deg')
+        self.add_input('ac|aero|CD_nonwing', val=0.)
         self.add_input('fltcond|TempIncrement', val=0., units='degC')
 
         n_Mach = self.options['Mach_train'].size
@@ -205,53 +217,54 @@ class OASDataGen(om.ExplicitComponent):
         self.declare_partials('*', '*')
 
         # Generate grids and default cached values for training inputs and outputs
-        self.S = -np.ones(1)
-        self.AR = -np.ones(1)
-        self.taper = -np.ones(1)
-        self.c4sweep = -np.ones(1)
-        self.twist = -1*np.ones((self.options["num_twist"],))
-        self.temp_incr = -42*np.ones(1)
-        self.Mach, self.alpha, self.alt = np.meshgrid(self.options['Mach_train'],
-                                                      self.options['alpha_train'],
-                                                      self.options['alt_train'],
-                                                      indexing='ij')
-        self.CL = np.zeros((n_Mach, n_alpha, n_alt))
-        self.CD = np.zeros((n_Mach, n_alpha, n_alt))
-        self.partials = None
+        OASDataGen.S = -np.ones(1)
+        OASDataGen.AR = -np.ones(1)
+        OASDataGen.taper = -np.ones(1)
+        OASDataGen.c4sweep = -np.ones(1)
+        OASDataGen.twist = -1*np.ones((self.options["num_twist"],))
+        OASDataGen.temp_incr = -42*np.ones(1)
+        OASDataGen.Mach, OASDataGen.alpha, OASDataGen.alt = np.meshgrid(self.options['Mach_train'],
+                                                                        self.options['alpha_train'],
+                                                                        self.options['alt_train'],
+                                                                        indexing='ij')
+        OASDataGen.CL = np.zeros((n_Mach, n_alpha, n_alt))
+        OASDataGen.CD = np.zeros((n_Mach, n_alpha, n_alt))
+        OASDataGen.partials = None
     
     def compute(self, inputs, outputs):
-        S = inputs["ac|geom|S_ref"]
-        AR = inputs["ac|geom|AR"]
-        taper = inputs["ac|geom|taper"]
-        sweep = inputs["ac|geom|c4sweep"]
-        twist = inputs["ac|geom|twist"]
+        S = inputs["ac|geom|wing|S_ref"]
+        AR = inputs["ac|geom|wing|AR"]
+        taper = inputs["ac|geom|wing|taper"]
+        sweep = inputs["ac|geom|wing|c4sweep"]
+        twist = inputs["ac|geom|wing|twist"]
+        CD_nonwing = inputs["ac|aero|CD_nonwing"]
         temp_incr = inputs["fltcond|TempIncrement"]
 
         # If the inputs are unchaged, use the previously calculated values
-        if (S == self.S and
-           AR == self.AR and
-           taper == self.taper and
-           sweep == self.c4sweep and
-           np.all(twist == self.twist) and
-           temp_incr == self.temp_incr):
-            outputs['CL_train'] = self.CL
-            outputs['CD_train'] = self.CD
+        if (S == OASDataGen.S and
+           AR == OASDataGen.AR and
+           taper == OASDataGen.taper and
+           sweep == OASDataGen.c4sweep and
+           np.all(twist == OASDataGen.twist) and
+           temp_incr == OASDataGen.temp_incr):
+            outputs['CL_train'] = OASDataGen.CL
+            outputs['CD_train'] = OASDataGen.CD + CD_nonwing
             return
 
         print(f"S = {S}; AR = {AR}; taper = {taper}; sweep = {sweep}; twist = {twist}; temp_incr = {temp_incr}")
         # Copy new values to cached ones
-        self.S[:] = S
-        self.AR[:] = AR
-        self.taper[:] = taper
-        self.c4sweep[:] = sweep
-        self.twist[:] = twist
-        self.temp_incr[:] = temp_incr
+        OASDataGen.S[:] = S
+        OASDataGen.AR[:] = AR
+        OASDataGen.taper[:] = taper
+        OASDataGen.c4sweep[:] = sweep
+        OASDataGen.twist[:] = twist
+        OASDataGen.temp_incr[:] = temp_incr
         
         # Compute new training values
         train_in = {}
-        train_in['Mach_number_grid'] = self.Mach
-        train_in['alpha_grid'] = self.alpha
-        train_in['alt_grid'] = self.alt
+        train_in['Mach_number_grid'] = OASDataGen.Mach
+        train_in['alpha_grid'] = OASDataGen.alpha
+        train_in['alt_grid'] = OASDataGen.alt
         train_in['TempIncrement'] = temp_incr
         train_in['S_ref'] = S
         train_in['AR'] = AR
@@ -262,17 +275,18 @@ class OASDataGen(om.ExplicitComponent):
         train_in['num_y'] = self.options['num_y']
 
         data = compute_training_data(train_in, surf_dict=self.options['surf_options'])
-        self.CL[:] = data['CL']
-        self.CD[:] = data['CD']
-        self.partials = copy(data['partials'])
-        outputs['CL_train'] = self.CL
-        outputs['CD_train'] = self.CD
+        OASDataGen.CL[:] = data['CL']
+        OASDataGen.CD[:] = data['CD']
+        OASDataGen.partials = copy(data['partials'])
+        outputs['CL_train'] = OASDataGen.CL
+        outputs['CD_train'] = OASDataGen.CD + CD_nonwing
     
     def compute_partials(self, inputs, partials):
         # Compute partials if they haven't been already and return them
         self.compute(inputs, {})
-        for key, value in self.partials.items():
+        for key, value in OASDataGen.partials.items():
             partials[key][:] = value
+        partials['CD_train', 'ac|aero|CD_nonwing'] = np.ones(OASDataGen.CD.shape)
 
 
 """
@@ -330,16 +344,16 @@ def compute_training_data(inputs, surf_dict=None, print_timing=False):
     CD = np.zeros(inputs['Mach_number_grid'].shape)
     jac_num_rows = np.product(np.array(inputs['Mach_number_grid'].shape))  # product of array dimensions
     partials = {}
-    partials['CL_train', 'ac|geom|S_ref'] = np.zeros((jac_num_rows, 1))
-    partials['CD_train', 'ac|geom|S_ref'] = np.zeros((jac_num_rows, 1))
-    partials['CL_train', 'ac|geom|AR'] = np.zeros((jac_num_rows, 1))
-    partials['CD_train', 'ac|geom|AR'] = np.zeros((jac_num_rows, 1))
-    partials['CL_train', 'ac|geom|taper'] = np.zeros((jac_num_rows, 1))
-    partials['CD_train', 'ac|geom|taper'] = np.zeros((jac_num_rows, 1))
-    partials['CL_train', 'ac|geom|c4sweep'] = np.zeros((jac_num_rows, 1))
-    partials['CD_train', 'ac|geom|c4sweep'] = np.zeros((jac_num_rows, 1))
-    partials['CL_train', 'ac|geom|twist'] = np.zeros((jac_num_rows, inputs['twist'].size))
-    partials['CD_train', 'ac|geom|twist'] = np.zeros((jac_num_rows, inputs['twist'].size))
+    partials['CL_train', 'ac|geom|wing|S_ref'] = np.zeros((jac_num_rows, 1))
+    partials['CD_train', 'ac|geom|wing|S_ref'] = np.zeros((jac_num_rows, 1))
+    partials['CL_train', 'ac|geom|wing|AR'] = np.zeros((jac_num_rows, 1))
+    partials['CD_train', 'ac|geom|wing|AR'] = np.zeros((jac_num_rows, 1))
+    partials['CL_train', 'ac|geom|wing|taper'] = np.zeros((jac_num_rows, 1))
+    partials['CD_train', 'ac|geom|wing|taper'] = np.zeros((jac_num_rows, 1))
+    partials['CL_train', 'ac|geom|wing|c4sweep'] = np.zeros((jac_num_rows, 1))
+    partials['CD_train', 'ac|geom|wing|c4sweep'] = np.zeros((jac_num_rows, 1))
+    partials['CL_train', 'ac|geom|wing|twist'] = np.zeros((jac_num_rows, inputs['twist'].size))
+    partials['CD_train', 'ac|geom|wing|twist'] = np.zeros((jac_num_rows, inputs['twist'].size))
     partials['CL_train', 'fltcond|TempIncrement'] = np.zeros((jac_num_rows, 1))
     partials['CD_train', 'fltcond|TempIncrement'] = np.zeros((jac_num_rows, 1))
 
@@ -353,11 +367,11 @@ def compute_training_data(inputs, surf_dict=None, print_timing=False):
 
     # Set design variables
     p.model.set_input_defaults('fltcond|TempIncrement', val=inputs['TempIncrement'], units='degC')
-    p.model.set_input_defaults('ac|geom|S_ref', val=inputs['S_ref'], units='m**2')
-    p.model.set_input_defaults('ac|geom|AR', val=inputs['AR'])
-    p.model.set_input_defaults('ac|geom|taper', val=inputs['taper'])
-    p.model.set_input_defaults('ac|geom|c4sweep', val=inputs['c4sweep'], units='deg')
-    p.model.set_input_defaults('ac|geom|twist', val=inputs['twist'], units='deg')
+    p.model.set_input_defaults('ac|geom|wing|S_ref', val=inputs['S_ref'], units='m**2')
+    p.model.set_input_defaults('ac|geom|wing|AR', val=inputs['AR'])
+    p.model.set_input_defaults('ac|geom|wing|taper', val=inputs['taper'])
+    p.model.set_input_defaults('ac|geom|wing|c4sweep', val=inputs['c4sweep'], units='deg')
+    p.model.set_input_defaults('ac|geom|wing|twist', val=inputs['twist'], units='deg')
 
     p.setup()
 
@@ -395,8 +409,8 @@ def compute_training_data(inputs, surf_dict=None, print_timing=False):
                 # Compute derivatives
                 of = ['fltcond|CL', 'fltcond|CD']
                 of_out = ['CL_train', 'CD_train']
-                wrt = ['ac|geom|S_ref', 'ac|geom|AR', 'ac|geom|taper',
-                       'ac|geom|c4sweep', 'ac|geom|twist', 'fltcond|TempIncrement']
+                wrt = ['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper',
+                       'ac|geom|wing|c4sweep', 'ac|geom|wing|twist', 'fltcond|TempIncrement']
                 t = time()
                 deriv = p.compute_totals(of, wrt)
                 t_der += time() - t
@@ -429,15 +443,15 @@ class VLM(om.Group):
         Altitude (scalar, m)
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
-    ac|geom|S_ref : float
+    ac|geom|wing|S_ref : float
         Wing planform area (scalar, m^2)
-    ac|geom|AR : float
+    ac|geom|wing|AR : float
         Wing aspect ratio (scalar, dimensionless)
-    ac|geom|taper : float
+    ac|geom|wing|taper : float
         Wing taper ratio (scalar, dimensionless)
-    ac|geom|c4sweep : float
+    ac|geom|wing|c4sweep : float
         Wing sweep measured at quarter chord (scalar, degrees)
-    ac|geom|twist : float
+    ac|geom|wing|twist : float
         List of twist angles at control points of spline (vector, degrees)
         NOTE: length of vector is num_twist (set in options)
 
@@ -476,8 +490,8 @@ class VLM(om.Group):
         #                            Set up mesh
         # =================================================================
         self.add_subsystem("mesh", PlanformMesh(num_x=nx, num_y=ny),
-                           promotes_inputs=[("S", "ac|geom|S_ref"), ("AR", "ac|geom|AR"),
-                                            ("taper", "ac|geom|taper"), ("sweep", "ac|geom|c4sweep")])
+                           promotes_inputs=[("S", "ac|geom|wing|S_ref"), ("AR", "ac|geom|wing|AR"),
+                                            ("taper", "ac|geom|wing|taper"), ("sweep", "ac|geom|wing|c4sweep")])
 
         # Add bspline component for twist
         x_interp = np.linspace(0.0, 1.0, ny)
@@ -486,7 +500,7 @@ class VLM(om.Group):
             om.SplineComp(
                 method="bsplines", x_interp_val=x_interp, num_cp=n_twist, interp_options={"order": min(n_twist, 4)}
             ),
-            promotes_inputs=[("twist_cp", "ac|geom|twist")]
+            promotes_inputs=[("twist_cp", "ac|geom|wing|twist")]
         )
         comp.add_spline(y_cp_name="twist_cp", y_interp_name="twist", y_units="deg")
 
@@ -544,7 +558,7 @@ class VLM(om.Group):
             # the total CL and CD.
             # These CL0 and CD0 values do not vary wrt alpha.
             'CL0' : 0.0,            # CL of the surface at alpha=0
-            'CD0' : 0.0078,            # CD of the surface at alpha=0
+            'CD0' : 0.0,            # CD of the surface at alpha=0
 
             # Airfoil properties for viscous drag calculation
             'k_lam' : 0.05,         # percentage of chord with laminar
@@ -724,6 +738,7 @@ if __name__=="__main__":
     taper = 0.149
     c4sweep = 31.6
     twist = np.array([-3, 1.5, 6])
+    CD_nonwing = 0.02
     nx = 3
     ny = 7
 
@@ -753,7 +768,7 @@ if __name__=="__main__":
     inputs['num_y'] = ny
     res = compute_training_data(inputs)
     CL1_exact = copy(res['CL'][0,:,0])
-    CD1_exact = copy(res['CD'][0,:,0])
+    CD1_exact = copy(res['CD'][0,:,0]) + CD_nonwing
 
     inputs = {}
     inputs['Mach_number_grid'], inputs['alpha_grid'], inputs['alt_grid'] = np.meshgrid(M2,
@@ -770,7 +785,7 @@ if __name__=="__main__":
     inputs['num_y'] = ny
     res = compute_training_data(inputs)
     CL2_exact = copy(res['CL'][0,:,0])
-    CD2_exact = copy(res['CD'][0,:,0])
+    CD2_exact = copy(res['CD'][0,:,0]) + CD_nonwing
 
     # Generate surrogate and get estimated data
     p = om.Problem()
@@ -790,13 +805,14 @@ if __name__=="__main__":
     p.set_val('fltcond|h', h1, units='m')
     p.set_val('fltcond|q', 6125.*np.ones(nn), units='Pa')
     p.set_val('fltcond|TempIncrement', 0, units='degC')
-    p.set_val('ac|geom|S_ref', S, units='m**2')
-    p.set_val('ac|geom|AR', AR)
-    p.set_val('ac|geom|taper', taper)
-    p.set_val('ac|geom|c4sweep', c4sweep)
-    p.set_val('ac|geom|twist', twist)
+    p.set_val('ac|geom|wing|S_ref', S, units='m**2')
+    p.set_val('ac|geom|wing|AR', AR)
+    p.set_val('ac|geom|wing|taper', taper)
+    p.set_val('ac|geom|wing|c4sweep', c4sweep)
+    p.set_val('ac|geom|wing|twist', twist)
+    p.set_val('ac|aero|CD_nonwing', CD_nonwing)
 
-    # p.check_partials(method='fd', compact_print=True, show_only_incorrect=True)
+    # p.check_partials(method='fd', compact_print=True, show_only_incorrect=False)
 
     p.run_model()
     CD1_est = copy(p.get_val('aero_surrogate.CD'))
