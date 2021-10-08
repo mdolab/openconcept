@@ -121,7 +121,7 @@ class B738AnalysisGroup(om.Group):
 
 def configure_problem():
     prob = om.Problem()
-    prob.model = B738AnalysisGroup()
+    prob.model.add_subsystem('analysis', B738AnalysisGroup(), promotes=['*'])
     prob.model.nonlinear_solver = om.NewtonSolver(iprint=2,solve_subsystems=True)
     prob.model.linear_solver = om.DirectSolver()
     prob.model.nonlinear_solver.options['maxiter'] = 10
@@ -132,7 +132,7 @@ def configure_problem():
 
     prob.driver = om.pyOptSparseDriver()
     prob.driver.options['optimizer'] = 'SNOPT'
-    prob.driver.opt_settings['Major feasibility tolerance'] = 1e-6
+    prob.driver.opt_settings['Major feasibility tolerance'] = 7e-6
     prob.model.add_design_var('cruise|h0', upper=45e3, units='ft')
     prob.model.add_constraint('climb.throttle', lower=0.01, upper=1.05)
     prob.model.add_constraint('cruise.throttle', lower=0.01, upper=1.05)
@@ -196,7 +196,7 @@ def run_738_analysis(plots=False):
     prob.setup(check=True, mode='fwd')
     set_values(prob, num_nodes)
     prob.run_model()
-    prob.model.list_outputs()
+    # prob.model.list_outputs()
     if plots:
         show_outputs(prob)
     return prob
@@ -207,11 +207,12 @@ def run_738_optimization(plots=False):
     prob.setup(check=True, mode='fwd')
     set_values(prob, num_nodes)
     prob.run_driver()
-    prob.model.list_outputs()
+    # prob.model.list_outputs()
     if plots:
         show_outputs(prob)
     return prob
 
 
 if __name__ == "__main__":
-    run_738_analysis(plots=True)    
+    # run_738_analysis(plots=True)
+    run_738_optimization(plots=True)
