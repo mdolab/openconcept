@@ -4,6 +4,7 @@ import numpy as np
 import openmdao.api as om
 from time import time
 from copy import copy, deepcopy
+import multiprocessing.pool as mp
 
 # OpenAeroStruct
 try:
@@ -318,10 +319,10 @@ Inputs
 ------
 inputs : dict
     A dictionary containing the following entries:
-    alpha_grid : ndarray
-        Angle of attack (3D meshgrid 'ij'-style ndarray, degrees)
     Mach_number_grid : mdarray
         Mach number (3D meshgrid 'ij'-style ndarray, dimensionless)
+    alpha_grid : ndarray
+        Angle of attack (3D meshgrid 'ij'-style ndarray, degrees)
     alt_grid : ndarray
         Altitude (3D meshgrid 'ij'-style ndarray, m)
     TempIncrement : float
@@ -358,32 +359,66 @@ data : dict
         Partial derivatives of the training data flattened in the proper OpenMDAO-style
         format for use as partial derivatives in the OASDataGen component
 """
-def compute_training_data(inputs, surf_dict=None, print_timing=False):
+def compute_training_data(inputs, surf_dict=None):
     t_start = time()
+    print(f"Generating training data...", end='')
+
+    # Set up test points for use in parallelized map function ([Mach, alpha, altitude, inputs] for each point)
+    test_points = np.array([inputs['Mach_number_grid'].flatten(),
+                            inputs['alpha_grid'].flatten(),
+                            inputs['alt_grid'].flatten(),
+                            np.zeros(inputs['Mach_number_grid'].size)]).T.tolist()
+    inputs_to_send = {'surf_dict': surf_dict}
+    keys = ['TempIncrement', 'S_ref', 'AR', 'taper', 'c4sweep', 'twist', 'num_x', 'num_y']
+    for key in keys:
+        inputs_to_send[key] = inputs[key]
+    for row in test_points:
+        row[-1] = inputs_to_send
+
+    # Initialize the parallel pool and compute the OpenAeroStruct data
+    parallel_pool = mp.Pool()
+    out = list(parallel_pool.map(compute_aerodynamic_data, test_points))
+
     # Initialize output arrays
     CL = np.zeros(inputs['Mach_number_grid'].shape)
     CD = np.zeros(inputs['Mach_number_grid'].shape)
-    jac_num_rows = np.product(np.array(inputs['Mach_number_grid'].shape))  # product of array dimensions
+    jac_num_rows = inputs['Mach_number_grid'].size  # product of array dimensions
+    of = ['CL_train', 'CD_train']
+    wrt = ['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper',
+            'ac|geom|wing|c4sweep', 'ac|geom|wing|twist', 'fltcond|TempIncrement']
     partials = {}
-    partials['CL_train', 'ac|geom|wing|S_ref'] = np.zeros((jac_num_rows, 1))
-    partials['CD_train', 'ac|geom|wing|S_ref'] = np.zeros((jac_num_rows, 1))
-    partials['CL_train', 'ac|geom|wing|AR'] = np.zeros((jac_num_rows, 1))
-    partials['CD_train', 'ac|geom|wing|AR'] = np.zeros((jac_num_rows, 1))
-    partials['CL_train', 'ac|geom|wing|taper'] = np.zeros((jac_num_rows, 1))
-    partials['CD_train', 'ac|geom|wing|taper'] = np.zeros((jac_num_rows, 1))
-    partials['CL_train', 'ac|geom|wing|c4sweep'] = np.zeros((jac_num_rows, 1))
-    partials['CD_train', 'ac|geom|wing|c4sweep'] = np.zeros((jac_num_rows, 1))
-    partials['CL_train', 'ac|geom|wing|twist'] = np.zeros((jac_num_rows, inputs['twist'].size))
-    partials['CD_train', 'ac|geom|wing|twist'] = np.zeros((jac_num_rows, inputs['twist'].size))
-    partials['CL_train', 'fltcond|TempIncrement'] = np.zeros((jac_num_rows, 1))
-    partials['CD_train', 'fltcond|TempIncrement'] = np.zeros((jac_num_rows, 1))
+    for f in of:
+        for u in wrt:
+            if u == 'ac|geom|wing|twist':
+                partials[f, u] = np.zeros((jac_num_rows, inputs['twist'].size))
+            else:
+                partials[f, u] = np.zeros((jac_num_rows, 1))
+    data = {'CL': CL, 'CD': CD, 'partials': partials}
+
+    # Transfer data into output data structure the proper format
+    for i in range(len(out)):
+        data['CL'][np.unravel_index(i, inputs['Mach_number_grid'].shape)] = out[i]['CL']
+        data['CD'][np.unravel_index(i, inputs['Mach_number_grid'].shape)] = out[i]['CD']
+        for f in of:
+            for u in wrt:
+                data['partials'][f, u][i] = out[i]['partials'][f, u]
+    
+    print(f"done in {time() - t_start} sec")
+
+    return data
+
+# Function to compute CL, CD, and derivatives at a given test point. Used for
+# the parallel mapping function in compute_training_data
+# Input "point" is row in test_points array
+def compute_aerodynamic_data(point):
+    inputs = point[3]
 
     # Set up OpenAeroStruct problem
     p = om.Problem()
     p.model.add_subsystem('aero_analysis', VLM(num_x=inputs['num_x'],
                                                num_y=inputs['num_y'],
                                                num_twist=inputs['twist'].size,
-                                               surf_options=surf_dict),
+                                               surf_options=inputs['surf_dict']),
                            promotes=['*'])
 
     # Set design variables
@@ -393,62 +428,30 @@ def compute_training_data(inputs, surf_dict=None, print_timing=False):
     p.model.set_input_defaults('ac|geom|wing|taper', val=inputs['taper'])
     p.model.set_input_defaults('ac|geom|wing|c4sweep', val=inputs['c4sweep'], units='deg')
     p.model.set_input_defaults('ac|geom|wing|twist', val=inputs['twist'], units='deg')
-
     p.setup()
 
-    # Iterate through the training points and evaluate the model
-    iter = 0
-    total = inputs['Mach_number_grid'].shape[0]*inputs['Mach_number_grid'].shape[1]*inputs['Mach_number_grid'].shape[2]
-    jac_row = 0
-    t_mod = 0
-    t_der = 0
-    t_set = 0
-    for i in range(inputs['Mach_number_grid'].shape[0]):
-        for j in range(inputs['Mach_number_grid'].shape[1]):
-            for k in range(inputs['Mach_number_grid'].shape[2]):
-                # Problems were observed with derivatives due
-                # to a strange effect in OpenAeroStruct's wave drag calculation
-                # and setting up the problem fresh every time fixed it
-                t = time()
-                p.setup()
-                t_set += time() - t
+    p.set_val('fltcond|M', point[0])
+    p.set_val('fltcond|alpha', point[1], units='deg')
+    p.set_val('fltcond|h', point[2], units='m')
 
-                # Set the values for the current training point in the model
-                p.set_val('fltcond|M', inputs['Mach_number_grid'][i,j,k])
-                p.set_val('fltcond|alpha', inputs['alpha_grid'][i,j,k], units='deg')
-                p.set_val('fltcond|h', inputs['alt_grid'][i,j,k], units='m')
+    p.run_model()
 
-                # Run the models and pull the lift and drag values out
-                print(f"Generating training data...{iter/total*100:.1f}%", end='\r')
-                iter += 1
-                t = time()
-                p.run_model()
-                t_mod += time() - t
-                CL[i,j,k] = p.get_val('fltcond|CL')
-                CD[i,j,k] = p.get_val('fltcond|CD')
+    output = {}
+    output['CL'] = p.get_val('fltcond|CL')
+    output['CD'] = p.get_val('fltcond|CD')
 
-                # Compute derivatives
-                of = ['fltcond|CL', 'fltcond|CD']
-                of_out = ['CL_train', 'CD_train']
-                wrt = ['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper',
-                       'ac|geom|wing|c4sweep', 'ac|geom|wing|twist', 'fltcond|TempIncrement']
-                t = time()
-                deriv = p.compute_totals(of, wrt)
-                t_der += time() - t
-                for n, f in enumerate(of):
-                    for u in wrt:
-                        partials[of_out[n], u][jac_row, :] = deriv[f, u]
-                jac_row += 1
+    # Compute derivatives
+    output['partials'] = {}
+    of = ['fltcond|CL', 'fltcond|CD']
+    of_out = ['CL_train', 'CD_train']
+    wrt = ['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper',
+            'ac|geom|wing|c4sweep', 'ac|geom|wing|twist', 'fltcond|TempIncrement']
+    deriv = p.compute_totals(of, wrt)
+    for n, f in enumerate(of):
+        for u in wrt:
+            output['partials'][of_out[n], u] = np.copy(deriv[f, u])
     
-    print("                                          ", end="\r")
-    if print_timing:
-        print(f"Model time: {t_mod} sec")
-        print(f"Derivative time: {t_der} sec")
-        print(f"Setup time: {t_set} sec")
-        print(f"Total time: {time() - t_start} sec")
-    data = {'CL': CL, 'CD': CD, 'partials': partials}
-    return data
-
+    return output
 
 class VLM(om.Group):
     """
