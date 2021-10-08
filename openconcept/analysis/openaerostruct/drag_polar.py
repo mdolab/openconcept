@@ -3,7 +3,7 @@ from __future__ import division
 import numpy as np
 import openmdao.api as om
 from time import time
-from copy import copy
+from copy import copy, deepcopy
 
 # OpenAeroStruct
 try:
@@ -188,7 +188,6 @@ class OASDataGen(om.ExplicitComponent):
     surf_options : dict
         Dictionary of OpenAeroStruct surface options; any options provided here
         will override the default ones; see the OpenAeroStruct documentation for more information
-    TODO: if surf_options changes, the model needs to be retrained
     """
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
@@ -200,7 +199,7 @@ class OASDataGen(om.ExplicitComponent):
                              desc='List of angle of attack training values (degrees)')
         self.options.declare('alt_train', default=np.linspace(0, 12e3, 4),
                              desc='List of altitude training values (meters)')
-        self.options.declare('surf_options', default=None, desc="Dictionary of OpenAeroStruct surface options")
+        self.options.declare('surf_options', default={}, desc="Dictionary of OpenAeroStruct surface options")
     
     def setup(self):
         self.add_input('ac|geom|wing|S_ref', units='m**2')
@@ -219,6 +218,24 @@ class OASDataGen(om.ExplicitComponent):
         self.add_output("CD_train", shape=(n_Mach, n_alpha, n_alt))
 
         self.declare_partials('*', '*')
+
+        # Check that the surf_options dictionary does not differ
+        # from other instances of the OASDataGen object
+        if hasattr(OASDataGen, 'surf_options'):
+            error = False
+            if OASDataGen.surf_options.keys() != self.options['surf_options'].keys():
+                error = True
+            for key in OASDataGen.surf_options.keys():
+                if isinstance(OASDataGen.surf_options[key], np.ndarray):
+                    error = error or np.any(OASDataGen.surf_options[key] != self.options['surf_options'][key])
+                else:
+                    error = error or OASDataGen.surf_options[key] != self.options['surf_options'][key]          
+            if error:
+                raise ValueError('The OASDataGen and OASDragPolar components do not support\n'
+                                 'differently-valued surf_options within an OpenMDAO model')
+        else:
+            OASDataGen.surf_options = deepcopy(self.options['surf_options'])
+
 
         # Generate grids and default cached values for training inputs and outputs
         OASDataGen.S = -np.ones(1)

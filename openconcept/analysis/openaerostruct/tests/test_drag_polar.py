@@ -70,6 +70,31 @@ class OASDragPolarTestCase(unittest.TestCase):
         assert_near_equal(mesh.get_val('fltcond|CD') + 0.01, p.get_val('aero_surrogate.CD'), tolerance=5e-2)
         assert_near_equal(p.get_val('drag', units='N'), p.get_val('aero_surrogate.CD') * 100 * 5e3, tolerance=5e-2)
     
+    def test_surf_options(self):
+        nn = 1
+        twist = np.array([-1, 0, 1])
+        p = om.Problem(OASDragPolar(num_nodes=nn, num_x=3, num_y=5, num_twist=twist.size, Mach_train=np.linspace(0.1, 0.8, 2),
+                                  alpha_train=np.linspace(-11, 15, 2), alt_train=np.linspace(0, 15e3, 2), surf_options={'k_lam': 0.9}))
+        p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+        p.model.linear_solver = om.DirectSolver()
+        p.setup()
+        p.set_val('fltcond|TempIncrement', 0, units='degC')
+        p.set_val('ac|geom|wing|S_ref', 100, units='m**2')
+        p.set_val('ac|geom|wing|AR', 10)
+        p.set_val('ac|geom|wing|taper', 0.1)
+        p.set_val('ac|geom|wing|c4sweep', 20, units='deg')
+        p.set_val('ac|geom|wing|twist', twist, units='deg')
+        p.set_val('ac|aero|CD_nonwing', 0.01)
+        p.set_val('fltcond|q', 5e3*np.ones(nn), units='Pa')
+        p.set_val('fltcond|M', 0.5*np.ones(nn))
+        p.set_val('fltcond|h', 7.5e3*np.ones(nn), units='m')
+        p.set_val('fltcond|CL', 0.5*np.ones(nn))
+        p.run_model()
+
+        # Ensure they're all the same
+        assert_near_equal(p.get_val('drag', units='N'), 34962.6043231*np.ones(nn), tolerance=1e-10)
+
+    
     def test_vectorized(self):
         nn = 7
         twist = np.array([-1, 0, 1])
@@ -126,6 +151,30 @@ class OASDataGenTestCase(unittest.TestCase):
 
         partials = p.check_partials(form='central')
         assert_check_partials(partials, atol=6e-5, rtol=2e-5)
+    
+    def test_different_surf_options(self):
+        # Test that when there are different surf_options within a single model it catches it
+        p = om.Problem()
+        p.model.add_subsystem('one', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        p.model.add_subsystem('two', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        p.model.add_subsystem('three', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        p.setup()
+
+        p = om.Problem()
+        p.model.add_subsystem('one', OASDataGen(surf_options={'a': 1.13521}))
+        p.model.add_subsystem('two', OASDataGen(surf_options={'a': 1.1352}))
+        self.assertRaises(ValueError, p.setup)
+
+        p = om.Problem()
+        p.model.add_subsystem('one', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        p.model.add_subsystem('two', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1.0001, 10)}))
+        p.model.add_subsystem('three', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        self.assertRaises(ValueError, p.setup)
+
+        p = om.Problem()
+        p.model.add_subsystem('one', OASDataGen())
+        p.model.add_subsystem('two', OASDataGen(surf_options={'boof': True}))
+        self.assertRaises(ValueError, p.setup)
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class VLMTestCase(unittest.TestCase):
