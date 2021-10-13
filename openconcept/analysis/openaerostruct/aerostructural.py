@@ -6,6 +6,14 @@ from time import time
 from copy import copy, deepcopy
 import multiprocessing.pool as mp
 
+# Progress bar
+try:
+    import tqdm
+    progress_bar = True
+except ImportError:
+    print("Progress bar for training data can be enabled by installing the tqdm Python package with \"pip install tqdm\"")
+    progress_bar = False
+
 # OpenAeroStruct
 try:
     from openaerostruct.geometry.geometry_mesh_transformations import Rotate
@@ -396,7 +404,10 @@ def compute_training_data(inputs, surf_dict=None):
 
     # Initialize the parallel pool and compute the OpenAeroStruct data
     parallel_pool = mp.Pool()
-    out = list(parallel_pool.map(compute_aerodynamic_data, test_points))
+    if progress_bar:
+        out = list(tqdm.tqdm(parallel_pool.imap(compute_aerodynamic_data, test_points), total=len(test_points)))
+    else:
+        out = list(parallel_pool.map(compute_aerodynamic_data, test_points))
 
     # Initialize output arrays
     CL = np.zeros(inputs['Mach_number_grid'].shape)
@@ -985,7 +996,7 @@ if __name__=="__main__":
     p.run_model()
 
     om.n2(p, outfile='aerostructural_n2.html', show_browser=False)
-    
+
     print(f"CL = {p.get_val('CL')}")
     print(f"CD = {p.get_val('CD')}")
     print(f"failure = {p.get_val('failure')}")

@@ -6,6 +6,14 @@ from time import time
 from copy import copy, deepcopy
 import multiprocessing.pool as mp
 
+# Progress bar
+try:
+    import tqdm
+    progress_bar = True
+except ImportError:
+    print("Progress bar for training data can be enabled by installing the tqdm Python package with \"pip install tqdm\"")
+    progress_bar = False
+
 # OpenAeroStruct
 try:
     from openaerostruct.geometry.geometry_mesh_transformations import Rotate
@@ -95,7 +103,7 @@ class OASDragPolar(om.Group):
                              desc='List of angle of attack training values (degrees)')
         self.options.declare('alt_train', default=np.linspace(0, 12e3, 4),
                              desc='List of altitude training values (meters)')
-        self.options.declare('surf_options', default=None, desc="Dictionary of OpenAeroStruct surface options")
+        self.options.declare('surf_options', default={}, desc="Dictionary of OpenAeroStruct surface options")
     
     def setup(self):
         nn = self.options['num_nodes']
@@ -373,7 +381,7 @@ data : dict
 """
 def compute_training_data(inputs, surf_dict=None):
     t_start = time()
-    print(f"Generating training data...", end='')
+    print(f"\nGenerating training data...")
 
     # Set up test points for use in parallelized map function ([Mach, alpha, altitude, inputs] for each point)
     test_points = np.array([inputs['Mach_number_grid'].flatten(),
@@ -389,7 +397,10 @@ def compute_training_data(inputs, surf_dict=None):
 
     # Initialize the parallel pool and compute the OpenAeroStruct data
     parallel_pool = mp.Pool()
-    out = list(parallel_pool.map(compute_aerodynamic_data, test_points))
+    if progress_bar:
+        out = list(tqdm.tqdm(parallel_pool.imap(compute_aerodynamic_data, test_points), total=len(test_points)))
+    else:
+        out = list(parallel_pool.map(compute_aerodynamic_data, test_points))
 
     # Initialize output arrays
     CL = np.zeros(inputs['Mach_number_grid'].shape)
@@ -415,7 +426,7 @@ def compute_training_data(inputs, surf_dict=None):
             for u in wrt:
                 data['partials'][f, u][i] = out[i]['partials'][f, u]
     
-    print(f"done in {time() - t_start} sec")
+    print(f"        ...done in {time() - t_start} sec\n")
 
     return data
 
