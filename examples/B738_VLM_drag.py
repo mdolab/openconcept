@@ -128,7 +128,7 @@ def configure_problem():
     prob.model.nonlinear_solver.options['atol'] = 1e-6
     prob.model.nonlinear_solver.options['rtol'] = 1e-6
     prob.model.nonlinear_solver.options['err_on_non_converge'] = True
-    prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=True)
+    prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
 
     prob.driver = om.pyOptSparseDriver()
     prob.driver.options['optimizer'] = 'SNOPT'
@@ -166,7 +166,7 @@ def set_values(prob, num_nodes):
     prob.set_val('reserve|h0',15000.,units='ft')
     prob.set_val('mission_range',2050,units='NM')
 
-def show_outputs(prob):
+def show_outputs(prob, plots=True):
     # print some outputs
     vars_list = ['descent.fuel_used_final','loiter.fuel_used_final']
     units = ['lb','lb']
@@ -176,7 +176,6 @@ def show_outputs(prob):
         print(nice_print_names[i]+': '+str(prob.get_val(thing,units=units[i])[0])+' '+units[i])
 
     # plot some stuff
-    plots = True
     if plots:
         x_var = 'range'
         x_unit = 'NM'
@@ -197,8 +196,7 @@ def run_738_analysis(plots=False):
     set_values(prob, num_nodes)
     prob.run_model()
     # prob.model.list_outputs()
-    if plots:
-        show_outputs(prob)
+    show_outputs(prob, plots=plots)
     return prob
 
 def run_738_optimization(plots=False):
@@ -214,5 +212,5 @@ def run_738_optimization(plots=False):
 
 
 if __name__ == "__main__":
-    # run_738_analysis(plots=True)
-    run_738_optimization(plots=True)
+    run_738_analysis(plots=False)
+    # run_738_optimization(plots=True)

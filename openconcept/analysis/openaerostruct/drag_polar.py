@@ -33,6 +33,8 @@ class OASDragPolar(om.Group):
     Drag polar generated using OpenAeroStruct's vortex lattice method and a surrogate
     model to decrease the computational cost.
 
+    NOTE: set the OMP_NUM_THREADS environment variable to 1 for much better parallel training performance!
+
     Inputs
     ------
     fltcond|CL : float
