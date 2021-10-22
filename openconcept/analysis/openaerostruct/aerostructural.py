@@ -31,7 +31,7 @@ from openconcept.analysis.atmospherics.density_comp import DensityComp
 from openconcept.analysis.atmospherics.speedofsound_comp import SpeedOfSoundComp
 
 
-class OASDragPolar(om.Group):
+class OASAerostructDragPolar(om.Group):
     """
     Drag polar generated using OpenAeroStruct's vortex lattice method and a surrogate
     model to decrease the computational cost.
@@ -59,6 +59,12 @@ class OASDragPolar(om.Group):
     ac|geom|wing|twist : float
         List of twist angles at control points of spline (vector, degrees)
         NOTE: length of vector is num_twist (set in options), NOT num_nodes
+    ac|geom|wing|skin_thickness : float
+        List of skin thicknesses at control points of spline (vector, m)
+        NOTE: length of vector is num_skin (set in options)
+    ac|geom|wing|spar_thickness : float
+        List of spar thicknesses at control points of spline (vector, m)
+        NOTE: length of vector is num_spar (set in options)
     ac|aero|CD_nonwing : float
         Drag coefficient of components other than the wing; e.g. fuselage,
         tail, interference drag, etc.; this value is simply added to the
@@ -76,6 +82,8 @@ class OASDragPolar(om.Group):
         for each FEM node. Must be < 0 to constrain wingboxes stresses to
         be less than yield stress. Used to simplify the optimization problem by
         reducing the number of constraints.
+    ac|weights|W_wing : float
+        Weight of the wing (scalar, kg)
 
     Options
     -------
@@ -88,6 +96,10 @@ class OASDragPolar(om.Group):
         uses symmetry (scalar, dimensionless)
     num_twist : int
         Number of spline control points for twist (scalar, dimensionless)
+    num_skin : int
+        Number of spline control points for skin thickness (scalar, dimensionless)
+    num_spar : int
+        Number of spline control points for spar thickness (scalar, dimensionless)
     alpha_train : list or ndarray
         List of angle of attack values at which to train the model (ndarray, degrees)
     Mach_train : list or ndarray
@@ -107,6 +119,8 @@ class OASDragPolar(om.Group):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
         self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
+        self.options.declare("num_skin", default=4, desc="Number of skin thickness spline control points")
+        self.options.declare("num_spar", default=4, desc="Number of spar thickness spline control points")
         self.options.declare('Mach_train', default=np.array([0.1, 0.3, 0.45, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9]),
                              desc='List of Mach number training values (dimensionless)')
         self.options.declare('alpha_train', default=np.linspace(-10, 15, 6),
@@ -179,6 +193,12 @@ class OASDataGen(om.ExplicitComponent):
     ac|geom|wing|twist : float
         List of twist angles at control points of spline (vector, degrees)
         NOTE: length of vector is num_twist (set in options)
+    ac|geom|wing|skin_thickness : float
+        List of skin thicknesses at control points of spline (vector, m)
+        NOTE: length of vector is num_skin (set in options)
+    ac|geom|wing|spar_thickness : float
+        List of spar thicknesses at control points of spline (vector, m)
+        NOTE: length of vector is num_spar (set in options)
     ac|aero|CD_nonwing : float
         Drag coefficient of components other than the wing; e.g. fuselage,
         tail, interference drag, etc.; this value is simply added to the
@@ -192,6 +212,10 @@ class OASDataGen(om.ExplicitComponent):
         Grid of lift coefficient data to train structured surrogate model
     CD_train : 3-dim ndarray
         Grid of drag coefficient data to train structured surrogate model
+    failure_train : float
+        Grid of KS structural failure constraint to train structured surrogate; constrain failure < 0
+    W_wing_train : float
+        Grid of wing structural weight to train structured surrogate model (scalar, kg)
 
     Options
     -------
@@ -202,6 +226,10 @@ class OASDataGen(om.ExplicitComponent):
         uses symmetry (scalar, dimensionless)
     num_twist : int
         Number of spline control points for twist (scalar, dimensionless)
+    num_skin : int
+        Number of spline control points for skin thickness (scalar, dimensionless)
+    num_spar : int
+        Number of spline control points for spar thickness (scalar, dimensionless)
     Mach_train : list or ndarray
         List of Mach numbers at which to train the model (ndarray, dimensionless)
     alpha_train : list or ndarray
@@ -220,6 +248,8 @@ class OASDataGen(om.ExplicitComponent):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
         self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
+        self.options.declare("num_skin", default=4, desc="Number of skin thickness spline control points")
+        self.options.declare("num_spar", default=4, desc="Number of spar thickness spline control points")
         self.options.declare('Mach_train', default=np.array([0.1, 0.3, 0.45, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9]),
                              desc='List of Mach number training values (dimensionless)')
         self.options.declare('alpha_train', default=np.linspace(-10, 15, 6),
@@ -235,6 +265,10 @@ class OASDataGen(om.ExplicitComponent):
         self.add_input('ac|geom|wing|c4sweep', units='deg')
         self.add_input('ac|geom|wing|twist', val=np.zeros(self.options["num_twist"]),
                        shape=(self.options["num_twist"],), units='deg')
+        self.add_input('ac|geom|wing|skin_thickness', val=np.zeros(self.options["num_skin"]),
+                       shape=(self.options["num_skin"],), units='m')
+        self.add_input('ac|geom|wing|spar_thickness', val=np.zeros(self.options["num_spar"]),
+                       shape=(self.options["num_spar"],), units='m')
         self.add_input('ac|aero|CD_nonwing', val=0.)
         self.add_input('fltcond|TempIncrement', val=0., units='degC')
 
@@ -243,6 +277,8 @@ class OASDataGen(om.ExplicitComponent):
         n_alt = self.options['alt_train'].size
         self.add_output("CL_train", shape=(n_Mach, n_alpha, n_alt))
         self.add_output("CD_train", shape=(n_Mach, n_alpha, n_alt))
+        self.add_output("failure_train", shape=(n_Mach, n_alpha, n_alt))
+        self.add_output("W_wing_train", shape=(n_Mach, n_alpha, n_alt), units='kg')
 
         self.declare_partials('*', '*')
 
@@ -270,6 +306,8 @@ class OASDataGen(om.ExplicitComponent):
         OASDataGen.taper = -np.ones(1)
         OASDataGen.c4sweep = -np.ones(1)
         OASDataGen.twist = -1*np.ones((self.options["num_twist"],))
+        OASDataGen.skin = -1*np.ones((self.options["num_skin"],))
+        OASDataGen.spar = -1*np.ones((self.options["num_spar"],))
         OASDataGen.temp_incr = -42*np.ones(1)
         OASDataGen.Mach, OASDataGen.alpha, OASDataGen.alt = np.meshgrid(self.options['Mach_train'],
                                                                         self.options['alpha_train'],
@@ -277,6 +315,8 @@ class OASDataGen(om.ExplicitComponent):
                                                                         indexing='ij')
         OASDataGen.CL = np.zeros((n_Mach, n_alpha, n_alt))
         OASDataGen.CD = np.zeros((n_Mach, n_alpha, n_alt))
+        OASDataGen.failure = np.zeros((n_Mach, n_alpha, n_alt))
+        OASDataGen.W_wing = np.zeros((n_Mach, n_alpha, n_alt))
         OASDataGen.partials = None
     
     def compute(self, inputs, outputs):
@@ -285,6 +325,8 @@ class OASDataGen(om.ExplicitComponent):
         taper = inputs["ac|geom|wing|taper"]
         sweep = inputs["ac|geom|wing|c4sweep"]
         twist = inputs["ac|geom|wing|twist"]
+        skin = inputs["ac|geom|wing|skin_thickness"]
+        spar = inputs["ac|geom|wing|spar_thickness"]
         CD_nonwing = inputs["ac|aero|CD_nonwing"]
         temp_incr = inputs["fltcond|TempIncrement"]
 
@@ -294,18 +336,24 @@ class OASDataGen(om.ExplicitComponent):
            taper == OASDataGen.taper and
            sweep == OASDataGen.c4sweep and
            np.all(twist == OASDataGen.twist) and
+           np.all(skin == OASDataGen.skin) and
+           np.all(spar == OASDataGen.spar) and
            temp_incr == OASDataGen.temp_incr):
             outputs['CL_train'] = OASDataGen.CL
             outputs['CD_train'] = OASDataGen.CD + CD_nonwing
+            outputs['failure_train'] = OASDataGen.failure
+            outputs['W_wing_train'] = OASDataGen.W_wing
             return
 
-        print(f"S = {S}; AR = {AR}; taper = {taper}; sweep = {sweep}; twist = {twist}; temp_incr = {temp_incr}")
+        print(f"S = {S}; AR = {AR}; taper = {taper}; sweep = {sweep}; twist = {twist}; skin = {skin}; spar = {spar}; temp_incr = {temp_incr}")
         # Copy new values to cached ones
         OASDataGen.S[:] = S
         OASDataGen.AR[:] = AR
         OASDataGen.taper[:] = taper
         OASDataGen.c4sweep[:] = sweep
         OASDataGen.twist[:] = twist
+        OASDataGen.skin[:] = skin
+        OASDataGen.spar[:] = spar
         OASDataGen.temp_incr[:] = temp_incr
         
         # Compute new training values
@@ -319,15 +367,21 @@ class OASDataGen(om.ExplicitComponent):
         train_in['taper'] = taper
         train_in['c4sweep'] = sweep
         train_in['twist'] = twist
+        train_in['skin'] = skin
+        train_in['spar'] = spar
         train_in['num_x'] = self.options['num_x']
         train_in['num_y'] = self.options['num_y']
 
         data = compute_training_data(train_in, surf_dict=self.options['surf_options'])
         OASDataGen.CL[:] = data['CL']
         OASDataGen.CD[:] = data['CD']
+        OASDataGen.failure[:] = data['failure']
+        OASDataGen.W_wing[:] = data['W_wing']
         OASDataGen.partials = copy(data['partials'])
         outputs['CL_train'] = OASDataGen.CL
         outputs['CD_train'] = OASDataGen.CD + CD_nonwing
+        outputs['failure_train'] = OASDataGen.failure
+        outputs['W_wing_train'] = OASDataGen.W_wing
     
     def compute_partials(self, inputs, partials):
         # Compute partials if they haven't been already and return them
@@ -364,6 +418,12 @@ inputs : dict
     twist : float
         List of twist angles at control points of spline (vector, degrees)
         NOTE: length of vector is num_twist (set in options of OASDataGen)
+    skin : float
+        List of skin thicknesses at control points of spline (vector, m)
+        NOTE: length of vector is num_skin (set in options of OASDataGen)
+    spar : float
+        List of spar thicknesses at control points of spline (vector, m)
+        NOTE: length of vector is num_spar (set in options of OASDataGen)
     num_x: int
         number of points in x (streamwise) direction (scalar, dimensionless)
     num_y: int
@@ -385,6 +445,10 @@ data : dict
         Lift coefficients at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
     CD : ndarray
         Drag coefficients at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
+    failure : ndarray
+        KS structural failure constraint at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
+    W_wing : ndarray
+        Wing structural weight at training points (3D meshgrid 'ij'-style ndarray, kg)
     partials : dict
         Partial derivatives of the training data flattened in the proper OpenMDAO-style
         format for use as partial derivatives in the OASDataGen component
@@ -440,9 +504,9 @@ def compute_training_data(inputs, surf_dict=None):
 
     return data
 
-# Function to compute CL, CD, and derivatives at a given test point. Used for
-# the parallel mapping function in compute_training_data
-# Input "point" is row in test_points array
+# Function to compute CL, CD, failure, wing weight, and derivatives at a
+# given test point. Used for the parallel mapping function in
+# compute_training_data. Input "point" is row in test_points array.
 def compute_aerodynamic_data(point):
     inputs = point[3]
 
@@ -653,9 +717,6 @@ class Aerostruct(om.Group):
             "strength_factor_for_upper_skin": 1.0,  # yield stress is multiplied by this factor for upper skin
             "struct_weight_relief": True,  # if true, add the weight of the structure to its loads
             "distributed_fuel_weight": False,
-            # "fuel_density": 803.,  # [kg/m^3] fuel density (only needed if the fuel-in-wing volume constraint is used)
-            # "Wf_reserve": 15000.,  # [kg] reserve fuel mass
-            # "n_point_masses": 1,  # number of point masses in system; in this case, the engine (omit if no point masses)
 
             # Constraints
             "exact_failure_constraint": False,  # if false, use KS function
