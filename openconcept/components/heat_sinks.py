@@ -98,10 +98,10 @@ class BandolierCoolingSystem(om.ExplicitComponent):
         self.add_input('t_channel', units='m', val=0.0005)
 
         self.add_output('dTdt', shape=(nn,), units='K/s', tags=['integrate', 'state_name:T_battery', 'state_units:K', 'state_val:300.0', 'state_promotes:True'])
-        self.add_output('T_surface', shape=(nn,), units='K')
-        self.add_output('T_core', shape=(nn,), units='K')
+        self.add_output('T_surface', shape=(nn,), units='K', lower=1e-10)
+        self.add_output('T_core', shape=(nn,), units='K', lower=1e-10)
         self.add_output('q', shape=(nn,), units='W')
-        self.add_output('T_out', shape=(nn,), units='K', val=300)
+        self.add_output('T_out', shape=(nn,), units='K', val=300, lower=1e-10)
 
         self.declare_partials(['*'], ['*'], method='cs')
 
@@ -250,7 +250,7 @@ class LiquidCooledBattery(om.Group):
         if not quasi_steady:
             ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
                                            promotes_outputs=['*'], promotes_inputs=['*'])
-            ode_integ.add_integrand('T', rate_name='dTdt', units='K', lower=0.0)
+            ode_integ.add_integrand('T', rate_name='dTdt', units='K', lower=1e-10)
         else:
             self.add_subsystem('thermal_bal',
                                om.BalanceComp('T', eq_units='K/s', lhs_name='dTdt', rhs_val=0.0, units='K', lower=1.0, val=299.*np.ones((nn,))),
@@ -350,7 +350,7 @@ class MotorCoolingJacket(om.ExplicitComponent):
         self.add_input('power_rating', units='W', val=2e5)
         self.add_input('motor_weight', units='kg', val=100)
         self.add_output('q', shape=(nn,), units='W')
-        self.add_output('T_out', shape=(nn,), units='K', val=300)
+        self.add_output('T_out', shape=(nn,), units='K', val=300, lower=1e-10)
         self.add_output('dTdt', shape=(nn,), units='K/s', tags=['integrate', 'state_name:T_motor', 'state_units:K', 'state_val:300.0', 'state_promotes:True'])        
         
         self.declare_partials(['T_out','q','dTdt'], ['power_rating'], rows=arange, cols=np.zeros((nn,)))
@@ -463,7 +463,7 @@ class LiquidCooledMotor(om.Group):
         if not quasi_steady:
             ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
                                            promotes_outputs=['*'], promotes_inputs=['*'])
-            ode_integ.add_integrand('T', rate_name='dTdt', units='K', lower=0.0)
+            ode_integ.add_integrand('T', rate_name='dTdt', units='K', lower=1e-10)
         else:
             self.add_subsystem('thermal_bal',
                                om.BalanceComp('T', eq_units='K/s', lhs_name='dTdt', rhs_val=0.0, units='K', lower=1.0, val=299.*np.ones((nn,))),
