@@ -27,6 +27,9 @@ class HeatPipeIntegrationTestCase(unittest.TestCase):
         assert_near_equal(prob['q_max'], np.ones(nn)*2807.04869547, tolerance=1e-5)
         assert_near_equal(prob['weight'], 0.51463886, tolerance=1e-5)
         assert_near_equal(prob['T_cond'], np.ones(nn)*29.9441105, tolerance=1e-5)
+
+        partials = prob.check_partials(method='cs',compact_print=True, step=1e-50)
+        assert_check_partials(partials)
     
     def test_simple_vector(self):
         nn = 5
@@ -45,6 +48,9 @@ class HeatPipeIntegrationTestCase(unittest.TestCase):
         assert_near_equal(prob['q_max'], np.array([4936.75193703, 5022.29454826, 5074.04485581, 5095.29546816, 5081.04977578]), tolerance=1e-5)
         assert_near_equal(prob['weight'], 0.51463886, tolerance=1e-5)
         assert_near_equal(prob['T_cond'], np.array([29.9441105, 37.4231564, 44.90220466, 52.38125436, 59.86030483]), tolerance=1e-5)
+
+        partials = prob.check_partials(method='cs',compact_print=True, step=1e-50)
+        assert_check_partials(partials)
     
     def test_two_pipes(self):
         nn = 3
@@ -63,6 +69,9 @@ class HeatPipeIntegrationTestCase(unittest.TestCase):
         one.setup(check=True, force_alloc_complex=True)
         one.run_model()
 
+        partials = one.check_partials(method='cs',compact_print=True, step=1e-50)
+        assert_check_partials(partials)
+
         # Twice as many pipes with twice as much heat
         two = Problem()
         pipe = two.model.add_subsystem('test', hp.HeatPipe(num_nodes=nn), promotes=['*'])
@@ -75,6 +84,9 @@ class HeatPipeIntegrationTestCase(unittest.TestCase):
 
         two.setup(check=True, force_alloc_complex=True)
         two.run_model()
+
+        partials = two.check_partials(method='cs',compact_print=True, step=1e-50)
+        assert_check_partials(partials)
 
         assert_near_equal(one['q_max'], two['q_max']/2)
         assert_near_equal(one['weight'], two['weight']/2)
@@ -93,6 +105,9 @@ class HeatPipeThermalResistanceTestCase(unittest.TestCase):
 
         assert_near_equal(p['thermal_resistance'], np.ones(nn)*0.00076513, tolerance=1e-5)
 
+        partials = p.check_partials(method='cs',compact_print=True, step=1e-50)
+        assert_check_partials(partials)
+
 class HeatPipeVaporTempDropTestCase(unittest.TestCase):
     """
     Basic test for HeatPipeVaporTempDrop component to ensure no drastic changes in outputs
@@ -106,6 +121,9 @@ class HeatPipeVaporTempDropTestCase(unittest.TestCase):
         
         assert_near_equal(p['delta_T'], np.ones(nn)*2.37127, tolerance=1e-5)
 
+        partials = p.check_partials(method='cs',compact_print=True, step=1e-50)
+        assert_check_partials(partials)
+
 class HeatPipeWeightTestCase(unittest.TestCase):
     """
     Basic test for HeatPipeWeight component to ensure no drastic changes in outputs
@@ -118,6 +136,7 @@ class HeatPipeWeightTestCase(unittest.TestCase):
         
         assert_near_equal(p['heat_pipe_weight'], 0.04074404, tolerance=1e-5)
         assert_near_equal(p['wall_thickness'], 6.99300699e-05, tolerance=1e-5)
+
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
@@ -136,6 +155,7 @@ class AmmoniaPropertiesTestCase(unittest.TestCase):
         assert_near_equal(p['rho_liquid'], np.ones(nn)*482.9)
         assert_near_equal(p['rho_vapor'], np.ones(nn)*43.9)
         assert_near_equal(p['vapor_pressure'], np.ones(nn)*5123.)
+
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
     
@@ -150,6 +170,7 @@ class AmmoniaPropertiesTestCase(unittest.TestCase):
         assert_near_equal(p['rho_liquid'], np.array([648.00187402, 624.69, 599.75101299, 572.91683838, 543.40564864, 509.97440705]), tolerance=1e-5)
         assert_near_equal(p['rho_vapor'], np.array([2.6756274, 4.8593, 8.26745558, 13.40464169, 21.03778235, 32.43929276]), tolerance=1e-5)
         assert_near_equal(p['vapor_pressure'], np.array([327.98889865,  614.9, 1065.92300458, 1733.70063068, 2677.30942723, 3966.79472967]), tolerance=1e-5)
+
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
@@ -171,6 +192,9 @@ class QMaxHeatPipeTestCase(unittest.TestCase):
         assert_near_equal(p['q_max'], np.array([4936.75193703, 5074.04485581, 5081.04977578]), tolerance=1e-5)
         assert_near_equal(p['heat_pipe_weight'], 0.51463886, tolerance=1e-5)
 
+        partials = p.check_partials(method='cs',compact_print=True, step=1e-50)
+        assert_check_partials(partials)
+
 class QMaxAnalyticalPartTestCase(unittest.TestCase):
     """
     Basic test for QMaxAnalyticalPart component to ensure no drastic changes in outputs
@@ -183,3 +207,6 @@ class QMaxAnalyticalPartTestCase(unittest.TestCase):
         p.run_model()
         
         assert_near_equal(p['q_max'], np.ones(nn)*875.86211677, tolerance=1e-5)
+
+        partials = p.check_partials(method='cs',compact_print=True, step=1e-50)
+        assert_check_partials(partials)
