@@ -3,7 +3,7 @@ import unittest
 import os
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
-from openmdao.api import Problem, DirectSolver
+from openmdao.api import Problem
 import openconcept
 from openconcept.components.cfm56 import CFM56
 
@@ -21,7 +21,6 @@ class CFM56TestCase(unittest.TestCase):
     def test_defaults(self):
         p = Problem()
         p.model = CFM56()
-        p.model.linear_solver = DirectSolver()
 
         p.setup(force_alloc_complex=True)
 
@@ -31,7 +30,7 @@ class CFM56TestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('thrust'), 7050.74007329*np.ones(1), tolerance=1e-10)
+        assert_near_equal(p.get_val('thrust', units='lbf'), 7050.74007329*np.ones(1), tolerance=1e-10)
         assert_near_equal(p.get_val('fuel_flow', units='kg/s'), .50273837866*np.ones(1), tolerance=1e-10)
         assert_near_equal(p.get_val('T4', units='degK'), 1432.06790075*np.ones(1), tolerance=1e-10)
 
@@ -42,7 +41,6 @@ class CFM56TestCase(unittest.TestCase):
         nn = 5
         p = Problem()
         p.model = CFM56(num_nodes=nn)
-        p.model.linear_solver = DirectSolver()
 
         p.setup(force_alloc_complex=True)
 
@@ -52,7 +50,7 @@ class CFM56TestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('thrust'), np.array([1463.81336747, 3961.41898067, 5278.43601914,
+        assert_near_equal(p.get_val('thrust', units='lbf'), np.array([1463.81336747, 3961.41898067, 5278.43601914,
                           5441.45056659, 6478.26284602]), tolerance=1e-10)
         assert_near_equal(p.get_val('fuel_flow', units='kg/s'), 1e-3*np.array([170.25667238, 254.96500022,
                           357.45651444, 405.72535156, 492.41365636]), tolerance=1e-10)
