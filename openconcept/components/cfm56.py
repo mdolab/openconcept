@@ -63,7 +63,7 @@ def CFM56(num_nodes=1, plot=False):
                     training_data=a[:,4], units='lbm/s',
                     surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+'cfm56fuelburn.pkl'))
     comp.add_output('T4', np.ones((num_nodes,))*3000.,
-                    training_data=a[:,5], units='R',
+                    training_data=a[:,5], units='degR',
                     surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+'cfm56T4.pkl'))
     comp.options['default_surrogate'] = KrigingSurrogate(lapack_driver='gesvd', cache_trained_model=True)
 
