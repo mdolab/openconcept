@@ -6,6 +6,10 @@ from time import time
 from copy import copy, deepcopy
 import multiprocessing.pool as mp
 
+# Supress ComplexWarning from OpenAeroStruct
+import warnings
+warnings.simplefilter("ignore")
+
 # Progress bar
 try:
     import tqdm
@@ -33,7 +37,8 @@ from openconcept.analysis.atmospherics.speedofsound_comp import SpeedOfSoundComp
 
 class OASAerostructDragPolar(om.Group):
     """
-    Drag polar generated using OpenAeroStruct's vortex lattice method and a surrogate
+    Drag polar and wing weight estimate generated using OpenAeroStruct's
+    aerostructural analysis capabilities and a surrogate
     model to decrease the computational cost.
 
     NOTE: set the OMP_NUM_THREADS environment variable to 1 for much better parallel training performance!
@@ -59,6 +64,9 @@ class OASAerostructDragPolar(om.Group):
     ac|geom|wing|twist : float
         List of twist angles at control points of spline (vector, degrees)
         NOTE: length of vector is num_twist (set in options), NOT num_nodes
+    ac|geom|wing|toverc : float
+        List of thickness to chord ratios at control points of spline (vector, dimensionless)
+        NOTE: length of vector is num_toverc (set in options)
     ac|geom|wing|skin_thickness : float
         List of skin thicknesses at control points of spline (vector, m)
         NOTE: length of vector is num_skin (set in options)
@@ -96,6 +104,8 @@ class OASAerostructDragPolar(om.Group):
         uses symmetry (scalar, dimensionless)
     num_twist : int
         Number of spline control points for twist (scalar, dimensionless)
+    num_toverc : int
+        Number of spline control points for thickness to chord ratio (scalar, dimensionless)
     num_skin : int
         Number of spline control points for skin thickness (scalar, dimensionless)
     num_spar : int
@@ -119,6 +129,7 @@ class OASAerostructDragPolar(om.Group):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
         self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
+        self.options.declare("num_toverc", default=4, desc="Number of thickness to chord ratio spline control points")
         self.options.declare("num_skin", default=4, desc="Number of skin thickness spline control points")
         self.options.declare("num_spar", default=4, desc="Number of spar thickness spline control points")
         self.options.declare('Mach_train', default=np.array([0.1, 0.3, 0.45, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9]),
@@ -137,11 +148,14 @@ class OASAerostructDragPolar(om.Group):
 
         # Training data
         self.add_subsystem('training_data', OASDataGen(num_x=self.options['num_x'], num_y=self.options['num_y'],
-                                                       num_twist=self.options['num_twist'], alpha_train=self.options['alpha_train'],
+                                                       num_twist=self.options['num_twist'], num_skin=self.options['num_skin'],
+                                                       num_spar=self.options['num_spar'], alpha_train=self.options['alpha_train'],
                                                        Mach_train=self.options['Mach_train'], alt_train=self.options['alt_train'],
                                                        surf_options=self.options['surf_options']),
                            promotes_inputs=['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper', 'ac|geom|wing|c4sweep',
-                                            'ac|geom|wing|twist', 'ac|aero|CD_nonwing', 'fltcond|TempIncrement'])
+                                            'ac|geom|wing|twist', 'ac|geom|wing|toverc', 'ac|geom|wing|skin_thickness',
+                                            'ac|geom|wing|spar_thickness', 'ac|aero|CD_nonwing', 'fltcond|TempIncrement'],
+                           promotes_outputs=[('W_wing', 'ac|weights|W_wing')])
 
         # Surrogate model
         interp = om.MetaModelStructuredComp(method='scipy_cubic', training_data_gradients=True, vec_size=nn, extrapolate=True)
@@ -150,17 +164,20 @@ class OASAerostructDragPolar(om.Group):
         interp.add_input('fltcond|h', 0., units='m', training_data=self.options['alt_train'])
         interp.add_output('CL', training_data=np.zeros((n_Mach, n_alpha, n_alt)))
         interp.add_output('CD', training_data=np.zeros((n_Mach, n_alpha, n_alt)))
-        self.add_subsystem('aero_surrogate', interp, promotes_inputs=['fltcond|M', 'fltcond|h'])
+        interp.add_output('failure', training_data=np.zeros((n_Mach, n_alpha, n_alt)))
+        self.add_subsystem('aero_surrogate', interp, promotes_inputs=['fltcond|M', 'fltcond|h'],
+                           promotes_outputs=['failure'])
         self.connect('training_data.CL_train', 'aero_surrogate.CL_train')
         self.connect('training_data.CD_train', 'aero_surrogate.CD_train')
+        self.connect('training_data.failure_train', 'aero_surrogate.failure_train')
 
         # Solve for angle of attack that meets input lift coefficient
-        self.add_subsystem("alpha_bal", om.BalanceComp('alpha', eq_units=None, lhs_name="CL_VLM",
+        self.add_subsystem("alpha_bal", om.BalanceComp('alpha', eq_units=None, lhs_name="CL_OAS",
                                                        rhs_name="fltcond|CL", val=np.ones(nn),
                                                        units="deg"),
                            promotes_inputs=['fltcond|CL'])
         self.connect("alpha_bal.alpha", "aero_surrogate.alpha")
-        self.connect("aero_surrogate.CL", "alpha_bal.CL_VLM")
+        self.connect("aero_surrogate.CL", "alpha_bal.CL_OAS")
 
         # Compute drag force from drag coefficient
         self.add_subsystem('drag_calc', om.ExecComp('drag = q * S * CD',
@@ -193,6 +210,9 @@ class OASDataGen(om.ExplicitComponent):
     ac|geom|wing|twist : float
         List of twist angles at control points of spline (vector, degrees)
         NOTE: length of vector is num_twist (set in options)
+    ac|geom|wing|toverc : float
+        List of thickness to chord ratios at control points of spline (vector, dimensionless)
+        NOTE: length of vector is num_toverc (set in options)
     ac|geom|wing|skin_thickness : float
         List of skin thicknesses at control points of spline (vector, m)
         NOTE: length of vector is num_skin (set in options)
@@ -214,8 +234,8 @@ class OASDataGen(om.ExplicitComponent):
         Grid of drag coefficient data to train structured surrogate model
     failure_train : float
         Grid of KS structural failure constraint to train structured surrogate; constrain failure < 0
-    W_wing_train : float
-        Grid of wing structural weight to train structured surrogate model (scalar, kg)
+    W_wing : float
+        Wing structural weight (scalar, kg)
 
     Options
     -------
@@ -226,6 +246,8 @@ class OASDataGen(om.ExplicitComponent):
         uses symmetry (scalar, dimensionless)
     num_twist : int
         Number of spline control points for twist (scalar, dimensionless)
+    num_toverc : int
+        Number of spline control points for thickness to chord ratio (scalar, dimensionless)
     num_skin : int
         Number of spline control points for skin thickness (scalar, dimensionless)
     num_spar : int
@@ -248,6 +270,7 @@ class OASDataGen(om.ExplicitComponent):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
         self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
+        self.options.declare("num_toverc", default=4, desc="Number of thickness to chord ratio spline control points")
         self.options.declare("num_skin", default=4, desc="Number of skin thickness spline control points")
         self.options.declare("num_spar", default=4, desc="Number of spar thickness spline control points")
         self.options.declare('Mach_train', default=np.array([0.1, 0.3, 0.45, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9]),
@@ -265,6 +288,8 @@ class OASDataGen(om.ExplicitComponent):
         self.add_input('ac|geom|wing|c4sweep', units='deg')
         self.add_input('ac|geom|wing|twist', val=np.zeros(self.options["num_twist"]),
                        shape=(self.options["num_twist"],), units='deg')
+        self.add_input('ac|geom|wing|toverc', val=np.zeros(self.options["num_toverc"]),
+                       shape=(self.options["num_toverc"],))
         self.add_input('ac|geom|wing|skin_thickness', val=np.zeros(self.options["num_skin"]),
                        shape=(self.options["num_skin"],), units='m')
         self.add_input('ac|geom|wing|spar_thickness', val=np.zeros(self.options["num_spar"]),
@@ -278,7 +303,7 @@ class OASDataGen(om.ExplicitComponent):
         self.add_output("CL_train", shape=(n_Mach, n_alpha, n_alt))
         self.add_output("CD_train", shape=(n_Mach, n_alpha, n_alt))
         self.add_output("failure_train", shape=(n_Mach, n_alpha, n_alt))
-        self.add_output("W_wing_train", shape=(n_Mach, n_alpha, n_alt), units='kg')
+        self.add_output("W_wing", units='kg')
 
         self.declare_partials('*', '*')
 
@@ -306,6 +331,7 @@ class OASDataGen(om.ExplicitComponent):
         OASDataGen.taper = -np.ones(1)
         OASDataGen.c4sweep = -np.ones(1)
         OASDataGen.twist = -1*np.ones((self.options["num_twist"],))
+        OASDataGen.toverc = -1*np.ones((self.options["num_toverc"],))
         OASDataGen.skin = -1*np.ones((self.options["num_skin"],))
         OASDataGen.spar = -1*np.ones((self.options["num_spar"],))
         OASDataGen.temp_incr = -42*np.ones(1)
@@ -316,7 +342,7 @@ class OASDataGen(om.ExplicitComponent):
         OASDataGen.CL = np.zeros((n_Mach, n_alpha, n_alt))
         OASDataGen.CD = np.zeros((n_Mach, n_alpha, n_alt))
         OASDataGen.failure = np.zeros((n_Mach, n_alpha, n_alt))
-        OASDataGen.W_wing = np.zeros((n_Mach, n_alpha, n_alt))
+        OASDataGen.W_wing = 0
         OASDataGen.partials = None
     
     def compute(self, inputs, outputs):
@@ -325,6 +351,7 @@ class OASDataGen(om.ExplicitComponent):
         taper = inputs["ac|geom|wing|taper"]
         sweep = inputs["ac|geom|wing|c4sweep"]
         twist = inputs["ac|geom|wing|twist"]
+        toverc = inputs["ac|geom|wing|toverc"]
         skin = inputs["ac|geom|wing|skin_thickness"]
         spar = inputs["ac|geom|wing|spar_thickness"]
         CD_nonwing = inputs["ac|aero|CD_nonwing"]
@@ -336,13 +363,14 @@ class OASDataGen(om.ExplicitComponent):
            taper == OASDataGen.taper and
            sweep == OASDataGen.c4sweep and
            np.all(twist == OASDataGen.twist) and
+           np.all(toverc == OASDataGen.toverc) and
            np.all(skin == OASDataGen.skin) and
            np.all(spar == OASDataGen.spar) and
            temp_incr == OASDataGen.temp_incr):
             outputs['CL_train'] = OASDataGen.CL
             outputs['CD_train'] = OASDataGen.CD + CD_nonwing
             outputs['failure_train'] = OASDataGen.failure
-            outputs['W_wing_train'] = OASDataGen.W_wing
+            outputs['W_wing'] = OASDataGen.W_wing
             return
 
         print(f"S = {S}; AR = {AR}; taper = {taper}; sweep = {sweep}; twist = {twist}; skin = {skin}; spar = {spar}; temp_incr = {temp_incr}")
@@ -352,6 +380,7 @@ class OASDataGen(om.ExplicitComponent):
         OASDataGen.taper[:] = taper
         OASDataGen.c4sweep[:] = sweep
         OASDataGen.twist[:] = twist
+        OASDataGen.toverc[:] = toverc
         OASDataGen.skin[:] = skin
         OASDataGen.spar[:] = spar
         OASDataGen.temp_incr[:] = temp_incr
@@ -367,6 +396,7 @@ class OASDataGen(om.ExplicitComponent):
         train_in['taper'] = taper
         train_in['c4sweep'] = sweep
         train_in['twist'] = twist
+        train_in['toverc'] = toverc
         train_in['skin'] = skin
         train_in['spar'] = spar
         train_in['num_x'] = self.options['num_x']
@@ -376,12 +406,12 @@ class OASDataGen(om.ExplicitComponent):
         OASDataGen.CL[:] = data['CL']
         OASDataGen.CD[:] = data['CD']
         OASDataGen.failure[:] = data['failure']
-        OASDataGen.W_wing[:] = data['W_wing']
+        OASDataGen.W_wing = data['W_wing']
         OASDataGen.partials = copy(data['partials'])
         outputs['CL_train'] = OASDataGen.CL
         outputs['CD_train'] = OASDataGen.CD + CD_nonwing
         outputs['failure_train'] = OASDataGen.failure
-        outputs['W_wing_train'] = OASDataGen.W_wing
+        outputs['W_wing'] = OASDataGen.W_wing
     
     def compute_partials(self, inputs, partials):
         # Compute partials if they haven't been already and return them
@@ -418,6 +448,9 @@ inputs : dict
     twist : float
         List of twist angles at control points of spline (vector, degrees)
         NOTE: length of vector is num_twist (set in options of OASDataGen)
+    toverc : float
+        List of thickness to chord ratios at control points of spline (vector, dimensionless)
+        NOTE: length of vector is num_toverc (set in options of OASDataGen)
     skin : float
         List of skin thicknesses at control points of spline (vector, m)
         NOTE: length of vector is num_skin (set in options of OASDataGen)
@@ -447,8 +480,8 @@ data : dict
         Drag coefficients at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
     failure : ndarray
         KS structural failure constraint at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
-    W_wing : ndarray
-        Wing structural weight at training points (3D meshgrid 'ij'-style ndarray, kg)
+    W_wing : float
+        Wing structural weight; same regardless of flight condition (scalar, kg)
     partials : dict
         Partial derivatives of the training data flattened in the proper OpenMDAO-style
         format for use as partial derivatives in the OASDataGen component
@@ -461,13 +494,20 @@ def compute_training_data(inputs, surf_dict=None):
     test_points = np.array([inputs['Mach_number_grid'].flatten(),
                             inputs['alpha_grid'].flatten(),
                             inputs['alt_grid'].flatten(),
-                            np.zeros(inputs['Mach_number_grid'].size)]).T.tolist()
+                            np.zeros(inputs['Mach_number_grid'].size),  # inputs_to_send goes here
+                            np.zeros(inputs['Mach_number_grid'].size)   # compute W_wing goes here
+                            ]).T.tolist()
     inputs_to_send = {'surf_dict': surf_dict}
-    keys = ['TempIncrement', 'S_ref', 'AR', 'taper', 'c4sweep', 'twist', 'num_x', 'num_y']
+    keys = ['TempIncrement', 'S_ref', 'AR', 'taper', 'c4sweep', 'twist',
+            'toverc', 'skin', 'spar', 'num_x', 'num_y']
     for key in keys:
         inputs_to_send[key] = inputs[key]
-    for row in test_points:
-        row[-1] = inputs_to_send
+    for i, row in enumerate(test_points):
+        # Only compute wing weight on the first iteration (identical across flight conditions)
+        row[4] = False
+        if i == 0:
+            row[4] = True
+        row[3] = inputs_to_send
 
     # Initialize the parallel pool and compute the OpenAeroStruct data
     parallel_pool = mp.Pool()
@@ -479,27 +519,37 @@ def compute_training_data(inputs, surf_dict=None):
     # Initialize output arrays
     CL = np.zeros(inputs['Mach_number_grid'].shape)
     CD = np.zeros(inputs['Mach_number_grid'].shape)
+    failure = np.zeros(inputs['Mach_number_grid'].shape)
     jac_num_rows = inputs['Mach_number_grid'].size  # product of array dimensions
-    of = ['CL_train', 'CD_train']
+    of = ['CL_train', 'CD_train', 'failure_train']
     wrt = ['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper',
-            'ac|geom|wing|c4sweep', 'ac|geom|wing|twist', 'fltcond|TempIncrement']
+            'ac|geom|wing|c4sweep', 'ac|geom|wing|twist', 'ac|geom|wing|toverc',
+            'ac|geom|wing|skin_thickness', 'ac|geom|wing|spar_thickness', 'fltcond|TempIncrement']
+    vec_wrt = {'ac|geom|wing|twist': inputs['twist'].size, 'ac|geom|wing|toverc': inputs['toverc'].size,
+            'ac|geom|wing|skin_thickness': inputs['skin'].size, 'ac|geom|wing|spar_thickness': inputs['spar'].size}
     partials = {}
     for f in of:
         for u in wrt:
-            if u == 'ac|geom|wing|twist':
-                partials[f, u] = np.zeros((jac_num_rows, inputs['twist'].size))
-            else:
-                partials[f, u] = np.zeros((jac_num_rows, 1))
-    data = {'CL': CL, 'CD': CD, 'partials': partials}
+            # States that are vectors have different partial shapes
+            partials[f, u] = np.zeros((jac_num_rows, vec_wrt[u])) if u in vec_wrt.keys() else np.zeros((jac_num_rows, 1))
+    data = {'CL': CL, 'CD': CD, 'failure': failure, 'partials': partials}
 
     # Transfer data into output data structure the proper format
     for i in range(len(out)):
         data['CL'][np.unravel_index(i, inputs['Mach_number_grid'].shape)] = out[i]['CL']
         data['CD'][np.unravel_index(i, inputs['Mach_number_grid'].shape)] = out[i]['CD']
+        data['failure'][np.unravel_index(i, inputs['Mach_number_grid'].shape)] = out[i]['failure']
         for f in of:
             for u in wrt:
                 data['partials'][f, u][i] = out[i]['partials'][f, u]
     
+    # Handle wing weight separately since the output has a different shape than the rest
+    data['W_wing'] = out[0]['W_wing']
+    for u in wrt:
+        # States that are vectors have different partial shapes
+        partials['W_wing', u] = np.zeros((vec_wrt[u],)) if u in vec_wrt.keys() else np.zeros((1,))
+        partials['W_wing', u][:] = out[0]['partials']['W_wing', u]
+
     print(f"done in {time() - t_start} sec")
 
     return data
@@ -509,12 +559,16 @@ def compute_training_data(inputs, surf_dict=None):
 # compute_training_data. Input "point" is row in test_points array.
 def compute_aerodynamic_data(point):
     inputs = point[3]
+    compute_W_wing = point[4]
 
     # Set up OpenAeroStruct problem
     p = om.Problem()
     p.model.add_subsystem('aero_analysis', Aerostruct(num_x=inputs['num_x'],
                                                num_y=inputs['num_y'],
                                                num_twist=inputs['twist'].size,
+                                               num_toverc=inputs['toverc'].size,
+                                               num_skin=inputs['skin'].size,
+                                               num_spar=inputs['spar'].size,
                                                surf_options=inputs['surf_dict']),
                            promotes=['*'])
 
@@ -525,7 +579,13 @@ def compute_aerodynamic_data(point):
     p.model.set_input_defaults('ac|geom|wing|taper', val=inputs['taper'])
     p.model.set_input_defaults('ac|geom|wing|c4sweep', val=inputs['c4sweep'], units='deg')
     p.model.set_input_defaults('ac|geom|wing|twist', val=inputs['twist'], units='deg')
+    p.model.set_input_defaults('ac|geom|wing|toverc', val=inputs['toverc'])
+    p.model.set_input_defaults('ac|geom|wing|skin_thickness', val=inputs['skin'], units='m')
+    p.model.set_input_defaults('ac|geom|wing|spar_thickness', val=inputs['spar'], units='m')
     p.setup()
+
+    # Silence OpenAeroStruct's NLGBS aerostructural solver
+    p.model.aero_analysis.aerostruct_point.coupled.nonlinear_solver.options["iprint"] = 0
 
     p.set_val('fltcond|M', point[0])
     p.set_val('fltcond|alpha', point[1], units='deg')
@@ -536,13 +596,20 @@ def compute_aerodynamic_data(point):
     output = {}
     output['CL'] = p.get_val('fltcond|CL')
     output['CD'] = p.get_val('fltcond|CD')
+    output['failure'] = p.get_val('failure')
+    if compute_W_wing:
+        output['W_wing'] = p.get_val('ac|weights|W_wing')
 
     # Compute derivatives
     output['partials'] = {}
-    of = ['fltcond|CL', 'fltcond|CD']
-    of_out = ['CL_train', 'CD_train']
+    of = ['fltcond|CL', 'fltcond|CD', 'failure']
+    of_out = ['CL_train', 'CD_train', 'failure_train']
+    if compute_W_wing:
+        of += ['ac|weights|W_wing']
+        of_out += ['W_wing']
     wrt = ['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper',
-            'ac|geom|wing|c4sweep', 'ac|geom|wing|twist', 'fltcond|TempIncrement']
+            'ac|geom|wing|c4sweep', 'ac|geom|wing|twist', 'ac|geom|wing|toverc',
+            'ac|geom|wing|skin_thickness', 'ac|geom|wing|spar_thickness', 'fltcond|TempIncrement']
     deriv = p.compute_totals(of, wrt)
     for n, f in enumerate(of):
         for u in wrt:
@@ -577,6 +644,9 @@ class Aerostruct(om.Group):
     ac|geom|wing|twist : float
         List of twist angles at control points of spline (vector, degrees)
         NOTE: length of vector is num_twist (set in options)
+    ac|geom|wing|toverc : float
+        List of thickness to chord ratios at control points of spline (vector, dimensionless)
+        NOTE: length of vector is num_toverc (set in options)
     ac|geom|wing|skin_thickness : float
         List of skin thicknesses at control points of spline (vector, m)
         NOTE: length of vector is num_skin (set in options)
@@ -604,6 +674,8 @@ class Aerostruct(om.Group):
         uses symmetry (scalar, dimensionless)
     num_twist : int
         Number of spline control points for twist (scalar, dimensionless)
+    num_toverc : int
+        Number of spline control points for thickness to chord ratio (scalar, dimensionless)
     num_skin : int
         Number of spline control points for skin thickness (scalar, dimensionless)
     num_spar : int
@@ -620,6 +692,7 @@ class Aerostruct(om.Group):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
         self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
+        self.options.declare("num_toverc", default=4, desc="Number of thickness to chord ratio spline control points")
         self.options.declare("num_skin", default=4, desc="Number of skin thickness spline control points")
         self.options.declare("num_spar", default=4, desc="Number of spar thickness spline control points")
         self.options.declare('surf_options', default=None, desc="Dictionary of OpenAeroStruct surface options")
@@ -745,7 +818,7 @@ class Aerostruct(om.Group):
             om.SplineComp(
                 method="bsplines", x_interp_val=x_interp, num_cp=n_t_over_c, interp_options={"order": min(n_t_over_c, 4)}
             ),
-            promotes_inputs=[("t_over_c_cp", "ac|geom|wing|t_over_c")],
+            promotes_inputs=[("t_over_c_cp", "ac|geom|wing|toverc")],
             promotes_outputs=['t_over_c']
         )
         comp.add_spline(y_cp_name="t_over_c_cp", y_interp_name="t_over_c")
@@ -780,7 +853,7 @@ class Aerostruct(om.Group):
                                                                 ('taper', 'ac|geom|wing|taper'),
                                                                 ('sweep', 'ac|geom|wing|c4sweep'),
                                                                 'ac|geom|wing|twist',
-                                                                'ac|geom|wing|t_over_c',
+                                                                'ac|geom|wing|toverc',
                                                                 ('skin_thickness_cp', 'ac|geom|wing|skin_thickness'),
                                                                 ('spar_thickness_cp', 'ac|geom|wing|spar_thickness')],
                                               promotes_outputs=["ac|weights|W_wing"])
@@ -824,6 +897,7 @@ class Aerostruct(om.Group):
 
 if __name__=="__main__":
     # Define parameters
+    nn = 1
     num_x = 7
     num_y = 25
     S = 427.8  # m^2
@@ -839,14 +913,68 @@ if __name__=="__main__":
     spar = np.array([0.004, 0.005, 0.008, 0.01, 0.01])
     n_spar = spar.size
 
-    M = 0.5
+    M = 0.7
     alpha = 3  # deg
+    CL = 0.35
     h = 0  # m
+
+    p = om.Problem()
+    p.model.add_subsystem('aerostruct', OASAerostructDragPolar(num_nodes=nn,
+                                                               num_x=num_x,
+                                                               num_y=num_y,
+                                                               num_twist=n_twist,
+                                                               num_toverc=n_t_over_c,
+                                                               num_skin=n_skin,
+                                                               num_spar=n_spar,
+                                                               Mach_train=np.array([0.1, 0.5, 0.8]),
+                                                               alpha_train=np.array([-10, 1.1, 10]),
+                                                               alt_train=np.array([0, 10e3])),
+                                                            #    ),
+                           promotes=['*'])
+    p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, iprint=2)
+    p.model.nonlinear_solver.linear_solver = om.DirectSolver()
+    p.setup(force_alloc_complex=True)
+
+    # Set values
+    # Geometry
+    p.set_val('ac|geom|wing|S_ref', S, units='m**2')
+    p.set_val('ac|geom|wing|AR', AR)
+    p.set_val('ac|geom|wing|taper', taper)
+    p.set_val('ac|geom|wing|c4sweep', sweep, units='deg')
+    p.set_val('ac|geom|wing|twist', twist, units='deg')
+    p.set_val('ac|geom|wing|toverc', t_over_c)
+    p.set_val('ac|geom|wing|skin_thickness', skin, units='m')
+    p.set_val('ac|geom|wing|spar_thickness', spar, units='m')
+    p.set_val('fltcond|q', 6125.*np.ones(nn), units='Pa')
+    p.set_val('fltcond|TempIncrement', 0, units='degC')
+
+    # Flight condition
+    p.set_val('fltcond|M', M)
+    p.set_val('fltcond|CL', CL)
+    p.set_val('fltcond|h', h, units='m')
+
+    p.run_model()
+
+    p.check_partials(compact_print=True, method='cs')
+
+    print(f"================== SURROGATE ==================")
+    print(f"Drag: {p.get_val('drag', units='N')} N")
+    print(f"CL: {p.get_val('aero_surrogate.CL')}")
+    print(f"CD: {p.get_val('aero_surrogate.CD')}")
+    print(f"Alpha: {p.get_val('aero_surrogate.alpha', units='deg')} deg")
+    print(f"Failure: {p.get_val('failure')}")
+    print(f"Wing weight: {p.get_val('ac|weights|W_wing', units='kg')} kg")
 
 
     prob = om.Problem()
-    prob.model.add_subsystem('aerostruct', Aerostruct(num_x=num_x, num_y=num_y, num_twist=n_twist,
-                                                      num_skin=n_skin, num_spar=n_spar), promotes=['*'])
+    prob.model.add_subsystem('model', Aerostruct(num_x=num_x,
+                                                 num_y=num_y,
+                                                 num_twist=n_twist,
+                                                 num_toverc=n_t_over_c,
+                                                 num_skin=n_skin,
+                                                 num_spar=n_spar),
+                             promotes=['*'])
+
     prob.setup()
 
     # Set values
@@ -856,206 +984,20 @@ if __name__=="__main__":
     prob.set_val('ac|geom|wing|taper', taper)
     prob.set_val('ac|geom|wing|c4sweep', sweep, units='deg')
     prob.set_val('ac|geom|wing|twist', twist, units='deg')
-    prob.set_val('ac|geom|wing|t_over_c', t_over_c)
+    prob.set_val('ac|geom|wing|toverc', t_over_c)
     prob.set_val('ac|geom|wing|skin_thickness', skin, units='m')
     prob.set_val('ac|geom|wing|spar_thickness', spar, units='m')
 
     # Flight condition
     prob.set_val('fltcond|M', M)
-    prob.set_val('fltcond|alpha', alpha, units='deg')
+    prob.set_val('fltcond|alpha', p.get_val('aero_surrogate.alpha', units='deg'), units='deg')
     prob.set_val('fltcond|h', h, units='m')
 
     prob.run_model()
 
-    om.n2(prob, outfile='aerostructural_n2.html', show_browser=False)
-
-    print(f"CL = {prob.get_val('fltcond|CL')}")
-    print(f"CD = {prob.get_val('fltcond|CD')}")
-    print(f"failure = {prob.get_val('failure')}")
-    print(f"weight = {prob.get_val('ac|weights|W_wing', units='kg')} kg")
-
-
-
-
-    # Provide coordinates for a portion of an airfoil for the wingbox cross-section as an nparray
-    # with dtype=complex (to work with the complex-step derivative approximation). These should
-    # be for an airfoil with the chord scaled to 1. We use the 10% to 60% portion of the NACA
-    # SC2-0612 airfoil for this case. We use the coordinates available from airfoiltools.com.
-    # Using such a large number of coordinates is not necessary. The first and last x-coordinates
-    # of the upper and lower surfaces must be the same.
-    upper_x = np.array([0.1, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.2, 0.21, 0.22, 0.23, 0.24, 0.25, 0.26, 0.27, 0.28, 0.29, 0.3, 0.31, 0.32, 0.33, 0.34, 0.35, 0.36, 0.37, 0.38, 0.39, 0.4, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46, 0.47, 0.48, 0.49, 0.5, 0.51, 0.52, 0.53, 0.54, 0.55, 0.56, 0.57, 0.58, 0.59, 0.6], dtype="complex128")
-    lower_x = np.array([0.1, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.2, 0.21, 0.22, 0.23, 0.24, 0.25, 0.26, 0.27, 0.28, 0.29, 0.3, 0.31, 0.32, 0.33, 0.34, 0.35, 0.36, 0.37, 0.38, 0.39, 0.4, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46, 0.47, 0.48, 0.49, 0.5, 0.51, 0.52, 0.53, 0.54, 0.55, 0.56, 0.57, 0.58, 0.59, 0.6], dtype="complex128")
-    upper_y = np.array([ 0.0447,  0.046,  0.0472,  0.0484,  0.0495,  0.0505,  0.0514,  0.0523,  0.0531,  0.0538, 0.0545,  0.0551,  0.0557, 0.0563,  0.0568, 0.0573,  0.0577,  0.0581,  0.0585,  0.0588,  0.0591,  0.0593,  0.0595,  0.0597,  0.0599,  0.06,    0.0601,  0.0602,  0.0602,  0.0602,  0.0602,  0.0602,  0.0601,  0.06,    0.0599,  0.0598,  0.0596,  0.0594,  0.0592,  0.0589,  0.0586,  0.0583,  0.058,   0.0576,  0.0572,  0.0568,  0.0563,  0.0558,  0.0553,  0.0547,  0.0541], dtype="complex128")  # noqa: E201, E241
-    lower_y = np.array([-0.0447, -0.046, -0.0473, -0.0485, -0.0496, -0.0506, -0.0515, -0.0524, -0.0532, -0.054, -0.0547, -0.0554, -0.056, -0.0565, -0.057, -0.0575, -0.0579, -0.0583, -0.0586, -0.0589, -0.0592, -0.0594, -0.0595, -0.0596, -0.0597, -0.0598, -0.0598, -0.0598, -0.0598, -0.0597, -0.0596, -0.0594, -0.0592, -0.0589, -0.0586, -0.0582, -0.0578, -0.0573, -0.0567, -0.0561, -0.0554, -0.0546, -0.0538, -0.0529, -0.0519, -0.0509, -0.0497, -0.0485, -0.0472, -0.0458, -0.0444], dtype="complex128")
-
-    surf_dict = {
-        # Wing definition
-        "name": "wing",  # name of surface
-        "symmetry": True,  # if true, model half of the wing (reflect across plane y = 0)
-        "S_ref_type": "projected",  # how we compute the wing area (can be wetted or projected)
-        "mesh": np.zeros((num_x, num_y, 3)),
-        "fem_model_type": "wingbox",  # wingbox or tube
-        "data_x_upper": upper_x,
-        "data_x_lower": lower_x,
-        "data_y_upper": upper_y,
-        "data_y_lower": lower_y,
-        "twist_cp": np.ones(n_twist),
-        "spar_thickness_cp": np.ones(n_spar),  # [m]
-        "skin_thickness_cp": np.ones(n_skin),  # [m]
-        "t_over_c_cp": np.ones(n_t_over_c),
-        "original_wingbox_airfoil_t_over_c": 0.12,
-        "thickness_cp": np.array([0.1, 0.2, 0.3]),
-
-        # Aerodynamic performance of the lifting surface at
-        # an angle of attack of 0 (alpha = 0)
-        # These CL0 and CD0 values are added to the CL and CD
-        # obtained from aerodynamic analysis of the surface to
-        # get the total CL and CD. These CL0 and CD0 values
-        # don't vary with alpha.
-        "CL0": 0.0,  # CL of the surface at alpha = 0
-        "CD0": 0.0078,  # CD of the surface at alpha = 0
-
-        # Airfoil properties for viscous drag calculation
-        "k_lam": 0.05,  # percentage of chord with laminar flow
-        "c_max_t": 0.38,  # chordwise location of maximum thickness
-        "with_viscous": True,
-        "with_wave": True,  # if true, compute wave drag
-
-        # Structural values are based on aluminum 7075
-        "E": 73.1e9,  # [Pa] Young's modulus of the spar
-        "G": (73.1e9 / 2 / 1.33),  # [Pa] shear modulus of the spar (calculated using E and Poisson's ratio)
-        "yield": 420e6 / 1.5,  # [Pa] yield stress divided by safety factor of 1.5
-        "mrho": 2.78e3,  # [kg/m^3] material density
-        "fem_origin": 0.35,  # normalized chordwise location of the spar
-        "wing_weight_ratio": 1.25,  # estimate weight of other components like fasteners, overlaps, etc.
-        "strength_factor_for_upper_skin": 1.0,  # yield stress is multiplied by this factor for upper skin
-        "struct_weight_relief": True,  # if true, add the weight of the structure to its loads
-        "distributed_fuel_weight": False,
-        # "fuel_density": 803.,  # [kg/m^3] fuel density (only needed if the fuel-in-wing volume constraint is used)
-        # "Wf_reserve": 15000.,  # [kg] reserve fuel mass
-        # "n_point_masses": 1,  # number of point masses in system; in this case, the engine (omit if no point masses)
-
-        # Constraints
-        "exact_failure_constraint": False,  # if false, use KS function
-    }
-
-
-    p = om.Problem()
-    wing_group = om.Group()
-
-    # Add bspline component for twist
-    x_interp = np.linspace(0.0, 1.0, num_y)
-    comp = wing_group.add_subsystem(
-        "twist_bsp",
-        om.SplineComp(
-            method="bsplines", x_interp_val=x_interp, num_cp=n_twist, interp_options={"order": min(n_twist, 4)}
-        ),
-        promotes_inputs=[("twist_cp", "ac|geom|wing|twist")]
-    )
-    comp.add_spline(y_cp_name="twist_cp", y_interp_name="twist", y_units="deg")
-
-    # Add bspline component for thickness to chord ratio
-    x_interp = np.linspace(0.0, 1.0, num_y - 1)
-    comp = wing_group.add_subsystem(
-        "t_over_c_bsp",
-        om.SplineComp(
-            method="bsplines", x_interp_val=x_interp, num_cp=n_t_over_c, interp_options={"order": min(n_t_over_c, 4)}
-        ),
-        promotes_inputs=[("t_over_c_cp", "ac|geom|wing|t_over_c")],
-        promotes_outputs=['t_over_c']
-    )
-    comp.add_spline(y_cp_name="t_over_c_cp", y_interp_name="t_over_c")
-
-    # Wing mesh generator
-    wing_group.add_subsystem('mesh_gen', PlanformMesh(num_x=num_x, num_y=num_y), promotes_inputs=['*'])
-
-    # Apply twist spline to mesh
-    wing_group.add_subsystem("twist_mesh", Rotate(val=np.zeros(num_y), mesh_shape=(num_x, num_y, 3), symmetry=True),
-                             promotes_outputs=["mesh"])
-    wing_group.connect("twist_bsp.twist", "twist_mesh.twist")
-    wing_group.connect("mesh_gen.mesh", "twist_mesh.in_mesh")
-
-    wing_group.add_subsystem(
-        "wingbox_group",
-        WingboxGroup(surface=surf_dict),
-        promotes_inputs=["mesh", "t_over_c", "skin_thickness_cp", "spar_thickness_cp"],
-        promotes_outputs=["A", "Iy", "Iz", "J", "Qz", "A_enc", "A_int", "htop", "hbottom", "hfront", "hrear",
-                          "skin_thickness", "spar_thickness"]
-    )
-
-    wing_group.add_subsystem(
-        "struct_setup",
-        SpatialBeamSetup(surface=surf_dict),
-        promotes_inputs=["mesh", "A", "Iy", "Iz", "J", "A_int"],
-        promotes_outputs=["nodes", "local_stiff_transformed", "structural_mass", "cg_location", "element_mass"],
-    )
-
-    p.model.add_subsystem('wing', wing_group, promotes_inputs=[('S', 'ac|geom|wing|S_ref'), 
-                                                               ('AR', 'ac|geom|wing|AR'),
-                                                               ('taper', 'ac|geom|wing|taper'),
-                                                               ('sweep', 'ac|geom|wing|c4sweep'),
-                                                               'ac|geom|wing|twist',
-                                                               'ac|geom|wing|t_over_c',
-                                                               ('skin_thickness_cp', 'ac|geom|wing|skin_thickness'),
-                                                               ('spar_thickness_cp', 'ac|geom|wing|spar_thickness')])
-
-    p.model.add_subsystem('aerostruct_point', AerostructPoint(surfaces=[surf_dict], internally_connect_fuelburn=False),
-                          promotes_inputs=['v', 'Mach_number', 'alpha', 're', 'rho', 'CT', 'R',
-                                           'W0', 'speed_of_sound', 'empty_cg'],
-                          promotes_outputs=['CL', 'CD', ('wing_perf.failure', 'failure')])
-
-    # Connect geometry parameters from the wing to the aerostructural analysis
-    p.model.connect('wing.mesh', 'aerostruct_point.coupled.wing.mesh')
-    p.model.connect('wing.local_stiff_transformed', 'aerostruct_point.coupled.wing.local_stiff_transformed')
-    p.model.connect('wing.nodes', ['aerostruct_point.wing_perf.nodes',
-                                   'aerostruct_point.coupled.wing.nodes'])
-    if surf_dict["struct_weight_relief"]:
-        p.model.connect("wing.element_mass", "aerostruct_point.coupled.wing.element_mass")
-    p.model.connect('wing.cg_location', 'aerostruct_point.total_perf.wing_cg_location')
-    p.model.connect('wing.structural_mass', 'aerostruct_point.total_perf.wing_structural_mass')
-    p.model.connect('wing.t_over_c', 'aerostruct_point.wing_perf.t_over_c')
-    p.model.connect('wing.spar_thickness', 'aerostruct_point.wing_perf.spar_thickness')
-    p.model.connect('wing.A_enc', 'aerostruct_point.wing_perf.A_enc')
-    p.model.connect('wing.Qz', 'aerostruct_point.wing_perf.Qz')
-    p.model.connect('wing.J', 'aerostruct_point.wing_perf.J')
-    p.model.connect('wing.htop', 'aerostruct_point.wing_perf.htop')
-    p.model.connect('wing.hbottom', 'aerostruct_point.wing_perf.hbottom')
-    p.model.connect('wing.hfront', 'aerostruct_point.wing_perf.hfront')
-    p.model.connect('wing.hrear', 'aerostruct_point.wing_perf.hrear')
-
-    # Set default input values for inputs promoted from multiple places
-    p.model.set_input_defaults('aerostruct_point.coupled.wing.nodes', np.zeros((num_y, 3)), units='m')
-    p.model.set_input_defaults('alpha', 3, units='deg')
-    p.model.set_input_defaults('v', 100, units='m/s')
-    p.model.set_input_defaults('rho', 1., units='kg/m**3')
-    p.model.set_input_defaults('Mach_number', 0.5)
-    p.model.set_input_defaults('W0', 1., units='kg')  # unused variable but must be set since promoted
-                                                      # from multiple locations (may be used in the future)
-
-    p.setup()
-
-    # Set values
-    # Geometry
-    p.set_val('ac|geom|wing|S_ref', S, units='m**2')
-    p.set_val('ac|geom|wing|AR', AR)
-    p.set_val('ac|geom|wing|taper', taper)
-    p.set_val('ac|geom|wing|c4sweep', sweep, units='deg')
-    p.set_val('ac|geom|wing|twist', twist, units='deg')
-    p.set_val('ac|geom|wing|t_over_c', t_over_c)
-    p.set_val('ac|geom|wing|skin_thickness', skin, units='m')
-    p.set_val('ac|geom|wing|spar_thickness', spar, units='m')
-
-    # Flight condition
-    p.set_val('v', prob.get_val('aerostruct_point.v', units='m/s'), units='m/s')
-    p.set_val('Mach_number', M)
-    p.set_val('alpha', alpha, units='deg')
-    p.set_val('re', prob.get_val('aerostruct_point.re', units='1/m'), units='1/m')
-    p.set_val('rho', prob.get_val('aerostruct_point.rho', units='kg/m**3'), units='kg/m**3')
-    p.set_val('speed_of_sound', prob.get_val('aerostruct_point.speed_of_sound', units='m/s'), units='m/s')
-
-    p.run_model()
-
-    print(f"CL = {p.get_val('CL')}")
-    print(f"CD = {p.get_val('CD')}")
-    print(f"failure = {p.get_val('failure')}")
-    print(f"weight = {p.get_val('aerostruct_point.total_perf.wing_structural_mass', units='kg')} kg")
+    print(f"================== OpenAeroStruct ==================")
+    print(f"CL: {prob.get_val('fltcond|CL')}")
+    print(f"CD: {prob.get_val('fltcond|CD')}")
+    print(f"Alpha: {prob.get_val('fltcond|alpha', units='deg')} deg")
+    print(f"Failure: {prob.get_val('failure')}")
+    print(f"Wing weight: {prob.get_val('ac|weights|W_wing', units='kg')} kg")
