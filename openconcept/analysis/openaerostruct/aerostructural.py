@@ -955,7 +955,7 @@ if __name__=="__main__":
 
     p.run_model()
 
-    p.check_partials(compact_print=True, method='cs')
+    p.check_partials(compact_print=True, method='fd')
 
     print(f"================== SURROGATE ==================")
     print(f"Drag: {p.get_val('drag', units='N')} N")
@@ -994,8 +994,6 @@ if __name__=="__main__":
     prob.set_val('fltcond|h', h, units='m')
 
     prob.run_model()
-
-    prob.check_partials(compact_print=True, method='cs', step=1e-50)
 
     print(f"================== OpenAeroStruct ==================")
     print(f"CL: {prob.get_val('fltcond|CL')}")
