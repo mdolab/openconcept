@@ -33,17 +33,11 @@ jobs:
         pip install .[testing]
     - name: Download engine deck surrogate model
       run: |
-        pwd
         wget http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
-        ls
         tar -xvf engine_kriging_surrogate_model.tar.gz
-        ls
         mv cfm56* ./openconcept/components/empirical_data/cfm56
-        ls
         mv n3_hybrid* ./openconcept/components/empirical_data/n+3_hybrid
-        ls
         mv n3* ./openconcept/components/empirical_data/n+3
-        ls
     - name: Build and Test
       run: |
         python -m pytest --cov-config .coveragerc --cov=openconcept
