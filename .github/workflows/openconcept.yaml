@@ -33,8 +33,11 @@ jobs:
         pip install .[testing]
     - name: Download engine deck surrogate model data
       run: |
-        curl.exe -o engine_kriging_surrogate_model.tar.gz http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
-        dir
+        Invoke-WebRequest -Uri http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz  -UseBasicParsing -OutFile enginedeck.tar.gz
+        tar -xvf enginedeck.tar.gz
+        mv cfm56* ./openconcept/components/empirical_data/cfm56
+        mv n3_hybrid* ./openconcept/components/empirical_data/n+3_hybrid
+        mv n3* ./openconcept/components/empirical_data/n+3
     - name: Build and Test
       run: |
         python -m pytest --cov-config .coveragerc --cov=openconcept
