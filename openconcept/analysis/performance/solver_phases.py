@@ -995,8 +995,8 @@ class TakeoffTransition(ExplicitComponent):
         self.options.declare('h_obstacle',default=10.66,desc='Obstacle clearance height in m')
         self.options.declare('load_factor', default=1.2, desc='Load factor during circular arc transition')
     def setup(self):
-        self.add_input('fltcond|Utrue', units='m/s', src_indices=0)
-        self.add_input('gamma', units='rad', src_indices=0)
+        self.add_input('fltcond|Utrue', units='m/s', src_indices=0, flat_src_indices=True)
+        self.add_input('gamma', units='rad', src_indices=0, flat_src_indices=True)
         self.add_output('s_transition', units='m')
         self.add_output('h_transition', units='m')
         self.add_output('t_transition',units='s')
@@ -1077,8 +1077,8 @@ class TakeoffClimb(ExplicitComponent):
         self.options.declare('h_obstacle',default=10.66,desc='Obstacle clearance height in m')
     def setup(self):
         self.add_input('h_transition', units='m')
-        self.add_input('gamma', units='rad',src_indices=-1)
-        self.add_input('fltcond|Utrue', units='m/s',src_indices=-1)
+        self.add_input('gamma', units='rad',src_indices=-1, flat_src_indices=True)
+        self.add_input('fltcond|Utrue', units='m/s',src_indices=-1, flat_src_indices=True)
 
         self.add_output('s_climb', units='m')
         self.add_output('t_climb', units='s')

@@ -237,10 +237,10 @@ def run_problem(ram_recovery=1.0, dPqP=0.0, heat_in=0.0, cfg=0.98, oc_use_dpqp=F
     # iv.add_output('pressure_recovery_3', val=np.ones((nn,)))
 
     prob.setup()
-    prob.set_val('oc.area_1', value=64, units='inch**2')
-    prob.set_val('oc.convergence_hack', value=0.0, units='Pa')
-    prob.set_val('oc.area_nozzle_in', value=60.0, units='inch**2')
-    prob.set_val('oc.inlet.totalpressure.eta_ram', value=ram_recovery)
+    prob.set_val('oc.area_1', val=64, units='inch**2')
+    prob.set_val('oc.convergence_hack', val=0.0, units='Pa')
+    prob.set_val('oc.area_nozzle_in', val=60.0, units='inch**2')
+    prob.set_val('oc.inlet.totalpressure.eta_ram', val=ram_recovery)
 
     if HAS_PYCYCLE:
         #Define the design point
@@ -266,15 +266,15 @@ def run_problem(ram_recovery=1.0, dPqP=0.0, heat_in=0.0, cfg=0.98, oc_use_dpqp=F
 
     if HAS_PYCYCLE:
         # set areas based on pycycle design point
-        prob.set_val('oc.area_1', value=prob.get_val('pyduct.design.inlet.Fl_O:stat:area', units='inch**2'), units='inch**2')
-        prob.set_val('iv.area_2', value=prob.get_val('pyduct.design.duct.Fl_O:stat:area', units='inch**2'), units='inch**2')
+        prob.set_val('oc.area_1', val=prob.get_val('pyduct.design.inlet.Fl_O:stat:area', units='inch**2'), units='inch**2')
+        prob.set_val('iv.area_2', val=prob.get_val('pyduct.design.duct.Fl_O:stat:area', units='inch**2'), units='inch**2')
     else:
-        prob.set_val('oc.area_1', value=oc_areas[0], units='inch**2')
-        prob.set_val('iv.area_2', value=oc_areas[1], units='inch**2')
+        prob.set_val('oc.area_1', val=oc_areas[0], units='inch**2')
+        prob.set_val('iv.area_2', val=oc_areas[1], units='inch**2')
 
-    prob.set_val('oc.sta3.heat_in', value=heat_in, units='kW')
+    prob.set_val('oc.sta3.heat_in', val=heat_in, units='kW')
     if oc_use_dpqp:
-        prob.set_val('oc.sta3.pressure_recovery', value=(1-dPqP), units=None)
+        prob.set_val('oc.sta3.pressure_recovery', val=(1-dPqP), units=None)
     else:
         if HAS_PYCYCLE:
             delta_p = prob.get_val('pyduct.design.inlet.Fl_O:tot:P', units='Pa') - prob.get_val('pyduct.design.nozz.Fl_O:tot:P', units='Pa')

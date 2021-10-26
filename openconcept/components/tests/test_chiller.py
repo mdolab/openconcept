@@ -87,7 +87,7 @@ class HeatPumpWeightTestCase(unittest.TestCase):
         p = Problem()
         p.model.linear_solver = DirectSolver()
         p.model = HeatPumpWeight()
-        p.setup()
+        p.setup(force_alloc_complex=True)
         p.set_val('power_rating', 1., units='kW')
         p.set_val('specific_power', 200., units='W/kg')
         p.run_model()

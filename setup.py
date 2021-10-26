@@ -52,6 +52,6 @@ setup(
         'openmdao>=3.5.0',
     ],
     extras_require = {
-        'testing':  ["pytest", "openmdao[docs]"]
+        'testing':  ["pytest", "openmdao[docs]", "redbaron"]
       },
 )
