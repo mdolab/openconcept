@@ -40,6 +40,7 @@ setup(
         'openconcept',
         'openconcept.analysis',
         'openconcept.analysis.atmospherics',
+        'openconcept.analysis.performance',
         'openconcept.components',
         'openconcept.components.empirical_data',
         'openconcept.utilities',
