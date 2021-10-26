@@ -148,10 +148,10 @@ class OASAerostructDragPolar(om.Group):
 
         # Training data
         self.add_subsystem('training_data', OASDataGen(num_x=self.options['num_x'], num_y=self.options['num_y'],
-                                                       num_twist=self.options['num_twist'], num_skin=self.options['num_skin'],
-                                                       num_spar=self.options['num_spar'], alpha_train=self.options['alpha_train'],
-                                                       Mach_train=self.options['Mach_train'], alt_train=self.options['alt_train'],
-                                                       surf_options=self.options['surf_options']),
+                                                       num_twist=self.options['num_twist'], num_toverc=self.options['num_toverc'],
+                                                       num_skin=self.options['num_skin'], num_spar=self.options['num_spar'],
+                                                       alpha_train=self.options['alpha_train'], Mach_train=self.options['Mach_train'],
+                                                       alt_train=self.options['alt_train'], surf_options=self.options['surf_options']),
                            promotes_inputs=['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper', 'ac|geom|wing|c4sweep',
                                             'ac|geom|wing|twist', 'ac|geom|wing|toverc', 'ac|geom|wing|skin_thickness',
                                             'ac|geom|wing|spar_thickness', 'ac|aero|CD_nonwing', 'fltcond|TempIncrement'],
@@ -904,13 +904,13 @@ if __name__=="__main__":
     AR = 9.82
     taper = 0.149
     sweep = 31.6
-    twist = np.array([-1, 0, 1])
+    twist = np.array([-1, 1])
     n_twist = twist.size
-    t_over_c = np.array([0.12, 0.12, 0.12, 0.12])
+    t_over_c = np.array([0.12, 0.12])
     n_t_over_c = t_over_c.size
-    skin = np.array([0.005, 0.015, 0.025])
+    skin = np.array([0.005, 0.025])
     n_skin = skin.size
-    spar = np.array([0.004, 0.005, 0.008, 0.01, 0.01])
+    spar = np.array([0.004, 0.01])
     n_spar = spar.size
 
     M = 0.7
@@ -926,9 +926,9 @@ if __name__=="__main__":
                                                                num_toverc=n_t_over_c,
                                                                num_skin=n_skin,
                                                                num_spar=n_spar,
-                                                               Mach_train=np.array([0.1, 0.5, 0.8]),
-                                                               alpha_train=np.array([-10, 1.1, 10]),
-                                                               alt_train=np.array([0, 10e3])),
+                                                               Mach_train=np.array([0.1, 0.8]),
+                                                               alpha_train=np.array([-10, 10]),
+                                                               alt_train=np.array([0])),
                                                             #    ),
                            promotes=['*'])
     p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, iprint=2)
@@ -975,7 +975,7 @@ if __name__=="__main__":
                                                  num_spar=n_spar),
                              promotes=['*'])
 
-    prob.setup()
+    prob.setup(force_alloc_complex=True)
 
     # Set values
     # Geometry
@@ -994,6 +994,8 @@ if __name__=="__main__":
     prob.set_val('fltcond|h', h, units='m')
 
     prob.run_model()
+
+    prob.check_partials(compact_print=True, method='cs', step=1e-50)
 
     print(f"================== OpenAeroStruct ==================")
     print(f"CL: {prob.get_val('fltcond|CL')}")
