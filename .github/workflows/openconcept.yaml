@@ -31,7 +31,7 @@ jobs:
       run: |
         pip install coverage pytest-cov sphinx_rtd_theme
         pip install .[testing]
-    - name: Download engine deck surrogate model
+    - name: Download engine deck surrogate model data
       run: |
         wget http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
         tar -xvf engine_kriging_surrogate_model.tar.gz
