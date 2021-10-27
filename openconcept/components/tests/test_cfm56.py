@@ -9,9 +9,9 @@ from openconcept.components.cfm56 import CFM56
 
 # Skip these test cases if the cached surrogate files don't exist
 file_root = openconcept.__path__[0] + r'/components/empirical_data/cfm56/'
-cached_thrust = os.path.exists(file_root + 'cfm56thrust.pkl')
-cached_fuelburn = os.path.exists(file_root + 'cfm56fuelburn.pkl')
-cached_T4 = os.path.exists(file_root + 'cfm56T4.pkl')
+cached_thrust = os.path.exists(file_root + 'cfm56thrust_trained.zip')
+cached_fuelburn = os.path.exists(file_root + 'cfm56fuelburn_trained.zip')
+cached_T4 = os.path.exists(file_root + 'cfm56T4_trained.zip')
 skip_tests = True
 if cached_thrust and cached_fuelburn and cached_T4:
     skip_tests = False

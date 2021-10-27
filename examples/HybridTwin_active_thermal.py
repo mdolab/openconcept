@@ -281,7 +281,7 @@ def show_outputs(prob):
         x_var = 'range'
         x_unit = 'NM'
         y_vars = ['fltcond|h','fltcond|Ueas','fuel_used','throttle','fltcond|vs','propmodel.batt1.SOC',
-                  'propmodel.motorheatsink.T','propmodel.batteryheatsink.T','propmodel.refrig.hot_side_balance_param']
+                  'propmodel.motorheatsink.T','propmodel.batteryheatsink.T']
         y_units = ['ft','kn','lbm',None,'ft/min',None,'degC','degC','inch**2']
         x_label = 'Range (nmi)'
         y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)', 'Battery SOC', 'Motor temp', 'Battery temp', 'HX area']

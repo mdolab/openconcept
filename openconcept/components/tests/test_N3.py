@@ -10,18 +10,18 @@ from openconcept.components.N3 import N3, N3Hybrid
 # Skip these test cases if the cached surrogate files don't exist
 # N+3 hybrid
 hybrid_file_root = openconcept.__path__[0] + r'/components/empirical_data/n+3_hybrid/'
-hybrid_cached_thrust = os.path.exists(hybrid_file_root + r'/n3_hybrid_thrust.pkl')
-hybrid_cached_fuelburn = os.path.exists(hybrid_file_root + r'n3_hybrid_fuelflow.pkl')
-hybrid_cached_surge = os.path.exists(hybrid_file_root + 'n3_hybrid_smw.pkl')
+hybrid_cached_thrust = os.path.exists(hybrid_file_root + r'/n3_hybrid_thrust_trained.zip')
+hybrid_cached_fuelburn = os.path.exists(hybrid_file_root + r'n3_hybrid_fuelflow_trained.zip')
+hybrid_cached_surge = os.path.exists(hybrid_file_root + 'n3_hybrid_smw_trained.zip')
 hybrid_skip_tests = True
 if hybrid_cached_thrust and hybrid_cached_fuelburn and hybrid_cached_surge:
     hybrid_skip_tests = False
 
 # N+3
 file_root = openconcept.__path__[0] + r'/components/empirical_data/n+3/'
-cached_thrust = os.path.exists(file_root + r'/n3_thrust.pkl')
-cached_fuelburn = os.path.exists(file_root + r'n3_fuelflow.pkl')
-cached_T4 = os.path.exists(file_root + r'n3_smw.pkl')
+cached_thrust = os.path.exists(file_root + r'/n3_thrust_trained.zip')
+cached_fuelburn = os.path.exists(file_root + r'n3_fuelflow_trained.zip')
+cached_T4 = os.path.exists(file_root + r'n3_smw_trained.zip')
 skip_tests = True
 if cached_thrust and cached_fuelburn and cached_T4:
     skip_tests = False

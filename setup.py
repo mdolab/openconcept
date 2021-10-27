@@ -42,7 +42,6 @@ setup(
         'openconcept.analysis.atmospherics',
         'openconcept.analysis.performance',
         'openconcept.analysis.tests',
-        'openconcept.utilities.surrogates',
         'openconcept.components',
         'openconcept.components.empirical_data',
         'openconcept.utilities',
