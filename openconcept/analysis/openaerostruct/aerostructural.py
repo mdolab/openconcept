@@ -5,10 +5,7 @@ import openmdao.api as om
 from time import time
 from copy import copy, deepcopy
 import multiprocessing.pool as mp
-
-# Supress ComplexWarning from OpenAeroStruct
 import warnings
-warnings.simplefilter("ignore")
 
 # Progress bar
 try:
@@ -26,7 +23,7 @@ try:
     from openaerostruct.structures.wingbox_group import WingboxGroup
     from openconcept.analysis.openaerostruct.drag_polar import PlanformMesh
 except ImportError:
-    raise ImportError("OpenAeroStruct must be installed to use the OASDragPolar component")
+    raise ImportError("OpenAeroStruct must be installed to use the OASAerostructDragPolar component")
 
 # Atmospheric calculations
 from openconcept.analysis.atmospherics.temperature_comp import TemperatureComp
@@ -373,7 +370,8 @@ class OASDataGen(om.ExplicitComponent):
             outputs['W_wing'] = OASDataGen.W_wing
             return
 
-        print(f"S = {S}; AR = {AR}; taper = {taper}; sweep = {sweep}; twist = {twist}; skin = {skin}; spar = {spar}; temp_incr = {temp_incr}")
+        print(f"S = {S}; AR = {AR}; taper = {taper}; sweep = {sweep}; twist = {twist};")
+        print(f"toverc = {toverc}; skin = {skin}; spar = {spar}; temp_incr = {temp_incr}")
         # Copy new values to cached ones
         OASDataGen.S[:] = S
         OASDataGen.AR[:] = AR
@@ -509,12 +507,17 @@ def compute_training_data(inputs, surf_dict=None):
             row[4] = True
         row[3] = inputs_to_send
 
-    # Initialize the parallel pool and compute the OpenAeroStruct data
-    parallel_pool = mp.Pool()
-    if progress_bar:
-        out = list(tqdm.tqdm(parallel_pool.imap(compute_aerodynamic_data, test_points), total=len(test_points)))
-    else:
-        out = list(parallel_pool.map(compute_aerodynamic_data, test_points))
+    # Catch ComplexWarning from OpenAeroStruct runs since with a full
+    # grid it'll come up 100s of times
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=np.ComplexWarning)
+        
+        # Initialize the parallel pool and compute the OpenAeroStruct data
+        parallel_pool = mp.Pool()
+        if progress_bar:
+            out = list(tqdm.tqdm(parallel_pool.imap(compute_aerodynamic_data, test_points), total=len(test_points)))
+        else:
+            out = list(parallel_pool.map(compute_aerodynamic_data, test_points))
 
     # Initialize output arrays
     CL = np.zeros(inputs['Mach_number_grid'].shape)
@@ -703,6 +706,7 @@ class Aerostruct(om.Group):
         n_twist = int(self.options["num_twist"])
         n_skin = int(self.options["num_skin"])
         n_spar = int(self.options["num_spar"])
+        n_toverc = int(self.options["num_toverc"])
 
         # =================================================================
         #              Compute atmospheric and fluid properties
@@ -761,7 +765,7 @@ class Aerostruct(om.Group):
             "twist_cp": np.ones(n_twist),
             "spar_thickness_cp": np.ones(n_spar),  # [m]
             "skin_thickness_cp": np.ones(n_skin),  # [m]
-            "t_over_c_cp": np.ones(n_t_over_c),
+            "t_over_c_cp": np.ones(n_toverc),
             "original_wingbox_airfoil_t_over_c": 0.12,
             "thickness_cp": np.array([0.1, 0.2, 0.3]),
 
@@ -801,7 +805,7 @@ class Aerostruct(om.Group):
         wing_group = om.Group()
 
         # Add bspline component for twist
-        x_interp = np.linspace(0.0, 1.0, num_y)
+        x_interp = np.linspace(0.0, 1.0, n_y)
         comp = wing_group.add_subsystem(
             "twist_bsp",
             om.SplineComp(
@@ -812,22 +816,22 @@ class Aerostruct(om.Group):
         comp.add_spline(y_cp_name="twist_cp", y_interp_name="twist", y_units="deg")
 
         # Add bspline component for thickness to chord ratio
-        x_interp = np.linspace(0.0, 1.0, num_y - 1)
+        x_interp = np.linspace(0.0, 1.0, n_y - 1)
         comp = wing_group.add_subsystem(
             "t_over_c_bsp",
             om.SplineComp(
-                method="bsplines", x_interp_val=x_interp, num_cp=n_t_over_c, interp_options={"order": min(n_t_over_c, 4)}
+                method="bsplines", x_interp_val=x_interp, num_cp=n_toverc, interp_options={"order": min(n_toverc, 4)}
             ),
             promotes_inputs=[("t_over_c_cp", "ac|geom|wing|toverc")],
-            promotes_outputs=['t_over_c']
+            promotes_outputs=["t_over_c"]
         )
         comp.add_spline(y_cp_name="t_over_c_cp", y_interp_name="t_over_c")
 
         # Wing mesh generator
-        wing_group.add_subsystem('mesh_gen', PlanformMesh(num_x=num_x, num_y=num_y), promotes_inputs=['*'])
+        wing_group.add_subsystem('mesh_gen', PlanformMesh(num_x=n_x, num_y=n_y), promotes_inputs=['*'])
 
         # Apply twist spline to mesh
-        wing_group.add_subsystem("twist_mesh", Rotate(val=np.zeros(num_y), mesh_shape=(num_x, num_y, 3), symmetry=True),
+        wing_group.add_subsystem("twist_mesh", Rotate(val=np.zeros(n_y), mesh_shape=(n_x, n_y, 3), symmetry=True),
                                 promotes_outputs=["mesh"])
         wing_group.connect("twist_bsp.twist", "twist_mesh.twist")
         wing_group.connect("mesh_gen.mesh", "twist_mesh.in_mesh")
@@ -872,7 +876,7 @@ class Aerostruct(om.Group):
         # Set input defaults for inputs that go to multiple locations
         self.set_input_defaults('fltcond|M', 0.1)
         self.set_input_defaults('fltcond|alpha', 0.)
-        self.set_input_defaults('aerostruct_point.coupled.wing.nodes', np.zeros((num_y, 3)), units='m')
+        self.set_input_defaults('aerostruct_point.coupled.wing.nodes', np.zeros((n_y, 3)), units='m')
         self.set_input_defaults('W0', 1., units='kg')  # unused variable but must be set since promoted
                                                         # from multiple locations (may be used in the future)
 
@@ -898,8 +902,8 @@ class Aerostruct(om.Group):
 if __name__=="__main__":
     # Define parameters
     nn = 1
-    num_x = 7
-    num_y = 25
+    num_x = 5
+    num_y = 7
     S = 427.8  # m^2
     AR = 9.82
     taper = 0.149
@@ -925,11 +929,7 @@ if __name__=="__main__":
                                                                num_twist=n_twist,
                                                                num_toverc=n_t_over_c,
                                                                num_skin=n_skin,
-                                                               num_spar=n_spar,
-                                                               Mach_train=np.array([0.1, 0.8]),
-                                                               alpha_train=np.array([-10, 10]),
-                                                               alt_train=np.array([0])),
-                                                            #    ),
+                                                               num_spar=n_spar),
                            promotes=['*'])
     p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, iprint=2)
     p.model.nonlinear_solver.linear_solver = om.DirectSolver()
@@ -955,7 +955,7 @@ if __name__=="__main__":
 
     p.run_model()
 
-    p.check_partials(compact_print=True, method='fd')
+    # p.check_partials(compact_print=True, method='fd')
 
     print(f"================== SURROGATE ==================")
     print(f"Drag: {p.get_val('drag', units='N')} N")
