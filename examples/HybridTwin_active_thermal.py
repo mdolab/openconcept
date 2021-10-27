@@ -24,7 +24,7 @@ from openconcept.utilities.linearinterp import LinearInterpolator
 from openconcept.utilities.visualization import plot_trajectory
 
 """
-WARNING: This example has known convergence issues because of the chiller in the
+WARNING: This example has known convergence problems because of the chiller in the
          propulsion layout (TwinSeriesHybridElectricPropulsionRefrigerated)
 
 Eytan Adler, 27/10/2021
