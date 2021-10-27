@@ -41,9 +41,9 @@ class N3HybridTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('thrust', units='lbf'), 6965.43502572*np.ones(1), tolerance=1e-10)
-        assert_near_equal(p.get_val('fuel_flow', units='kg/s'), .34333923275*np.ones(1), tolerance=1e-10)
-        assert_near_equal(p.get_val('surge_margin'), 17.49872079*np.ones(1), tolerance=3e-10)
+        assert_near_equal(p.get_val('thrust', units='lbf'), 6965.43674107*np.ones(1), tolerance=1e-6)
+        assert_near_equal(p.get_val('fuel_flow', units='kg/s'), 0.34333925*np.ones(1), tolerance=1e-6)
+        assert_near_equal(p.get_val('surge_margin'), 17.49872296*np.ones(1), tolerance=1e-6)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -62,12 +62,12 @@ class N3HybridTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('thrust', units='lbf'), np.array([2139.16344767, 4298.37034408,
-                          5731.7340516, 5567.1710359, 6098.6277089 ]), tolerance=1e-10)
-        assert_near_equal(p.get_val('fuel_flow', units='kg/s'), 1e-3*np.array([128.30544414,
-                          151.07410832, 248.57054231, 280.13559437, 242.69174402]), tolerance=1e-10)
-        assert_near_equal(p.get_val('surge_margin'), np.array([3.61771543, 5.13884665,
-                          17.61454298, 29.65132244, 17.4655423 ]), tolerance=3e-10)
+        assert_near_equal(p.get_val('thrust', units='lbf'), np.array([2143.74837065, 4298.37044104,
+                            5731.73572266, 5567.1704698, 6093.64182948]), tolerance=5e-3)
+        assert_near_equal(p.get_val('fuel_flow', units='kg/s'), np.array([0.12830921,
+                            0.15107399, 0.24857052, 0.28013556, 0.24271405]), tolerance=5e-3)
+        assert_near_equal(p.get_val('surge_margin'), np.array([3.62385489, 5.13891739, 17.61488138,
+                            29.65131358, 17.48630861]), tolerance=5e-3)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -86,9 +86,9 @@ class N3TestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('thrust', units='lbf'), 6902.32350757*np.ones(1), tolerance=1e-10)
-        assert_near_equal(p.get_val('fuel_flow', units='kg/s'), .35176628605*np.ones(1), tolerance=1e-10)
-        assert_near_equal(p.get_val('surge_margin'), 18.42442281*np.ones(1), tolerance=3e-10)
+        assert_near_equal(p.get_val('thrust', units='lbf'), 6902.32371562*np.ones(1), tolerance=1e-6)
+        assert_near_equal(p.get_val('fuel_flow', units='kg/s'), 0.35176628*np.ones(1), tolerance=1e-6)
+        assert_near_equal(p.get_val('surge_margin'), 18.42447377*np.ones(1), tolerance=1e-6)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -106,12 +106,12 @@ class N3TestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('thrust', units='lbf'), np.array([2111.4945168, 4298.21260618,
-                          5731.73000548, 5567.19105977, 6098.6277089]), tolerance=1e-10)
-        assert_near_equal(p.get_val('fuel_flow', units='kg/s'), 1e-3*np.array([154.42603246,
-                          185.27455666, 268.86802685, 290.35633843, 242.69174402]), tolerance=1e-10)
-        assert_near_equal(p.get_val('surge_margin'), np.array([9.61978054, 9.85226939,
-                          21.01362321, 31.54418716, 17.4655423]), tolerance=3e-10)
+        assert_near_equal(p.get_val('thrust', units='lbf'), np.array([2116.01166807, 4298.21330183,
+                            5731.73026453, 5567.1916333, 6093.64182948]), tolerance=5e-3)
+        assert_near_equal(p.get_val('fuel_flow', units='kg/s'), np.array([0.15443523, 0.18527426,
+                            0.26886803, 0.29035632, 0.24271405]), tolerance=5e-3)
+        assert_near_equal(p.get_val('surge_margin'), np.array([9.63957356, 9.85223288,
+                            21.01375818, 31.54415929, 17.48630861]), tolerance=5e-3)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)

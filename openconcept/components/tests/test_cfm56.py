@@ -30,9 +30,9 @@ class CFM56TestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('thrust', units='lbf'), 7050.74007329*np.ones(1), tolerance=1e-10)
-        assert_near_equal(p.get_val('fuel_flow', units='kg/s'), .50273837866*np.ones(1), tolerance=1e-10)
-        assert_near_equal(p.get_val('T4', units='degK'), 1432.06790075*np.ones(1), tolerance=1e-10)
+        assert_near_equal(p.get_val('thrust', units='lbf'), 7050.73840869*np.ones(1), tolerance=1e-6)
+        assert_near_equal(p.get_val('fuel_flow', units='kg/s'), 0.50273824*np.ones(1), tolerance=1e-6)
+        assert_near_equal(p.get_val('T4', units='degK'), 1432.06813946*np.ones(1), tolerance=1e-6)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
@@ -50,12 +50,12 @@ class CFM56TestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val('thrust', units='lbf'), np.array([1463.81336747, 3961.41898067, 5278.43601914,
-                          5441.45056659, 6478.26284602]), tolerance=1e-10)
-        assert_near_equal(p.get_val('fuel_flow', units='kg/s'), 1e-3*np.array([170.25667238, 254.96500022,
-                          357.45651444, 405.72535156, 492.41365636]), tolerance=1e-10)
-        assert_near_equal(p.get_val('T4', units='degK'), np.array([1005.34531262, 1207.57602501,
-                          1381.9478859, 1508.07883526, 1665.04281926]), tolerance=1e-10)
+        assert_near_equal(p.get_val('thrust', units='lbf'), np.array([1445.41349482, 3961.46624224,
+                            5278.43191982, 5441.44404298, 6479.00525867]), tolerance=5e-3)
+        assert_near_equal(p.get_val('fuel_flow', units='kg/s'), np.array([0.17032429, 0.25496437,
+                            0.35745638, 0.40572545, 0.4924194]), tolerance=5e-3)
+        assert_near_equal(p.get_val('T4', units='degK'), np.array([1005.38911171, 1207.57548728,
+                            1381.94820904, 1508.07901676, 1665.37063872]), tolerance=5e-3)
 
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
