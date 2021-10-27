@@ -23,6 +23,13 @@ from openconcept.analysis.performance.mission_profiles import BasicMission
 from openconcept.utilities.linearinterp import LinearInterpolator
 from openconcept.utilities.visualization import plot_trajectory
 
+"""
+WARNING: This example has known convergence issues because of the chiller in the
+         propulsion layout (TwinSeriesHybridElectricPropulsionRefrigerated)
+
+Eytan Adler, 27/10/2021
+"""
+
 class AugmentedFBObjective(ExplicitComponent):
     def setup(self):
         self.add_input('fuel_burn', units='kg')
