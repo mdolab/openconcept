@@ -281,12 +281,13 @@ class OASDataGen(om.ExplicitComponent):
         temp_incr = inputs["fltcond|TempIncrement"]
 
         # If the inputs are unchaged, use the previously calculated values
-        if (S == OASDataGen.S and
-           AR == OASDataGen.AR and
-           taper == OASDataGen.taper and
-           sweep == OASDataGen.c4sweep and
-           np.all(twist == OASDataGen.twist) and
-           temp_incr == OASDataGen.temp_incr):
+        tol = 1e-15  # floating point comparison tolerance
+        if (np.abs(S - OASDataGen.S) < tol and
+           np.abs(AR - OASDataGen.AR) < tol and
+           np.abs(taper - OASDataGen.taper) < tol and
+           np.abs(sweep - OASDataGen.c4sweep) < tol and
+           np.all(np.abs(twist - OASDataGen.twist) < tol) and
+           np.abs(temp_incr - OASDataGen.temp_incr) < tol):
             outputs['CL_train'] = OASDataGen.CL
             outputs['CD_train'] = OASDataGen.CD + CD_nonwing
             return
