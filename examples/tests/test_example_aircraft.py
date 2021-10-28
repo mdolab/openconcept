@@ -137,9 +137,9 @@ class B738VLMTestCase(unittest.TestCase):
     def test_values_B738(self):
         prob = self.prob
         # block fuel
-        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lbm'), 28442.26988485, tolerance=1e-5)
+        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lbm'), 28443.39604559, tolerance=1e-5)
         # total fuel
-        assert_near_equal(prob.get_val('loiter.fuel_used_final', units='lbm'), 34073.70284445, tolerance=1e-5)
+        assert_near_equal(prob.get_val('loiter.fuel_used_final', units='lbm'), 34075.30721371, tolerance=1e-5)
 
 if __name__=="__main__":
     # unittest.main()
