@@ -281,7 +281,7 @@ class OASDataGen(om.ExplicitComponent):
         temp_incr = inputs["fltcond|TempIncrement"]
 
         # If the inputs are unchaged, use the previously calculated values
-        tol = 1e-15  # floating point comparison tolerance
+        tol = 1e-13  # floating point comparison tolerance
         if (np.abs(S - OASDataGen.S) < tol and
            np.abs(AR - OASDataGen.AR) < tol and
            np.abs(taper - OASDataGen.taper) < tol and

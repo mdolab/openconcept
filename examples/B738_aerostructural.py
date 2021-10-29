@@ -12,6 +12,9 @@ from openconcept.analysis.openaerostruct.aerostructural import OASAerostructDrag
 from examples.aircraft_data.B738 import data as acdata
 from openconcept.analysis.performance.mission_profiles import MissionWithReserve
 from openconcept.components.cfm56 import CFM56
+from openconcept.analysis.openaerostruct.aerostructural import Aerostruct
+from openconcept.analysis.aerodynamics import Lift
+from openconcept.analysis.atmospherics.dynamic_pressure_comp import DynamicPressureComp
 
 class B738AirplaneModel(oc.IntegratorGroup):
     """
@@ -52,15 +55,14 @@ class B738AirplaneModel(oc.IntegratorGroup):
         self.connect('propmodel.fuel_flow', 'doubler.fuel_flow_in')
 
         oas_surf_dict = {}  # options for OpenAeroStruct
-        n_twist = 4
-        n_toverc = 4
+        # Grid size and number of spline control points (must be same as B738AnalysisGroup)
+        num_x = 3
+        num_y = 7
+        n_twist = 3
+        n_toverc = 3
         n_skin = 3
         n_spar = 3
-        twist = np.linspace(-2, 2, n_twist)
-        toverc = acdata['ac']['geom']['wing']['toverc']['value'] * np.ones(n_toverc)
-        t_skin = np.array([0.005, 0.007, 0.015])
-        t_spar = np.array([0.005, 0.007, 0.015])
-        self.add_subsystem('drag', OASAerostructDragPolar(num_nodes=nn, num_x=3, num_y=7,
+        self.add_subsystem('drag', OASAerostructDragPolar(num_nodes=nn, num_x=num_x, num_y=num_y,
                                                 num_twist=n_twist, num_toverc=n_toverc,
                                                 num_skin=n_skin, num_spar=n_spar,
                                                 surf_options=oas_surf_dict),
@@ -70,24 +72,8 @@ class B738AirplaneModel(oc.IntegratorGroup):
                                             'ac|geom|wing|skin_thickness', 'ac|geom|wing|spar_thickness',
                                             'ac|aero|CD_nonwing'],
                            promotes_outputs=['drag', 'ac|weights|W_wing', ('failure', 'ac|struct|failure')])
-        self.set_input_defaults('ac|geom|wing|twist', twist, units='deg')
-        self.set_input_defaults('ac|geom|wing|toverc', toverc)
-        self.set_input_defaults('ac|geom|wing|skin_thickness', t_skin, units='m')
-        self.set_input_defaults('ac|geom|wing|spar_thickness', t_spar, units='m')
-        self.set_input_defaults('ac|aero|CD_nonwing', 0.0145)  # based on matching fuel burn of B738.py example
 
         # generally the weights module will be custom to each airplane
-        # Compute Raymer wing weight to know what to subtract from the OEW before adding the OpenAeroStruct weight
-        W_dg = 174.2e3  # design gross weight, lbs
-        N_z = 1.5*3.  # ultimate load factor (1.5 x limit load factor of 2.5g)
-        S_w = 1368.  # trapezoidal wing area, ft^2 (from photogrammetry)
-        A = 9.44  # aspect ratio
-        t_c = 0.12  # root thickness to chord ratio
-        taper = 0.159  # taper ratio
-        sweep = 25.  # wing sweep at 25% MAC
-        S_csw = 35.2  # wing-mounted control surface area, ft^2 (from photogrammetry)
-        W_wing_raymer = 0.0051 * (W_dg * N_z)**0.557 * S_w**0.649 * A**0.5 * \
-                        (t_c)**(-0.4) * (1 + taper)**0.1 / np.cos(np.deg2rad(sweep)) * S_csw**0.1
         passthru = om.ExecComp('OEW=x',
                   x={'val': 1.0,
                      'units': 'kg'},
@@ -101,13 +87,12 @@ class B738AirplaneModel(oc.IntegratorGroup):
         # out, then add in OpenAeroStruct wing weight estimate
         self.add_subsystem('weight', oc.AddSubtractComp(output_name='weight',
                                                      input_names=['ac|weights|MTOW', 'fuel_used',
-                                                                  'orig_W_wing',
+                                                                  'ac|weights|orig_W_wing',
                                                                   'ac|weights|W_wing'],
                                                      units='kg', vec_size=[1, nn, 1, 1],
-                                                     scaling_factors=[1, -1, -1.5, 1]),  # TODO: remove the factor of 1.5 on raymer wing weight, why is it so low?
+                                                     scaling_factors=[1, -1, -1, 1]),  # TODO: remove the factor of 1.5 on raymer wing weight, why is it so low?
                            promotes_inputs=['*'],
                            promotes_outputs=['weight'])
-        self.set_input_defaults('orig_W_wing', W_wing_raymer, units='lb')
 
 class B738AnalysisGroup(om.Group):
     def setup(self):
@@ -144,11 +129,76 @@ class B738AnalysisGroup(om.Group):
         dv_comp.add_output_from_dict('ac|num_passengers_max')
         dv_comp.add_output_from_dict('ac|q_cruise')
 
+        # Aerostructural design parameters
+        num_x = 3
+        num_y = 7
+        n_twist = 3
+        n_toverc = 3
+        n_skin = 3
+        n_spar = 3
+        twist = np.linspace(-2, 2, n_twist)
+        toverc = acdata['ac']['geom']['wing']['toverc']['value'] * np.ones(n_toverc)
+        t_skin = np.array([0.005, 0.007, 0.015])
+        t_spar = np.array([0.005, 0.007, 0.015])
+        self.set_input_defaults('ac|geom|wing|twist', twist, units='deg')
+        self.set_input_defaults('ac|geom|wing|toverc', toverc)
+        self.set_input_defaults('ac|geom|wing|skin_thickness', t_skin, units='m')
+        self.set_input_defaults('ac|geom|wing|spar_thickness', t_spar, units='m')
+        self.set_input_defaults('ac|aero|CD_nonwing', 0.0145)  # based on matching fuel burn of B738.py example
+
+        # Compute Raymer wing weight to know what to subtract from the MTOW before adding the OpenAeroStruct weight
+        W_dg = 174.2e3  # design gross weight, lbs
+        N_z = 1.5*3.  # ultimate load factor (1.5 x limit load factor of 3g)
+        S_w = 1368.  # trapezoidal wing area, ft^2 (from photogrammetry)
+        A = 9.44  # aspect ratio
+        t_c = 0.12  # root thickness to chord ratio
+        taper = 0.159  # taper ratio
+        sweep = 25.  # wing sweep at 25% MAC
+        S_csw = 196.8  # wing-mounted control surface area, ft^2 (from photogrammetry)
+        W_wing_raymer = 0.0051 * (W_dg * N_z)**0.557 * S_w**0.649 * A**0.5 * \
+                        (t_c)**(-0.4) * (1 + taper)**0.1 / np.cos(np.deg2rad(sweep)) * S_csw**0.1
+        self.set_input_defaults('ac|weights|orig_W_wing', W_wing_raymer, units='lb')
+
+        # ======================== Mission analysis ========================
         # Run a full mission analysis including takeoff, reserve_, cruise,reserve_ and descereserve_nt
         analysis = self.add_subsystem('analysis',
                                       MissionWithReserve(num_nodes=nn,
                                                           aircraft_model=B738AirplaneModel),
                                       promotes_inputs=['*'], promotes_outputs=['*'])
+        
+        # ======================== Aerostructural sizing at 2.5g ========================
+        # Add single point aerostructural analysis at 2.5g and MTOW to size the wingbox structure
+        self.add_subsystem('aerostructural_maneuver', Aerostruct(num_x=num_x, num_y=num_y, num_twist=n_twist,
+                                                                    num_toverc=n_toverc, num_skin=n_skin,
+                                                                    num_spar=n_spar),
+                           promotes_inputs=['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper',
+                                            'ac|geom|wing|c4sweep', 'ac|geom|wing|toverc',
+                                            'ac|geom|wing|skin_thickness', 'ac|geom|wing|spar_thickness',
+                                            'load_factor'],
+                           promotes_outputs=[('failure', '2_5g_KS_failure')])
+        
+        # Flight condition of 2.5g maneuver load case
+        self.set_input_defaults('aerostructural_maneuver.fltcond|M', 0.8)
+        self.set_input_defaults('aerostructural_maneuver.fltcond|h', 20e3, units='ft')
+        self.set_input_defaults('load_factor', 2.5)  # multiplier on weights in structural problem
+
+        # Find angle of attack for 2.5g sizing flight condition such that lift = 2.5 * MTOW
+        self.add_subsystem('dyn_pressure', DynamicPressureComp(num_nodes=1))
+        self.add_subsystem('lift', Lift(num_nodes=1), promotes_inputs=['ac|geom|wing|S_ref'])
+        self.add_subsystem('kg_to_N', om.ExecComp('force = load_factor * mass * a',
+                                                                      force={'units': 'N'},
+                                                                      mass={'units': 'kg'},
+                                                                      a={'units': 'm/s**2', 'val': 9.807}),
+                           promotes_inputs=[('mass', 'ac|weights|MTOW'), 'load_factor'])
+        self.add_subsystem('struct_sizing_AoA', om.BalanceComp('alpha', eq_units='N', lhs_name='MTOW', rhs_name='lift', units='deg'))
+        self.connect('kg_to_N.force', 'struct_sizing_AoA.MTOW')
+        self.connect('aerostructural_maneuver.density.fltcond|rho', 'dyn_pressure.fltcond|rho')
+        self.connect('aerostructural_maneuver.airspeed.Utrue', 'dyn_pressure.fltcond|Utrue')
+        self.connect('dyn_pressure.fltcond|q', 'lift.fltcond|q')
+        self.connect('aerostructural_maneuver.fltcond|CL', 'lift.fltcond|CL')
+        self.connect('lift.lift', 'struct_sizing_AoA.lift')
+        self.connect('struct_sizing_AoA.alpha', 'aerostructural_maneuver.fltcond|alpha')
+        
 
 def configure_problem():
     prob = om.Problem()
@@ -158,21 +208,40 @@ def configure_problem():
     prob.model.nonlinear_solver.options['maxiter'] = 10
     prob.model.nonlinear_solver.options['atol'] = 1e-6
     prob.model.nonlinear_solver.options['rtol'] = 1e-6
-    prob.model.nonlinear_solver.options['err_on_non_converge'] = False
+    prob.model.nonlinear_solver.options['err_on_non_converge'] = True
     prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
 
     prob.driver = om.pyOptSparseDriver()
     prob.driver.options['optimizer'] = 'SNOPT'
     prob.driver.opt_settings['Major feasibility tolerance'] = 7e-6
-    prob.model.add_design_var('cruise|h0', upper=45e3, units='ft')
+    prob.driver.options['debug_print'] = ['objs', 'desvars']
+
+    # =========================== Mission design variables/constraints ===========================
+    prob.model.add_objective('descent.fuel_used_final')  # minimize block fuel burn
+    # prob.model.add_design_var('cruise|h0', upper=45e3, units='ft')
     prob.model.add_constraint('climb.throttle', lower=0.01, upper=1.05)
     prob.model.add_constraint('cruise.throttle', lower=0.01, upper=1.05)
     prob.model.add_constraint('descent.throttle', lower=0.01, upper=1.05)
+
+    # =========================== Aerostructural wing design variables/constraints ===========================
     # Find twist distribution that minimizes fuel burn; lock the twist tip in place
     # to prevent rigid rotation of the whole wing
-    prob.model.add_design_var('ac|geom|wing|twist', lower=np.array([0, -10, -10, -10]),
-                              upper=np.array([0, 10, 10, 10]), units='deg')
-    prob.model.add_objective('descent.fuel_used_final')
+    prob.model.add_design_var('ac|geom|wing|twist', lower=np.array([0, -10, -10]),
+                              upper=np.array([0, 10, 10]), units='deg')
+    prob.model.add_design_var('ac|geom|wing|AR', lower=5., upper=17.)
+    prob.model.add_design_var('ac|geom|wing|c4sweep', lower=0., upper=45.)
+    prob.model.add_design_var('ac|geom|wing|toverc', lower=.1, upper=0.25)
+    prob.model.add_design_var("ac|geom|wing|spar_thickness", lower=0.003, upper=0.1, scaler=1e2, units='m')
+    prob.model.add_design_var("ac|geom|wing|skin_thickness", lower=0.003, upper=0.1, scaler=1e2, units='m')
+    prob.model.add_design_var('ac|geom|wing|taper', lower=.01, scaler=1e1)
+    prob.model.add_constraint('2_5g_KS_failure', upper=0.)
+    # prob.model.add_constraint('climb.ac|struct|failure', upper=0.)
+    # prob.model.add_constraint('cruise.ac|struct|failure', upper=0.)
+    # prob.model.add_constraint('descent.ac|struct|failure', upper=0.)
+    # prob.model.add_constraint('reserve_climb.ac|struct|failure', upper=0.)
+    # prob.model.add_constraint('reserve_cruise.ac|struct|failure', upper=0.)
+    # prob.model.add_constraint('loiter.ac|struct|failure', upper=0.)
+    # prob.model.add_constraint('reserve_descent.ac|struct|failure', upper=0.)
     
     return prob
 
@@ -223,14 +292,16 @@ def show_outputs(prob, plots=True):
 def run_738_analysis(plots=False):
     num_nodes = 11
     prob = configure_problem()
-    prob.setup(check=True, mode='fwd')
+    prob.setup(check=False, mode='fwd')
     set_values(prob, num_nodes)
     prob.run_model()
     om.n2(prob, show_browser=False)
     # prob.model.list_inputs(print_arrays=True)
     # prob.model.list_outputs(print_arrays=True)
     show_outputs(prob, plots=plots)
-    print(f"Wing weight = {prob.get_val('ac|weights|W_wing', units='kg')[0]} kg")
+    print(f"Wing weight = {prob.get_val('ac|weights|W_wing', units='lb')[0]} lb")
+    print(f"Raymer wing weight = {prob.get_val('ac|weights|orig_W_wing', units='lb')[0]} lb")
+    print(f"2.5g failure = {prob.get_val('2_5g_KS_failure')}")
     print(f"Climb failure = {prob.get_val('climb.ac|struct|failure')}")
     print(f"Cruise failure = {prob.get_val('cruise.ac|struct|failure')}")
     print(f"Descent failure = {prob.get_val('descent.ac|struct|failure')}")
@@ -242,12 +313,18 @@ def run_738_optimization(plots=False):
     prob.setup(check=True, mode='fwd')
     set_values(prob, num_nodes)
     prob.run_driver()
-    # prob.model.list_outputs()
+    prob.list_problem_vars(driver_scaling=False)
+    print(f"Wing weight = {prob.get_val('ac|weights|W_wing', units='lb')[0]} lb")
+    print(f"Raymer wing weight = {prob.get_val('ac|weights|orig_W_wing', units='lb')[0]} lb")
+    print(f"2.5g failure = {prob.get_val('2_5g_KS_failure')}")
+    print(f"Climb failure = {prob.get_val('climb.ac|struct|failure')}")
+    print(f"Cruise failure = {prob.get_val('cruise.ac|struct|failure')}")
+    print(f"Descent failure = {prob.get_val('descent.ac|struct|failure')}")
     if plots:
         show_outputs(prob)
     return prob
 
 
 if __name__ == "__main__":
-    run_738_analysis(plots=False)
-    # run_738_optimization(plots=True)
+    # run_738_analysis(plots=False)
+    run_738_optimization(plots=True)

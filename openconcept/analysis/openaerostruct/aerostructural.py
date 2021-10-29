@@ -355,7 +355,7 @@ class OASDataGen(om.ExplicitComponent):
         temp_incr = inputs["fltcond|TempIncrement"]
 
         # If the inputs are unchaged, use the previously calculated values
-        tol = 1e-15  # floating point comparison tolerance
+        tol = 1e-13  # floating point comparison tolerance
         if (np.abs(S - OASDataGen.S) < tol and
            np.abs(AR - OASDataGen.AR) < tol and
            np.abs(taper - OASDataGen.taper) < tol and
@@ -865,7 +865,7 @@ class Aerostruct(om.Group):
 
         self.add_subsystem('aerostruct_point', AerostructPoint(surfaces=[surf_dict], internally_connect_fuelburn=False),
                             promotes_inputs=[('Mach_number', 'fltcond|M'), ('alpha', 'fltcond|alpha'),
-                                            'W0', 'empty_cg',
+                                            'W0', 'empty_cg', 'load_factor',
                                             ('total_perf.wing_structural_mass', 'ac|weights|W_wing')],
                             promotes_outputs=[('CL', 'fltcond|CL'), ('CD', 'fltcond|CD'),
                                               ('wing_perf.failure', 'failure')])
