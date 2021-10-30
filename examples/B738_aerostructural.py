@@ -59,6 +59,7 @@ class B738AirplaneModel(oc.IntegratorGroup):
 
         oas_surf_dict = {}  # options for OpenAeroStruct
         # Grid size and number of spline control points (must be same as B738AnalysisGroup)
+        global NUM_X, NUM_Y
         num_x = NUM_X
         num_y = NUM_Y
         n_twist = 3
@@ -100,10 +101,16 @@ class B738AirplaneModel(oc.IntegratorGroup):
 class B738AnalysisGroup(om.Group):
     def initialize(self):
         self.options.declare('num_nodes', default=11, desc='Number of analysis points per flight segment')
+        self.options.declare('num_x', default=5, desc='Aerostructural chordwise nodes')
+        self.options.declare('num_y', default=15, desc='Aerostructural halfspan nodes')
 
     def setup(self):
         # Define number of analysis points to run pers mission segment
         nn = self.options['num_nodes']
+
+        global NUM_X, NUM_Y
+        NUM_X = self.options['num_x']
+        NUM_Y = self.options['num_y']
 
         # Define a bunch of design varaiables and airplane-specific parameters
         dv_comp = self.add_subsystem('dv_comp',  oc.DictIndepVarComp(acdata),
@@ -232,14 +239,14 @@ def configure_problem(num_nodes):
     # =========================== Aerostructural wing design variables/constraints ===========================
     # Find twist distribution that minimizes fuel burn; lock the twist tip in place
     # to prevent rigid rotation of the whole wing
-    prob.model.add_design_var('ac|geom|wing|twist', lower=np.array([0, -10, -10]),
-                              upper=np.array([0, 10, 10]), units='deg')
+    # prob.model.add_design_var('ac|geom|wing|twist', lower=np.array([0, -10, -10]),
+    #                           upper=np.array([0, 10, 10]), units='deg')
     prob.model.add_design_var('ac|geom|wing|AR', lower=5., upper=17.)
-    prob.model.add_design_var('ac|geom|wing|c4sweep', lower=0., upper=45.)
-    prob.model.add_design_var('ac|geom|wing|toverc', lower=.1, upper=0.25)
+    # prob.model.add_design_var('ac|geom|wing|c4sweep', lower=0., upper=45.)
+    # prob.model.add_design_var('ac|geom|wing|toverc', lower=.1, upper=0.25)
     prob.model.add_design_var("ac|geom|wing|spar_thickness", lower=0.003, upper=0.1, scaler=1e2, units='m')
     prob.model.add_design_var("ac|geom|wing|skin_thickness", lower=0.003, upper=0.1, scaler=1e2, units='m')
-    prob.model.add_design_var('ac|geom|wing|taper', lower=.01, scaler=1e1)
+    # prob.model.add_design_var('ac|geom|wing|taper', lower=.01, scaler=1e1)
     prob.model.add_constraint('2_5g_KS_failure', upper=0.)
     
     return prob

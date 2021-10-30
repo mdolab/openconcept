@@ -870,7 +870,7 @@ class Aerostruct(om.Group):
 
         self.add_subsystem('aerostruct_point', AerostructPoint(surfaces=[surf_dict], internally_connect_fuelburn=False),
                             promotes_inputs=[('Mach_number', 'fltcond|M'), ('alpha', 'fltcond|alpha'),
-                                            'W0', 'empty_cg', 'load_factor',
+                                            'W0', 'empty_cg', 'load_factor', ('coupled.load_factor', 'load_factor'),
                                             ('total_perf.wing_structural_mass', 'ac|weights|W_wing')],
                             promotes_outputs=[('CL', 'fltcond|CL'), ('CD', 'fltcond|CD'),
                                               ('wing_perf.failure', 'failure')])
@@ -882,6 +882,7 @@ class Aerostruct(om.Group):
         # Set input defaults for inputs that go to multiple locations
         self.set_input_defaults('fltcond|M', 0.1)
         self.set_input_defaults('fltcond|alpha', 0.)
+        self.set_input_defaults('load_factor', 1.)
         self.set_input_defaults('aerostruct_point.coupled.wing.nodes', np.zeros((n_y, 3)), units='m')
         self.set_input_defaults('W0', 1., units='kg')  # unused variable but must be set since promoted
                                                         # from multiple locations (may be used in the future)
@@ -903,6 +904,7 @@ class Aerostruct(om.Group):
         self.connect('wing.hbottom', 'aerostruct_point.wing_perf.hbottom')
         self.connect('wing.hfront', 'aerostruct_point.wing_perf.hfront')
         self.connect('wing.hrear', 'aerostruct_point.wing_perf.hrear')
+        self.connect('aerostruct_point.fuelburn', 'aerostruct_point.total_perf.L_equals_W.fuelburn')
 
 
 if __name__=="__main__":
