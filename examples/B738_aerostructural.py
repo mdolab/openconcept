@@ -16,6 +16,9 @@ from openconcept.analysis.openaerostruct.aerostructural import Aerostruct
 from openconcept.analysis.aerodynamics import Lift
 from openconcept.analysis.atmospherics.dynamic_pressure_comp import DynamicPressureComp
 
+NUM_X = 5
+NUM_Y = 15
+
 class B738AirplaneModel(oc.IntegratorGroup):
     """
     A custom model specific to the Boeing 737-800 airplane.
@@ -56,8 +59,8 @@ class B738AirplaneModel(oc.IntegratorGroup):
 
         oas_surf_dict = {}  # options for OpenAeroStruct
         # Grid size and number of spline control points (must be same as B738AnalysisGroup)
-        num_x = 3
-        num_y = 7
+        num_x = NUM_X
+        num_y = NUM_Y
         n_twist = 3
         n_toverc = 3
         n_skin = 3
@@ -90,14 +93,17 @@ class B738AirplaneModel(oc.IntegratorGroup):
                                                                   'ac|weights|orig_W_wing',
                                                                   'ac|weights|W_wing'],
                                                      units='kg', vec_size=[1, nn, 1, 1],
-                                                     scaling_factors=[1, -1, -1, 1]),  # TODO: remove the factor of 1.5 on raymer wing weight, why is it so low?
+                                                     scaling_factors=[1, -1, -1, 1]),
                            promotes_inputs=['*'],
                            promotes_outputs=['weight'])
 
 class B738AnalysisGroup(om.Group):
+    def initialize(self):
+        self.options.declare('num_nodes', default=11, desc='Number of analysis points per flight segment')
+
     def setup(self):
         # Define number of analysis points to run pers mission segment
-        nn = 11
+        nn = self.options['num_nodes']
 
         # Define a bunch of design varaiables and airplane-specific parameters
         dv_comp = self.add_subsystem('dv_comp',  oc.DictIndepVarComp(acdata),
@@ -130,8 +136,8 @@ class B738AnalysisGroup(om.Group):
         dv_comp.add_output_from_dict('ac|q_cruise')
 
         # Aerostructural design parameters
-        num_x = 3
-        num_y = 7
+        num_x = NUM_X
+        num_y = NUM_Y
         n_twist = 3
         n_toverc = 3
         n_skin = 3
@@ -200,9 +206,9 @@ class B738AnalysisGroup(om.Group):
         self.connect('struct_sizing_AoA.alpha', 'aerostructural_maneuver.fltcond|alpha')
         
 
-def configure_problem():
+def configure_problem(num_nodes):
     prob = om.Problem()
-    prob.model.add_subsystem('analysis', B738AnalysisGroup(), promotes=['*'])
+    prob.model.add_subsystem('analysis', B738AnalysisGroup(num_nodes=num_nodes), promotes=['*'])
     prob.model.nonlinear_solver = om.NewtonSolver(iprint=2,solve_subsystems=True)
     prob.model.linear_solver = om.DirectSolver()
     prob.model.nonlinear_solver.options['maxiter'] = 10
@@ -235,21 +241,14 @@ def configure_problem():
     prob.model.add_design_var("ac|geom|wing|skin_thickness", lower=0.003, upper=0.1, scaler=1e2, units='m')
     prob.model.add_design_var('ac|geom|wing|taper', lower=.01, scaler=1e1)
     prob.model.add_constraint('2_5g_KS_failure', upper=0.)
-    # prob.model.add_constraint('climb.ac|struct|failure', upper=0.)
-    # prob.model.add_constraint('cruise.ac|struct|failure', upper=0.)
-    # prob.model.add_constraint('descent.ac|struct|failure', upper=0.)
-    # prob.model.add_constraint('reserve_climb.ac|struct|failure', upper=0.)
-    # prob.model.add_constraint('reserve_cruise.ac|struct|failure', upper=0.)
-    # prob.model.add_constraint('loiter.ac|struct|failure', upper=0.)
-    # prob.model.add_constraint('reserve_descent.ac|struct|failure', upper=0.)
     
     return prob
 
 def set_values(prob, num_nodes):
     # set some (required) mission parameters. Each pahse needs a vertical and air-speed
     # the entire mission needs a cruise altitude and range
-    prob.set_val('climb.fltcond|vs', np.linspace(2300.,  600.,num_nodes), units='ft/min')
-    prob.set_val('climb.fltcond|Ueas', np.linspace(230, 220,num_nodes), units='kn')
+    prob.set_val('climb.fltcond|vs', np.linspace(2300.,  500.,num_nodes), units='ft/min')
+    prob.set_val('climb.fltcond|Ueas', np.linspace(230, 210,num_nodes), units='kn')
     prob.set_val('cruise.fltcond|vs', np.ones((num_nodes,)) * 4., units='ft/min')
     prob.set_val('cruise.fltcond|Ueas', np.linspace(265, 258, num_nodes), units='kn')
     prob.set_val('descent.fltcond|vs', np.linspace(-1000, -150, num_nodes), units='ft/min')
@@ -291,7 +290,10 @@ def show_outputs(prob, plots=True):
 
 def run_738_analysis(plots=False):
     num_nodes = 11
-    prob = configure_problem()
+    global NUM_X, NUM_Y
+    NUM_X = 3
+    NUM_Y = 7
+    prob = configure_problem(num_nodes)
     prob.setup(check=False, mode='fwd')
     set_values(prob, num_nodes)
     prob.run_model()
@@ -309,7 +311,10 @@ def run_738_analysis(plots=False):
 
 def run_738_optimization(plots=False):
     num_nodes = 11
-    prob = configure_problem()
+    global NUM_X, NUM_Y
+    NUM_X = 3
+    NUM_Y = 7
+    prob = configure_problem(num_nodes)
     prob.setup(check=True, mode='fwd')
     set_values(prob, num_nodes)
     prob.run_driver()

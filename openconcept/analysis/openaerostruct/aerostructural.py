@@ -800,6 +800,11 @@ class Aerostruct(om.Group):
             "exact_failure_constraint": False,  # if false, use KS function
         }
 
+        # Overwrite any options in the surface dict with those provided in the options
+        if self.options['surf_options'] is not None:
+            for key in self.options['surf_options']:
+                surf_dict[key] = self.options['surf_options'][key]
+
         # =================================================================
         #              Set up aerodynamic and structural mesh
         # =================================================================
