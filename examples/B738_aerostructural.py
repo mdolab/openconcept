@@ -206,7 +206,8 @@ class B738AnalysisGroup(om.Group):
                                                                       a={'units': 'm/s**2', 'val': 9.807}),
                            promotes_inputs=['load_factor', ('MTOW', 'ac|weights|MTOW')])
         self.add_subsystem('struct_sizing_AoA', om.BalanceComp('alpha', eq_units='N', lhs_name='MTOW',
-                                                               rhs_name='lift', units='deg', val=10.))
+                                                               rhs_name='lift', units='deg', val=10.,
+                                                               lower=0.))
         self.connect('climb.ac|weights|W_wing', 'kg_to_N.W_wing')
         self.connect('kg_to_N.lift', 'struct_sizing_AoA.MTOW')
         self.connect('aerostructural_maneuver.density.fltcond|rho', 'dyn_pressure.fltcond|rho')
