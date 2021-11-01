@@ -187,7 +187,7 @@ class B738AnalysisGroup(om.Group):
                            promotes_inputs=['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper',
                                             'ac|geom|wing|c4sweep', 'ac|geom|wing|toverc',
                                             'ac|geom|wing|skin_thickness', 'ac|geom|wing|spar_thickness',
-                                            'load_factor'],
+                                            'ac|geom|wing|twist', 'load_factor'],
                            promotes_outputs=[('failure', '2_5g_KS_failure')])
         
         # Flight condition of 2.5g maneuver load case
@@ -198,13 +198,17 @@ class B738AnalysisGroup(om.Group):
         # Find angle of attack for 2.5g sizing flight condition such that lift = 2.5 * MTOW
         self.add_subsystem('dyn_pressure', DynamicPressureComp(num_nodes=1))
         self.add_subsystem('lift', Lift(num_nodes=1), promotes_inputs=['ac|geom|wing|S_ref'])
-        self.add_subsystem('kg_to_N', om.ExecComp('force = load_factor * mass * a',
-                                                                      force={'units': 'N'},
-                                                                      mass={'units': 'kg'},
+        self.add_subsystem('kg_to_N', om.ExecComp('lift = load_factor * (MTOW - orig_W_wing + W_wing) * a',
+                                                                      lift={'units': 'N'},
+                                                                      MTOW={'units': 'kg'},
+                                                                      orig_W_wing={'units': 'kg', 'val': W_wing_raymer/2.20462},
+                                                                      W_wing={'units': 'kg'},
                                                                       a={'units': 'm/s**2', 'val': 9.807}),
-                           promotes_inputs=[('mass', 'ac|weights|MTOW'), 'load_factor'])
-        self.add_subsystem('struct_sizing_AoA', om.BalanceComp('alpha', eq_units='N', lhs_name='MTOW', rhs_name='lift', units='deg'))
-        self.connect('kg_to_N.force', 'struct_sizing_AoA.MTOW')
+                           promotes_inputs=['load_factor', ('MTOW', 'ac|weights|MTOW')])
+        self.add_subsystem('struct_sizing_AoA', om.BalanceComp('alpha', eq_units='N', lhs_name='MTOW',
+                                                               rhs_name='lift', units='deg', val=10.))
+        self.connect('climb.ac|weights|W_wing', 'kg_to_N.W_wing')
+        self.connect('kg_to_N.lift', 'struct_sizing_AoA.MTOW')
         self.connect('aerostructural_maneuver.density.fltcond|rho', 'dyn_pressure.fltcond|rho')
         self.connect('aerostructural_maneuver.airspeed.Utrue', 'dyn_pressure.fltcond|Utrue')
         self.connect('dyn_pressure.fltcond|q', 'lift.fltcond|q')
