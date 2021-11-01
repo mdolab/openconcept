@@ -18,6 +18,10 @@ from openconcept.analysis.atmospherics.dynamic_pressure_comp import DynamicPress
 
 NUM_X = 5
 NUM_Y = 15
+NUM_TWIST = 3
+NUM_TOVERC = 3
+NUM_SKIN = 3
+NUM_SPAR = 3
 
 class B738AirplaneModel(oc.IntegratorGroup):
     """
@@ -59,16 +63,10 @@ class B738AirplaneModel(oc.IntegratorGroup):
 
         oas_surf_dict = {}  # options for OpenAeroStruct
         # Grid size and number of spline control points (must be same as B738AnalysisGroup)
-        global NUM_X, NUM_Y
-        num_x = NUM_X
-        num_y = NUM_Y
-        n_twist = 3
-        n_toverc = 3
-        n_skin = 3
-        n_spar = 3
-        self.add_subsystem('drag', OASAerostructDragPolar(num_nodes=nn, num_x=num_x, num_y=num_y,
-                                                num_twist=n_twist, num_toverc=n_toverc,
-                                                num_skin=n_skin, num_spar=n_spar,
+        global NUM_X, NUM_Y, NUM_TWIST, NUM_TOVERC, NUM_SKIN, NUM_SPAR
+        self.add_subsystem('drag', OASAerostructDragPolar(num_nodes=nn, num_x=NUM_X, num_y=NUM_Y,
+                                                num_twist=NUM_TWIST, num_toverc=NUM_TOVERC,
+                                                num_skin=NUM_SKIN, num_spar=NUM_SPAR,
                                                 surf_options=oas_surf_dict),
                            promotes_inputs=['fltcond|CL', 'fltcond|M', 'fltcond|h', 'fltcond|q', 'ac|geom|wing|S_ref',
                                             'ac|geom|wing|AR', 'ac|geom|wing|taper', 'ac|geom|wing|c4sweep',
@@ -103,14 +101,22 @@ class B738AnalysisGroup(om.Group):
         self.options.declare('num_nodes', default=11, desc='Number of analysis points per flight segment')
         self.options.declare('num_x', default=5, desc='Aerostructural chordwise nodes')
         self.options.declare('num_y', default=15, desc='Aerostructural halfspan nodes')
+        self.options.declare('num_twist', default=3, desc='Number of twist control points')
+        self.options.declare('num_toverc', default=3, desc='Number of t/c control points')
+        self.options.declare('num_skin', default=3, desc='Number of skin control points')
+        self.options.declare('num_spar', default=3, desc='Number of spar control points')
 
     def setup(self):
         # Define number of analysis points to run pers mission segment
         nn = self.options['num_nodes']
 
-        global NUM_X, NUM_Y
+        global NUM_X, NUM_Y, NUM_TWIST, NUM_TOVERC, NUM_SKIN, NUM_SPAR
         NUM_X = self.options['num_x']
         NUM_Y = self.options['num_y']
+        NUM_TWIST = self.options['num_twist']
+        NUM_TOVERC = self.options['num_toverc']
+        NUM_SKIN = self.options['num_skin']
+        NUM_SPAR = self.options['num_spar']
 
         # Define a bunch of design varaiables and airplane-specific parameters
         dv_comp = self.add_subsystem('dv_comp',  oc.DictIndepVarComp(acdata),
@@ -143,16 +149,10 @@ class B738AnalysisGroup(om.Group):
         dv_comp.add_output_from_dict('ac|q_cruise')
 
         # Aerostructural design parameters
-        num_x = NUM_X
-        num_y = NUM_Y
-        n_twist = 3
-        n_toverc = 3
-        n_skin = 3
-        n_spar = 3
-        twist = np.linspace(-2, 2, n_twist)
-        toverc = acdata['ac']['geom']['wing']['toverc']['value'] * np.ones(n_toverc)
-        t_skin = np.array([0.005, 0.007, 0.015])
-        t_spar = np.array([0.005, 0.007, 0.015])
+        twist = np.linspace(-2, 2, NUM_TWIST)
+        toverc = acdata['ac']['geom']['wing']['toverc']['value'] * np.ones(NUM_TOVERC)
+        t_skin = np.linspace(0.005, 0.015, NUM_SKIN)
+        t_spar = np.linspace(0.005, 0.015, NUM_SPAR)
         self.set_input_defaults('ac|geom|wing|twist', twist, units='deg')
         self.set_input_defaults('ac|geom|wing|toverc', toverc)
         self.set_input_defaults('ac|geom|wing|skin_thickness', t_skin, units='m')
@@ -181,9 +181,9 @@ class B738AnalysisGroup(om.Group):
         
         # ======================== Aerostructural sizing at 2.5g ========================
         # Add single point aerostructural analysis at 2.5g and MTOW to size the wingbox structure
-        self.add_subsystem('aerostructural_maneuver', Aerostruct(num_x=num_x, num_y=num_y, num_twist=n_twist,
-                                                                    num_toverc=n_toverc, num_skin=n_skin,
-                                                                    num_spar=n_spar),
+        self.add_subsystem('aerostructural_maneuver', Aerostruct(num_x=NUM_X, num_y=NUM_Y, num_twist=NUM_TWIST,
+                                                                    num_toverc=NUM_TOVERC, num_skin=NUM_SKIN,
+                                                                    num_spar=NUM_SPAR),
                            promotes_inputs=['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper',
                                             'ac|geom|wing|c4sweep', 'ac|geom|wing|toverc',
                                             'ac|geom|wing|skin_thickness', 'ac|geom|wing|spar_thickness',
