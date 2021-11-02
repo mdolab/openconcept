@@ -256,15 +256,18 @@ def configure_problem(num_nodes):
     
     return prob
 
-def set_values(prob, num_nodes):
-    # set some (required) mission parameters. Each pahse needs a vertical and air-speed
+def set_values(prob, num_nodes, range=2050):
+    # set some (required) mission parameters. Each phase needs a vertical and air-speed
     # the entire mission needs a cruise altitude and range
-    prob.set_val('climb.fltcond|vs', np.linspace(2300.,  500.,num_nodes), units='ft/min')
-    prob.set_val('climb.fltcond|Ueas', np.linspace(230, 210,num_nodes), units='kn')
-    prob.set_val('cruise.fltcond|vs', np.ones((num_nodes,)) * 4., units='ft/min')
-    prob.set_val('cruise.fltcond|Ueas', np.linspace(265, 258, num_nodes), units='kn')
-    prob.set_val('descent.fltcond|vs', np.linspace(-1000, -150, num_nodes), units='ft/min')
-    prob.set_val('descent.fltcond|Ueas', np.ones((num_nodes,)) * 250, units='kn')
+    prob.set_val('cruise|h0',35000.,units='ft')
+    prob.set_val('reserve|h0',15000.,units='ft')
+    prob.set_val('mission_range',range,units='NM')
+    prob.set_val('climb.fltcond|vs', np.linspace(2000.,  400.,num_nodes), units='ft/min')
+    prob.set_val('climb.fltcond|Ueas', np.linspace(220, 200,num_nodes), units='kn')
+    prob.set_val('cruise.fltcond|vs', np.zeros((num_nodes,)), units='ft/min')
+    prob.set_val('cruise.fltcond|Ueas', np.linspace(250.279, 250.279, num_nodes), units='kn')  # M 0.78 @ 35k ft
+    prob.set_val('descent.fltcond|vs', np.linspace(-2000, -1000, num_nodes), units='ft/min')
+    prob.set_val('descent.fltcond|Ueas', np.linspace(240, 250, num_nodes), units='kn')
     prob.set_val('reserve_climb.fltcond|vs', np.linspace(3000.,  2300.,num_nodes), units='ft/min')
     prob.set_val('reserve_climb.fltcond|Ueas', np.linspace(230, 230,num_nodes), units='kn')
     prob.set_val('reserve_cruise.fltcond|vs', np.ones((num_nodes,)) * 4., units='ft/min')
@@ -273,9 +276,6 @@ def set_values(prob, num_nodes):
     prob.set_val('reserve_descent.fltcond|Ueas', np.ones((num_nodes,)) * 250, units='kn')
     prob.set_val('loiter.fltcond|vs', np.linspace(0.0, 0.0, num_nodes), units='ft/min')
     prob.set_val('loiter.fltcond|Ueas', np.ones((num_nodes,)) * 200, units='kn')
-    prob.set_val('cruise|h0',33000.,units='ft')
-    prob.set_val('reserve|h0',15000.,units='ft')
-    prob.set_val('mission_range',2050,units='NM')
 
 def show_outputs(prob, plots=True):
     # print some outputs
