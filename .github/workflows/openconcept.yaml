@@ -31,6 +31,20 @@ jobs:
       run: |
         pip install coverage pytest-cov sphinx_rtd_theme
         pip install .[testing]
+    - if: ${{ matrix.os == 'ubuntu-latest' }}
+      name: Download engine deck surrogate model data Ubuntu
+      run: |
+        wget http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
+    - if: ${{ matrix.os == 'windows-latest' }}
+      name: Download engine deck surrogate model data Windows
+      run: |
+        curl -L -o engine_kriging_surrogate_model.tar.gz http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
+    - name: Move engine deck files to appropriate location
+      run: |
+        tar -xvf engine_kriging_surrogate_model.tar.gz
+        mv cfm56* ./openconcept/components/empirical_data/cfm56
+        mv n3_hybrid* ./openconcept/components/empirical_data/n+3_hybrid
+        mv n3* ./openconcept/components/empirical_data/n+3
     - name: Build and Test
       run: |
         python -m pytest --cov-config .coveragerc --cov=openconcept

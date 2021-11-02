@@ -97,7 +97,7 @@ class ElementMultiplyDivideComp(ExplicitComponent):
     def add_equation(self, output_name, input_names, vec_size=1, length=1, val=1.0,
                      res_units=None, desc='', lower=None, upper=None, ref=1.0,
                      ref0=0.0, res_ref=None,  scaling_factor=1,
-                     divide=None, input_units=None):
+                     divide=None, input_units=None, tags=None):
         """
         Add a multiplication relation.
 
@@ -152,10 +152,12 @@ class ElementMultiplyDivideComp(ExplicitComponent):
         res_ref : float or ndarray
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
+        tags : list of str
+            Tags to apply to the output variable
         """
         kwargs = {'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref}
+                  'res_ref': res_ref, 'tags': tags}
         self._add_systems.append((output_name, input_names, vec_size, length, val,
                                   scaling_factor, divide, input_units, kwargs))
 

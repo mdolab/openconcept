@@ -19,3 +19,6 @@ coloring_files/total_coloring.pkl
 *egg-info/
 openconcept/.coverage
 .coverage
+scratch/
+*.out
+*.zip

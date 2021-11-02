@@ -83,7 +83,7 @@ class SeriesHybridTwinModel(Group):
                                             'fltcond|q', ('e', 'ac|aero|polar|e')])
 
         self.add_subsystem('OEW',TwinSeriesHybridEmptyWeight(),
-                           promotes_inputs=[('P_TO','ac|propulsion|engine|rating'),'*'])
+                           promotes_inputs=['*', ('P_TO','ac|propulsion|engine|rating')])
         self.connect('propmodel.propellers_weight', 'W_propeller')
         self.connect('propmodel.eng1.component_weight', 'W_engine')
         self.connect('propmodel.gen1.component_weight', 'W_generator')
@@ -178,12 +178,12 @@ class ElectricTwinAnalysisGroup(Group):
                                                  ['*'])
 
         margins = self.add_subsystem('margins',ExecComp('MTOW_margin = MTOW - OEW - total_fuel - W_battery - payload',
-                                                        MTOW_margin={'units':'lbm','value':100},
-                                                        MTOW={'units':'lbm','value':10000},
-                                                        OEW={'units':'lbm','value':5000},
-                                                        total_fuel={'units':'lbm','value':1000},
-                                                        W_battery={'units':'lbm','value':1000},
-                                                        payload={'units':'lbm','value':1000}),
+                                                        MTOW_margin={'units':'lbm','val':100},
+                                                        MTOW={'units':'lbm','val':10000},
+                                                        OEW={'units':'lbm','val':5000},
+                                                        total_fuel={'units':'lbm','val':1000},
+                                                        W_battery={'units':'lbm','val':1000},
+                                                        payload={'units':'lbm','val':1000}),
                                                         promotes_inputs=['payload'])
         self.connect('cruise.OEW','margins.OEW')
         self.connect('descent.fuel_used_final','margins.total_fuel')
