@@ -99,8 +99,8 @@ class B738AirplaneModel(oc.IntegratorGroup):
 class B738AnalysisGroup(om.Group):
     def initialize(self):
         self.options.declare('num_nodes', default=11, desc='Number of analysis points per flight segment')
-        self.options.declare('num_x', default=5, desc='Aerostructural chordwise nodes')
-        self.options.declare('num_y', default=15, desc='Aerostructural halfspan nodes')
+        self.options.declare('num_x', default=3, desc='Aerostructural chordwise nodes')
+        self.options.declare('num_y', default=7, desc='Aerostructural halfspan nodes')
         self.options.declare('num_twist', default=3, desc='Number of twist control points')
         self.options.declare('num_toverc', default=3, desc='Number of t/c control points')
         self.options.declare('num_skin', default=3, desc='Number of skin control points')
@@ -232,7 +232,7 @@ def configure_problem(num_nodes):
     prob.driver = om.pyOptSparseDriver()
     prob.driver.options['optimizer'] = 'SNOPT'
     prob.driver.opt_settings['Major feasibility tolerance'] = 7e-6
-    prob.driver.options['debug_print'] = ['objs', 'desvars']
+    prob.driver.options['debug_print'] = ['objs', 'desvars', 'nl_cons']
 
     # =========================== Mission design variables/constraints ===========================
     prob.model.add_objective('descent.fuel_used_final')  # minimize block fuel burn

@@ -940,7 +940,7 @@ if __name__=="__main__":
                                                                num_spar=n_spar),
                            promotes=['*'])
     p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, iprint=2)
-    p.model.nonlinear_solver.linear_solver = om.DirectSolver()
+    p.model.linear_solver = om.DirectSolver()
     p.setup(force_alloc_complex=True)
 
     # Set values
