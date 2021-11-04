@@ -31,6 +31,9 @@ from openconcept.analysis.atmospherics.pressure_comp import PressureComp
 from openconcept.analysis.atmospherics.density_comp import DensityComp
 from openconcept.analysis.atmospherics.speedofsound_comp import SpeedOfSoundComp
 
+# Utitilty for vector manipulation
+from openconcept.utilities.math.combine_split_comp import VectorConcatenateComp
+
 
 class OASAerostructDragPolar(om.Group):
     """
@@ -86,7 +89,7 @@ class OASAerostructDragPolar(om.Group):
         KS aggregation quantity obtained by combining the failure criteria
         for each FEM node. Must be < 0 to constrain wingboxes stresses to
         be less than yield stress. Used to simplify the optimization problem by
-        reducing the number of constraints.
+        reducing the number of constraints (vector, dimensionless)
     ac|weights|W_wing : float
         Weight of the wing (scalar, kg)
 
@@ -905,6 +908,143 @@ class Aerostruct(om.Group):
         self.connect('wing.hfront', 'aerostruct_point.wing_perf.hfront')
         self.connect('wing.hrear', 'aerostruct_point.wing_perf.hrear')
         self.connect('aerostruct_point.fuelburn', 'aerostruct_point.total_perf.L_equals_W.fuelburn')
+
+class OASAerostructDragPolarExact(om.Group):
+    """
+    Drag polar and wing weight estimate generated using OpenAeroStruct's
+    aerostructural analysis capabilities directly, without a surrogate in the loop.
+
+    Inputs
+    ------
+    fltcond|CL : float
+        Lift coefficient (vector, dimensionless)
+    fltcond|M : float
+        Mach number (vector, dimensionless)
+    fltcond|h : float
+        Altitude (vector, m)
+    fltcond|q : float
+        Dynamic pressure (vector, Pascals)
+    ac|geom|wing|S_ref : float
+        Full planform area (scalar, m^2)
+    ac|geom|wing|AR : float
+        Aspect ratio (scalar, dimensionless)
+    ac|geom|wing|taper : float
+        Taper ratio (must be >0 and <=1); tip chord / root chord (scalar, dimensionless)
+    ac|geom|wing|c4sweep : float
+        Quarter chord sweep angle (scalar, degrees)
+    ac|geom|wing|twist : float
+        List of twist angles at control points of spline (vector, degrees)
+        NOTE: length of vector is num_twist (set in options), NOT num_nodes
+    ac|geom|wing|toverc : float
+        List of thickness to chord ratios at control points of spline (vector, dimensionless)
+        NOTE: length of vector is num_toverc (set in options)
+    ac|geom|wing|skin_thickness : float
+        List of skin thicknesses at control points of spline (vector, m)
+        NOTE: length of vector is num_skin (set in options)
+    ac|geom|wing|spar_thickness : float
+        List of spar thicknesses at control points of spline (vector, m)
+        NOTE: length of vector is num_spar (set in options)
+    ac|aero|CD_nonwing : float
+        Drag coefficient of components other than the wing; e.g. fuselage,
+        tail, interference drag, etc.; this value is simply added to the
+        drag coefficient computed by OpenAeroStruct (scalar, dimensionless)
+    fltcond|TempIncrement : float
+        Temperature increment for non-standard day (scalar, degC)
+        TODO fltcond|TempIncrement is a scalar in this component but a vector in OC
+
+    Outputs
+    -------
+    drag : float
+        Drag force (vector, Newtons)
+    failure : float
+        KS aggregation quantity obtained by combining the failure criteria
+        for each FEM node. Must be < 0 to constrain wingboxes stresses to
+        be less than yield stress. Used to simplify the optimization problem by
+        reducing the number of constraints (vector, dimensionless)
+    ac|weights|W_wing : float
+        Weight of the wing (scalar, kg)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points per mission segment (scalar, dimensionless)
+    num_x : int
+        Number of points in x (streamwise) direction (scalar, dimensionless)
+    num_y : int
+        Number of points in y (spanwise) direction for one wing because
+        uses symmetry (scalar, dimensionless)
+    num_twist : int
+        Number of spline control points for twist (scalar, dimensionless)
+    num_toverc : int
+        Number of spline control points for thickness to chord ratio (scalar, dimensionless)
+    num_skin : int
+        Number of spline control points for skin thickness (scalar, dimensionless)
+    num_spar : int
+        Number of spline control points for spar thickness (scalar, dimensionless)
+    surf_options : dict
+        Dictionary of OpenAeroStruct surface options; any options provided here
+        will override the default ones; see the OpenAeroStruct documentation for more information.
+        Because the geometry transformations are excluded in this model (to simplify the interface),
+        the <transformation>_cp options are not supported. The input ac|geom|wing|twist is the same
+        as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
+        is limited to adjusting the input parameters to this component.
+    """
+    def initialize(self):
+        self.options.declare('num_nodes', default=1, desc='Number of analysis points to run')
+        self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
+        self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
+        self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
+        self.options.declare("num_toverc", default=4, desc="Number of thickness to chord ratio spline control points")
+        self.options.declare("num_skin", default=4, desc="Number of skin thickness spline control points")
+        self.options.declare("num_spar", default=4, desc="Number of spar thickness spline control points")
+        self.options.declare('surf_options', default=None, desc="Dictionary of OpenAeroStruct surface options")
+    
+    def setup(self):
+        nn = self.options['num_nodes']
+
+        # Add an aerostructural analysis case for every node
+        for node in range(nn):
+            comp_name = f"aerostruct_{node}"
+            self.add_subsystem(comp_name, Aerostruct(num_x=self.options['num_x'], num_y=self.options['num_y'],
+                                                     num_twist=self.options['num_twist'], num_toverc=self.options['num_toverc'],
+                                                     num_skin=self.options['num_skin'], num_spar=self.options['num_spar'],
+                                                     surf_options=self.options['surf_options']),
+                               promotes_inputs=['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper', 'ac|geom|wing|c4sweep',
+                                                'ac|geom|wing|twist', 'ac|geom|wing|toverc', 'ac|geom|wing|skin_thickness',
+                                                'ac|geom|wing|spar_thickness', 'fltcond|TempIncrement'])
+            self.promotes(comp_name, inputs=['fltcond|alpha', 'fltcond|M', 'fltcond|h'], src_indices=node, flat_src_indices=True)
+
+            # Promote wing weight from one, doesn't really matter which
+            if node == 0:
+                self.promotes(comp_name, inputs=['ac|weights|W_wing'])
+        
+        # Combine lift and drag coefficients from different aerostructural analyses into one vector
+        comb = self.add_subsystem('vec_combine', VectorConcatenateComp(), promotes_outputs=['failure'])
+        comb.add_relation(output_name='CL_OAS', input_names=[f"CL_{node}" for node in range(nn)], vec_sizes=[1,] * nn)
+        comb.add_relation(output_name='CD_OAS', input_names=[f"CD_{node}" for node in range(nn)], vec_sizes=[1,] * nn)
+        comb.add_relation(output_name='failure', input_names=[f"failure_{node}" for node in range(nn)], vec_sizes=[1,] * nn)
+        for node in range(nn):
+            self.connect(f"aerostruct_{node}.fltcond|CL", f"vec_combine.CL_{node}")
+            self.connect(f"aerostruct_{node}.fltcond|CD", f"vec_combine.CD_{node}")
+            self.connect(f"aerostruct_{node}.failure", f"vec_combine.failure_{node}")
+
+        # Solve for angle of attack that meets input lift coefficient
+        self.add_subsystem('alpha_bal', om.BalanceComp('alpha', eq_units=None, lhs_name="CL_OAS",
+                                                       rhs_name="fltcond|CL", val=np.ones(nn),
+                                                       units="deg"),
+                           promotes_outputs=['fltcond|alpha'])
+        self.connect('vec_combine.CL_OAS', 'alpha_bal.CL_OAS')
+
+        # Compute drag force from drag coefficient
+        self.add_subsystem('drag_calc', om.ExecComp('drag = q * S * (CD + CD0)',
+                                                    drag={'units': 'N', 'shape': (nn,)},
+                                                    q={'units': 'Pa', 'shape': (nn,)},
+                                                    S={'units': 'm**2'},
+                                                    CD={'shape': (nn,)},
+                                                    CD0={'shape': (1,)}),
+                           promotes_inputs=[('q', 'fltcond|q'), ('S', 'ac|geom|wing|S_ref'), ('CD0', 'ac|aero|CD_nonwing')],
+                           promotes_outputs=['drag'])
+        self.connect('vec_combine.CD_OAS', 'drag_calc.CD')
 
 
 if __name__=="__main__":

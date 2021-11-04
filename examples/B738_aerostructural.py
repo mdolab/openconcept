@@ -8,7 +8,7 @@ sys.path.insert(0, os.getcwd())
 import openmdao.api as om
 import openconcept.api as oc
 # imports for the airplane model itself
-from openconcept.analysis.openaerostruct.aerostructural import OASAerostructDragPolar
+from openconcept.analysis.openaerostruct.aerostructural import OASAerostructDragPolar, OASAerostructDragPolarExact
 from examples.aircraft_data.B738 import data as acdata
 from openconcept.analysis.performance.mission_profiles import MissionWithReserve
 from openconcept.components.cfm56 import CFM56
@@ -22,6 +22,7 @@ NUM_TWIST = 3
 NUM_TOVERC = 3
 NUM_SKIN = 3
 NUM_SPAR = 3
+USE_SURROGATE = True
 
 class B738AirplaneModel(oc.IntegratorGroup):
     """
@@ -63,17 +64,29 @@ class B738AirplaneModel(oc.IntegratorGroup):
 
         oas_surf_dict = {}  # options for OpenAeroStruct
         # Grid size and number of spline control points (must be same as B738AnalysisGroup)
-        global NUM_X, NUM_Y, NUM_TWIST, NUM_TOVERC, NUM_SKIN, NUM_SPAR
-        self.add_subsystem('drag', OASAerostructDragPolar(num_nodes=nn, num_x=NUM_X, num_y=NUM_Y,
-                                                num_twist=NUM_TWIST, num_toverc=NUM_TOVERC,
-                                                num_skin=NUM_SKIN, num_spar=NUM_SPAR,
-                                                surf_options=oas_surf_dict),
-                           promotes_inputs=['fltcond|CL', 'fltcond|M', 'fltcond|h', 'fltcond|q', 'ac|geom|wing|S_ref',
-                                            'ac|geom|wing|AR', 'ac|geom|wing|taper', 'ac|geom|wing|c4sweep',
-                                            'ac|geom|wing|twist', 'ac|geom|wing|toverc',
-                                            'ac|geom|wing|skin_thickness', 'ac|geom|wing|spar_thickness',
-                                            'ac|aero|CD_nonwing'],
-                           promotes_outputs=['drag', 'ac|weights|W_wing', ('failure', 'ac|struct|failure')])
+        global NUM_X, NUM_Y, NUM_TWIST, NUM_TOVERC, NUM_SKIN, NUM_SPAR, USE_SURROGATE
+        if USE_SURROGATE:
+            self.add_subsystem('drag', OASAerostructDragPolar(num_nodes=nn, num_x=NUM_X, num_y=NUM_Y,
+                                                    num_twist=NUM_TWIST, num_toverc=NUM_TOVERC,
+                                                    num_skin=NUM_SKIN, num_spar=NUM_SPAR,
+                                                    surf_options=oas_surf_dict),
+                            promotes_inputs=['fltcond|CL', 'fltcond|M', 'fltcond|h', 'fltcond|q', 'ac|geom|wing|S_ref',
+                                                'ac|geom|wing|AR', 'ac|geom|wing|taper', 'ac|geom|wing|c4sweep',
+                                                'ac|geom|wing|twist', 'ac|geom|wing|toverc',
+                                                'ac|geom|wing|skin_thickness', 'ac|geom|wing|spar_thickness',
+                                                'ac|aero|CD_nonwing'],
+                            promotes_outputs=['drag', 'ac|weights|W_wing', ('failure', 'ac|struct|failure')])
+        else:
+            self.add_subsystem('drag', OASAerostructDragPolarExact(num_nodes=nn, num_x=NUM_X, num_y=NUM_Y,
+                                                    num_twist=NUM_TWIST, num_toverc=NUM_TOVERC,
+                                                    num_skin=NUM_SKIN, num_spar=NUM_SPAR,
+                                                    surf_options=oas_surf_dict),
+                            promotes_inputs=['fltcond|CL', 'fltcond|M', 'fltcond|h', 'fltcond|q', 'ac|geom|wing|S_ref',
+                                                'ac|geom|wing|AR', 'ac|geom|wing|taper', 'ac|geom|wing|c4sweep',
+                                                'ac|geom|wing|twist', 'ac|geom|wing|toverc',
+                                                'ac|geom|wing|skin_thickness', 'ac|geom|wing|spar_thickness',
+                                                'ac|aero|CD_nonwing'],
+                            promotes_outputs=['drag', 'ac|weights|W_wing', ('failure', 'ac|struct|failure')])
 
         # generally the weights module will be custom to each airplane
         passthru = om.ExecComp('OEW=x',
@@ -105,18 +118,20 @@ class B738AnalysisGroup(om.Group):
         self.options.declare('num_toverc', default=3, desc='Number of t/c control points')
         self.options.declare('num_skin', default=3, desc='Number of skin control points')
         self.options.declare('num_spar', default=3, desc='Number of spar control points')
+        self.options.declare('use_surrogate', default=True, desc='Use surrogate for aerostructural drag polar')
 
     def setup(self):
         # Define number of analysis points to run pers mission segment
         nn = self.options['num_nodes']
 
-        global NUM_X, NUM_Y, NUM_TWIST, NUM_TOVERC, NUM_SKIN, NUM_SPAR
+        global NUM_X, NUM_Y, NUM_TWIST, NUM_TOVERC, NUM_SKIN, NUM_SPAR, USE_SURROGATE
         NUM_X = self.options['num_x']
         NUM_Y = self.options['num_y']
         NUM_TWIST = self.options['num_twist']
         NUM_TOVERC = self.options['num_toverc']
         NUM_SKIN = self.options['num_skin']
         NUM_SPAR = self.options['num_spar']
+        USE_SURROGATE = self.options['use_surrogate']
 
         # Define a bunch of design varaiables and airplane-specific parameters
         dv_comp = self.add_subsystem('dv_comp',  oc.DictIndepVarComp(acdata),
