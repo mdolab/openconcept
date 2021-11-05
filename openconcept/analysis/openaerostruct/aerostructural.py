@@ -911,6 +911,19 @@ class Aerostruct(om.Group):
 
 class OASAerostructDragPolarExact(om.Group):
     """
+                          WARNING WARNING WARNING
+    ----------------------------------------------------------------------
+    This component is far more computationally expensive than the
+    OASAerostructDragPolar component, which uses a surrogate. For missions
+    with many flight segments, many num_nodes, or wing models with high
+    num_x and num_y values this component will result in a system that
+    returns a memory error when solved with a DirectSolver linear solver
+    because the Jacobian is too large to be factorized. Unless you know
+    what you're doing, this component should not be used (use
+    OASAerostructDragPolar instead).
+    ----------------------------------------------------------------------
+                          WARNING WARNING WARNING
+
     Drag polar and wing weight estimate generated using OpenAeroStruct's
     aerostructural analysis capabilities directly, without a surrogate in the loop.
 
@@ -1012,26 +1025,27 @@ class OASAerostructDragPolarExact(om.Group):
                                promotes_inputs=['ac|geom|wing|S_ref', 'ac|geom|wing|AR', 'ac|geom|wing|taper', 'ac|geom|wing|c4sweep',
                                                 'ac|geom|wing|twist', 'ac|geom|wing|toverc', 'ac|geom|wing|skin_thickness',
                                                 'ac|geom|wing|spar_thickness', 'fltcond|TempIncrement'])
-            self.promotes(comp_name, inputs=['fltcond|alpha', 'fltcond|M', 'fltcond|h'], src_indices=node, flat_src_indices=True)
+            self.promotes(comp_name, inputs=['fltcond|alpha', 'fltcond|M', 'fltcond|h'], src_indices=[node], flat_src_indices=True)
 
             # Promote wing weight from one, doesn't really matter which
             if node == 0:
-                self.promotes(comp_name, inputs=['ac|weights|W_wing'])
+                self.promotes(comp_name, outputs=['ac|weights|W_wing'])
         
         # Combine lift and drag coefficients from different aerostructural analyses into one vector
         comb = self.add_subsystem('vec_combine', VectorConcatenateComp(), promotes_outputs=['failure'])
-        comb.add_relation(output_name='CL_OAS', input_names=[f"CL_{node}" for node in range(nn)], vec_sizes=[1,] * nn)
-        comb.add_relation(output_name='CD_OAS', input_names=[f"CD_{node}" for node in range(nn)], vec_sizes=[1,] * nn)
-        comb.add_relation(output_name='failure', input_names=[f"failure_{node}" for node in range(nn)], vec_sizes=[1,] * nn)
+        comb.add_relation(output_name='CL_OAS', input_names=[f"CL_{node}" for node in range(nn)], vec_sizes=[1] * nn)
+        comb.add_relation(output_name='CD_OAS', input_names=[f"CD_{node}" for node in range(nn)], vec_sizes=[1] * nn)
+        comb.add_relation(output_name='failure', input_names=[f"failure_{node}" for node in range(nn)], vec_sizes=[1] * nn)
         for node in range(nn):
             self.connect(f"aerostruct_{node}.fltcond|CL", f"vec_combine.CL_{node}")
             self.connect(f"aerostruct_{node}.fltcond|CD", f"vec_combine.CD_{node}")
             self.connect(f"aerostruct_{node}.failure", f"vec_combine.failure_{node}")
 
         # Solve for angle of attack that meets input lift coefficient
-        self.add_subsystem('alpha_bal', om.BalanceComp('alpha', eq_units=None, lhs_name="CL_OAS",
+        self.add_subsystem('alpha_bal', om.BalanceComp('fltcond|alpha', eq_units=None, lhs_name="CL_OAS",
                                                        rhs_name="fltcond|CL", val=np.ones(nn),
                                                        units="deg"),
+                           promotes_inputs=['fltcond|CL'],
                            promotes_outputs=['fltcond|alpha'])
         self.connect('vec_combine.CL_OAS', 'alpha_bal.CL_OAS')
 

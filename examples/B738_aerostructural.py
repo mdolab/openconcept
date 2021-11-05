@@ -10,7 +10,7 @@ import openconcept.api as oc
 # imports for the airplane model itself
 from openconcept.analysis.openaerostruct.aerostructural import OASAerostructDragPolar, OASAerostructDragPolarExact
 from examples.aircraft_data.B738 import data as acdata
-from openconcept.analysis.performance.mission_profiles import MissionWithReserve
+from openconcept.analysis.performance.mission_profiles import BasicMission
 from openconcept.components.cfm56 import CFM56
 from openconcept.analysis.openaerostruct.aerostructural import Aerostruct
 from openconcept.analysis.aerodynamics import Lift
@@ -118,7 +118,8 @@ class B738AnalysisGroup(om.Group):
         self.options.declare('num_toverc', default=3, desc='Number of t/c control points')
         self.options.declare('num_skin', default=3, desc='Number of skin control points')
         self.options.declare('num_spar', default=3, desc='Number of spar control points')
-        self.options.declare('use_surrogate', default=True, desc='Use surrogate for aerostructural drag polar')
+        self.options.declare('use_surrogate', default=True, desc='Use surrogate for aerostructural drag ' +
+                                                                  'polar instead of OpenAeroStruct directly')
 
     def setup(self):
         # Define number of analysis points to run pers mission segment
@@ -167,7 +168,7 @@ class B738AnalysisGroup(om.Group):
         twist = np.linspace(-2, 2, NUM_TWIST)
         toverc = acdata['ac']['geom']['wing']['toverc']['value'] * np.ones(NUM_TOVERC)
         t_skin = np.linspace(0.005, 0.015, NUM_SKIN)
-        t_spar = np.linspace(0.005, 0.015, NUM_SPAR)
+        t_spar = np.linspace(0.005, 0.01, NUM_SPAR)
         self.set_input_defaults('ac|geom|wing|twist', twist, units='deg')
         self.set_input_defaults('ac|geom|wing|toverc', toverc)
         self.set_input_defaults('ac|geom|wing|skin_thickness', t_skin, units='m')
@@ -190,7 +191,7 @@ class B738AnalysisGroup(om.Group):
         # ======================== Mission analysis ========================
         # Run a full mission analysis including takeoff, reserve_, cruise,reserve_ and descereserve_nt
         analysis = self.add_subsystem('analysis',
-                                      MissionWithReserve(num_nodes=nn,
+                                      BasicMission(num_nodes=nn,
                                                           aircraft_model=B738AirplaneModel),
                                       promotes_inputs=['*'], promotes_outputs=['*'])
         
@@ -242,7 +243,7 @@ def configure_problem(num_nodes):
     prob.model.nonlinear_solver.options['atol'] = 1e-6
     prob.model.nonlinear_solver.options['rtol'] = 1e-6
     prob.model.nonlinear_solver.options['err_on_non_converge'] = True
-    prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
+    prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=True)
 
     prob.driver = om.pyOptSparseDriver()
     prob.driver.options['optimizer'] = 'SNOPT'
@@ -250,7 +251,7 @@ def configure_problem(num_nodes):
     prob.driver.options['debug_print'] = ['objs', 'desvars', 'nl_cons']
 
     # =========================== Mission design variables/constraints ===========================
-    prob.model.add_objective('descent.fuel_used_final')  # minimize block fuel burn
+    prob.model.add_objective('descent.fuel_used_final', scaler=1e-4)  # minimize block fuel burn
     # prob.model.add_design_var('cruise|h0', upper=45e3, units='ft')
     prob.model.add_constraint('climb.throttle', lower=0.01, upper=1.05)
     prob.model.add_constraint('cruise.throttle', lower=0.01, upper=1.05)
@@ -259,14 +260,14 @@ def configure_problem(num_nodes):
     # =========================== Aerostructural wing design variables/constraints ===========================
     # Find twist distribution that minimizes fuel burn; lock the twist tip in place
     # to prevent rigid rotation of the whole wing
-    # prob.model.add_design_var('ac|geom|wing|twist', lower=np.array([0, -10, -10]),
-    #                           upper=np.array([0, 10, 10]), units='deg')
-    prob.model.add_design_var('ac|geom|wing|AR', lower=5., upper=17.)
-    # prob.model.add_design_var('ac|geom|wing|c4sweep', lower=0., upper=45.)
-    # prob.model.add_design_var('ac|geom|wing|toverc', lower=.1, upper=0.25)
+    prob.model.add_design_var('ac|geom|wing|twist', lower=np.array([0, -10, -10]),
+                              upper=np.array([0, 10, 10]), units='deg')
+    prob.model.add_design_var('ac|geom|wing|AR', lower=5., upper=10.4)  # limit to fit in group III gate
+    prob.model.add_design_var('ac|geom|wing|c4sweep', lower=0., upper=35.)
+    prob.model.add_design_var('ac|geom|wing|toverc', lower=np.linspace(.03, 0.1, NUM_TOVERC), upper=0.25)
     prob.model.add_design_var("ac|geom|wing|spar_thickness", lower=0.003, upper=0.1, scaler=1e2, units='m')
     prob.model.add_design_var("ac|geom|wing|skin_thickness", lower=0.003, upper=0.1, scaler=1e2, units='m')
-    # prob.model.add_design_var('ac|geom|wing|taper', lower=.01, scaler=1e1)
+    prob.model.add_design_var('ac|geom|wing|taper', lower=.01, upper=0.35, scaler=1e1)
     prob.model.add_constraint('2_5g_KS_failure', upper=0.)
     
     return prob
@@ -275,7 +276,6 @@ def set_values(prob, num_nodes, range=2050):
     # set some (required) mission parameters. Each phase needs a vertical and air-speed
     # the entire mission needs a cruise altitude and range
     prob.set_val('cruise|h0',35000.,units='ft')
-    prob.set_val('reserve|h0',15000.,units='ft')
     prob.set_val('mission_range',range,units='NM')
     prob.set_val('climb.fltcond|vs', np.linspace(2000.,  400.,num_nodes), units='ft/min')
     prob.set_val('climb.fltcond|Ueas', np.linspace(220, 200,num_nodes), units='kn')
@@ -283,18 +283,10 @@ def set_values(prob, num_nodes, range=2050):
     prob.set_val('cruise.fltcond|Ueas', np.linspace(250.279, 250.279, num_nodes), units='kn')  # M 0.78 @ 35k ft
     prob.set_val('descent.fltcond|vs', np.linspace(-2000, -1000, num_nodes), units='ft/min')
     prob.set_val('descent.fltcond|Ueas', np.linspace(240, 250, num_nodes), units='kn')
-    prob.set_val('reserve_climb.fltcond|vs', np.linspace(3000.,  2300.,num_nodes), units='ft/min')
-    prob.set_val('reserve_climb.fltcond|Ueas', np.linspace(230, 230,num_nodes), units='kn')
-    prob.set_val('reserve_cruise.fltcond|vs', np.ones((num_nodes,)) * 4., units='ft/min')
-    prob.set_val('reserve_cruise.fltcond|Ueas', np.linspace(250, 250, num_nodes), units='kn')
-    prob.set_val('reserve_descent.fltcond|vs', np.linspace(-800, -800, num_nodes), units='ft/min')
-    prob.set_val('reserve_descent.fltcond|Ueas', np.ones((num_nodes,)) * 250, units='kn')
-    prob.set_val('loiter.fltcond|vs', np.linspace(0.0, 0.0, num_nodes), units='ft/min')
-    prob.set_val('loiter.fltcond|Ueas', np.ones((num_nodes,)) * 200, units='kn')
 
 def show_outputs(prob, plots=True):
     # print some outputs
-    vars_list = ['descent.fuel_used_final','loiter.fuel_used_final']
+    vars_list = ['descent.fuel_used_final']
     units = ['lb','lb']
     nice_print_names = ['Block fuel', 'Total fuel']
     print("=======================================================================")
@@ -313,7 +305,6 @@ def show_outputs(prob, plots=True):
         oc.plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels, marker='-',
                         plot_title='737-800 Mission Profile')
-    # prob.model.list_outputs()
 
 def run_738_analysis(plots=False):
     num_nodes = 11
@@ -358,5 +349,5 @@ def run_738_optimization(plots=False):
 
 
 if __name__ == "__main__":
-    # run_738_analysis(plots=False)
-    run_738_optimization(plots=True)
+    run_738_analysis(plots=False)
+    # run_738_optimization(plots=True)
