@@ -114,7 +114,7 @@ class OASDragPolar(om.Group):
         n_alt = self.options['alt_train'].size
 
         # Training data
-        self.add_subsystem('training_data', OASDataGen(num_x=self.options['num_x'], num_y=self.options['num_y'],
+        self.add_subsystem('training_data', VLMDataGen(num_x=self.options['num_x'], num_y=self.options['num_y'],
                                                        num_twist=self.options['num_twist'], alpha_train=self.options['alpha_train'],
                                                        Mach_train=self.options['Mach_train'], alt_train=self.options['alt_train'],
                                                        surf_options=self.options['surf_options']),
@@ -151,12 +151,13 @@ class OASDragPolar(om.Group):
         self.connect('aero_surrogate.CD', 'drag_calc.CD')
 
 
-class OASDataGen(om.ExplicitComponent):
+class VLMDataGen(om.ExplicitComponent):
     """
     Generates a grid of OpenAeroStruct lift and drag data to train
     a surrogate model. The grid is defined by the options and the
     planform geometry by the inputs. This component will only recalculate
-    the lift and drag grid when the planform shape changes.
+    the lift and drag grid when the planform shape changes. All VLMDataGen
+    components in the model must use the same training points and surf_options.
 
     Inputs
     ------
@@ -239,37 +240,37 @@ class OASDataGen(om.ExplicitComponent):
         self.declare_partials('*', '*')
 
         # Check that the surf_options dictionary does not differ
-        # from other instances of the OASDataGen object
-        if hasattr(OASDataGen, 'surf_options'):
+        # from other instances of the VLMDataGen object
+        if hasattr(VLMDataGen, 'surf_options'):
             error = False
-            if OASDataGen.surf_options.keys() != self.options['surf_options'].keys():
+            if VLMDataGen.surf_options.keys() != self.options['surf_options'].keys():
                 error = True
-            for key in OASDataGen.surf_options.keys():
-                if isinstance(OASDataGen.surf_options[key], np.ndarray):
-                    error = error or np.any(OASDataGen.surf_options[key] != self.options['surf_options'][key])
+            for key in VLMDataGen.surf_options.keys():
+                if isinstance(VLMDataGen.surf_options[key], np.ndarray):
+                    error = error or np.any(VLMDataGen.surf_options[key] != self.options['surf_options'][key])
                 else:
-                    error = error or OASDataGen.surf_options[key] != self.options['surf_options'][key]          
+                    error = error or VLMDataGen.surf_options[key] != self.options['surf_options'][key]          
             if error:
-                raise ValueError('The OASDataGen and OASDragPolar components do not support\n'
+                raise ValueError('The VLMDataGen and OASDragPolar components do not support\n'
                                  'differently-valued surf_options within an OpenMDAO model')
         else:
-            OASDataGen.surf_options = deepcopy(self.options['surf_options'])
+            VLMDataGen.surf_options = deepcopy(self.options['surf_options'])
 
 
         # Generate grids and default cached values for training inputs and outputs
-        OASDataGen.S = -np.ones(1)
-        OASDataGen.AR = -np.ones(1)
-        OASDataGen.taper = -np.ones(1)
-        OASDataGen.c4sweep = -np.ones(1)
-        OASDataGen.twist = -1*np.ones((self.options["num_twist"],))
-        OASDataGen.temp_incr = -42*np.ones(1)
-        OASDataGen.Mach, OASDataGen.alpha, OASDataGen.alt = np.meshgrid(self.options['Mach_train'],
+        VLMDataGen.S = -np.ones(1)
+        VLMDataGen.AR = -np.ones(1)
+        VLMDataGen.taper = -np.ones(1)
+        VLMDataGen.c4sweep = -np.ones(1)
+        VLMDataGen.twist = -1*np.ones((self.options["num_twist"],))
+        VLMDataGen.temp_incr = -42*np.ones(1)
+        VLMDataGen.Mach, VLMDataGen.alpha, VLMDataGen.alt = np.meshgrid(self.options['Mach_train'],
                                                                         self.options['alpha_train'],
                                                                         self.options['alt_train'],
                                                                         indexing='ij')
-        OASDataGen.CL = np.zeros((n_Mach, n_alpha, n_alt))
-        OASDataGen.CD = np.zeros((n_Mach, n_alpha, n_alt))
-        OASDataGen.partials = None
+        VLMDataGen.CL = np.zeros((n_Mach, n_alpha, n_alt))
+        VLMDataGen.CD = np.zeros((n_Mach, n_alpha, n_alt))
+        VLMDataGen.partials = None
     
     def compute(self, inputs, outputs):
         S = inputs["ac|geom|wing|S_ref"]
@@ -282,30 +283,30 @@ class OASDataGen(om.ExplicitComponent):
 
         # If the inputs are unchaged, use the previously calculated values
         tol = 1e-13  # floating point comparison tolerance
-        if (np.abs(S - OASDataGen.S) < tol and
-           np.abs(AR - OASDataGen.AR) < tol and
-           np.abs(taper - OASDataGen.taper) < tol and
-           np.abs(sweep - OASDataGen.c4sweep) < tol and
-           np.all(np.abs(twist - OASDataGen.twist) < tol) and
-           np.abs(temp_incr - OASDataGen.temp_incr) < tol):
-            outputs['CL_train'] = OASDataGen.CL
-            outputs['CD_train'] = OASDataGen.CD + CD_nonwing
+        if (np.abs(S - VLMDataGen.S) < tol and
+           np.abs(AR - VLMDataGen.AR) < tol and
+           np.abs(taper - VLMDataGen.taper) < tol and
+           np.abs(sweep - VLMDataGen.c4sweep) < tol and
+           np.all(np.abs(twist - VLMDataGen.twist) < tol) and
+           np.abs(temp_incr - VLMDataGen.temp_incr) < tol):
+            outputs['CL_train'] = VLMDataGen.CL
+            outputs['CD_train'] = VLMDataGen.CD + CD_nonwing
             return
 
         print(f"S = {S}; AR = {AR}; taper = {taper}; sweep = {sweep}; twist = {twist}; temp_incr = {temp_incr}")
         # Copy new values to cached ones
-        OASDataGen.S[:] = S
-        OASDataGen.AR[:] = AR
-        OASDataGen.taper[:] = taper
-        OASDataGen.c4sweep[:] = sweep
-        OASDataGen.twist[:] = twist
-        OASDataGen.temp_incr[:] = temp_incr
+        VLMDataGen.S[:] = S
+        VLMDataGen.AR[:] = AR
+        VLMDataGen.taper[:] = taper
+        VLMDataGen.c4sweep[:] = sweep
+        VLMDataGen.twist[:] = twist
+        VLMDataGen.temp_incr[:] = temp_incr
         
         # Compute new training values
         train_in = {}
-        train_in['Mach_number_grid'] = OASDataGen.Mach
-        train_in['alpha_grid'] = OASDataGen.alpha
-        train_in['alt_grid'] = OASDataGen.alt
+        train_in['Mach_number_grid'] = VLMDataGen.Mach
+        train_in['alpha_grid'] = VLMDataGen.alpha
+        train_in['alt_grid'] = VLMDataGen.alt
         train_in['TempIncrement'] = temp_incr
         train_in['S_ref'] = S
         train_in['AR'] = AR
@@ -316,18 +317,18 @@ class OASDataGen(om.ExplicitComponent):
         train_in['num_y'] = self.options['num_y']
 
         data = compute_training_data(train_in, surf_dict=self.options['surf_options'])
-        OASDataGen.CL[:] = data['CL']
-        OASDataGen.CD[:] = data['CD']
-        OASDataGen.partials = copy(data['partials'])
-        outputs['CL_train'] = OASDataGen.CL
-        outputs['CD_train'] = OASDataGen.CD + CD_nonwing
+        VLMDataGen.CL[:] = data['CL']
+        VLMDataGen.CD[:] = data['CD']
+        VLMDataGen.partials = copy(data['partials'])
+        outputs['CL_train'] = VLMDataGen.CL
+        outputs['CD_train'] = VLMDataGen.CD + CD_nonwing
     
     def compute_partials(self, inputs, partials):
         # Compute partials if they haven't been already and return them
         self.compute(inputs, {})
-        for key, value in OASDataGen.partials.items():
+        for key, value in VLMDataGen.partials.items():
             partials[key][:] = value
-        partials['CD_train', 'ac|aero|CD_nonwing'] = np.ones(OASDataGen.CD.shape)
+        partials['CD_train', 'ac|aero|CD_nonwing'] = np.ones(VLMDataGen.CD.shape)
 
 
 """
@@ -356,7 +357,7 @@ inputs : dict
         Wing sweep measured at quarter chord (scalar, degrees)
     twist : float
         List of twist angles at control points of spline (vector, degrees)
-        NOTE: length of vector is num_twist (set in options of OASDataGen)
+        NOTE: length of vector is num_twist (set in options of VLMDataGen)
     num_x: int
         number of points in x (streamwise) direction (scalar, dimensionless)
     num_y: int
@@ -380,7 +381,7 @@ data : dict
         Drag coefficients at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
     partials : dict
         Partial derivatives of the training data flattened in the proper OpenMDAO-style
-        format for use as partial derivatives in the OASDataGen component
+        format for use as partial derivatives in the VLMDataGen component
 """
 def compute_training_data(inputs, surf_dict=None):
     t_start = time()

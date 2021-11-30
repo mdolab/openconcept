@@ -121,11 +121,11 @@ class OASDragPolarTestCase(unittest.TestCase):
 
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
-class OASDataGenTestCase(unittest.TestCase):
+class VLMDataGenTestCase(unittest.TestCase):
     def test_defaults(self):
         # Regression test
         twist = np.array([-1, -0.5, 2])
-        p = om.Problem(OASDataGen(num_x=3, num_y=5, num_twist=twist.size, Mach_train=np.linspace(0.1, 0.85, 2),
+        p = om.Problem(VLMDataGen(num_x=3, num_y=5, num_twist=twist.size, Mach_train=np.linspace(0.1, 0.85, 2),
                                   alpha_train=np.linspace(-10, 15, 2), alt_train=np.linspace(0, 15e3, 2)))
         p.setup()
         p.set_val('fltcond|TempIncrement', 0, units='degC')
@@ -149,31 +149,31 @@ class OASDataGenTestCase(unittest.TestCase):
         assert_near_equal(CL, p.get_val('CL_train'), tolerance=1e-7)
         assert_near_equal(CD, p.get_val('CD_train'), tolerance=1e-7)
 
-        partials = p.check_partials(form='central')
+        partials = p.check_partials(out_stream=None, form='central')
         assert_check_partials(partials, atol=6e-5, rtol=2e-5)
     
     def test_different_surf_options(self):
         # Test that when there are different surf_options within a single model it catches it
         p = om.Problem()
-        p.model.add_subsystem('one', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
-        p.model.add_subsystem('two', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
-        p.model.add_subsystem('three', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        p.model.add_subsystem('one', VLMDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        p.model.add_subsystem('two', VLMDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        p.model.add_subsystem('three', VLMDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
         p.setup()
 
         p = om.Problem()
-        p.model.add_subsystem('one', OASDataGen(surf_options={'a': 1.13521}))
-        p.model.add_subsystem('two', OASDataGen(surf_options={'a': 1.1352}))
+        p.model.add_subsystem('one', VLMDataGen(surf_options={'a': 1.13521}))
+        p.model.add_subsystem('two', VLMDataGen(surf_options={'a': 1.1352}))
         self.assertRaises(ValueError, p.setup)
 
         p = om.Problem()
-        p.model.add_subsystem('one', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
-        p.model.add_subsystem('two', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1.0001, 10)}))
-        p.model.add_subsystem('three', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        p.model.add_subsystem('one', VLMDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        p.model.add_subsystem('two', VLMDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1.0001, 10)}))
+        p.model.add_subsystem('three', VLMDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
         self.assertRaises(ValueError, p.setup)
 
         p = om.Problem()
-        p.model.add_subsystem('one', OASDataGen())
-        p.model.add_subsystem('two', OASDataGen(surf_options={'boof': True}))
+        p.model.add_subsystem('one', VLMDataGen())
+        p.model.add_subsystem('two', VLMDataGen(surf_options={'boof': True}))
         self.assertRaises(ValueError, p.setup)
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
@@ -209,7 +209,7 @@ class VLMTestCase(unittest.TestCase):
         assert_near_equal(exact['CL'], p.get_val('fltcond|CL'))
         assert_near_equal(exact['CD'], p.get_val('fltcond|CD'))
 
-        partials = p.check_partials(form='central')
+        partials = p.check_partials(out_stream=None, form='central')
         assert_check_partials(partials, atol=6e-5, rtol=2e-5)
     
     def test_wave_drag(self):
@@ -344,7 +344,7 @@ class PlanformMeshTestCase(unittest.TestCase):
         
         assert_near_equal(p.get_val('mesh', units='m'), mesh)
 
-        partials = p.check_partials(form='central')
+        partials = p.check_partials(out_stream=None, form='central')
         assert_check_partials(partials)
     
     def test_taper(self):
@@ -556,7 +556,7 @@ def run_OAS(inputs, with_viscous=True, with_wave=True, t_over_c=np.array([.12]))
     prob.model.connect(name + '.mesh', point_name + '.aero_states.' + name + '_def_mesh')
     prob.model.connect(name + '.t_over_c', point_name + '.' + name + '_perf.' + 't_over_c')
 
-    # Set up and run the optimization problem
+    # Set up and run the model
     prob.setup()
     prob.run_model()
     outputs = {}

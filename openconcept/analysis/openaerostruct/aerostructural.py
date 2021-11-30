@@ -41,6 +41,10 @@ class OASAerostructDragPolar(om.Group):
     aerostructural analysis capabilities and a surrogate
     model to decrease the computational cost.
 
+    NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered
+          starting at the tip and moving to the root; a twist of [-1, 0, 1] would
+          have a tip twist of -1 deg and root twist of 1 deg
+
     NOTE: set the OMP_NUM_THREADS environment variable to 1 for much better parallel training performance!
 
     Inputs
@@ -196,6 +200,10 @@ class OASDataGen(om.ExplicitComponent):
     a surrogate model. The grid is defined by the options and the
     planform geometry by the inputs. This component will only recalculate
     the lift and drag grid when the planform shape changes.
+
+    NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered
+          starting at the tip and moving to the root; a twist of [-1, 0, 1] would
+          have a tip twist of -1 deg and root twist of 1 deg
 
     Inputs
     ------
@@ -629,6 +637,10 @@ class Aerostruct(om.Group):
     Perform a coupled aerostructural analysis using OpenAeroStruct.
     This component currently does not support distributed fuel loads
     or point loads added to the structure.
+
+    NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered
+          starting at the tip and moving to the root; a twist of [-1, 0, 1] would
+          have a tip twist of -1 deg and root twist of 1 deg
 
     Inputs
     ------
@@ -1120,7 +1132,6 @@ if __name__=="__main__":
     # p.check_partials(compact_print=True, method='fd')
 
     print(f"================== SURROGATE ==================")
-    print(f"Drag: {p.get_val('drag', units='N')} N")
     print(f"CL: {p.get_val('aero_surrogate.CL')}")
     print(f"CD: {p.get_val('aero_surrogate.CD')}")
     print(f"Alpha: {p.get_val('aero_surrogate.alpha', units='deg')} deg")
