@@ -141,10 +141,10 @@ class IntegratorGroupTestBase(oc.IntegratorGroup):
         nn = self.options['num_nodes']
         iv = self.add_subsystem('iv', om.IndepVarComp('x', val=np.linspace(0, 5, nn), units='s'))
         ec = self.add_subsystem('ec', om.ExecComp(['df = -10.2*x**2 + 4.2*x -10.5'], 
-                  df={'value': 1.0*np.ones((nn,)),
+                  df={'val': 1.0*np.ones((nn,)),
                      'units': 'kg/s',
                      'tags': ['integrate', 'state_name:f', 'state_units:kg']},
-                  x={'value': 1.0*np.ones((nn,)),
+                  x={'val': 1.0*np.ones((nn,)),
                        'units': 's'}))
         self.connect('iv.x', 'ec.x')
         self.set_order(['iv', 'ec', 'ode_integ'])
@@ -183,10 +183,10 @@ class IntegratorTestMultipleOutputs(IntegratorGroupTestBase):
         super(IntegratorTestMultipleOutputs, self).setup()
         nn = self.options['num_nodes']
         ec2 = self.add_subsystem('ec2', om.ExecComp(['df2 = 5.1*x**2 +0.5*x-7.2'], 
-            df2={'value': 1.0*np.ones((nn,)),
+            df2={'val': 1.0*np.ones((nn,)),
                 'units': 'W',
                 'tags': ['integrate', 'state_name:f2', 'state_units:J']},
-            x={'value': 1.0*np.ones((nn,)),
+            x={'val': 1.0*np.ones((nn,)),
                 'units': 's'}))
         self.connect('iv.x', 'ec2.x')
         self.set_order(['iv', 'ec', 'ec2', 'ode_integ'])
@@ -229,10 +229,10 @@ class IntegratorTestPromotes(IntegratorGroupTestBase):
         super(IntegratorTestPromotes, self).setup()
         nn = self.options['num_nodes']
         ec2 = self.add_subsystem('ec2', om.ExecComp(['df2 = 5.1*x**2 +0.5*x-7.2'], 
-            df2={'value': 1.0*np.ones((nn,)),
+            df2={'val': 1.0*np.ones((nn,)),
                 'units': 'W',
                 'tags': ['integrate', 'state_name:f2', 'state_units:J', 'state_promotes:True']},
-            x={'value': 1.0*np.ones((nn,)),
+            x={'val': 1.0*np.ones((nn,)),
                 'units': 's'}))
         self.connect('iv.x', 'ec2.x')
         self.set_order(['iv', 'ec', 'ec2', 'ode_integ'])
@@ -275,11 +275,11 @@ class IntegratorTestValLimits(IntegratorGroupTestBase):
         super(IntegratorTestValLimits, self).setup()
         nn = self.options['num_nodes']
         ec2 = self.add_subsystem('ec2', om.ExecComp(['df2 = 5.1*x**2 +0.5*x-7.2'], 
-            df2={'value': 1.0*np.ones((nn,)),
+            df2={'val': 1.0*np.ones((nn,)),
                 'units': 'W',
                 'tags': ['integrate', 'state_name:f2', 'state_units:J', 
                          'state_upper:1e20', 'state_lower:-1e20', 'state_val:np.linspace(0,5,'+str(nn)+')']},
-            x={'value': 1.0*np.ones((nn,)),
+            x={'val': 1.0*np.ones((nn,)),
                 'units': 's'}))
         self.connect('iv.x', 'ec2.x')
         self.set_order(['iv', 'ec', 'ec2', 'ode_integ'])
@@ -320,10 +320,10 @@ class IntegratorTestDuplicateRateNames(IntegratorGroupTestBase):
         super(IntegratorTestDuplicateRateNames, self).setup()
         nn = self.options['num_nodes']
         ec2 = self.add_subsystem('ec2', om.ExecComp(['df = 5.1*x**3 +0.5*x-7.2'], 
-            df={'value': 1.0*np.ones((nn,)),
+            df={'val': 1.0*np.ones((nn,)),
                 'units': 'W',
                 'tags': ['integrate', 'state_name:f2', 'state_units:J']},
-            x={'value': 1.0*np.ones((nn,)),
+            x={'val': 1.0*np.ones((nn,)),
                 'units': 's'}))
         self.connect('iv.x', 'ec2.x')
         self.set_order(['iv', 'ec', 'ec2', 'ode_integ'])
@@ -351,10 +351,10 @@ class IntegratorTestDuplicateStateNames(IntegratorGroupTestBase):
         super(IntegratorTestDuplicateStateNames, self).setup()
         nn = self.options['num_nodes']
         ec2 = self.add_subsystem('ec2', om.ExecComp(['df2 = 5.1*x**3 +0.5*x-7.2'], 
-            df2={'value': 1.0*np.ones((nn,)),
+            df2={'val': 1.0*np.ones((nn,)),
                 'units': 'W',
                 'tags': ['integrate', 'state_name:f', 'state_units:J']},
-            x={'value': 1.0*np.ones((nn,)),
+            x={'val': 1.0*np.ones((nn,)),
                 'units': 's'}))
         self.connect('iv.x', 'ec2.x')
         self.set_order(['iv', 'ec', 'ec2', 'ode_integ'])
@@ -447,10 +447,10 @@ class IntegratorGroupTestPromotedRate(oc.IntegratorGroup):
         nn = self.options['num_nodes']
         iv = self.add_subsystem('iv', om.IndepVarComp('x', val=np.linspace(0, 5, nn), units='s'))
         ec = self.add_subsystem('ec', om.ExecComp(['df = -10.2*x**2 + 4.2*x -10.5'], 
-                  df={'value': 1.0*np.ones((nn,)),
+                  df={'val': 1.0*np.ones((nn,)),
                      'units': 'kg/s',
                      'tags': ['integrate', 'state_name:f', 'state_units:kg']},
-                  x={'value': 1.0*np.ones((nn,)),
+                  x={'val': 1.0*np.ones((nn,)),
                        'units': 's'}), promotes_outputs=['df'])
         self.connect('iv.x', 'ec.x')
         self.set_order(['iv', 'ec', 'ode_integ'])

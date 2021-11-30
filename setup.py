@@ -40,6 +40,8 @@ setup(
         'openconcept',
         'openconcept.analysis',
         'openconcept.analysis.atmospherics',
+        'openconcept.analysis.performance',
+        'openconcept.analysis.tests',
         'openconcept.components',
         'openconcept.components.empirical_data',
         'openconcept.utilities',
@@ -49,9 +51,9 @@ setup(
         'six',
         'scipy>=1.0.0',
         'numpy>=1.14.0',
-        'openmdao>=3.5.0',
+        'openmdao>=3.10.0',
     ],
     extras_require = {
-        'testing':  ["pytest", "openmdao[docs]"]
+        'testing':  ["pytest", "openmdao[docs]", "redbaron"]
       },
 )

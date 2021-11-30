@@ -21,3 +21,4 @@ openconcept/.coverage
 .coverage
 scratch/
 *.out
+*.zip

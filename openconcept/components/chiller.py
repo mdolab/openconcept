@@ -302,16 +302,9 @@ class COPExplicit(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         epsilon = 0.05
         delta_T = inputs['T_h'] - inputs['T_c']
+        COP_raw = inputs['T_c'] / (delta_T)
         alpha = -1.5
-        
-        # Compute COP_raw for only the points where delta_T is nonzero (otherwise blows up)
-        dT_zero = np.real(delta_T) == 0.
-        dT_nonzero = np.real(delta_T) != 0.
-        COP_raw = inputs['T_c'][dT_nonzero] / (delta_T[dT_nonzero])
-        a = np.zeros(delta_T.shape)
-        a[dT_zero] = (1+np.tanh(-(delta_T[dT_zero]+3)))/2*10
-        a[dT_nonzero] = COP_raw*np.tanh(delta_T[dT_nonzero])*inputs['eff_factor'] + \
-                        (1+np.tanh(-(delta_T[dT_nonzero]+3)))/2*10
+        a = COP_raw*np.tanh(delta_T)*inputs['eff_factor'] + (1+np.tanh(-(delta_T+3)))/2*10
         b = 10.
         COP_soft = (a*np.exp(alpha*a)+b*np.exp(alpha*b))/(np.exp(alpha*a)+np.exp(alpha*b))
         outputs['COP'] = COP_soft

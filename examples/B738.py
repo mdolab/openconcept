@@ -36,14 +36,14 @@ class B738AirplaneModel(oc.IntegratorGroup):
                            promotes_inputs=propulsion_promotes_inputs)
 
         doubler = om.ExecComp(['thrust=2*thrust_in', 'fuel_flow=2*fuel_flow_in'], 
-                  thrust_in={'value': 1.0*np.ones((nn,)),
+                  thrust_in={'val': 1.0*np.ones((nn,)),
                      'units': 'kN'},
-                  thrust={'value': 1.0*np.ones((nn,)),
+                  thrust={'val': 1.0*np.ones((nn,)),
                        'units': 'kN'},
-                  fuel_flow={'value': 1.0*np.ones((nn,)),
+                  fuel_flow={'val': 1.0*np.ones((nn,)),
                      'units': 'kg/s',
                      'tags': ['integrate', 'state_name:fuel_used', 'state_units:kg', 'state_val:1.0', 'state_promotes:True']},
-                  fuel_flow_in={'value': 1.0*np.ones((nn,)),
+                  fuel_flow_in={'val': 1.0*np.ones((nn,)),
                        'units': 'kg/s'})
         
         self.add_subsystem('doubler', doubler, promotes_outputs=['*'])
@@ -62,9 +62,9 @@ class B738AirplaneModel(oc.IntegratorGroup):
 
         # generally the weights module will be custom to each airplane
         passthru = om.ExecComp('OEW=x',
-                  x={'value': 1.0,
+                  x={'val': 1.0,
                      'units': 'kg'},
-                  OEW={'value': 1.0,
+                  OEW={'val': 1.0,
                        'units': 'kg'})
         self.add_subsystem('OEW', passthru,
                            promotes_inputs=[('x', 'ac|weights|OEW')],

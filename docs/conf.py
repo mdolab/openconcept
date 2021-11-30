@@ -16,12 +16,16 @@ import os
 import sys
 import subprocess
 import openmdao
+import openconcept
 
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('./_exts'))
 # sphinx build needs to be able to find the openmdao embed_code plugin
 # so we add it to the path
-sys.path.insert(0, os.path.abspath(openmdao.__path__[0]+r'/docs/_exts'))
+this_directory = os.path.abspath(os.path.dirname(__file__))
+
+# sys.path.insert(0, os.path.abspath(openconcept.__path__[0]+r'/docs/_exts'))
 
 
 def generate_src_docs(dir, top, packages):

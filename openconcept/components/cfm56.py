@@ -2,7 +2,6 @@ from __future__ import division
 import numpy as np
 import openmdao.api as om
 import openconcept
-from openconcept.utilities.surrogates.cached_kriging_surrogate import KrigingSurrogate
 
 def CFM56(num_nodes=1, plot=False):
     """
@@ -58,14 +57,14 @@ def CFM56(num_nodes=1, plot=False):
 
     comp.add_output('thrust', np.ones((num_nodes,))*10000.,
                     training_data=a[:,3], units='lbf',
-                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+'cfm56thrust.pkl'))
+                    surrogate=om.KrigingSurrogate(training_cache=file_root+'cfm56thrust_trained.zip'))
     comp.add_output('fuel_flow', np.ones((num_nodes,))*3.0,
                     training_data=a[:,4], units='lbm/s',
-                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+'cfm56fuelburn.pkl'))
+                    surrogate=om.KrigingSurrogate(training_cache=file_root+'cfm56fuelburn_trained.zip'))
     comp.add_output('T4', np.ones((num_nodes,))*3000.,
-                    training_data=a[:,5], units='R',
-                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+'cfm56T4.pkl'))
-    comp.options['default_surrogate'] = KrigingSurrogate(lapack_driver='gesvd', cache_trained_model=True)
+                    training_data=a[:,5], units='degR',
+                    surrogate=om.KrigingSurrogate(training_cache=file_root+'cfm56T4_trained.zip'))
+    comp.options['default_surrogate'] = om.KrigingSurrogate(lapack_driver='gesvd')
 
     if plot:
         import matplotlib.pyplot as plt
