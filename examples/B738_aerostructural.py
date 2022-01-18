@@ -300,7 +300,7 @@ def show_outputs(prob, plots=True):
         y_units = ['ft','kn','lbm',None,'ft/min', None, None]
         x_label = 'Range (nmi)'
         y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)', 'Mach number', 'CL']
-        phases = ['climb', 'cruise', 'descent','reserve_climb','reserve_cruise','reserve_descent','loiter']
+        phases = ['climb', 'cruise', 'descent']
         oc.plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels, marker='-',
                         plot_title='737-800 Mission Profile')
