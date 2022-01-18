@@ -41,6 +41,9 @@ class OASAerostructDragPolar(om.Group):
     aerostructural analysis capabilities and a surrogate
     model to decrease the computational cost.
 
+    This component cannot currently handle fuel loads on the wing,
+    nor can it handle point loads applied to the structure.
+
     NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered
           starting at the tip and moving to the root; a twist of [-1, 0, 1] would
           have a tip twist of -1 deg and root twist of 1 deg
@@ -83,7 +86,11 @@ class OASAerostructDragPolar(om.Group):
         drag coefficient computed by OpenAeroStruct (scalar, dimensionless)
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
-        TODO fltcond|TempIncrement is a scalar in this component but a vector in OC
+        NOTE: fltcond|TempIncrement is a scalar in this component but a vector in OC.
+              This will be the case for the forseeable future because of the way the
+              OASDataGen component is set up. To make it work, TempIncrement would
+              need to be an input to the surrogate, which is not worth the extra
+              training cost (at minimum a 2x increase).
 
     Outputs
     -------
@@ -273,6 +280,8 @@ class OASDataGen(om.ExplicitComponent):
         the <transformation>_cp options are not supported. The input ac|geom|wing|twist is the same
         as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
         is limited to adjusting the input parameters to this component.
+    regen_tol : float
+        Difference in input variable above which to regenerate the training data.
     """
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
@@ -288,6 +297,7 @@ class OASDataGen(om.ExplicitComponent):
         self.options.declare('alt_train', default=np.linspace(0, 12e3, 4),
                              desc='List of altitude training values (meters)')
         self.options.declare('surf_options', default={}, desc="Dictionary of OpenAeroStruct surface options")
+        self.options.declare('regen_tol', default=1e-14, desc="Difference in variable beyond which to regenerate data")
     
     def setup(self):
         self.add_input('ac|geom|wing|S_ref', units='m**2')
@@ -366,7 +376,7 @@ class OASDataGen(om.ExplicitComponent):
         temp_incr = inputs["fltcond|TempIncrement"]
 
         # If the inputs are unchaged, use the previously calculated values
-        tol = 1e-13  # floating point comparison tolerance
+        tol = self.options["regen_tol"]  # floating point comparison tolerance
         if (np.abs(S - OASDataGen.S) < tol and
            np.abs(AR - OASDataGen.AR) < tol and
            np.abs(taper - OASDataGen.taper) < tol and
@@ -384,6 +394,7 @@ class OASDataGen(om.ExplicitComponent):
 
         print(f"S = {S}; AR = {AR}; taper = {taper}; sweep = {sweep}; twist = {twist};")
         print(f"toverc = {toverc}; skin = {skin}; spar = {spar}; temp_incr = {temp_incr}")
+
         # Copy new values to cached ones
         OASDataGen.S[:] = S
         OASDataGen.AR[:] = AR
@@ -975,7 +986,11 @@ class OASAerostructDragPolarExact(om.Group):
         drag coefficient computed by OpenAeroStruct (scalar, dimensionless)
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
-        TODO fltcond|TempIncrement is a scalar in this component but a vector in OC
+        NOTE: fltcond|TempIncrement is a scalar in this component but a vector in OC.
+              This will be the case for the forseeable future because of the way the
+              OASDataGen component is set up. To make it work, TempIncrement would
+              need to be an input to the surrogate, which is not worth the extra
+              training cost (at minimum a 2x increase).
 
     Outputs
     -------
@@ -1128,8 +1143,6 @@ if __name__=="__main__":
     p.set_val('fltcond|h', h, units='m')
 
     p.run_model()
-
-    # p.check_partials(compact_print=True, method='fd')
 
     print(f"================== SURROGATE ==================")
     print(f"CL: {p.get_val('aero_surrogate.CL')}")

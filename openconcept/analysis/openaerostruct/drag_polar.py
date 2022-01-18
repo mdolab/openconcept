@@ -62,7 +62,11 @@ class OASDragPolar(om.Group):
         drag coefficient computed by OpenAeroStruct (scalar, dimensionless)
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
-        TODO fltcond|TempIncrement is a scalar in this component but a vector in OC
+        NOTE: fltcond|TempIncrement is a scalar in this component but a vector in OC.
+              This will be the case for the forseeable future because of the way the
+              VLMDataGen component is set up. To make it work, TempIncrement would
+              need to be an input to the surrogate, which is not worth the extra
+              training cost (at minimum a 2x increase).
 
     Outputs
     -------
