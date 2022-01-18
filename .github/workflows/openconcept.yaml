@@ -31,13 +31,9 @@ jobs:
       run: |
         pip install coverage pytest-cov sphinx_rtd_theme
         pip install .[testing]
-    - name: Download OpenAeroStruct
-      uses: actions/checkout@master
-      with:
-        repository: mdolab/OpenAeroStruct
-        token: ${{ secrets.my_pat }}
     - name: Install OpenAeroStruct
       run: |
+        pip install https://github.com/mdolab/OpenAeroStruct.git
         pwd
         ls -la
         cd ..
