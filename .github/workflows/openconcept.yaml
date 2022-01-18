@@ -33,7 +33,7 @@ jobs:
         pip install .[testing]
     - name: Install OpenAeroStruct
       run: |
-        pip install https://github.com/mdolab/OpenAeroStruct.git
+        pip install git+https://github.com/mdolab/OpenAeroStruct.git@master
         pwd
         ls -la
         cd ..
