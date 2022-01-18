@@ -11,7 +11,7 @@ import warnings
 try:
     import tqdm
     progress_bar = True
-except ModuleNotFoundError:
+except ImportError:
     print("Progress bar for training data can be enabled by installing the tqdm Python package with \"pip install tqdm\"")
     progress_bar = False
 
@@ -22,8 +22,8 @@ try:
     from openaerostruct.structures.spatial_beam_setup import SpatialBeamSetup
     from openaerostruct.structures.wingbox_group import WingboxGroup
     from openconcept.analysis.openaerostruct.drag_polar import PlanformMesh
-except ModuleNotFoundError:
-    raise ModuleNotFoundError("OpenAeroStruct must be installed to use the OASAerostructDragPolar component")
+except ImportError:
+    raise ImportError("OpenAeroStruct must be installed to use the OASAerostructDragPolar component")
 
 # Atmospheric calculations
 from openconcept.analysis.atmospherics.temperature_comp import TemperatureComp

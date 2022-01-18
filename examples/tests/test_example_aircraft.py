@@ -5,8 +5,6 @@ import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
 from examples.B738 import run_738_analysis
-from examples.B738_VLM_drag import run_738_analysis as run_738VLM_analysis
-from examples.B738_aerostructural import run_738_analysis as run_738Aerostruct_analysis
 from examples.TBM850 import run_tbm_analysis
 from examples.HybridTwin_thermal import run_hybrid_twin_thermal_analysis
 from examples.HybridTwin_active_thermal import run_hybrid_twin_active_thermal_analysis
@@ -15,6 +13,12 @@ from examples.Caravan import run_caravan_analysis
 from examples.KingAirC90GT import run_kingair_analysis
 from examples.ElectricSinglewithThermal import run_electricsingle_analysis
 from examples.N3_HybridSingleAisle_Refrig import run_hybrid_sa_analysis
+try:
+    from examples.B738_VLM_drag import run_738_analysis as run_738VLM_analysis
+    from examples.B738_aerostructural import run_738_analysis as run_738Aerostruct_analysis
+    OAS_installed = True
+except:
+    OAS_installed = False
 
 
 class TBMAnalysisTestCase(unittest.TestCase):
@@ -133,6 +137,7 @@ class B738TestCase(unittest.TestCase):
         assert_near_equal(prob.get_val('loiter.fuel_used_final', units='lbm'), 34424.68533072, tolerance=3e-4)
         # changelog: 9/2020 - previously 34555.313, updated CFM surrogate model to reject spurious high Mach, low altitude points
 
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class B738VLMTestCase(unittest.TestCase):
     def setUp(self):
         self.prob = run_738VLM_analysis()
@@ -144,6 +149,7 @@ class B738VLMTestCase(unittest.TestCase):
         # total fuel
         assert_near_equal(prob.get_val('loiter.fuel_used_final', units='lbm'), 34075.30721371, tolerance=1e-5)
 
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class B738AerostructTestCase(unittest.TestCase):
     def setUp(self):
         self.prob = run_738Aerostruct_analysis()

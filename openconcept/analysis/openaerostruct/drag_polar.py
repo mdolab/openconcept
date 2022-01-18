@@ -10,7 +10,7 @@ import multiprocessing.pool as mp
 try:
     import tqdm
     progress_bar = True
-except ModuleNotFoundError:
+except ImportError:
     print("Progress bar for training data can be enabled by installing the tqdm Python package with \"pip install tqdm\"")
     progress_bar = False
 
@@ -18,8 +18,8 @@ except ModuleNotFoundError:
 try:
     from openaerostruct.geometry.geometry_mesh_transformations import Rotate
     from openaerostruct.aerodynamics.aero_groups import AeroPoint
-except ModuleNotFoundError:
-    raise ModuleNotFoundError("OpenAeroStruct must be installed to use the OASDragPolar component")
+except ImportError:
+    raise ImportError("OpenAeroStruct must be installed to use the OASDragPolar component")
 
 # Atmospheric calculations
 from openconcept.analysis.atmospherics.temperature_comp import TemperatureComp
