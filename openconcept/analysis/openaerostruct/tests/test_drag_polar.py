@@ -208,9 +208,6 @@ class VLMTestCase(unittest.TestCase):
 
         assert_near_equal(exact['CL'], p.get_val('fltcond|CL'))
         assert_near_equal(exact['CD'], p.get_val('fltcond|CD'))
-
-        partials = p.check_partials(out_stream=None, form='central')
-        assert_check_partials(partials, atol=6e-5, rtol=2e-5)
     
     def test_wave_drag(self):
         twist = np.array([-1, -0.5, 2])
