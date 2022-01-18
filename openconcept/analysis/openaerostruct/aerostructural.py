@@ -149,7 +149,7 @@ class OASAerostructDragPolar(om.Group):
                              desc='List of angle of attack training values (degrees)')
         self.options.declare('alt_train', default=np.linspace(0, 12e3, 4),
                              desc='List of altitude training values (meters)')
-        self.options.declare('surf_options', default=None, desc="Dictionary of OpenAeroStruct surface options")
+        self.options.declare('surf_options', default={}, desc="Dictionary of OpenAeroStruct surface options")
     
     def setup(self):
         nn = self.options['num_nodes']
@@ -337,8 +337,10 @@ class OASDataGen(om.ExplicitComponent):
                 else:
                     error = error or OASDataGen.surf_options[key] != self.options['surf_options'][key]          
             if error:
-                raise ValueError('The OASDataGen and OASDragPolar components do not support\n'
-                                 'differently-valued surf_options within an OpenMDAO model')
+                raise ValueError('The OASDataGen and OASAerostructDragPolar components do not support\n'
+                                 'differently-valued surf_options within an OpenMDAO model. Trying to replace:\n'
+                                 f"{OASDataGen.surf_options}\n"
+                                 f"with new options:\n{self.options['surf_options']}")
         else:
             OASDataGen.surf_options = deepcopy(self.options['surf_options'])
 

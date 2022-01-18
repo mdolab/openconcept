@@ -14,6 +14,15 @@ except:
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class OASAerostructDragPolarTestCase(unittest.TestCase):
+    def tearDown(self):
+        # Get rid of any specified surface options in the OASDataGen
+        # class after every test. This is necessary because the class
+        # stores the surface options as a "static" variable and
+        # prevents multiple OASDataGen instances with different
+        # surface options. Doing this prevents that error when doing
+        # multiple tests with different surface options.
+        del OASDataGen.surf_options
+
     def test(self):
         S = 100  # m^2
         AR = 10
@@ -163,6 +172,15 @@ class OASAerostructDragPolarTestCase(unittest.TestCase):
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class OASDataGenTestCase(unittest.TestCase):
+    def tearDown(self):
+        # Get rid of any specified surface options in the OASDataGen
+        # class after every test. This is necessary because the class
+        # stores the surface options as a "static" variable and
+        # prevents multiple OASDataGen instances with different
+        # surface options. Doing this prevents that error when doing
+        # multiple tests with different surface options.
+        del OASDataGen.surf_options
+
     def test_defaults(self):
         # Regression test
         twist = np.array([-1, -0.5, 2])  # deg
@@ -316,6 +334,5 @@ class OASAerostructDragPolarExactTestCase(unittest.TestCase):
         assert_near_equal(p.get_val('failure'), np.array([-0.89649433, -0.77578479, -0.64781499]), tolerance=1e-6)
         assert_near_equal(p.get_val('ac|weights|W_wing', units='kg'), 29322.10058108, tolerance=1e-6)
 
-# Calling unittest.main() here runs into issues. I think this is because it's not running each
-# test separately. The instances of the OASDataGen class running in other tests is problematic
-# because they all share the same inputs and surface options internally (like a static member).
+if __name__=="__main__":
+    unittest.main()

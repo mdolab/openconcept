@@ -15,7 +15,9 @@ from examples.ElectricSinglewithThermal import run_electricsingle_analysis
 from examples.N3_HybridSingleAisle_Refrig import run_hybrid_sa_analysis
 try:
     from examples.B738_VLM_drag import run_738_analysis as run_738VLM_analysis
+    from openconcept.analysis.openaerostruct.drag_polar import VLMDataGen
     from examples.B738_aerostructural import run_738_analysis as run_738Aerostruct_analysis
+    from openconcept.analysis.openaerostruct.aerostructural import OASDataGen
     OAS_installed = True
 except:
     OAS_installed = False
@@ -142,6 +144,15 @@ class B738VLMTestCase(unittest.TestCase):
     def setUp(self):
         self.prob = run_738VLM_analysis()
     
+    def tearDown(self):
+        # Get rid of any specified surface options in the VLMDataGen
+        # class after every test. This is necessary because the class
+        # stores the surface options as a "static" variable and
+        # prevents multiple VLMDataGen instances with different
+        # surface options. Doing this prevents that error when doing
+        # multiple tests with different surface options.
+        del VLMDataGen.surf_options
+
     def test_values_B738(self):
         prob = self.prob
         # block fuel
@@ -153,6 +164,15 @@ class B738VLMTestCase(unittest.TestCase):
 class B738AerostructTestCase(unittest.TestCase):
     def setUp(self):
         self.prob = run_738Aerostruct_analysis()
+    
+    def tearDown(self):
+        # Get rid of any specified surface options in the OASDataGen
+        # class after every test. This is necessary because the class
+        # stores the surface options as a "static" variable and
+        # prevents multiple OASDataGen instances with different
+        # surface options. Doing this prevents that error when doing
+        # multiple tests with different surface options.
+        del OASDataGen.surf_options
     
     def test_values_B738(self):
         prob = self.prob

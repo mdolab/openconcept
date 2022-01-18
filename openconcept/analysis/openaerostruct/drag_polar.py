@@ -256,7 +256,9 @@ class VLMDataGen(om.ExplicitComponent):
                     error = error or VLMDataGen.surf_options[key] != self.options['surf_options'][key]          
             if error:
                 raise ValueError('The VLMDataGen and OASDragPolar components do not support\n'
-                                 'differently-valued surf_options within an OpenMDAO model')
+                                 'differently-valued surf_options within an OpenMDAO model. Trying to replace:\n'
+                                 f"{VLMDataGen.surf_options}\n"
+                                 f"with new options:\n{self.options['surf_options']}")
         else:
             VLMDataGen.surf_options = deepcopy(self.options['surf_options'])
 

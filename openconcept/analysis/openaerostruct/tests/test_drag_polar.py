@@ -14,6 +14,15 @@ except:
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class OASDragPolarTestCase(unittest.TestCase):
+    def tearDown(self):
+        # Get rid of any specified surface options in the VLMDataGen
+        # class after every test. This is necessary because the class
+        # stores the surface options as a "static" variable and
+        # prevents multiple VLMDataGen instances with different
+        # surface options. Doing this prevents that error when doing
+        # multiple tests with different surface options.
+        del VLMDataGen.surf_options
+
     def test(self):
         twist = np.array([-1, -0.5, 2])
 
@@ -122,6 +131,15 @@ class OASDragPolarTestCase(unittest.TestCase):
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class VLMDataGenTestCase(unittest.TestCase):
+    def tearDown(self):
+        # Get rid of any specified surface options in the VLMDataGen
+        # class after every test. This is necessary because the class
+        # stores the surface options as a "static" variable and
+        # prevents multiple VLMDataGen instances with different
+        # surface options. Doing this prevents that error when doing
+        # multiple tests with different surface options.
+        del VLMDataGen.surf_options
+
     def test_defaults(self):
         # Regression test
         twist = np.array([-1, -0.5, 2])
