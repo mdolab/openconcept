@@ -31,6 +31,10 @@ jobs:
       run: |
         pip install coverage pytest-cov sphinx_rtd_theme
         pip install .[testing]
+    - name: Setup OpenAeroStruct
+      run: |
+        pwd
+        ls -la
     - if: ${{ matrix.os == 'ubuntu-latest' }}
       name: Download engine deck surrogate model data Ubuntu
       run: |
