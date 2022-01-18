@@ -245,14 +245,13 @@ def configure_problem(num_nodes):
     prob.model.nonlinear_solver.options['err_on_non_converge'] = True
     prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=True)
 
-    prob.driver = om.pyOptSparseDriver()
-    prob.driver.options['optimizer'] = 'SNOPT'
-    prob.driver.opt_settings['Major feasibility tolerance'] = 7e-6
+    prob.driver = om.ScipyOptimizeDriver()
+    prob.driver.options['optimizer'] = 'SLSQP'
+    prob.driver.opt_settings['tol'] = 1e-5
     prob.driver.options['debug_print'] = ['objs', 'desvars', 'nl_cons']
 
     # =========================== Mission design variables/constraints ===========================
     prob.model.add_objective('descent.fuel_used_final', scaler=1e-4)  # minimize block fuel burn
-    # prob.model.add_design_var('cruise|h0', upper=45e3, units='ft')
     prob.model.add_constraint('climb.throttle', lower=0.01, upper=1.05)
     prob.model.add_constraint('cruise.throttle', lower=0.01, upper=1.05)
     prob.model.add_constraint('descent.throttle', lower=0.01, upper=1.05)
