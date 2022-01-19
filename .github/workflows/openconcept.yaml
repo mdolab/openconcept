@@ -36,7 +36,10 @@ jobs:
         pip install git+https://github.com/mdolab/OpenAeroStruct.git@master
     - name: Test VLM
       run: |
-        python -m pytest openconcept/analysis/openaerostruct/tests/test_drag_polar.py
+        python -m pytest openconcept/analysis/openaerostruct/tests/test_aerostructural.py
+    - name: Get info
+      run: |
+        lscpu
     # - if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' }}
     #   name: Download engine deck surrogate model data Ubuntu/macOS
     #   run: |
