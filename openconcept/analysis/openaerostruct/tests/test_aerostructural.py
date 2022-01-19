@@ -170,133 +170,133 @@ except:
 #         assert_near_equal(p.get_val('drag', units='N'), 35911.23954369*np.ones(nn), tolerance=1e-10)
 
 
-# @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
-# class OASDataGenTestCase(unittest.TestCase):
-#     def tearDown(self):
-#         # Get rid of any specified surface options in the OASDataGen
-#         # class after every test. This is necessary because the class
-#         # stores the surface options as a "static" variable and
-#         # prevents multiple OASDataGen instances with different
-#         # surface options. Doing this prevents that error when doing
-#         # multiple tests with different surface options.
-#         del OASDataGen.surf_options
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
+class OASDataGenTestCase(unittest.TestCase):
+    def tearDown(self):
+        # Get rid of any specified surface options in the OASDataGen
+        # class after every test. This is necessary because the class
+        # stores the surface options as a "static" variable and
+        # prevents multiple OASDataGen instances with different
+        # surface options. Doing this prevents that error when doing
+        # multiple tests with different surface options.
+        del OASDataGen.surf_options
 
-#     def test_defaults(self):
-#         # Regression test
-#         twist = np.array([-1, -0.5, 2])  # deg
-#         toverc = np.array([0.05, 0.1, 0.12])
-#         t_skin = np.array([5, 13, 15])  # mm
-#         t_spar = np.array([5, 13, 15])  # mm
-#         p = om.Problem(OASDataGen(num_x=3, num_y=7, num_twist=twist.size, num_toverc=toverc.size,
-#                                   num_skin=t_skin.size, num_spar=t_spar.size, Mach_train=np.linspace(0.1, 0.85, 2),
-#                                   alpha_train=np.linspace(-10, 15, 2), alt_train=np.linspace(0, 15e3, 2)))
-#         p.setup()
-#         p.set_val('fltcond|TempIncrement', 0, units='degC')
-#         p.set_val('ac|geom|wing|S_ref', 100, units='m**2')
-#         p.set_val('ac|geom|wing|AR', 10)
-#         p.set_val('ac|geom|wing|taper', 0.1)
-#         p.set_val('ac|geom|wing|c4sweep', 20, units='deg')
-#         p.set_val('ac|geom|wing|twist', twist, units='deg')
-#         p.set_val('ac|geom|wing|toverc', toverc)
-#         p.set_val('ac|geom|wing|skin_thickness', t_skin, units='mm')
-#         p.set_val('ac|geom|wing|spar_thickness', t_spar, units='mm')
-#         p.set_val('ac|aero|CD_nonwing', 0.01)
-#         p.run_model()
+    def test_defaults(self):
+        # Regression test
+        twist = np.array([-1, -0.5, 2])  # deg
+        toverc = np.array([0.05, 0.1, 0.12])
+        t_skin = np.array([5, 13, 15])  # mm
+        t_spar = np.array([5, 13, 15])  # mm
+        p = om.Problem(OASDataGen(num_x=3, num_y=7, num_twist=twist.size, num_toverc=toverc.size,
+                                  num_skin=t_skin.size, num_spar=t_spar.size, Mach_train=np.linspace(0.1, 0.85, 2),
+                                  alpha_train=np.linspace(-10, 15, 2), alt_train=np.linspace(0, 15e3, 2)))
+        p.setup()
+        p.set_val('fltcond|TempIncrement', 0, units='degC')
+        p.set_val('ac|geom|wing|S_ref', 100, units='m**2')
+        p.set_val('ac|geom|wing|AR', 10)
+        p.set_val('ac|geom|wing|taper', 0.1)
+        p.set_val('ac|geom|wing|c4sweep', 20, units='deg')
+        p.set_val('ac|geom|wing|twist', twist, units='deg')
+        p.set_val('ac|geom|wing|toverc', toverc)
+        p.set_val('ac|geom|wing|skin_thickness', t_skin, units='mm')
+        p.set_val('ac|geom|wing|spar_thickness', t_spar, units='mm')
+        p.set_val('ac|aero|CD_nonwing', 0.01)
+        p.run_model()
 
-#         # Check that the values don't change
-#         CL = np.array([[[-0.79243052, -0.79557334],
-#                         [ 1.30041913,  1.30407159]],
-#                        [[-0.62943499, -0.76690382],
-#                         [ 1.08568083,  1.26980739]]])
-#         CD = np.array([[[0.0423459,  0.04473217],
-#                         [0.07565092, 0.0781007 ]],
-#                        [[0.03668226, 0.04308131],
-#                         [0.11930142, 0.15852171]]])
+        # Check that the values don't change
+        CL = np.array([[[-0.79243052, -0.79557334],
+                        [ 1.30041913,  1.30407159]],
+                       [[-0.62943499, -0.76690382],
+                        [ 1.08568083,  1.26980739]]])
+        CD = np.array([[[0.0423459,  0.04473217],
+                        [0.07565092, 0.0781007 ]],
+                       [[0.03668226, 0.04308131],
+                        [0.11930142, 0.15852171]]])
 
-#         assert_near_equal(p.get_val('CL_train'), CL, tolerance=1e-7)
-#         assert_near_equal(p.get_val('CD_train'), CD, tolerance=1e-7)
+        assert_near_equal(p.get_val('CL_train'), CL, tolerance=1e-7)
+        assert_near_equal(p.get_val('CD_train'), CD, tolerance=1e-7)
 
-#         # The fundamental problem with the derivative inaccuracy is rooted in OpenAeroStruct,
-#         # not this code. There are no analytic derivatives explicitly implemented in any of
-#         # the components in aerostructural.py, so the purpose for this check is just to
-#         # ensure that the derivatives are assembled properly.
-#         partials = p.check_partials(step=1e-7)
-#         assert_check_partials(partials, atol=1e-2, rtol=1.5e-2)
+        # The fundamental problem with the derivative inaccuracy is rooted in OpenAeroStruct,
+        # not this code. There are no analytic derivatives explicitly implemented in any of
+        # the components in aerostructural.py, so the purpose for this check is just to
+        # ensure that the derivatives are assembled properly.
+        partials = p.check_partials(step=1e-7)
+        assert_check_partials(partials, atol=1e-2, rtol=1.5e-2)
     
-#     def test_different_surf_options(self):
-#         # Test that when there are different surf_options within a single model it catches it
-#         p = om.Problem()
-#         p.model.add_subsystem('one', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
-#         p.model.add_subsystem('two', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
-#         p.model.add_subsystem('three', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
-#         p.setup()
+    def test_different_surf_options(self):
+        # Test that when there are different surf_options within a single model it catches it
+        p = om.Problem()
+        p.model.add_subsystem('one', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        p.model.add_subsystem('two', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        p.model.add_subsystem('three', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        p.setup()
 
-#         p = om.Problem()
-#         p.model.add_subsystem('one', OASDataGen(surf_options={'a': 1.13521}))
-#         p.model.add_subsystem('two', OASDataGen(surf_options={'a': 1.1352}))
-#         self.assertRaises(ValueError, p.setup)
+        p = om.Problem()
+        p.model.add_subsystem('one', OASDataGen(surf_options={'a': 1.13521}))
+        p.model.add_subsystem('two', OASDataGen(surf_options={'a': 1.1352}))
+        self.assertRaises(ValueError, p.setup)
 
-#         p = om.Problem()
-#         p.model.add_subsystem('one', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
-#         p.model.add_subsystem('two', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1.0001, 10)}))
-#         p.model.add_subsystem('three', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
-#         self.assertRaises(ValueError, p.setup)
+        p = om.Problem()
+        p.model.add_subsystem('one', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        p.model.add_subsystem('two', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1.0001, 10)}))
+        p.model.add_subsystem('three', OASDataGen(surf_options={'a': 1.13521, 'b': np.linspace(0, 1, 10)}))
+        self.assertRaises(ValueError, p.setup)
 
-#         p = om.Problem()
-#         p.model.add_subsystem('one', OASDataGen())
-#         p.model.add_subsystem('two', OASDataGen(surf_options={'boof': True}))
-#         self.assertRaises(ValueError, p.setup)
+        p = om.Problem()
+        p.model.add_subsystem('one', OASDataGen())
+        p.model.add_subsystem('two', OASDataGen(surf_options={'boof': True}))
+        self.assertRaises(ValueError, p.setup)
 
-# @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
-# class AerostructTestCase(unittest.TestCase):
-#     def get_prob(self, surf_dict={}):
-#         p = om.Problem(Aerostruct(num_x=3, num_y=5, num_twist=2, num_toverc=2,
-#                                   num_skin=2, num_spar=2, surf_options=surf_dict))
-#         p.setup()
-#         p.set_val('fltcond|alpha',3., units='deg')
-#         p.set_val('fltcond|M', 0.85)
-#         p.set_val('fltcond|h', 7.5e3, units='m')
-#         p.set_val('fltcond|TempIncrement', 1., units='degC')
-#         p.set_val('ac|geom|wing|S_ref', 427.8, units='m**2')
-#         p.set_val('ac|geom|wing|AR', 9.82)
-#         p.set_val('ac|geom|wing|taper', 0.149)
-#         p.set_val('ac|geom|wing|c4sweep', 31.6, units='deg')
-#         p.set_val('ac|geom|wing|twist', np.array([-1, 1]), units='deg')
-#         p.set_val('ac|geom|wing|toverc', np.array([0.12, 0.12]))
-#         p.set_val('ac|geom|wing|skin_thickness', np.array([0.005, 0.025]), units='m')
-#         p.set_val('ac|geom|wing|spar_thickness', np.array([0.004, 0.01]), units='m')
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
+class AerostructTestCase(unittest.TestCase):
+    def get_prob(self, surf_dict={}):
+        p = om.Problem(Aerostruct(num_x=3, num_y=5, num_twist=2, num_toverc=2,
+                                  num_skin=2, num_spar=2, surf_options=surf_dict))
+        p.setup()
+        p.set_val('fltcond|alpha',3., units='deg')
+        p.set_val('fltcond|M', 0.85)
+        p.set_val('fltcond|h', 7.5e3, units='m')
+        p.set_val('fltcond|TempIncrement', 1., units='degC')
+        p.set_val('ac|geom|wing|S_ref', 427.8, units='m**2')
+        p.set_val('ac|geom|wing|AR', 9.82)
+        p.set_val('ac|geom|wing|taper', 0.149)
+        p.set_val('ac|geom|wing|c4sweep', 31.6, units='deg')
+        p.set_val('ac|geom|wing|twist', np.array([-1, 1]), units='deg')
+        p.set_val('ac|geom|wing|toverc', np.array([0.12, 0.12]))
+        p.set_val('ac|geom|wing|skin_thickness', np.array([0.005, 0.025]), units='m')
+        p.set_val('ac|geom|wing|spar_thickness', np.array([0.004, 0.01]), units='m')
 
-#         return p
+        return p
 
-#     def test_defaults(self):
-#         p = self.get_prob()
-#         p.run_model()
+    def test_defaults(self):
+        p = self.get_prob()
+        p.run_model()
 
-#         # Use values computed offline from an OAS wingbox case with the same inputs
-#         assert_near_equal(p.get_val('fltcond|CL'), 0.22369546, tolerance=1e-6)
-#         assert_near_equal(p.get_val('fltcond|CD'), 0.01664464, tolerance=1e-6)
-#         assert_near_equal(p.get_val('failure'), -0.64781499, tolerance=1e-6)
-#         assert_near_equal(p.get_val('ac|weights|W_wing', units='kg'), 29322.10058108, tolerance=1e-6)
+        # Use values computed offline from an OAS wingbox case with the same inputs
+        assert_near_equal(p.get_val('fltcond|CL'), 0.22369546, tolerance=1e-6)
+        assert_near_equal(p.get_val('fltcond|CD'), 0.01664464, tolerance=1e-6)
+        assert_near_equal(p.get_val('failure'), -0.64781499, tolerance=1e-6)
+        assert_near_equal(p.get_val('ac|weights|W_wing', units='kg'), 29322.10058108, tolerance=1e-6)
     
-#     def test_wave_drag(self):
-#         p = self.get_prob(surf_dict={'with_wave': False})
-#         p.run_model()
+    def test_wave_drag(self):
+        p = self.get_prob(surf_dict={'with_wave': False})
+        p.run_model()
 
-#         # Use values computed offline from an OAS wingbox case with the same inputs
-#         assert_near_equal(p.get_val('fltcond|CL'), 0.22369546, tolerance=1e-6)
-#         assert_near_equal(p.get_val('fltcond|CD'), 0.0164930472, tolerance=1e-6)
-#         assert_near_equal(p.get_val('failure'), -0.64781499, tolerance=1e-6)
-#         assert_near_equal(p.get_val('ac|weights|W_wing', units='kg'), 29322.10058108, tolerance=1e-6)
+        # Use values computed offline from an OAS wingbox case with the same inputs
+        assert_near_equal(p.get_val('fltcond|CL'), 0.22369546, tolerance=1e-6)
+        assert_near_equal(p.get_val('fltcond|CD'), 0.0164930472, tolerance=1e-6)
+        assert_near_equal(p.get_val('failure'), -0.64781499, tolerance=1e-6)
+        assert_near_equal(p.get_val('ac|weights|W_wing', units='kg'), 29322.10058108, tolerance=1e-6)
     
-#     def test_viscous_drag(self):
-#         p = self.get_prob(surf_dict={'with_viscous': False})
-#         p.run_model()
+    def test_viscous_drag(self):
+        p = self.get_prob(surf_dict={'with_viscous': False})
+        p.run_model()
 
-#         # Use values computed offline from an OAS wingbox case with the same inputs
-#         assert_near_equal(p.get_val('fltcond|CL'), 0.22369546, tolerance=1e-6)
-#         assert_near_equal(p.get_val('fltcond|CD'), 0.009647318876399, tolerance=1e-6)
-#         assert_near_equal(p.get_val('failure'), -0.64781499, tolerance=1e-6)
-#         assert_near_equal(p.get_val('ac|weights|W_wing', units='kg'), 29322.10058108, tolerance=1e-6)
+        # Use values computed offline from an OAS wingbox case with the same inputs
+        assert_near_equal(p.get_val('fltcond|CL'), 0.22369546, tolerance=1e-6)
+        assert_near_equal(p.get_val('fltcond|CD'), 0.009647318876399, tolerance=1e-6)
+        assert_near_equal(p.get_val('failure'), -0.64781499, tolerance=1e-6)
+        assert_near_equal(p.get_val('ac|weights|W_wing', units='kg'), 29322.10058108, tolerance=1e-6)
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class OASAerostructDragPolarExactTestCase(unittest.TestCase):
