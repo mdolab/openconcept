@@ -511,7 +511,7 @@ data : dict
 """
 def compute_training_data(inputs, surf_dict=None):
     t_start = time()
-    print(f"Generating training data...")
+    print(f"Generating OpenAeroStruct aerostructural training data...")
 
     # Set up test points for use in parallelized map function ([Mach, alpha, altitude, inputs] for each point)
     test_points = np.array([inputs['Mach_number_grid'].flatten(),
