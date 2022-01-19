@@ -34,30 +34,27 @@ jobs:
     - name: Install OpenAeroStruct
       run: |
         pip install git+https://github.com/mdolab/OpenAeroStruct.git@master
-    - name: Test aerostructural
+    - if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' }}
+      name: Download engine deck surrogate model data Ubuntu/macOS
       run: |
-        python -m pytest openconcept/analysis/openaerostruct/tests/test_aerostructural.py
-    # - if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' }}
-    #   name: Download engine deck surrogate model data Ubuntu/macOS
-    #   run: |
-    #     wget http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
-    # - if: ${{ matrix.os == 'windows-latest' }}
-    #   name: Download engine deck surrogate model data Windows
-    #   run: |
-    #     curl -L -o engine_kriging_surrogate_model.tar.gz http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
-    # - name: Move engine deck files to appropriate location
-    #   run: |
-    #     tar -xvf engine_kriging_surrogate_model.tar.gz
-    #     mv cfm56* ./openconcept/components/empirical_data/cfm56
-    #     mv n3_hybrid* ./openconcept/components/empirical_data/n+3_hybrid
-    #     mv n3* ./openconcept/components/empirical_data/n+3
-    # - name: Build and Test
-    #   run: |
-    #     python -m pytest --cov-config .coveragerc --cov=openconcept
-    # - name: Push to Coveralls
-    #   if: ${{ matrix.os == 'ubuntu-latest' }}
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #   run: |
-    #     pip install coveralls
-    #     coveralls --service=github --rcfile=.coveragerc
+        wget http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
+    - if: ${{ matrix.os == 'windows-latest' }}
+      name: Download engine deck surrogate model data Windows
+      run: |
+        curl -L -o engine_kriging_surrogate_model.tar.gz http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
+    - name: Move engine deck files to appropriate location
+      run: |
+        tar -xvf engine_kriging_surrogate_model.tar.gz
+        mv cfm56* ./openconcept/components/empirical_data/cfm56
+        mv n3_hybrid* ./openconcept/components/empirical_data/n+3_hybrid
+        mv n3* ./openconcept/components/empirical_data/n+3
+    - name: Build and Test
+      run: |
+        python -m pytest --cov-config .coveragerc --cov=openconcept
+    - name: Push to Coveralls
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        pip install coveralls
+        coveralls --service=github --rcfile=.coveragerc
