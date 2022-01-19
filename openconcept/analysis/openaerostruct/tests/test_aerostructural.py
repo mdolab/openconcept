@@ -334,5 +334,11 @@ class OASAerostructDragPolarExactTestCase(unittest.TestCase):
         assert_near_equal(p.get_val('failure'), np.array([-0.89649433, -0.77578479, -0.64781499]), tolerance=1e-6)
         assert_near_equal(p.get_val('ac|weights|W_wing', units='kg'), 29322.10058108, tolerance=1e-6)
 
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
+class ExampleUsageTestCase(unittest.TestCase):
+    def test(self):
+        # Test that it runs with no errors
+        example_usage()
+
 if __name__=="__main__":
     unittest.main()

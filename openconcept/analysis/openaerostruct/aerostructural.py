@@ -511,7 +511,7 @@ data : dict
 """
 def compute_training_data(inputs, surf_dict=None):
     t_start = time()
-    print(f"Generating training data...", end='')
+    print(f"Generating training data...")
 
     # Set up test points for use in parallelized map function ([Mach, alpha, altitude, inputs] for each point)
     test_points = np.array([inputs['Mach_number_grid'].flatten(),
@@ -1089,12 +1089,14 @@ class OASAerostructDragPolarExact(om.Group):
                            promotes_outputs=['drag'])
         self.connect('vec_combine.CD_OAS', 'drag_calc.CD')
 
-
-if __name__=="__main__":
+# Example usage of the aerostructural drag polar that compares
+# the surrogate to a direction OpenAeroStruct call
+# with a very coarse mesh and training point distribution
+def example_usage():
     # Define parameters
     nn = 1
-    num_x = 5
-    num_y = 7
+    num_x = 3
+    num_y = 5
     S = 427.8  # m^2
     AR = 9.82
     taper = 0.149
@@ -1109,7 +1111,6 @@ if __name__=="__main__":
     n_spar = spar.size
 
     M = 0.7
-    alpha = 3  # deg
     CL = 0.35
     h = 0  # m
 
@@ -1120,11 +1121,14 @@ if __name__=="__main__":
                                                                num_twist=n_twist,
                                                                num_toverc=n_t_over_c,
                                                                num_skin=n_skin,
-                                                               num_spar=n_spar),
+                                                               num_spar=n_spar,
+                                                               Mach_train=np.linspace(0.1, 0.8, 3),
+                                                               alpha_train=np.linspace(-11, 15, 3),
+                                                               alt_train=np.linspace(0, 15e3, 2)),
                            promotes=['*'])
     p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, iprint=2)
     p.model.linear_solver = om.DirectSolver()
-    p.setup(force_alloc_complex=True)
+    p.setup()
 
     # Set values
     # Geometry
@@ -1153,7 +1157,7 @@ if __name__=="__main__":
     print(f"Failure: {p.get_val('failure')}")
     print(f"Wing weight: {p.get_val('ac|weights|W_wing', units='kg')} kg")
 
-
+    # Call OpenAeroStruct at the same flight condition to compare
     prob = om.Problem()
     prob.model.add_subsystem('model', Aerostruct(num_x=num_x,
                                                  num_y=num_y,
@@ -1163,7 +1167,7 @@ if __name__=="__main__":
                                                  num_spar=n_spar),
                              promotes=['*'])
 
-    prob.setup(force_alloc_complex=True)
+    prob.setup()
 
     # Set values
     # Geometry
@@ -1189,3 +1193,6 @@ if __name__=="__main__":
     print(f"Alpha: {prob.get_val('fltcond|alpha', units='deg')} deg")
     print(f"Failure: {prob.get_val('failure')}")
     print(f"Wing weight: {prob.get_val('ac|weights|W_wing', units='kg')} kg")
+
+if __name__=="__main__":
+    example_usage()

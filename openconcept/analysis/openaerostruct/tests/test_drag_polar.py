@@ -579,7 +579,11 @@ def run_OAS(inputs, with_viscous=True, with_wave=True, t_over_c=np.array([.12]))
     outputs['CD'] = prob['aero_point_0.wing_perf.CD']
     return outputs
 
-
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
+class ExampleUsageTestCase(unittest.TestCase):
+    def test(self):
+        # Test that it runs with no errors
+        example_usage()
 
 if __name__=="__main__":
     unittest.main()
