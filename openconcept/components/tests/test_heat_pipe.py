@@ -136,7 +136,6 @@ class HeatPipeWeightTestCase(unittest.TestCase):
         
         assert_near_equal(p['heat_pipe_weight'], 0.04074404, tolerance=1e-5)
         assert_near_equal(p['wall_thickness'], 6.99300699e-05, tolerance=1e-5)
-
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 
@@ -155,7 +154,6 @@ class AmmoniaPropertiesTestCase(unittest.TestCase):
         assert_near_equal(p['rho_liquid'], np.ones(nn)*482.9)
         assert_near_equal(p['rho_vapor'], np.ones(nn)*43.9)
         assert_near_equal(p['vapor_pressure'], np.ones(nn)*5123.)
-
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
     
@@ -170,7 +168,6 @@ class AmmoniaPropertiesTestCase(unittest.TestCase):
         assert_near_equal(p['rho_liquid'], np.array([648.00187402, 624.69, 599.75101299, 572.91683838, 543.40564864, 509.97440705]), tolerance=1e-5)
         assert_near_equal(p['rho_vapor'], np.array([2.6756274, 4.8593, 8.26745558, 13.40464169, 21.03778235, 32.43929276]), tolerance=1e-5)
         assert_near_equal(p['vapor_pressure'], np.array([327.98889865,  614.9, 1065.92300458, 1733.70063068, 2677.30942723, 3966.79472967]), tolerance=1e-5)
-
         partials = p.check_partials(method='cs',compact_print=True)
         assert_check_partials(partials)
 

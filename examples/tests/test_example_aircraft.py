@@ -13,6 +13,14 @@ from examples.Caravan import run_caravan_analysis
 from examples.KingAirC90GT import run_kingair_analysis
 from examples.ElectricSinglewithThermal import run_electricsingle_analysis
 from examples.N3_HybridSingleAisle_Refrig import run_hybrid_sa_analysis
+try:
+    from examples.B738_VLM_drag import run_738_analysis as run_738VLM_analysis
+    from openconcept.analysis.openaerostruct.drag_polar import VLMDataGen
+    from examples.B738_aerostructural import run_738_analysis as run_738Aerostruct_analysis
+    from openconcept.analysis.openaerostruct.aerostructural import OASDataGen
+    OAS_installed = True
+except:
+    OAS_installed = False
 
 
 class TBMAnalysisTestCase(unittest.TestCase):
@@ -130,6 +138,46 @@ class B738TestCase(unittest.TestCase):
         # total fuel
         assert_near_equal(prob.get_val('loiter.fuel_used_final', units='lbm'), 34424.68533072, tolerance=3e-4)
         # changelog: 9/2020 - previously 34555.313, updated CFM surrogate model to reject spurious high Mach, low altitude points
+
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
+class B738VLMTestCase(unittest.TestCase):
+    def setUp(self):
+        self.prob = run_738VLM_analysis()
+    
+    def tearDown(self):
+        # Get rid of any specified surface options in the VLMDataGen
+        # class after every test. This is necessary because the class
+        # stores the surface options as a "static" variable and
+        # prevents multiple VLMDataGen instances with different
+        # surface options. Doing this prevents that error when doing
+        # multiple tests with different surface options.
+        del VLMDataGen.surf_options
+
+    def test_values_B738(self):
+        prob = self.prob
+        # block fuel
+        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lbm'), 28443.39604559, tolerance=1e-5)
+        # total fuel
+        assert_near_equal(prob.get_val('loiter.fuel_used_final', units='lbm'), 34075.30721371, tolerance=1e-5)
+
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
+class B738AerostructTestCase(unittest.TestCase):
+    def setUp(self):
+        self.prob = run_738Aerostruct_analysis()
+    
+    def tearDown(self):
+        # Get rid of any specified surface options in the OASDataGen
+        # class after every test. This is necessary because the class
+        # stores the surface options as a "static" variable and
+        # prevents multiple OASDataGen instances with different
+        # surface options. Doing this prevents that error when doing
+        # multiple tests with different surface options.
+        del OASDataGen.surf_options
+    
+    def test_values_B738(self):
+        prob = self.prob
+        # block fuel
+        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lbm'), 34310.44045734, tolerance=1e-5)
 
 class N3HSATestCase(unittest.TestCase):
     def setUp(self):
