@@ -29,7 +29,6 @@ class B738AirplaneModel(oc.IntegratorGroup):
 
         # a propulsion system needs to be defined in order to provide thrust
         # information for the mission analysis code
-        # propulsion_promotes_outputs = ['fuel_flow', 'thrust']
         propulsion_promotes_inputs = ["fltcond|*", "throttle"]
 
         self.add_subsystem('propmodel', CFM56(num_nodes=nn, plot=False),
@@ -172,7 +171,6 @@ def show_outputs(prob):
         oc.plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels, marker='-',
                         plot_title='737-800 Mission Profile')
-    # prob.model.list_outputs()
 
 def run_738_analysis(plots=False):
     num_nodes = 11
