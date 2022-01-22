@@ -24,10 +24,9 @@ import multiprocessing.pool as mp
 import warnings
 
 # Progress bar
+progress_bar = True
 try:
     import tqdm
-
-    progress_bar = True
 except ImportError:
     print('Progress bar for training data can be enabled by installing the tqdm Python package with "pip install tqdm"')
     progress_bar = False
