@@ -1,3 +1,19 @@
+"""
+This work was the basis of the following paper.
+Please cite it if you use this for your own publication!
+
+@InProceedings{Adler2022a,
+    author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
+    title       = {Aerostructural wing design optimization considering full mission analysis},
+    booktitle   = {AIAA SciTech Forum},
+    doi         = {10.2514/6.2022-0382},
+    month       = {January},
+    year        = {2022}
+}
+
+Eytan Adler (Jan 2022)
+"""
+
 from __future__ import division
 
 import numpy as np
@@ -7,10 +23,9 @@ from copy import copy, deepcopy
 import multiprocessing.pool as mp
 
 # Progress bar
+progress_bar = True
 try:
     import tqdm
-
-    progress_bar = True
 except ImportError:
     print('Progress bar for training data can be enabled by installing the tqdm Python package with "pip install tqdm"')
     progress_bar = False
@@ -534,12 +549,9 @@ def compute_aerodynamic_data(point):
 
     p.run_model()
 
-    output = {}
-    output["CL"] = p.get_val("fltcond|CL")
-    output["CD"] = p.get_val("fltcond|CD")
+    output = {"CL": p.get_val("fltcond|CL"), "CD": p.get_val("fltcond|CD"), "partials": {}}
 
     # Compute derivatives
-    output["partials"] = {}
     of = ["fltcond|CL", "fltcond|CD"]
     of_out = ["CL_train", "CD_train"]
     wrt = [

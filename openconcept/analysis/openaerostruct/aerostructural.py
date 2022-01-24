@@ -1,3 +1,19 @@
+"""
+This work was the basis of the following paper.
+Please cite it if you use this for your own publication!
+
+@InProceedings{Adler2022a,
+    author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
+    title       = {Aerostructural wing design optimization considering full mission analysis},
+    booktitle   = {AIAA SciTech Forum},
+    doi         = {10.2514/6.2022-0382},
+    month       = {January},
+    year        = {2022}
+}
+
+Eytan Adler (Jan 2022)
+"""
+
 from __future__ import division
 
 import numpy as np
@@ -8,10 +24,9 @@ import multiprocessing.pool as mp
 import warnings
 
 # Progress bar
+progress_bar = True
 try:
     import tqdm
-
-    progress_bar = True
 except ImportError:
     print('Progress bar for training data can be enabled by installing the tqdm Python package with "pip install tqdm"')
     progress_bar = False
