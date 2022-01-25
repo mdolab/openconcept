@@ -54,6 +54,7 @@ setup(
         'openmdao>=3.10.0',
     ],
     extras_require = {
-        'testing':  ["pytest", "openmdao[docs]", "redbaron"]
+        'testing':  ["pytest", "openmdao[docs]", "redbaron"],
+        'docs': ["sphinx_mdolab_theme"]
       },
 )

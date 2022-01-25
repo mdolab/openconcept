@@ -16,7 +16,9 @@ The reason for OpenConcept's efficiency is the analytic derivatives built into e
 
 ## Documentation
 
-Automatically-generated documentation is available at (https://openconcept.readthedocs.io)
+Automatically-generated documentation is available at (https://openconcept.readthedocs.io).
+
+To build the docs locally, install the `sphinx_mdolab_theme` and `redbaron` via `pip`. Then enter the `docs` folder in the root directory and run `make html`. The built documentation can be viewed by opening `_build/html/index.html`.
 
 ## Getting Started
 

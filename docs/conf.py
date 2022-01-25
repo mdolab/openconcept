@@ -18,6 +18,8 @@ import subprocess
 import openmdao
 import openconcept
 
+from sphinx_mdolab_theme.config import *
+
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('./_exts'))
@@ -184,9 +186,8 @@ NumpyDocstring._parse = patched_parse
 
 # -- Project information -----------------------------------------------------
 
-project = 'openconcept'
-copyright = '2018, Benjamin J. Brelje'
-author = 'Benjamin J. Brelje'
+project = 'OpenConcept'
+author = 'Benjamin J. Brelje and Eytan J. Adler'
 
 import openconcept
 # The short X.Y version
@@ -360,6 +361,7 @@ if generate_srcdocs:
     # os.rename('_srcdocs_native/modules.rst','_srcdocs_native/index.rst')
     # openmdao way
     packages = ['analysis',
+                'analysis.openaerostruct',
                 'analysis.atmospherics',
                 'analysis.performance',
                 'components',
