@@ -6,13 +6,9 @@
 OpenConcept
 ===========
 
-.. image:: https://travis-ci.org/mdolab/openconcept.svg?branch=master
-    :target: https://travis-ci.org/mdolab/openconcept
-    :alt: Linux Status
-
-.. image:: https://ci.appveyor.com/api/projects/status/tn4hv14w5xlree4t/branch/master?svg=true
-    :target: https://ci.appveyor.com/project/bbrelje/openconcept/branch/master
-    :alt: Windows Status
+.. image:: https://github.com/mdolab/openconcept/workflows/Build/badge.svg?branch=master
+    :target: https://github.com/mdolab/openconcept/actions?query=branch%3Amaster
+    :alt: Build Status
 
 .. image:: https://coveralls.io/repos/github/mdolab/openconcept/badge.svg
     :target: https://coveralls.io/github/mdolab/openconcept
