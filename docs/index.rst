@@ -8,21 +8,21 @@ OpenConcept
 
 .. image:: https://github.com/mdolab/openconcept/workflows/Build/badge.svg?branch=master
     :target: https://github.com/mdolab/openconcept/actions?query=branch%3Amaster
-    :alt: Build Status
+    :alt: Build
 
-.. image:: https://coveralls.io/repos/github/mdolab/openconcept/badge.svg
-    :target: https://coveralls.io/github/mdolab/openconcept
-    :alt: Coverage Status
+.. image:: https://codecov.io/gh/mdolab/openconcept/branch/master/graph/badge.svg?token=RR8CN3IOSL
+    :target: https://codecov.io/gh/mdolab/openconcept
+    :alt: Coverage
 
 .. image:: https://readthedocs.com/projects/mdolab-openconcept/badge/?version=latest
     :target: https://mdolab-openconcept.readthedocs-hosted.com/en/latest/?badge=latest
-    :alt: Documentation Status
+    :alt: Documentation
 
 
 OpenConcept is a new toolkit for the conceptual design of aircraft.
 It is open source (GitHub: https://github.com/mdolab/openconcept) and MIT licensed.
 OpenConcept was developed in order to model and optimize aircraft with electric propulsion at low computational cost.
-The tools are built on top of NASA Glenn's `OpenMDAO <http://openmdao.org/>`_ framework, which in turn is written in Python.
+The tools are built on top of NASA Glenn's `OpenMDAO <http://openmdao.org/>`__ framework, which in turn is written in Python.
 
 The following charts show more than 250 individually optimized hybrid-electric light twin aircraft (similar to a King Air C90GT).
 Optimizing hundreds of configurations can be done in a couple of hours on a standard laptop computer.
@@ -36,44 +36,55 @@ Accurate, efficient derivatives enable the use of Newton nonlinear equation solu
 ---------------
 Getting Started
 ---------------
-1. Clone the repo to disk (`git clone https://github.com/mdolab/openconcept`)
-2. If you use Anaconda, create a virtual environment using the environment.yml file (`conda env create environment.yml`) and then activate it using `conda activate openconcept`. 
-3. If you wish to install OpenConcept in your Python distribution, run `python setup.py install`.
-4. Run `python examples\TBM850.py` to test OpenConcept on a single-engine turboprop aircraft (the TBM 850)
-5. Look at the `examples\aircraft data\TBM850.py` folder to play with the assumptions / config / geometry and see the effects on the output result
-
+1. Clone the repo to disk (``git clone https://github.com/mdolab/openconcept``)
+2. Navigate to the root ``openconcept`` folder
+3. Run ``pip install -e .`` to install the package (the ``-e`` can be omitted if not editing the source)
+4. Navigate to the ``examples`` folder
+5. Run ``python TBM850.py`` to test OpenConcept on a single-engine turboprop aircraft (the TBM 850)
+6. Look at the ``examples/aircraft data/TBM850.py`` file to play with the assumptions / config / geometry and see the effects on the output result
 
 ------------
 Dependencies
 ------------
-This toolkit requires the use of OpenMDAO 3.0.0 or later due to backward-incompatible changes.
-However, 2.8+ can be used with very minor keyword argument changes to OpenMDAO components
+This toolkit requires the use of `OpenMDAO <https://openmdao.org>`__ 3.10.0 or later due to backward-incompatible changes. OpenMDAO requires a late NumPy and SciPy.
+Python 3.8 is recommended since it is the version with which the code is tested, but newer Python versions will likely work as well.
 
 ---------------
 Please Cite Us!
 ---------------
 
-Please cite this software by reference to the conference paper:
-
-*Plaintext:*
+Please cite this software by reference to the `conference paper <https://www.researchgate.net/publication/326263660_Development_of_a_Conceptual_Design_Model_for_Aircraft_Electric_Propulsion_with_Efficient_Gradients>`__:
 
 Benjamin J. Brelje and Joaquim R.R.A. Martins.
 "Development of a Conceptual Design Model for Aircraft Electric Propulsion with Efficient Gradients",
 2018 AIAA/IEEE Electric Aircraft Technologies Symposium,
-AIAA Propulsion and Energy Forum, (AIAA 2018-4979) DOI: TBD
-
-*Bibtex:*
+AIAA Propulsion and Energy Forum, (AIAA 2018-4979) DOI: 10.2514/6.2018-4979
 
 ::
 
     @inproceedings{Brelje2018,
-	Address = {{C}incinnati,~{OH}},
-	Author = {Benjamin J. Brelje and Joaquim R. R. A. Martins},
-	Booktitle = {2018 AIAA/IEEE Electric Aircraft Technologies Symposium},
-	Month = jul,
-	Title = {Development of a Conceptual Design Model for Aircraft Electric Propulsion with Efficient Gradients},
-	Year = 2018,
-    Number = {AIAA-2018-4979},
+	address = {{C}incinnati,~{OH}},
+	author = {Benjamin J. Brelje and Joaquim R. R. A. Martins},
+	booktitle = {2018 AIAA/IEEE Electric Aircraft Technologies Symposium},
+	month = {July},
+	title = {Development of a Conceptual Design Model for Aircraft Electric Propulsion with Efficient Gradients},
+	year = {2018},
+	doi = {10.2514/6.2018-4979}
+	}
+
+If using the integrated OpenAeroStruct VLM or aerostructural aerodynamic models, please cite the following `conference paper <https://www.researchgate.net/publication/357559489_Aerostructural_wing_design_optimization_considering_full_mission_analysis>`__:
+
+Eytan J. Adler and Joaquim R.R.A. Martins, "Aerostructural wing design optimization considering full mission analysis", 2022 AIAA SciTech Forum, San Diego, CA, January 2022. DOI: 10.2514/6.2022-0382
+
+::
+
+    @inproceedings{Adler2022a,
+	author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
+	title       = {Aerostructural wing design optimization considering full mission analysis},
+	booktitle   = {AIAA SciTech Forum},
+	doi         = {10.2514/6.2022-0382},
+	month       = {January},
+	year        = {2022}
 	}
 
 ------------
