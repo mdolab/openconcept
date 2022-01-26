@@ -31,6 +31,7 @@ jobs:
       run: |
         pip install coverage pytest-cov sphinx_rtd_theme
         pip install .[testing]
+        pip install .[docs]
     - name: Install OpenAeroStruct
       run: |
         pip install git+https://github.com/mdolab/OpenAeroStruct.git@master
