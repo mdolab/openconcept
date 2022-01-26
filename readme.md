@@ -34,6 +34,7 @@ To build the docs locally, install the `sphinx_mdolab_theme` and `redbaron` via 
 ### Requirements
 
 This toolkit requires the use of [OpenMDAO](https://openmdao.org/) 3.10.0 or later. OpenMDAO requires a late NumPy and SciPy.
+If you'd like to use the OpenAeroStruct features of OpenConcept, OpenMDAO 3.10 is required because that is the newest version supported by OpenAeroStruct at the time of writing this.
 
 ## Citation
 

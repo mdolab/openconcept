@@ -47,6 +47,7 @@ Getting Started
 Dependencies
 ------------
 This toolkit requires the use of `OpenMDAO <https://openmdao.org>`__ 3.10.0 or later due to backward-incompatible changes. OpenMDAO requires a late NumPy and SciPy.
+If you'd like to use the OpenAeroStruct features of OpenConcept, OpenMDAO 3.10 is required because that is the newest version supported by OpenAeroStruct at the time of writing this.
 Python 3.8 is recommended since it is the version with which the code is tested, but newer Python versions will likely work as well.
 
 ---------------
