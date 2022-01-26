@@ -2,6 +2,7 @@
 This work was the basis of the following paper.
 Please cite it if you use this for your own publication!
 ::
+
     @InProceedings{Adler2022a,
         author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
         title       = {Aerostructural wing design optimization considering full mission analysis},
@@ -49,7 +50,7 @@ class OASDragPolar(om.Group):
     Drag polar generated using OpenAeroStruct's vortex lattice method and a surrogate
     model to decrease the computational cost.
 
-    NOTE: twist is ordered starting at the tip and moving to the root; a twist
+    NOTE: twist is ordered starting at the tip and moving to the root; a twist \
           of [-1, 0, 1] would have a tip twist of -1 deg and root twist of 1 deg
 
     NOTE: set the OMP_NUM_THREADS environment variable to 1 for much better parallel training performance!
@@ -81,10 +82,10 @@ class OASDragPolar(om.Group):
         drag coefficient computed by OpenAeroStruct (scalar, dimensionless)
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
-        NOTE: fltcond|TempIncrement is a scalar in this component but a vector in OC.
-              This will be the case for the forseeable future because of the way the
-              VLMDataGen component is set up. To make it work, TempIncrement would
-              need to be an input to the surrogate, which is not worth the extra
+        NOTE: fltcond|TempIncrement is a scalar in this component but a vector in OC. \
+              This will be the case for the forseeable future because of the way the \
+              VLMDataGen component is set up. To make it work, TempIncrement would \
+              need to be an input to the surrogate, which is not worth the extra \
               training cost (at minimum a 2x increase).
 
     Outputs
