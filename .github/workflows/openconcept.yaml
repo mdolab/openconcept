@@ -51,10 +51,8 @@ jobs:
     - name: Build and Test
       run: |
         python -m pytest --cov-config .coveragerc --cov=openconcept
-    - name: Push to Coveralls
-      if: ${{ matrix.os == 'ubuntu-latest' }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        pip install coveralls
-        coveralls --service=github --rcfile=.coveragerc
+    - name: Upload coverage to Codecov
+      if: ${{ matrix.os == 'ubuntu-latest'}}
+      uses: codecov/codecov-action@v1
+      with:
+        fail_ci_if_error: true
