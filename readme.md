@@ -4,7 +4,7 @@
 
 [![Build Status](https://github.com/mdolab/openconcept/workflows/Build/badge.svg?branch=master)](https://github.com/mdolab/openconcept/actions?query=branch%3Amaster)
 [![Coverage Status](https://coveralls.io/repos/github/mdolab/openconcept/badge.svg)](https://coveralls.io/github/mdolab/openconcept)
-[![Documentation Status](https://readthedocs.org/projects/openconcept/badge/?version=latest)](https://openconcept.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.com/projects/mdolab-openconcept/badge/?version=latest)](https://mdolab-openconcept.readthedocs-hosted.com/en/latest/?badge=latest)
 
 OpenConcept is a new toolkit for the conceptual design of aircraft. OpenConcept was developed in order to model and optimize aircraft with electric propulsion at low computational cost. The tools are built on top of NASA Glenn's [OpenMDAO](http://openmdao.org/) framework, which in turn is written in Python.
 

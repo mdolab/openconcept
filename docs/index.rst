@@ -14,8 +14,8 @@ OpenConcept
     :target: https://coveralls.io/github/mdolab/openconcept
     :alt: Coverage Status
 
-.. image:: https://readthedocs.org/projects/openconcept/badge/?version=latest
-    :target: https://openconcept.readthedocs.io/en/latest/?badge=latest
+.. image:: https://readthedocs.com/projects/mdolab-openconcept/badge/?version=latest
+    :target: https://mdolab-openconcept.readthedocs-hosted.com/en/latest/?badge=latest
     :alt: Documentation Status
 
 
