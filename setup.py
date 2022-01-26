@@ -54,6 +54,6 @@ setup(
         'openmdao>=3.10.0',
     ],
     extras_require = {
-        'testing':  ["pytest", "openmdao[docs]", "redbaron", "sphinx_mdolab_theme"]
+        'testing':  ["pytest", "openmdao[docs]", "redbaron", "sphinx_mdolab_theme", "git+https://github.com/mdolab/OpenAeroStruct.git@master"]
       },
 )
