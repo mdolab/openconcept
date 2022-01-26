@@ -54,7 +54,7 @@ from openconcept.utilities.math.combine_split_comp import VectorConcatenateComp
 
 class OASAerostructDragPolar(om.Group):
     """
-    Drag polar and wing weight estimate generated using OpenAeroStruct
+    Drag polar and wing weight estimate generated using OpenAeroStruct's
     aerostructural analysis capabilities and a surrogate
     model to decrease the computational cost.
 
