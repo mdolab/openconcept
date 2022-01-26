@@ -1,0 +1,4 @@
+numpydoc
+sphinx_mdolab_theme
+openmdao[docs]
+redbaron
