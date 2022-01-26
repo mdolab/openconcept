@@ -11,8 +11,6 @@ Please cite it if you use this for your own publication!
         month       = {January},
         year        = {2022}
     }
-
-Eytan Adler (Jan 2022)
 """
 
 from __future__ import division
@@ -261,8 +259,8 @@ class OASDataGen(om.ExplicitComponent):
     planform geometry by the inputs. This component will only recalculate
     the lift and drag grid when the planform shape changes.
 
-    NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered
-          starting at the tip and moving to the root; a twist of [-1, 0, 1] would
+    NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered \
+          starting at the tip and moving to the root; a twist of [-1, 0, 1] would \
           have a tip twist of -1 deg and root twist of 1 deg
 
     Inputs
@@ -758,8 +756,8 @@ class Aerostruct(om.Group):
     This component currently does not support distributed fuel loads
     or point loads added to the structure.
 
-    NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered
-          starting at the tip and moving to the root; a twist of [-1, 0, 1] would
+    NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered \
+          starting at the tip and moving to the root; a twist of [-1, 0, 1] would \
           have a tip twist of -1 deg and root twist of 1 deg
 
     Inputs
@@ -1293,7 +1291,7 @@ class Aerostruct(om.Group):
 
 class OASAerostructDragPolarExact(om.Group):
     """
-    WARNING WARNING WARNING
+    *WARNING WARNING WARNING*
     
     This component is far more computationally expensive than the
     OASAerostructDragPolar component, which uses a surrogate. For missions
@@ -1304,7 +1302,7 @@ class OASAerostructDragPolarExact(om.Group):
     what you're doing, this component should not be used (use
     OASAerostructDragPolar instead).
 
-    WARNING WARNING WARNING
+    *WARNING WARNING WARNING*
 
     Drag polar and wing weight estimate generated using OpenAeroStruct's
     aerostructural analysis capabilities directly, without a surrogate in the loop.

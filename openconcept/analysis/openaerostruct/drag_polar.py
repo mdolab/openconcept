@@ -11,8 +11,6 @@ Please cite it if you use this for your own publication!
         month       = {January},
         year        = {2022}
     }
-
-Eytan Adler (Jan 2022)
 """
 
 from __future__ import division
