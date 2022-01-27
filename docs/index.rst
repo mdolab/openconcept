@@ -6,20 +6,7 @@
 OpenConcept
 ===========
 
-.. image:: https://github.com/mdolab/openconcept/workflows/Build/badge.svg?branch=master
-    :target: https://github.com/mdolab/openconcept/actions?query=branch%3Amaster
-    :alt: Build
-
-.. image:: https://codecov.io/gh/mdolab/openconcept/branch/master/graph/badge.svg?token=RR8CN3IOSL
-    :target: https://codecov.io/gh/mdolab/openconcept
-    :alt: Coverage
-
-.. image:: https://readthedocs.com/projects/mdolab-openconcept/badge/?version=latest
-    :target: https://mdolab-openconcept.readthedocs-hosted.com/en/latest/?badge=latest
-    :alt: Documentation
-
-
-OpenConcept is a new toolkit for the conceptual design of aircraft.
+OpenConcept is a toolkit for the conceptual design of aircraft.
 It is open source (GitHub: https://github.com/mdolab/openconcept) and MIT licensed.
 OpenConcept was developed in order to model and optimize aircraft with electric propulsion at low computational cost.
 The tools are built on top of NASA Glenn's `OpenMDAO <http://openmdao.org/>`__ framework, which in turn is written in Python.
@@ -46,7 +33,7 @@ Getting Started
 ------------
 Dependencies
 ------------
-This toolkit requires the use of `OpenMDAO <https://openmdao.org>`__ 3.10.0 or later due to backward-incompatible changes. OpenMDAO requires a late NumPy and SciPy.
+This toolkit requires the use of `OpenMDAO <https://openmdao.org>`__ 3.10.0 or later due to backward-incompatible changes. OpenMDAO requires a recent NumPy and SciPy.
 If you'd like to use the OpenAeroStruct features of OpenConcept, OpenMDAO 3.10 is required because that is the newest version supported by OpenAeroStruct at the time of writing this.
 Python 3.8 is recommended since it is the version with which the code is tested, but newer Python versions will likely work as well.
 

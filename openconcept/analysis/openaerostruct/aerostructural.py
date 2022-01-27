@@ -1291,18 +1291,14 @@ class Aerostruct(om.Group):
 
 class OASAerostructDragPolarExact(om.Group):
     """
-    *WARNING WARNING WARNING*
-    
-    This component is far more computationally expensive than the
-    OASAerostructDragPolar component, which uses a surrogate. For missions
-    with many flight segments, many num_nodes, or wing models with high
-    num_x and num_y values this component will result in a system that
-    returns a memory error when solved with a DirectSolver linear solver
-    because the Jacobian is too large to be factorized. Unless you know
-    what you're doing, this component should not be used (use
-    OASAerostructDragPolar instead).
-
-    *WARNING WARNING WARNING*
+    .. warning:: This component is far more computationally expensive than the
+                 OASAerostructDragPolar component, which uses a surrogate. For missions
+                 with many flight segments, many num_nodes, or wing models with high
+                 num_x and num_y values this component will result in a system that
+                 returns a memory error when solved with a DirectSolver linear solver
+                 because the Jacobian is too large to be factorized. Unless you know
+                 what you're doing, this component should not be used (use
+                 OASAerostructDragPolar instead).
 
     Drag polar and wing weight estimate generated using OpenAeroStruct's
     aerostructural analysis capabilities directly, without a surrogate in the loop.
