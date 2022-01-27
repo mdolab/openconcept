@@ -44,10 +44,12 @@ class OASDragPolar(om.Group):
     Drag polar generated using OpenAeroStruct's vortex lattice method and a surrogate
     model to decrease the computational cost.
 
-    NOTE: twist is ordered starting at the tip and moving to the root; a twist \
-          of [-1, 0, 1] would have a tip twist of -1 deg and root twist of 1 deg
+    Notes
+    -----
+    Twist is ordered starting at the tip and moving to the root; a twist
+    of [-1, 0, 1] would have a tip twist of -1 deg and root twist of 1 deg
 
-    NOTE: set the OMP_NUM_THREADS environment variable to 1 for much better parallel training performance!
+    Set the OMP_NUM_THREADS environment variable to 1 for much better parallel training performance!
 
     Inputs
     ------
@@ -577,8 +579,10 @@ class VLM(om.Group):
     """
     Computes lift and drag using OpenAeroStruct's vortex lattice implementation.
 
-    NOTE: twist is ordered starting at the tip and moving to the root; a twist
-          of [-1, 0, 1] would have a tip twist of -1 deg and root twist of 1 deg
+    Notes
+    -----
+    Twist is ordered starting at the tip and moving to the root; a twist
+    of [-1, 0, 1] would have a tip twist of -1 deg and root twist of 1 deg
 
     Inputs
     ------

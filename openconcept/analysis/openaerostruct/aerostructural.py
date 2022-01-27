@@ -55,11 +55,13 @@ class OASAerostructDragPolar(om.Group):
     This component cannot currently handle fuel loads on the wing,
     nor can it handle point loads applied to the structure.
 
-    NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered \
-          starting at the tip and moving to the root; a twist of [-1, 0, 1] would \
-          have a tip twist of -1 deg and root twist of 1 deg
+    Notes
+    -----
+    The spanwise variables (twist, toverc, skin/spar thickness) are ordered
+    starting at the tip and moving to the root; a twist of [-1, 0, 1] would
+    have a tip twist of -1 deg and root twist of 1 deg
 
-    NOTE: set the OMP_NUM_THREADS environment variable to 1 for much better parallel training performance!
+    Set the OMP_NUM_THREADS environment variable to 1 for much better parallel training performance!
 
     Inputs
     ------
@@ -259,9 +261,11 @@ class OASDataGen(om.ExplicitComponent):
     planform geometry by the inputs. This component will only recalculate
     the lift and drag grid when the planform shape changes.
 
-    NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered \
-          starting at the tip and moving to the root; a twist of [-1, 0, 1] would \
-          have a tip twist of -1 deg and root twist of 1 deg
+    Notes
+    -----
+    The spanwise variables (twist, toverc, skin/spar thickness) are ordered
+    starting at the tip and moving to the root; a twist of [-1, 0, 1] would
+    have a tip twist of -1 deg and root twist of 1 deg
 
     Inputs
     ------
@@ -760,9 +764,11 @@ class Aerostruct(om.Group):
     This component currently does not support distributed fuel loads
     or point loads added to the structure.
 
-    NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered \
-          starting at the tip and moving to the root; a twist of [-1, 0, 1] would \
-          have a tip twist of -1 deg and root twist of 1 deg
+    Notes
+    -----
+    The spanwise variables (twist, toverc, skin/spar thickness) are ordered
+    starting at the tip and moving to the root; a twist of [-1, 0, 1] would
+    have a tip twist of -1 deg and root twist of 1 deg
 
     Inputs
     ------
