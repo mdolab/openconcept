@@ -1,18 +1,3 @@
-"""
-This work was the basis of the following paper.
-Please cite it if you use this for your own publication!
-::
-
-    @InProceedings{Adler2022a,
-        author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
-        title       = {Aerostructural wing design optimization considering full mission analysis},
-        booktitle   = {AIAA SciTech Forum},
-        doi         = {10.2514/6.2022-0382},
-        month       = {January},
-        year        = {2022}
-    }
-"""
-
 from __future__ import division
 
 import numpy as np
@@ -41,6 +26,17 @@ from openconcept.analysis.atmospherics.temperature_comp import TemperatureComp
 from openconcept.analysis.atmospherics.pressure_comp import PressureComp
 from openconcept.analysis.atmospherics.density_comp import DensityComp
 from openconcept.analysis.atmospherics.speedofsound_comp import SpeedOfSoundComp
+
+CITATION = """
+@InProceedings{Adler2022a,
+    author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
+    title       = {Aerostructural wing design optimization considering full mission analysis},
+    booktitle   = {AIAA SciTech Forum},
+    doi         = {10.2514/6.2022-0382},
+    month       = {January},
+    year        = {2022}
+}
+"""
 
 
 class OASDragPolar(om.Group):
@@ -116,6 +112,10 @@ class OASDragPolar(om.Group):
         as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
         is limited to adjusting the input parameters to this component.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of analysis points to run")
@@ -262,6 +262,10 @@ class VLMDataGen(om.ExplicitComponent):
         as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
         is limited to adjusting the input parameters to this component.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
@@ -623,6 +627,10 @@ class VLM(om.Group):
         is limited to adjusting the input parameters to this component.
     """
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
+
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
         self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
@@ -800,6 +808,10 @@ class PlanformMesh(om.ExplicitComponent):
     num_y: int
         number of points in y (spanwise) direction (scalar, dimensionless)
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")

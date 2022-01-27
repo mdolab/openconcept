@@ -1,18 +1,3 @@
-"""
-This work was the basis of the following paper.
-Please cite it if you use this for your own publication!
-::
-
-    @InProceedings{Adler2022a,
-        author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
-        title       = {Aerostructural wing design optimization considering full mission analysis},
-        booktitle   = {AIAA SciTech Forum},
-        doi         = {10.2514/6.2022-0382},
-        month       = {January},
-        year        = {2022}
-    }
-"""
-
 from __future__ import division
 
 import numpy as np
@@ -48,6 +33,17 @@ from openconcept.analysis.atmospherics.speedofsound_comp import SpeedOfSoundComp
 
 # Utitilty for vector manipulation
 from openconcept.utilities.math.combine_split_comp import VectorConcatenateComp
+
+CITATION = """
+@InProceedings{Adler2022a,
+    author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
+    title       = {Aerostructural wing design optimization considering full mission analysis},
+    booktitle   = {AIAA SciTech Forum},
+    doi         = {10.2514/6.2022-0382},
+    month       = {January},
+    year        = {2022}
+}
+"""
 
 
 class OASAerostructDragPolar(om.Group):
@@ -150,6 +146,10 @@ class OASAerostructDragPolar(om.Group):
         as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
         is limited to adjusting the input parameters to this component.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of analysis points to run")
@@ -334,6 +334,10 @@ class OASDataGen(om.ExplicitComponent):
     regen_tol : float
         Difference in input variable above which to regenerate the training data.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
@@ -825,6 +829,10 @@ class Aerostruct(om.Group):
         as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
         is limited to adjusting the input parameters to this component.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
@@ -1382,6 +1390,10 @@ class OASAerostructDragPolarExact(om.Group):
         as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
         is limited to adjusting the input parameters to this component.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of analysis points to run")
