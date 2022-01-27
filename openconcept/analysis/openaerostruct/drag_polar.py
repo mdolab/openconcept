@@ -1,19 +1,3 @@
-"""
-This work was the basis of the following paper.
-Please cite it if you use this for your own publication!
-
-@InProceedings{Adler2022a,
-    author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
-    title       = {Aerostructural wing design optimization considering full mission analysis},
-    booktitle   = {AIAA SciTech Forum},
-    doi         = {10.2514/6.2022-0382},
-    month       = {January},
-    year        = {2022}
-}
-
-Eytan Adler (Jan 2022)
-"""
-
 from __future__ import division
 
 import numpy as np
@@ -43,16 +27,29 @@ from openconcept.analysis.atmospherics.pressure_comp import PressureComp
 from openconcept.analysis.atmospherics.density_comp import DensityComp
 from openconcept.analysis.atmospherics.speedofsound_comp import SpeedOfSoundComp
 
+CITATION = """
+@InProceedings{Adler2022a,
+    author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
+    title       = {Aerostructural wing design optimization considering full mission analysis},
+    booktitle   = {AIAA SciTech Forum},
+    doi         = {10.2514/6.2022-0382},
+    month       = {January},
+    year        = {2022}
+}
+"""
+
 
 class OASDragPolar(om.Group):
     """
     Drag polar generated using OpenAeroStruct's vortex lattice method and a surrogate
     model to decrease the computational cost.
 
-    NOTE: twist is ordered starting at the tip and moving to the root; a twist
-          of [-1, 0, 1] would have a tip twist of -1 deg and root twist of 1 deg
+    Notes
+    -----
+    Twist is ordered starting at the tip and moving to the root; a twist
+    of [-1, 0, 1] would have a tip twist of -1 deg and root twist of 1 deg
 
-    NOTE: set the OMP_NUM_THREADS environment variable to 1 for much better parallel training performance!
+    Set the OMP_NUM_THREADS environment variable to 1 for much better parallel training performance!
 
     Inputs
     ------
@@ -81,10 +78,10 @@ class OASDragPolar(om.Group):
         drag coefficient computed by OpenAeroStruct (scalar, dimensionless)
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
-        NOTE: fltcond|TempIncrement is a scalar in this component but a vector in OC.
-              This will be the case for the forseeable future because of the way the
-              VLMDataGen component is set up. To make it work, TempIncrement would
-              need to be an input to the surrogate, which is not worth the extra
+        NOTE: fltcond|TempIncrement is a scalar in this component but a vector in OC. \
+              This will be the case for the forseeable future because of the way the \
+              VLMDataGen component is set up. To make it work, TempIncrement would \
+              need to be an input to the surrogate, which is not worth the extra \
               training cost (at minimum a 2x increase).
 
     Outputs
@@ -117,6 +114,10 @@ class OASDragPolar(om.Group):
         as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
         is limited to adjusting the input parameters to this component.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of analysis points to run")
@@ -263,6 +264,10 @@ class VLMDataGen(om.ExplicitComponent):
         as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
         is limited to adjusting the input parameters to this component.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
@@ -574,8 +579,10 @@ class VLM(om.Group):
     """
     Computes lift and drag using OpenAeroStruct's vortex lattice implementation.
 
-    NOTE: twist is ordered starting at the tip and moving to the root; a twist
-          of [-1, 0, 1] would have a tip twist of -1 deg and root twist of 1 deg
+    Notes
+    -----
+    Twist is ordered starting at the tip and moving to the root; a twist
+    of [-1, 0, 1] would have a tip twist of -1 deg and root twist of 1 deg
 
     Inputs
     ------
@@ -623,6 +630,10 @@ class VLM(om.Group):
         as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
         is limited to adjusting the input parameters to this component.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
@@ -801,6 +812,10 @@ class PlanformMesh(om.ExplicitComponent):
     num_y: int
         number of points in y (spanwise) direction (scalar, dimensionless)
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")

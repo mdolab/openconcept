@@ -2,9 +2,9 @@
 
 ### Author: Benjamin J. Brelje and Eytan J. Adler
 
-[![Build Status](https://github.com/mdolab/openconcept/workflows/Build/badge.svg?branch=master)](https://github.com/mdolab/openconcept/actions?query=branch%3Amaster)
-[![Coverage Status](https://coveralls.io/repos/github/mdolab/openconcept/badge.svg)](https://coveralls.io/github/mdolab/openconcept)
-[![Documentation Status](https://readthedocs.org/projects/openconcept/badge/?version=latest)](https://openconcept.readthedocs.io/en/latest/?badge=latest)
+[![Build](https://github.com/mdolab/openconcept/workflows/Build/badge.svg?branch=master)](https://github.com/mdolab/openconcept/actions?query=branch%3Amaster)
+[![Coverage](https://codecov.io/gh/mdolab/openconcept/branch/master/graph/badge.svg?token=RR8CN3IOSL)](https://codecov.io/gh/mdolab/openconcept)
+[![Documentation](https://readthedocs.com/projects/mdolab-openconcept/badge/?version=latest)](https://mdolab-openconcept.readthedocs-hosted.com/en/latest/?badge=latest)
 
 OpenConcept is a new toolkit for the conceptual design of aircraft. OpenConcept was developed in order to model and optimize aircraft with electric propulsion at low computational cost. The tools are built on top of NASA Glenn's [OpenMDAO](http://openmdao.org/) framework, which in turn is written in Python.
 
@@ -16,22 +16,25 @@ The reason for OpenConcept's efficiency is the analytic derivatives built into e
 
 ## Documentation
 
-Automatically-generated documentation is available at (https://openconcept.readthedocs.io)
+Automatically-generated documentation is available at (https://mdolab-openconcept.readthedocs-hosted.com/en/latest/).
+
+To build the docs locally, install the `sphinx_mdolab_theme` and `redbaron` via `pip`. Then enter the `docs` folder in the root directory and run `make html`. The built documentation can be viewed by opening `_build/html/index.html`.
 
 ## Getting Started
 
-1. Clone the repo to disk
+1. Clone the repo to disk (`git clone https://github.com/mdolab/openconcept`)
 2. Navigate to the root `openconcept` folder
 3. Run `pip install -e .` to install the package (the `-e` can be omitted if not editing the source)
 4. Navigate to the `examples` folder
 5. Run `python TBM850.py` to test OpenConcept on a single-engine turboprop aircraft (the TBM 850)
-6. Look at the `examples/aircraft data/TBM850.py` folder to play with the assumptions / config / geometry and see the effects on the output result
+6. Look at the `examples/aircraft data/TBM850.py` file to play with the assumptions / config / geometry and see the effects on the output result
 
 `examples/HybridTwin.py` is set up to do MDO in a grid of specific energies and design ranges and save the results to disk. Visualization utilities will be added soon (to produce contour plots as shown in this Readme)
 
 ### Requirements
 
 This toolkit requires the use of [OpenMDAO](https://openmdao.org/) 3.10.0 or later. OpenMDAO requires a late NumPy and SciPy.
+If you'd like to use the OpenAeroStruct features of OpenConcept, OpenMDAO 3.10 is required because that is the newest version supported by OpenAeroStruct at the time of writing this.
 
 ## Citation
 

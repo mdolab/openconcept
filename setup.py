@@ -26,20 +26,20 @@ setup(
         'Operating System :: Microsoft :: Windows',
         'Topic :: Scientific/Engineering',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: Implementation :: CPython',
     ],
     keywords='aircraft design optimization multidisciplinary multi-disciplinary analysis',
-    author='Benjamin Brelje',
-    author_email='bbrelje@umich.edu',
+    author='Benjamin J. Brelje and Eytan J. Adler',
+    author_email='bbrelje@umich.edu and eytana@umich.edu',
     url='http://www.brelje.net',
-    download_url='https://github.com/bbrelje/openconcept',
+    download_url='https://github.com/mdolab/openconcept',
     license='MIT License',
     packages=[
         'openconcept',
         'openconcept.analysis',
         'openconcept.analysis.atmospherics',
+        'openconcept.analysis.openaerostruct',
         'openconcept.analysis.performance',
         'openconcept.analysis.tests',
         'openconcept.components',
@@ -54,6 +54,7 @@ setup(
         'openmdao>=3.10.0',
     ],
     extras_require = {
-        'testing':  ["pytest", "openmdao[docs]", "redbaron"]
+        'testing':  ["pytest", "openmdao[docs]", "redbaron", "sphinx_mdolab_theme",
+                     "openaerostruct @ git+https://github.com/mdolab/OpenAeroStruct.git@master"]
       },
 )

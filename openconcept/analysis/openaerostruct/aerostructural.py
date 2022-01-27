@@ -1,19 +1,3 @@
-"""
-This work was the basis of the following paper.
-Please cite it if you use this for your own publication!
-
-@InProceedings{Adler2022a,
-    author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
-    title       = {Aerostructural wing design optimization considering full mission analysis},
-    booktitle   = {AIAA SciTech Forum},
-    doi         = {10.2514/6.2022-0382},
-    month       = {January},
-    year        = {2022}
-}
-
-Eytan Adler (Jan 2022)
-"""
-
 from __future__ import division
 
 import numpy as np
@@ -50,6 +34,17 @@ from openconcept.analysis.atmospherics.speedofsound_comp import SpeedOfSoundComp
 # Utitilty for vector manipulation
 from openconcept.utilities.math.combine_split_comp import VectorConcatenateComp
 
+CITATION = """
+@InProceedings{Adler2022a,
+    author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
+    title       = {Aerostructural wing design optimization considering full mission analysis},
+    booktitle   = {AIAA SciTech Forum},
+    doi         = {10.2514/6.2022-0382},
+    month       = {January},
+    year        = {2022}
+}
+"""
+
 
 class OASAerostructDragPolar(om.Group):
     """
@@ -60,11 +55,13 @@ class OASAerostructDragPolar(om.Group):
     This component cannot currently handle fuel loads on the wing,
     nor can it handle point loads applied to the structure.
 
-    NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered
-          starting at the tip and moving to the root; a twist of [-1, 0, 1] would
-          have a tip twist of -1 deg and root twist of 1 deg
+    Notes
+    -----
+    The spanwise variables (twist, toverc, skin/spar thickness) are ordered
+    starting at the tip and moving to the root; a twist of [-1, 0, 1] would
+    have a tip twist of -1 deg and root twist of 1 deg
 
-    NOTE: set the OMP_NUM_THREADS environment variable to 1 for much better parallel training performance!
+    Set the OMP_NUM_THREADS environment variable to 1 for much better parallel training performance!
 
     Inputs
     ------
@@ -102,10 +99,10 @@ class OASAerostructDragPolar(om.Group):
         drag coefficient computed by OpenAeroStruct (scalar, dimensionless)
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
-        NOTE: fltcond|TempIncrement is a scalar in this component but a vector in OC.
-              This will be the case for the forseeable future because of the way the
-              OASDataGen component is set up. To make it work, TempIncrement would
-              need to be an input to the surrogate, which is not worth the extra
+        NOTE: fltcond|TempIncrement is a scalar in this component but a vector in OC. \
+              This will be the case for the forseeable future because of the way the \
+              OASDataGen component is set up. To make it work, TempIncrement would \
+              need to be an input to the surrogate, which is not worth the extra \
               training cost (at minimum a 2x increase).
 
     Outputs
@@ -151,6 +148,10 @@ class OASAerostructDragPolar(om.Group):
         as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
         is limited to adjusting the input parameters to this component.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of analysis points to run")
@@ -260,9 +261,11 @@ class OASDataGen(om.ExplicitComponent):
     planform geometry by the inputs. This component will only recalculate
     the lift and drag grid when the planform shape changes.
 
-    NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered
-          starting at the tip and moving to the root; a twist of [-1, 0, 1] would
-          have a tip twist of -1 deg and root twist of 1 deg
+    Notes
+    -----
+    The spanwise variables (twist, toverc, skin/spar thickness) are ordered
+    starting at the tip and moving to the root; a twist of [-1, 0, 1] would
+    have a tip twist of -1 deg and root twist of 1 deg
 
     Inputs
     ------
@@ -335,6 +338,10 @@ class OASDataGen(om.ExplicitComponent):
     regen_tol : float
         Difference in input variable above which to regenerate the training data.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
@@ -757,9 +764,11 @@ class Aerostruct(om.Group):
     This component currently does not support distributed fuel loads
     or point loads added to the structure.
 
-    NOTE: the spanwise variables (twist, toverc, skin/spar thickness) are ordered
-          starting at the tip and moving to the root; a twist of [-1, 0, 1] would
-          have a tip twist of -1 deg and root twist of 1 deg
+    Notes
+    -----
+    The spanwise variables (twist, toverc, skin/spar thickness) are ordered
+    starting at the tip and moving to the root; a twist of [-1, 0, 1] would
+    have a tip twist of -1 deg and root twist of 1 deg
 
     Inputs
     ------
@@ -826,6 +835,10 @@ class Aerostruct(om.Group):
         as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
         is limited to adjusting the input parameters to this component.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
@@ -1292,18 +1305,14 @@ class Aerostruct(om.Group):
 
 class OASAerostructDragPolarExact(om.Group):
     """
-                          WARNING WARNING WARNING
-    ----------------------------------------------------------------------
-    This component is far more computationally expensive than the
-    OASAerostructDragPolar component, which uses a surrogate. For missions
-    with many flight segments, many num_nodes, or wing models with high
-    num_x and num_y values this component will result in a system that
-    returns a memory error when solved with a DirectSolver linear solver
-    because the Jacobian is too large to be factorized. Unless you know
-    what you're doing, this component should not be used (use
-    OASAerostructDragPolar instead).
-    ----------------------------------------------------------------------
-                          WARNING WARNING WARNING
+    .. warning:: This component is far more computationally expensive than the
+                 OASAerostructDragPolar component, which uses a surrogate. For missions
+                 with many flight segments, many num_nodes, or wing models with high
+                 num_x and num_y values this component will result in a system that
+                 returns a memory error when solved with a DirectSolver linear solver
+                 because the Jacobian is too large to be factorized. Unless you know
+                 what you're doing, this component should not be used (use
+                 OASAerostructDragPolar instead).
 
     Drag polar and wing weight estimate generated using OpenAeroStruct's
     aerostructural analysis capabilities directly, without a surrogate in the loop.
@@ -1344,10 +1353,10 @@ class OASAerostructDragPolarExact(om.Group):
         drag coefficient computed by OpenAeroStruct (scalar, dimensionless)
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
-        NOTE: fltcond|TempIncrement is a scalar in this component but a vector in OC.
-              This will be the case for the forseeable future because of the way the
-              OASDataGen component is set up. To make it work, TempIncrement would
-              need to be an input to the surrogate, which is not worth the extra
+        NOTE: fltcond|TempIncrement is a scalar in this component but a vector in OC. \
+              This will be the case for the forseeable future because of the way the \
+              OASDataGen component is set up. To make it work, TempIncrement would \
+              need to be an input to the surrogate, which is not worth the extra \
               training cost (at minimum a 2x increase).
 
     Outputs
@@ -1387,6 +1396,10 @@ class OASAerostructDragPolarExact(om.Group):
         as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
         is limited to adjusting the input parameters to this component.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cite = CITATION
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of analysis points to run")
