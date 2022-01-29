@@ -834,6 +834,12 @@ class Aerostruct(om.Group):
         the <transformation>_cp options are not supported. The input ac|geom|wing|twist is the same
         as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
         is limited to adjusting the input parameters to this component.
+    set_defaults : bool
+        If True, sets Mach number and alpha input defaults. This option should almost never need
+        to be set!!  It is for the edge case where OASAerostructDragPolarExact vectorizes this
+        component directly. For some reason, setting the input defaults here (at least in
+        OpenMDAO 3.16.0) prevents the proper shape from being set in OASAerostructDragPolarExact.
+        (default, True)
     """
 
     def __init__(self, **kwargs):
@@ -848,6 +854,7 @@ class Aerostruct(om.Group):
         self.options.declare("num_skin", default=4, desc="Number of skin thickness spline control points")
         self.options.declare("num_spar", default=4, desc="Number of spar thickness spline control points")
         self.options.declare("surf_options", default=None, desc="Dictionary of OpenAeroStruct surface options")
+        self.options.declare("set_defaults", default=True, desc="Sets input defaults for Mach number and alpha")
 
     def setup(self):
         n_x = int(self.options["num_x"])
@@ -1277,8 +1284,9 @@ class Aerostruct(om.Group):
         self.connect("sound_speed.fltcond|a", "aerostruct_point.speed_of_sound")
 
         # Set input defaults for inputs that go to multiple locations
-        self.set_input_defaults("fltcond|M", 0.1)
-        self.set_input_defaults("fltcond|alpha", 0.0)
+        if self.options["set_defaults"]:
+            self.set_input_defaults("fltcond|M", 0.1)
+            self.set_input_defaults("fltcond|alpha", 0.0)
         self.set_input_defaults("load_factor", 1.0)
         self.set_input_defaults("aerostruct_point.coupled.wing.nodes", np.zeros((n_y, 3)), units="m")
         self.set_input_defaults("W0", 1.0, units="kg")  # unused variable but must be set since promoted
@@ -1427,6 +1435,7 @@ class OASAerostructDragPolarExact(om.Group):
                     num_skin=self.options["num_skin"],
                     num_spar=self.options["num_spar"],
                     surf_options=self.options["surf_options"],
+                    set_defaults=False,
                 ),
                 promotes_inputs=[
                     "ac|geom|wing|S_ref",
