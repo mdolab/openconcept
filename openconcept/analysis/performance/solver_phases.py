@@ -995,8 +995,8 @@ class TakeoffTransition(ExplicitComponent):
         self.options.declare('h_obstacle',default=10.66,desc='Obstacle clearance height in m')
         self.options.declare('load_factor', default=1.2, desc='Load factor during circular arc transition')
     def setup(self):
-        self.add_input('fltcond|Utrue', units='m/s', src_indices=0, flat_src_indices=True)
-        self.add_input('gamma', units='rad', src_indices=0, flat_src_indices=True)
+        self.add_input('fltcond|Utrue', units='m/s')
+        self.add_input('gamma', units='rad')
         self.add_output('s_transition', units='m')
         self.add_output('h_transition', units='m')
         self.add_output('t_transition',units='s')
@@ -1077,8 +1077,8 @@ class TakeoffClimb(ExplicitComponent):
         self.options.declare('h_obstacle',default=10.66,desc='Obstacle clearance height in m')
     def setup(self):
         self.add_input('h_transition', units='m')
-        self.add_input('gamma', units='rad',src_indices=-1, flat_src_indices=True)
-        self.add_input('fltcond|Utrue', units='m/s',src_indices=-1, flat_src_indices=True)
+        self.add_input('gamma', units='rad')
+        self.add_input('fltcond|Utrue', units='m/s')
 
         self.add_output('s_climb', units='m')
         self.add_output('t_climb', units='s')
@@ -1202,8 +1202,10 @@ class RobustRotationPhase(oc.PhaseGroup):
         # the aircraft model needs to provide thrust and drag
         self.add_subsystem('acmodel',self.options['aircraft_model'](num_nodes=nn,flight_phase=self.options['flight_phase']),promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('climbangle',ClimbAngleComp(num_nodes=nn),promotes_inputs=['drag','weight','thrust'],promotes_outputs=['gamma'])
-        self.add_subsystem('transition',TakeoffTransition(),promotes_inputs=['fltcond|Utrue','gamma'],promotes_outputs=['h_transition','s_transition','t_transition'])
-        self.add_subsystem('v2climb',TakeoffClimb(),promotes_inputs=['h_transition','gamma','fltcond|Utrue'],promotes_outputs=['s_climb','t_climb'])
+        self.add_subsystem('transition',TakeoffTransition(),promotes_outputs=['h_transition','s_transition','t_transition'])
+        self.promotes('transition', inputs=['fltcond|Utrue','gamma'], src_indices=0, flat_src_indices=True)
+        self.add_subsystem('v2climb',TakeoffClimb(),promotes_inputs=['h_transition'],promotes_outputs=['s_climb','t_climb'])
+        self.promotes('v2climb', inputs=['fltcond|Utrue','gamma'], src_indices=-1, flat_src_indices=True)
         self.add_subsystem('tod_final',AddSubtractComp(output_name='range_final',input_names=['range_initial','s_transition','s_climb'],units='m'),promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('duration',AddSubtractComp(output_name='duration',input_names=['t_transition','t_climb'],units='s'),promotes_inputs=['*'],promotes_outputs=['*'])
         self.add_subsystem('h_final',AddSubtractComp(output_name='fltcond|h_final',input_names=['h_obstacle'],units='m'),promotes_inputs=['*'],promotes_outputs=['*'])
