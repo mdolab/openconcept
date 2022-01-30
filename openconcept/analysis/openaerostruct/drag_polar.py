@@ -4,7 +4,7 @@ import numpy as np
 import openmdao.api as om
 from time import time
 from copy import copy, deepcopy
-import multiprocessing.pool as mp
+import multiprocessing as mp
 
 # Progress bar
 progress_bar = True
@@ -477,6 +477,17 @@ def compute_training_data(inputs, surf_dict=None):
         inputs_to_send[key] = inputs[key]
     for row in test_points:
         row[-1] = inputs_to_send
+
+
+    # Needed for GitHub Action's coverage testing (via pytest-cov)
+    # to run properly when the multiprocessing package is used
+    # https://pytest-cov.readthedocs.io/en/latest/subprocess-support.html#if-you-use-multiprocessing-process
+    try:
+        from pytest_cov.embed import cleanup_on_sigterm
+    except ImportError:
+        pass
+    else:
+        cleanup_on_sigterm()
 
     # Initialize the parallel pool and compute the OpenAeroStruct data
     with mp.Pool() as parallel_pool:
