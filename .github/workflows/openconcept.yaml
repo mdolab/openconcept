@@ -42,11 +42,8 @@ jobs:
     - name: Set OMP_NUM_THREADS=1 to improve OAS training time (Linux/macOS)
       if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macOS-latest' }}
       run: |
-        export OMP_NUM_THREADS=1
-    - name: Set OMP_NUM_THREADS=1 to improve OAS training time (Windows)
-      if: ${{ matrix.os == 'windows-latest' }}
-      run: |
-        set OMP_NUM_THREADS=1
+        echo "export OMP_NUM_THREADS=1" | tee -a ~/.bashrc
+        source ~/.bashrc
     - name: Debug aerostruct tests
       run: |
         echo $OMP_NUM_THREADS
