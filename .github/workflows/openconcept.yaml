@@ -29,7 +29,6 @@ jobs:
         conda install numpy scipy
     - name: Install
       run: |
-        pip install coverage pytest-cov sphinx_rtd_theme
         pip install .[testing]
     - name: Download engine deck surrogate model
       run: |
