@@ -479,11 +479,11 @@ def compute_training_data(inputs, surf_dict=None):
         row[-1] = inputs_to_send
 
     # Initialize the parallel pool and compute the OpenAeroStruct data
-    parallel_pool = mp.Pool()
-    if progress_bar:
-        out = list(tqdm.tqdm(parallel_pool.imap(compute_aerodynamic_data, test_points), total=len(test_points)))
-    else:
-        out = list(parallel_pool.map(compute_aerodynamic_data, test_points))
+    with mp.Pool() as parallel_pool:
+        if progress_bar:
+            out = list(tqdm.tqdm(parallel_pool.imap(compute_aerodynamic_data, test_points), total=len(test_points)))
+        else:
+            out = list(parallel_pool.map(compute_aerodynamic_data, test_points))
 
     # Initialize output arrays
     CL = np.zeros(inputs["Mach_number_grid"].shape)
