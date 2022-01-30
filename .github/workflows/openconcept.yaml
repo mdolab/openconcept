@@ -35,7 +35,7 @@ jobs:
     - name: Debug aerostruct tests
       if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macOS-latest' }}
       run: |
-        python -m pytest openconcept/analysis/openaerostruct/tests
+        python -m pytest  --cov-config=.coveragerc --cov=openconcept --cov-report=xml openconcept/analysis/openaerostruct/tests
     - name: Download engine deck surrogate model
       run: |
         curl -L -o engine_kriging_surrogate_model.tar.gz http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
