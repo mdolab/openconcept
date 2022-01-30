@@ -13,6 +13,8 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
       fail-fast: false
+    env:
+      OMP_NUM_THREADS: 1
     defaults:
       run:
         shell: bash -l {0}
@@ -30,6 +32,9 @@ jobs:
     - name: Install
       run: |
         pip install .[testing]
+    - name: Debug aerostruct tests
+      run: |
+        python openconcept/analysis/openaerostruct/tests/test_aerostructural.py
     - name: Download engine deck surrogate model
       run: |
         curl -L -o engine_kriging_surrogate_model.tar.gz http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
@@ -39,15 +44,6 @@ jobs:
         mv cfm56* ./openconcept/components/empirical_data/cfm56
         mv n3_hybrid* ./openconcept/components/empirical_data/n+3_hybrid
         mv n3* ./openconcept/components/empirical_data/n+3
-    - name: Set OMP_NUM_THREADS=1 to improve OAS training time (Linux/macOS)
-      if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macOS-latest' }}
-      run: |
-        echo "export OMP_NUM_THREADS=1" | tee -a ~/.bashrc
-        source ~/.bashrc
-    - name: Debug aerostruct tests
-      run: |
-        echo $OMP_NUM_THREADS
-        python openconcept/analysis/openaerostruct/tests/test_aerostructural.py
     - name: Build and Test
       run: |
         python -m pytest --cov-config=.coveragerc --cov=openconcept --cov-report=xml
