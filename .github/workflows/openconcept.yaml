@@ -39,6 +39,9 @@ jobs:
         mv cfm56* ./openconcept/components/empirical_data/cfm56
         mv n3_hybrid* ./openconcept/components/empirical_data/n+3_hybrid
         mv n3* ./openconcept/components/empirical_data/n+3
+    - name: Debug aerostruct tests
+      run: |
+        python openconcept/analysis/openaerostruct/tests/test_aerostructural.py
     - name: Build and Test
       run: |
         python -m pytest --cov-config=.coveragerc --cov=openconcept --cov-report=xml
