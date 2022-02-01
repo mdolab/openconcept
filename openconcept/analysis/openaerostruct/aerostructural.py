@@ -621,16 +621,6 @@ def compute_training_data(inputs, surf_dict=None):
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=np.ComplexWarning)
 
-        # Needed for GitHub Action's coverage testing (via pytest-cov)
-        # to run properly when the multiprocessing package is used
-        # https://pytest-cov.readthedocs.io/en/latest/subprocess-support.html#if-you-use-multiprocessing-process
-        try:
-            from pytest_cov.embed import cleanup_on_sigterm
-        except ImportError:
-            pass
-        else:
-            cleanup_on_sigterm()
-
         # Initialize the parallel pool and compute the OpenAeroStruct data
         with mp.Pool() as parallel_pool:
             if progress_bar:
