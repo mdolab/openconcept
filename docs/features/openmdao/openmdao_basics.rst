@@ -28,6 +28,7 @@ Pay attention to these four class methods which are very common in OpenMDAO mode
 
 .. literalinclude:: /../openconcept/analysis/aerodynamics.py
     :pyobject: PolarDrag
+    :language: python
 
 Connections in OpenMDAO can be `defined explicitly <http://openmdao.org/twodocs/versions/latest/features/core_features/grouping_components/connect.html>`_, or `semi-implicitly through variable promotion <http://openmdao.org/twodocs/versions/latest/features/core_features/grouping_components/add_subsystem.html>`_.
 Refer to the OpenMDAO docs for more details.

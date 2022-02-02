@@ -17,6 +17,7 @@ The propulsion system is instantiated as an OpenMDAO `Group`.
 
 .. literalinclude:: /../examples/propulsion_layouts/simple_turboprop.py
     :pyobject: TurbopropPropulsionSystem
+    :language: python
 
 Series Hybrid Example
 ---------------------
@@ -27,6 +28,7 @@ This example illustrates the complexities which arise when electrical components
 
 .. literalinclude:: /../examples/propulsion_layouts/simple_series_hybrid.py
     :pyobject: SingleSeriesHybridElectricPropulsionSystem
+    :language: python
 
 Components
 ----------
