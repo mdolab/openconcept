@@ -57,6 +57,7 @@ setup(
         'testing': ["pytest", "pytest-cov", "coverage",
                     "openaerostruct @ git+https://github.com/mdolab/OpenAeroStruct.git@master"],
         'docs': ["sphinx_mdolab_theme",
-                 "openaerostruct @ git+https://github.com/mdolab/OpenAeroStruct.git@master"]
+                 "openaerostruct @ git+https://github.com/mdolab/OpenAeroStruct.git@master"],
+        'plot': ["matplotlib"]
       },
 )

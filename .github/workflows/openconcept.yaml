@@ -32,6 +32,7 @@ jobs:
     - name: Install
       run: |
         pip install .[testing]
+        pip install .[docs]
     - name: Download engine deck surrogate model
       run: |
         curl -L -o engine_kriging_surrogate_model.tar.gz http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
