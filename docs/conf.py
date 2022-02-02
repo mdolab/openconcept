@@ -215,13 +215,6 @@ extensions = [
     'sphinx.ext.coverage',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'embed_code',
-    'embed_options',
-    'embed_compare',
-    'embed_shell_cmd',
-    'embed_bibtex',
-    'embed_n2',
-    'tags'
 ]
 autodoc_inherit_docstrings = False
 autodoc_member_order = 'bysource'
@@ -261,8 +254,8 @@ pygments_style = 'sphinx'
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_rtd_theme'
-html_style = 'css/override_theme.css'
+# html_theme = 'sphinx_rtd_theme'
+# html_style = 'css/override_theme.css'
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.

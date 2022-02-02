@@ -26,8 +26,8 @@ Pay attention to these four class methods which are very common in OpenMDAO mode
     - The `compute` method establishes how the outputs should be computed.
     - The `compute_partials` method tells the component how to compute partial derivatives.
 
-.. embed-code::
-    openconcept.analysis.aerodynamics.PolarDrag
+.. literalinclude:: /../openconcept/analysis/aerodynamics.py
+    :pyobject: PolarDrag
 
 Connections in OpenMDAO can be `defined explicitly <http://openmdao.org/twodocs/versions/latest/features/core_features/grouping_components/connect.html>`_, or `semi-implicitly through variable promotion <http://openmdao.org/twodocs/versions/latest/features/core_features/grouping_components/add_subsystem.html>`_.
 Refer to the OpenMDAO docs for more details.
