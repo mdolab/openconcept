@@ -11,7 +11,7 @@ This greatly reduces the computational cost of solving nonlinear equations and p
 Users unfamiliar with OpenMDAO are encouraged to visit the `getting started <http://openmdao.org/twodocs/versions/latest/getting_started/index.html>`_ page on their doc site.
 I will cover several portions of the OpenMDAO package that are used extensively in OpenMDAO.
 
-``Component``, ``Group``, and Connections
+Component, Group, and Connections
 -------------------------------------
 OpenMDAO models are generally made up of numerous ``Component`` instances.
 Components can be combined into a ``Group`` of components.
