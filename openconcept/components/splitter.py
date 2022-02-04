@@ -15,10 +15,10 @@ class PowerSplit(ExplicitComponent):
     power_rating : float
         Maximum rated power of the split mechanism. (scalar, W)
     power_split_fraction:
-        If `'rule'` is set to `'fraction'`, sets percentage of input power directed
+        If ``'rule'`` is set to ``'fraction'``, sets percentage of input power directed
         to Output A (minus losses). (vector, dimensionless)
     power_split_amount:
-        If `'rule'` is set to `'fixed'`, sets amount of input power to Output A (minus
+        If ``'rule'`` is set to ``'fixed'``, sets amount of input power to Output A (minus
         losses). (vector, W)
 
     Outputs
@@ -41,8 +41,8 @@ class PowerSplit(ExplicitComponent):
     num_nodes : int
         Number of analysis points to run (sets vec length; default 1)
     rule : str
-        Power split control rule to use; either `'fixed'` where a set
-        amount of power is sent to Output A or `'fraction'` where a
+        Power split control rule to use; either ``'fixed'`` where a set
+        amount of power is sent to Output A or ``'fraction'`` where a
         fraction of the total power is sent to Output A
     efficiency : float
         Component efficiency (default 1)

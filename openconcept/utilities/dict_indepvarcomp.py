@@ -12,12 +12,12 @@ class DictIndepVarComp(IndepVarComp):
     a name matching their location in the data tree.
 
     For example, let's assume we have stored some data about a vehicle in a dictionary
-    which can be accessed using the Python expression `vehicledata['wheels']['diameter']`.
-    The structured_name in this case is `'wheels|diameter'`.
+    which can be accessed using the Python expression ``vehicledata['wheels']['diameter']``.
+    The structured_name in this case is ``'wheels|diameter'``.
 
-    The user instantiates a component as `DictIndepVarComp(vehicledata)`
+    The user instantiates a component as ``DictIndepVarComp(vehicledata)``
     and adds an output as follows:
-    `component_instance.add_output_from_dict('wheels|diameter')`.
+    ``component_instance.add_output_from_dict('wheels|diameter')``.
 
     Outputs are created after initialization and are user-defined.
 
