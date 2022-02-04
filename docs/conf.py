@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.abspath('./_exts'))
 # so we add it to the path
 this_directory = os.path.abspath(os.path.dirname(__file__))
 
-# sys.path.insert(0, os.path.abspath(openconcept.__path__[0]+r'/docs/_exts'))
+sys.path.insert(0, os.path.abspath(openconcept.__path__[0]+r'/docs/_exts'))
 
 
 def generate_src_docs(dir, top, packages):
@@ -210,6 +210,7 @@ extensions = [
 	'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
+    "sphinx_copybutton",
 ]
 autodoc_inherit_docstrings = False
 autodoc_member_order = 'bysource'
@@ -234,9 +235,6 @@ master_doc = 'index'
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
 language = None
-
-# The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
 
 
 # -- Options for HTML output -------------------------------------------------
