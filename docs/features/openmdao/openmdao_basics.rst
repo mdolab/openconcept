@@ -12,7 +12,7 @@ Users unfamiliar with OpenMDAO are encouraged to visit the `getting started <htt
 I will cover several portions of the OpenMDAO package that are used extensively in OpenMDAO.
 
 Component, Group, and Connections
--------------------------------------
+---------------------------------
 OpenMDAO models are generally made up of numerous ``Component`` instances.
 Components can be combined into a ``Group`` of components.
 Each component (with some exceptions) has *inputs* and *outputs*.
@@ -37,8 +37,8 @@ In general, I use variable promotion if I have some high-level design parameters
 I use structured, unambiguous variable names so I can find and replace them if I need to refactor the code.
 Explicit connections are useful down at lower levels in the model where only one or two connections need to be made and it's unlikely that end users will edit the model.
 
-The ``Problem`` Class
--------------------
+The Problem Class
+-----------------
 To perform analysis and/or optimization, OpenMDAO requires a ``Problem`` object to be instantiated.
 Examples of problems representative of aircraft design can be found in the OpenConcept ``examples/`` folder.
 
