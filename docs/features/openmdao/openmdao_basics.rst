@@ -9,7 +9,7 @@ It is a Python-based environment for modeling, simulation, and optimization whic
 This greatly reduces the computational cost of solving nonlinear equations and performing gradient-based optimization.
 
 Users unfamiliar with OpenMDAO are encouraged to visit the `getting started <http://openmdao.org/twodocs/versions/latest/getting_started/index.html>`_ page on their doc site.
-I will cover several portions of the OpenMDAO package that are used extensively in OpenMDAO.
+I will cover several portions of the OpenMDAO package that are used extensively in OpenConcept.
 
 Component, Group, and Connections
 ---------------------------------
