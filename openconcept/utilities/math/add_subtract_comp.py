@@ -88,7 +88,7 @@ class AddSubtractComp(ExplicitComponent):
         else:
             raise ValueError(
                 "first argument to adder init must be either of type "
-                "`str' or 'None'")
+                "'str' or 'None'")
 
     def add_equation(self, output_name, input_names, vec_size=1, length=1, val=1.0,
                      units=None, res_units=None, desc='', lower=None, upper=None, ref=1.0,

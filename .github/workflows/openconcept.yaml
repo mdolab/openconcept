@@ -13,6 +13,8 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
       fail-fast: false
+    env:
+      OMP_NUM_THREADS: 1
     defaults:
       run:
         shell: bash -l {0}
@@ -29,8 +31,8 @@ jobs:
         conda install numpy scipy
     - name: Install
       run: |
-        pip install coverage pytest-cov sphinx_rtd_theme
         pip install .[testing]
+        pip install .[docs]
     - name: Download engine deck surrogate model
       run: |
         curl -L -o engine_kriging_surrogate_model.tar.gz http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
@@ -44,7 +46,7 @@ jobs:
       run: |
         python -m pytest --cov-config=.coveragerc --cov=openconcept --cov-report=xml
     - name: Upload coverage to Codecov
-      if: ${{ matrix.os == 'ubuntu-latest'}}
+      if: ${{ matrix.os == 'ubuntu-latest' }}
       uses: codecov/codecov-action@v2
       with:
         fail_ci_if_error: true

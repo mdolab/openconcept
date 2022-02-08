@@ -374,7 +374,7 @@ class OASAerostructDragPolarExactTestCase(unittest.TestCase):
         p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, atol=1e-8, rtol=1e-10)
         p.model.linear_solver = om.DirectSolver()
         p.model.set_input_defaults(
-            "fltcond|CL", np.array([0.094142402327027, 0.158902999486838, 0.223695460208479]), units="deg"
+            "fltcond|CL", np.array([0.094142402327027, 0.158902999486838, 0.223695460208479]),
         )
         p.model.set_input_defaults("fltcond|M", np.full(nn, 0.85))
         p.model.set_input_defaults("fltcond|h", np.full(nn, 7.5e3), units="m")
