@@ -76,7 +76,7 @@ class OSFGeometryTestCase(unittest.TestCase):
         assert_near_equal(prob['delta_p_hot'], -9112.282754, tolerance=1e-6 )
         assert_near_equal(prob['component_weight'], 1.147605, tolerance=1e-5 )
 
-        partials = prob.check_partials(method='cs',compact_print=True, show_only_incorrect=True)
+        partials = prob.check_partials(method='cs',compact_print=True, show_only_incorrect=True, step=1e-50)
         assert_check_partials(partials)
 
     def test_kayslondon_10_61(self):
@@ -358,7 +358,7 @@ class TestHXByHand(unittest.TestCase):
         assert_near_equal(prob['redh.Re_dh_cold'], redh_cold, tolerance=1e-6)
         assert_near_equal(prob['redh.Re_dh_hot'], redh_hot, tolerance=1e-6)
 
-        partials = prob.check_partials(method='cs',compact_print=True, show_only_incorrect=True)
+        partials = prob.check_partials(method='cs',compact_print=True, show_only_incorrect=True, step=1e-50)
         assert_check_partials(partials)
 
         j_cold = 0.6522*redh_cold**-0.5403*alpha_cold**-0.1541*delta_cold**0.1499*gamma_cold**-0.0678 * (1 + 5.269e-5*redh_cold**1.340*alpha_cold**0.504*delta_cold**0.456*gamma_cold**-1.055)**0.1

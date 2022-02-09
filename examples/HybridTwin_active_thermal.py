@@ -23,6 +23,13 @@ from openconcept.analysis.performance.mission_profiles import BasicMission
 from openconcept.utilities.linearinterp import LinearInterpolator
 from openconcept.utilities.visualization import plot_trajectory
 
+"""
+WARNING: This example has known convergence problems because of the chiller in the
+         propulsion layout (TwinSeriesHybridElectricPropulsionRefrigerated)
+
+Eytan Adler, 27/10/2021
+"""
+
 class AugmentedFBObjective(ExplicitComponent):
     def setup(self):
         self.add_input('fuel_burn', units='kg')
@@ -62,7 +69,7 @@ class SeriesHybridTwinModel(Group):
                                            promotes_inputs=[('start_val', 'hybridization'),
                                                             ('end_val', 'hybridization')])
 
-        propulsion_promotes_outputs = ['fuel_flow','thrust', 'bypass_refrig']
+        propulsion_promotes_outputs = ['fuel_flow','thrust']
         propulsion_promotes_inputs = ["fltcond|*", "ac|propulsion|*", "throttle", "propulsor_active",
                                       "ac|weights*", 'duration']
 
@@ -100,7 +107,7 @@ class SeriesHybridTwinModel(Group):
         self.connect('propmodel.duct.drag','hxadder.drag_hx')
         self.connect('propmodel.hx.frontal_area','hxadder.hx_frontal_area')
         self.add_subsystem('nozzle_area', MaxComp(num_nodes=nn, units='m**2'))
-        self.connect('propmodel.refrig.hot_side_balance_param', 'nozzle_area.array')
+        self.connect('propmodel.area_nozzle', 'nozzle_area.array')
         self.connect('nozzle_area.max','hxadder.nozzle_area')
         intfuel = self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson', diff_units='s',
                                                               time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
@@ -176,12 +183,12 @@ class ElectricTwinAnalysisGroup(Group):
                                                  ['*'])
 
         margins = self.add_subsystem('margins',ExecComp('MTOW_margin = MTOW - OEW - total_fuel - W_battery - payload',
-                                                        MTOW_margin={'units':'lbm','value':100},
-                                                        MTOW={'units':'lbm','value':10000},
-                                                        OEW={'units':'lbm','value':5000},
-                                                        total_fuel={'units':'lbm','value':1000},
-                                                        W_battery={'units':'lbm','value':1000},
-                                                        payload={'units':'lbm','value':1000}),
+                                                        MTOW_margin={'units':'lbm','val':100},
+                                                        MTOW={'units':'lbm','val':10000},
+                                                        OEW={'units':'lbm','val':5000},
+                                                        total_fuel={'units':'lbm','val':1000},
+                                                        W_battery={'units':'lbm','val':1000},
+                                                        payload={'units':'lbm','val':1000}),
                                                         promotes_inputs=['payload'])
         self.connect('cruise.OEW','margins.OEW')
         self.connect('descent.fuel_used_final','margins.total_fuel')
@@ -223,16 +230,14 @@ def set_values(prob, num_nodes, design_range, spec_energy):
     prob.set_val('mission_range',design_range,units='NM')
     prob.set_val('payload',1000,units='lb')
     prob.set_val('ac|propulsion|battery|specific_energy', spec_energy, units='W*h/kg')
-    prob.set_val('climb.propmodel.refrig_T_h_set', np.linspace(550, 450, num_nodes), units='K')
-    prob.set_val('cruise.propmodel.refrig_T_h_set', np.linspace(250, 250, num_nodes), units='K')
-    prob.set_val('descent.propmodel.refrig_T_h_set', np.linspace(400, 400, num_nodes), units='K')
     # set some airplane-specific values
     prob['analysis.cruise.acmodel.OEW.const.structural_fudge'] = 2.0
     prob['ac|propulsion|propeller|diameter'] = 2.2
     prob['ac|propulsion|engine|rating'] = 1117.2
 
     # Turn off the refrigerator during certain segments
-    prob['analysis.cruise.acmodel.propmodel.bypass_refrig'] = np.ones((num_nodes,), dtype=int)
+    prob['analysis.cruise.acmodel.propmodel.refrig.control.bypass_start'] = 1
+    prob['analysis.cruise.acmodel.propmodel.refrig.control.bypass_end'] = 1
 
     # set the initial battery SOC to match the HybridTwin_thermal after takeoff
     prob.set_val('climb.propmodel.batt1.SOC_initial', 0.8611499461827815, units=None)
@@ -283,7 +288,7 @@ def show_outputs(prob):
         x_var = 'range'
         x_unit = 'NM'
         y_vars = ['fltcond|h','fltcond|Ueas','fuel_used','throttle','fltcond|vs','propmodel.batt1.SOC',
-                  'propmodel.motorheatsink.T','propmodel.batteryheatsink.T','propmodel.refrig.hot_side_balance_param']
+                  'propmodel.motorheatsink.T','propmodel.batteryheatsink.T']
         y_units = ['ft','kn','lbm',None,'ft/min',None,'degC','degC','inch**2']
         x_label = 'Range (nmi)'
         y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)', 'Battery SOC', 'Motor temp', 'Battery temp', 'HX area']

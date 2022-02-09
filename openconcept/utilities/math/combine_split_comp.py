@@ -73,7 +73,7 @@ class VectorConcatenateComp(ExplicitComponent):
         else:
             raise ValueError(
                 "First argument to init must be either of type "
-                "`str' or 'None'")
+                "'str' or 'None'")
 
     def add_relation(self, output_name, input_names, vec_sizes, length=1, val=1.0,
                      units=None, res_units=None, desc='', lower=None, upper=None, ref=1.0,
@@ -281,7 +281,7 @@ class VectorSplitComp(ExplicitComponent):
         else:
             raise ValueError(
                 "input_name argument to init must be either of type "
-                "`str' or 'None'")
+                "'str' or 'None'")
 
     def add_relation(self, output_names, input_name, vec_sizes, length=1, val=1.0,
                      units=None, res_units=None, desc='', lower=None, upper=None, ref=1.0,

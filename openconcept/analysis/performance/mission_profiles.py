@@ -104,9 +104,9 @@ class MissionWithReserve(oc.TrajectoryGroup):
             self.connect('takeoff|h', 'reserve_descent.reserve_descentdt.takeoff|h')
 
             reserverange = om.ExecComp('reserverange=rangef-rangeo',
-                                    reserverange={'value': 100., 'units': 'NM'},
-                                    rangeo={'value': 0., 'units': 'NM'},
-                                    rangef={'value': 100., 'units': 'NM'})
+                                    reserverange={'val': 100., 'units': 'NM'},
+                                    rangeo={'val': 0., 'units': 'NM'},
+                                    rangef={'val': 100., 'units': 'NM'})
             self.add_subsystem('resrange', reserverange)
             self.connect('descent.ode_integ_phase.range_final', 'resrange.rangeo')
             self.connect('reserve_descent.ode_integ_phase.range_final', 'resrange.rangef')

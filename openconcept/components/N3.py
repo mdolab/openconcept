@@ -2,11 +2,11 @@ from __future__ import division
 import numpy as np
 import openmdao.api as om
 import openconcept
-from openconcept.utilities.surrogates.cached_kriging_surrogate import KrigingSurrogate
 
 def N3Hybrid(num_nodes=1, plot=False):
     """
-    Computes fuel savings attributable to hybridization
+    Returns OpenMDAO component for thrust deck
+    for optimized N+3 GTF with hybridization.
 
     Inputs
     ------
@@ -104,14 +104,14 @@ def N3Hybrid(num_nodes=1, plot=False):
 
     comp.add_output('thrust', np.ones((num_nodes,))*10000.,
                     training_data=a[:,4], units='lbf',
-                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+r'/n3_hybrid_thrust.pkl'))
+                    surrogate=om.KrigingSurrogate(training_cache=file_root+r'n3_hybrid_thrust_trained.zip'))
     comp.add_output('fuel_flow', np.ones((num_nodes,))*3.0,
                     training_data=a[:,5], units='lbm/s',
-                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+r'n3_hybrid_fuelflow.pkl'))
+                    surrogate=om.KrigingSurrogate(training_cache=file_root+r'n3_hybrid_fuelflow_trained.zip'))
     comp.add_output('surge_margin', np.ones((num_nodes,))*3.0,
                     training_data=a[:,6], units=None,
-                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+r'n3_hybrid_smw.pkl'))
-    comp.options['default_surrogate'] = KrigingSurrogate(lapack_driver='gesvd', cache_trained_model=True)
+                    surrogate=om.KrigingSurrogate(training_cache=file_root+r'n3_hybrid_smw_trained.zip'))
+    comp.options['default_surrogate'] = om.KrigingSurrogate(lapack_driver='gesvd')
 
     if plot:
         import matplotlib.pyplot as plt
@@ -238,7 +238,8 @@ def N3Hybrid(num_nodes=1, plot=False):
 
 def N3(num_nodes=1, plot=False):
     """
-    Thrust deck for optimized N+3 GTF without hybridization
+    Returns OpenMDAO component for thrust deck
+    for optimized N+3 GTF without hybridization.
 
     Inputs
     ------
@@ -297,14 +298,14 @@ def N3(num_nodes=1, plot=False):
 
     comp.add_output('thrust', np.ones((num_nodes,))*10000.,
                     training_data=a[:,3], units='lbf',
-                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+r'/n3_thrust.pkl'))
+                    surrogate=om.KrigingSurrogate(training_cache=file_root+r'n3_thrust_trained.zip'))
     comp.add_output('fuel_flow', np.ones((num_nodes,))*3.0,
                     training_data=a[:,4], units='lbm/s',
-                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+r'n3_fuelflow.pkl'))
+                    surrogate=om.KrigingSurrogate(training_cache=file_root+r'n3_fuelflow_trained.zip'))
     comp.add_output('surge_margin', np.ones((num_nodes,))*3.0,
                     training_data=a[:,5], units=None,
-                    surrogate=KrigingSurrogate(cache_trained_model=True, cached_model_filename=file_root+r'n3_smw.pkl'))
-    comp.options['default_surrogate'] = KrigingSurrogate(lapack_driver='gesvd', cache_trained_model=True)
+                    surrogate=om.KrigingSurrogate(training_cache=file_root+r'n3_smw_trained.zip'))
+    comp.options['default_surrogate'] = om.KrigingSurrogate(lapack_driver='gesvd')
 
     if plot:
         import matplotlib.pyplot as plt

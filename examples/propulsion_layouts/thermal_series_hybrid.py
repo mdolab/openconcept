@@ -10,7 +10,8 @@ from openconcept.components.propeller import SimplePropeller
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
-from openconcept.components.thermal import LiquidCooledComp, CoolantReservoir, HeatPumpWithIntegratedCoolantLoop, ConstantSurfaceTemperatureColdPlate_NTU
+from openconcept.components.thermal import LiquidCooledComp, CoolantReservoir, ConstantSurfaceTemperatureColdPlate_NTU
+from openconcept.components.chiller import HeatPumpWithIntegratedCoolantLoop
 from openconcept.components.ducts import ImplicitCompressibleDuct, ExplicitIncompressibleDuct
 from openconcept.components.heat_exchanger import HXGroup
 
@@ -228,13 +229,16 @@ class TwinSeriesHybridElectricPropulsionRefrigerated(Group):
                     ['ac|propulsion|motor|rating','motor_rating',240.0,'kW'],
                     ['ac|propulsion|generator|rating','gen_rating',250.0,'kW'],
                     ['ac|weights|W_battery','batt_weight',2000,'kg'],
+                    ['ac|propulsion|thermal|refrig|rating','refrig_rating',1.,'kW'],
+                    ['ac|propulsion|thermal|refrig|specific_power','refrig_spec_pow',200.,'W/kg'],
+                    ['ac|propulsion|thermal|refrig|eff','refrig_eff_factor',0.4,None],
                     ['ac|propulsion|thermal|hx|mdot_coolant','mdot_coolant',0.1*np.ones((nn,)),'kg/s'],
                     ['ac|propulsion|thermal|hx|coolant_mass','coolant_mass',10.,'kg'],
                     ['ac|propulsion|thermal|hx|channel_width','channel_width',1.,'mm'],
                     ['ac|propulsion|thermal|hx|channel_height','channel_height',20.,'mm'],
                     ['ac|propulsion|thermal|hx|channel_length','channel_length',0.2,'m'],
                     ['ac|propulsion|thermal|hx|n_parallel','n_parallel',50,None],
-                    # ['ac|propulsion|thermal|duct|area_nozzle','area_nozzle',58.*np.ones((nn,)),'inch**2'],
+                    ['ac|propulsion|thermal|duct|area_nozzle','area_nozzle',58.*np.ones((nn,)),'inch**2'],
                     ['ac|propulsion|battery|specific_energy','specific_energy',300,'W*h/kg']
                     ]
 
@@ -312,21 +316,14 @@ class TwinSeriesHybridElectricPropulsionRefrigerated(Group):
         iv.add_output('rho_coolant', val=rho_coolant*np.ones((nn,)),units='kg/m**3')
         lc_promotes = ['duration','channel_*','n_parallel']
 
-        # Add the refrigerators electrical load to the splitter with the two motors
-        # so it pulls power from both the battery and turboshaft at the hybridization ratio
-        self.add_subsystem('refrig', HeatPumpWithIntegratedCoolantLoop(num_nodes=nn,
-                                                                       hot_side_balance_param_units='inch**2',
-                                                                       hot_side_balance_param_lower=1e-10,
-                                                                       hot_side_balance_param_upper=1e3))
-        self.connect('refrig.Wdot', 'add_power.refrig_elec_load')
-        iv.add_output('refrig_eff_factor', val=0.4, shape=None, units=None)
-        iv.add_output('refrig_T_h_set', val=450., shape=(nn,), units='K')
-        iv.add_output('refrig_T_c_set', val=280., shape=(nn,), units='K')
-        iv.add_output('bypass_refrig', val=np.zeros((nn,)), shape=(nn,), units=None)
+        # Add the refrigerator's electrical load to the splitter with the two motors
+        # so it pulls power from both the battery and turboshaft at the hybridization ratio.
+        # Bypass the refrigeration with refrig.control.bypass_start and refrig.control.bypass_end
+        self.add_subsystem('refrig', HeatPumpWithIntegratedCoolantLoop(num_nodes=nn))
+        self.connect('refrig.elec_load', 'add_power.refrig_elec_load')
         self.connect('refrig_eff_factor', 'refrig.eff_factor')
-        self.connect('refrig_T_h_set', 'refrig.T_h_set')
-        self.connect('refrig_T_c_set', 'refrig.T_c_set')
-        self.connect('bypass_refrig', 'refrig.bypass_heat_pump')
+        self.connect('refrig_rating', 'refrig.power_rating')
+        self.connect('refrig_spec_pow', 'refrig.specific_power')
 
         # Coolant loop on electrical component side (cooling side of refrigerator)
         # ,---> battery ---> motor ---,
@@ -351,7 +348,7 @@ class TwinSeriesHybridElectricPropulsionRefrigerated(Group):
 
         self.connect('mdot_coolant',['batteryheatsink.mdot_coolant',
                                      'motorheatsink.mdot_coolant',
-                                     'refrig.mdot_coolant_cold'])
+                                     'refrig.mdot_coolant'])
 
 
         # Coolant loop on hot side of refrigerator to reject heat
@@ -369,11 +366,7 @@ class TwinSeriesHybridElectricPropulsionRefrigerated(Group):
         self.connect('refrig.T_out_hot','hx.T_in_hot')
         self.connect('hx.T_out_hot','refrig.T_in_hot')
 
-        # Modulate the duct inlet area to maintain the desired temperature on the hot side of the refrig
-        self.connect('refrig.hot_side_balance_param', 'duct.area_nozzle')
-
-        self.connect('mdot_coolant', ['refrig.mdot_coolant_hot',
-                                      'hx.mdot_hot'])
+        self.connect('mdot_coolant', 'hx.mdot_hot')
 
 
 class VehicleSizingModel(Group):

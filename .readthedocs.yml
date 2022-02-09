@@ -8,10 +8,10 @@ formats:
   - epub
 
 python:
-  version: 3.6
+  version: 3.8
   install:
     - method: pip
       path: .
       extra_requirements:
-        - testing
+        - docs
   system_packages: true

@@ -14,14 +14,18 @@
 #
 import os
 import sys
-import subprocess
-import openmdao
+import openconcept
+
+from sphinx_mdolab_theme.config import *
 
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('./_exts'))
 # sphinx build needs to be able to find the openmdao embed_code plugin
 # so we add it to the path
-sys.path.insert(0, os.path.abspath(openmdao.__path__[0]+r'/docs/_exts'))
+this_directory = os.path.abspath(os.path.dirname(__file__))
+
+# sys.path.insert(0, os.path.abspath(openconcept.__path__[0]+r'/docs/_exts'))
 
 
 def generate_src_docs(dir, top, packages):
@@ -180,9 +184,8 @@ NumpyDocstring._parse = patched_parse
 
 # -- Project information -----------------------------------------------------
 
-project = 'openconcept'
-copyright = '2018, Benjamin J. Brelje'
-author = 'Benjamin J. Brelje'
+project = 'OpenConcept'
+author = 'Benjamin J. Brelje and Eytan J. Adler'
 
 import openconcept
 # The short X.Y version
@@ -202,21 +205,12 @@ needs_sphinx = '1.5'
 # ones.
 
 extensions = [
-    'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.doctest',
 	'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
-    'sphinx.ext.mathjax',
-    'sphinx.ext.viewcode',
-    'embed_code',
-    'embed_options',
-    'embed_compare',
-    'embed_shell_cmd',
-    'embed_bibtex',
-    'embed_n2',
-    'tags'
+    "sphinx_copybutton",
 ]
 autodoc_inherit_docstrings = False
 autodoc_member_order = 'bysource'
@@ -242,42 +236,13 @@ master_doc = 'index'
 # Usually you set "language" from the command line for these cases.
 language = None
 
-# List of patterns, relative to source directory, that match files and
-# directories to ignore when looking for source files.
-# This pattern also affects html_static_path and html_extra_path .
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
-# The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
-
 
 # -- Options for HTML output -------------------------------------------------
-
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-#
-html_theme = 'sphinx_rtd_theme'
-html_style = 'css/override_theme.css'
-# Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
-# documentation.
-#
-# html_theme_options = {}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
-
-# Custom sidebar templates, must be a dictionary that maps document names
-# to template names.
-#
-# The default sidebars (for documents that don't match any pattern) are
-# defined by theme itself.  Builtin themes are using these templates by
-# default: ``['localtoc.html', 'relations.html', 'sourcelink.html',
-# 'searchbox.html']``.
-#
-# html_sidebars = {}
 
 
 # -- Options for HTMLHelp output ---------------------------------------------
@@ -356,6 +321,7 @@ if generate_srcdocs:
     # os.rename('_srcdocs_native/modules.rst','_srcdocs_native/index.rst')
     # openmdao way
     packages = ['analysis',
+                'analysis.openaerostruct',
                 'analysis.atmospherics',
                 'analysis.performance',
                 'components',

@@ -82,7 +82,7 @@ class SumComp(ExplicitComponent):
         else:
             raise ValueError(
                 "first argument to init must be either of type "
-                "`str' or 'None'")
+                "'str' or 'None'")
 
     def initialize(self):
         """

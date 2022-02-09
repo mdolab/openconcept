@@ -8,11 +8,28 @@ from .atmospherics_data import get_mask_arrays, compute_temps, compute_temp_deri
 
 class TemperatureComp(ExplicitComponent):
     '''
-    This component computes temperature from altitude.
+    This component computes temperature from altitude using the 1976 Standard Atmosphere.
 
     Adapted from:
     J.P. Jasa, J.T. Hwang, and J.R.R.A. Martins: Design and Trajectory Optimization of a Morphing Wing Aircraft
     2018 AIAA/ASCE/AHS/ASC Structures, Structural Dynamics, and Materials Conference; AIAA SciTech Forum, January 2018
+
+    Inputs
+    ------
+    fltcond|h : float
+        Altitude (vector, m)
+    fltcond|TempIncrement : float
+        Offset for temperature; useful for modeling hot (+ increment) or cold (- increment) days (vector, deg C)
+    
+    Outputs
+    -------
+    fltcond|T : float
+        Temperature at flight condition (vector, K)
+    
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run, i.e. length of vector inputs (scalar, dimensionless)
     '''
 
 

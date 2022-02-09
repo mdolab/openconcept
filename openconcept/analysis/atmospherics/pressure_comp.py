@@ -8,11 +8,26 @@ from .atmospherics_data import get_mask_arrays, compute_pressures, compute_press
 
 class PressureComp(ExplicitComponent):
     '''
-    This component computes pressure from altitude.
+    This component computes pressure from altitude using the 1976 Standard Atmosphere.
 
     Adapted from:
     J.P. Jasa, J.T. Hwang, and J.R.R.A. Martins: Design and Trajectory Optimization of a Morphing Wing Aircraft
     2018 AIAA/ASCE/AHS/ASC Structures, Structural Dynamics, and Materials Conference; AIAA SciTech Forum, January 2018
+
+    Inputs
+    ------
+    fltcond|h : float
+        Altitude (vector, m)
+    
+    Outputs
+    -------
+    fltcond|p : float
+        Pressure at flight condition (vector, Pa)
+    
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run, i.e. length of vector inputs (scalar, dimensionless)
     '''
 
 

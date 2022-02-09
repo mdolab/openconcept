@@ -21,3 +21,6 @@ openconcept/.coverage
 .coverage
 scratch/
 *.out
+*.zip
+*.npy
+.DS_Store

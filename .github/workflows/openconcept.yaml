@@ -11,8 +11,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: ["ubuntu-latest", "windows-latest"]
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
       fail-fast: false
+    env:
+      OMP_NUM_THREADS: 1
     defaults:
       run:
         shell: bash -l {0}
@@ -22,22 +24,30 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
-        python-version: 3.6
+        python-version: 3.8
     - name: Setup conda
       run: |
         conda config --set always_yes yes
         conda install numpy scipy
     - name: Install
       run: |
-        pip install coverage pytest-cov sphinx_rtd_theme
         pip install .[testing]
+        pip install .[docs]
+    - name: Download engine deck surrogate model
+      run: |
+        curl -L -o engine_kriging_surrogate_model.tar.gz http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
+    - name: Move engine deck files to appropriate location
+      run: |
+        tar -xvf engine_kriging_surrogate_model.tar.gz
+        mv cfm56* ./openconcept/components/empirical_data/cfm56
+        mv n3_hybrid* ./openconcept/components/empirical_data/n+3_hybrid
+        mv n3* ./openconcept/components/empirical_data/n+3
     - name: Build and Test
       run: |
-        python -m pytest --cov-config .coveragerc --cov=openconcept
-    - name: Push to Coveralls
+        python -m pytest --cov-config=.coveragerc --cov=openconcept --cov-report=xml
+    - name: Upload coverage to Codecov
       if: ${{ matrix.os == 'ubuntu-latest' }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        pip install coveralls
-        coveralls --service=github --rcfile=.coveragerc
+      uses: codecov/codecov-action@v2
+      with:
+        fail_ci_if_error: true
+        token: ${{ secrets.CODECOV_TOKEN }}

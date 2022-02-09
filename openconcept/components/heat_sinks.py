@@ -98,10 +98,10 @@ class BandolierCoolingSystem(om.ExplicitComponent):
         self.add_input('t_channel', units='m', val=0.0005)
 
         self.add_output('dTdt', shape=(nn,), units='K/s', tags=['integrate', 'state_name:T_battery', 'state_units:K', 'state_val:300.0', 'state_promotes:True'])
-        self.add_output('T_surface', shape=(nn,), units='K')
-        self.add_output('T_core', shape=(nn,), units='K')
+        self.add_output('T_surface', shape=(nn,), units='K', lower=1e-10)
+        self.add_output('T_core', shape=(nn,), units='K', lower=1e-10)
         self.add_output('q', shape=(nn,), units='W')
-        self.add_output('T_out', shape=(nn,), units='K', val=300)
+        self.add_output('T_out', shape=(nn,), units='K', val=300, lower=1e-10)
 
         self.declare_partials(['*'], ['*'], method='cs')
 
@@ -250,7 +250,7 @@ class LiquidCooledBattery(om.Group):
         if not quasi_steady:
             ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
                                            promotes_outputs=['*'], promotes_inputs=['*'])
-            ode_integ.add_integrand('T', rate_name='dTdt', units='K', lower=0.0)
+            ode_integ.add_integrand('T', rate_name='dTdt', units='K', lower=1e-10)
         else:
             self.add_subsystem('thermal_bal',
                                om.BalanceComp('T', eq_units='K/s', lhs_name='dTdt', rhs_val=0.0, units='K', lower=1.0, val=299.*np.ones((nn,))),
@@ -304,6 +304,8 @@ class MotorCoolingJacket(om.ExplicitComponent):
         Mass flow rate of the coolant (vector, kg/s)
     power_rating : float
         Rated steady state power of the motor (scalar, W)
+    motor_weight : float
+        Weight of electric motor (scalar, kg)
 
     Outputs
     -------
@@ -348,7 +350,7 @@ class MotorCoolingJacket(om.ExplicitComponent):
         self.add_input('power_rating', units='W', val=2e5)
         self.add_input('motor_weight', units='kg', val=100)
         self.add_output('q', shape=(nn,), units='W')
-        self.add_output('T_out', shape=(nn,), units='K', val=300)
+        self.add_output('T_out', shape=(nn,), units='K', val=300, lower=1e-10)
         self.add_output('dTdt', shape=(nn,), units='K/s', tags=['integrate', 'state_name:T_motor', 'state_units:K', 'state_val:300.0', 'state_promotes:True'])        
         
         self.declare_partials(['T_out','q','dTdt'], ['power_rating'], rows=arange, cols=np.zeros((nn,)))
@@ -461,7 +463,7 @@ class LiquidCooledMotor(om.Group):
         if not quasi_steady:
             ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
                                            promotes_outputs=['*'], promotes_inputs=['*'])
-            ode_integ.add_integrand('T', rate_name='dTdt', units='K', lower=0.0)
+            ode_integ.add_integrand('T', rate_name='dTdt', units='K', lower=1e-10)
         else:
             self.add_subsystem('thermal_bal',
                                om.BalanceComp('T', eq_units='K/s', lhs_name='dTdt', rhs_val=0.0, units='K', lower=1.0, val=299.*np.ones((nn,))),
@@ -491,6 +493,8 @@ class SimplePump(om.ExplicitComponent):
         Electricity used by the pump (vector, W)
     component_weight : float
         Pump weight (scalar, kg)
+    component_sizing_margin : float
+        Fraction of total power rating used via elec_load (vector, dimensionless)
 
     Options
     -------
@@ -498,12 +502,16 @@ class SimplePump(om.ExplicitComponent):
         Number of analysis points to run (sets vec length; default 1)
     efficiency : float
         Pump electrical + mech efficiency. Sensible range 0.0 to 1.0 (default 0.35)
+    weight_base : float
+        Base weight of pump, doesn't change with power rating (default 0)
+    weight_inc : float
+        Incremental weight of pump, scales linearly with power rating (default 1/450 kg/W)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
         self.options.declare('efficiency', default=0.35, desc='Efficiency (dimensionless)')
         self.options.declare('weight_base', default=0.0, desc='Pump base weight')
-        self.options.declare('weight_inc', default=1/450, desc='Pump base weight (kg/W)')
+        self.options.declare('weight_inc', default=1/450, desc='Incremental pump weight (kg/W)')
 
     def setup(self):
         nn = self.options['num_nodes']
@@ -607,7 +615,7 @@ class SimpleHose(om.ExplicitComponent):
 
         self.declare_partials(['delta_p'], ['rho_coolant', 'mdot_coolant'], rows=np.arange(nn), cols=np.arange(nn))
         self.declare_partials(['delta_p'], ['hose_diameter', 'hose_length', 'mu_coolant'], rows=np.arange(nn), cols=np.zeros(nn))
-        self.declare_partials(['component_weight'], ['hose_design_pressure','hose_length','hose_diameter'], method='cs')
+        self.declare_partials(['component_weight'], ['hose_design_pressure','hose_length','hose_diameter'], rows=[0], cols=[0])
         self.declare_partials(['component_weight'], ['rho_coolant'], rows=[0], cols=[0])
 
 
@@ -638,8 +646,21 @@ class SimpleHose(om.ExplicitComponent):
         nn = self.options['num_nodes']
         sigma = self.options['hose_operating_stress']
         rho_hose = self.options['hose_density']
+        thickness = inputs['hose_diameter'] * inputs['hose_design_pressure'] / 2 / sigma
+
+        d_thick_d_diam = inputs['hose_design_pressure'] / 2 / sigma
+        d_thick_d_press = inputs['hose_diameter'] / 2 / sigma
 
         J['component_weight','rho_coolant'] = (inputs['hose_diameter'] / 2) ** 2 * np.pi * inputs['hose_length']
+        J['component_weight', 'hose_design_pressure'] = (inputs['hose_diameter'] + thickness) * np.pi * d_thick_d_press * \
+                                                        rho_hose * inputs['hose_length'] + np.pi * thickness * rho_hose * \
+                                                        inputs['hose_length'] * d_thick_d_press
+        J['component_weight', 'hose_length'] = (inputs['hose_diameter'] + thickness) * np.pi * thickness * rho_hose + \
+                                               (inputs['hose_diameter'] / 2) ** 2 * np.pi * inputs['rho_coolant'][0]
+        J['component_weight', 'hose_diameter'] = (inputs['hose_diameter'] + thickness) * np.pi * d_thick_d_diam * rho_hose * \
+                                                 inputs['hose_length'] + (1 + d_thick_d_diam) * np.pi * thickness * rho_hose * \
+                                                 inputs['hose_length'] + inputs['hose_diameter'] / 2 * np.pi * \
+                                                 inputs['rho_coolant'][0] * inputs['hose_length']
 
         # use a colored complex step approach
         cs_step = 1e-30
