@@ -100,7 +100,7 @@ While the utility has many uses (see the OpenMDAO docs), every user should make 
 
 Putting it all Together
 -----------------------
-The ``examples/TBM850.py`` `script <https://github.com/mdolab/openconcept/blob/master/examples/TBM850.py>`_ models a single-engine turboprop aircraft and uses all of the elements mentioned on this page in an OpenConcept context.
+The ``examples/TBM850.py`` `script <https://github.com/mdolab/openconcept/blob/main/examples/TBM850.py>`_ models a single-engine turboprop aircraft and uses all of the elements mentioned on this page in an OpenConcept context.
 
 
 
