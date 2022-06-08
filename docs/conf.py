@@ -217,6 +217,9 @@ autodoc_member_order = 'bysource'
 
 autosummary_generate = []
 
+# Ignore docs errors 
+nitpick_ignore_regex = [("py:class", ".*")]
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
