@@ -14,8 +14,9 @@ with open(os.path.join(this_directory, "readme.md"), encoding="utf-8") as f:
 setup(
     name='openconcept',
     version=__version__,
-    description="Open Aircraft Conceptual Design Tools",
+    description="Open aircraft conceptual design tools",
     long_description=long_description,
+    long_description_content_type="text/markdown",
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',
@@ -32,7 +33,7 @@ setup(
     keywords='aircraft design optimization multidisciplinary multi-disciplinary analysis',
     author='Benjamin J. Brelje and Eytan J. Adler',
     author_email='bbrelje@umich.edu and eytana@umich.edu',
-    url='http://www.brelje.net',
+    url='https://github.com/mdolab/openconcept',
     download_url='https://github.com/mdolab/openconcept',
     license='MIT License',
     packages=[
