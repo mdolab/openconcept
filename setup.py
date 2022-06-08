@@ -32,7 +32,7 @@ setup(
     ],
     keywords='aircraft design optimization multidisciplinary multi-disciplinary analysis',
     author='Benjamin J. Brelje and Eytan J. Adler',
-    author_email='bbrelje@umich.edu and eytana@umich.edu',
+    author_email='',
     url='https://github.com/mdolab/openconcept',
     download_url='https://github.com/mdolab/openconcept',
     license='MIT License',
