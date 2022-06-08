@@ -26,14 +26,14 @@ Getting Started
 OpenConcept can be pip installed directly from PyPI with ``pip install openconcept``.
 
 To run the examples or edit the source code:
-1. Clone the repo to disk (``git clone https://github.com/mdolab/openconcept``)
-2. Navigate to the root ``openconcept`` folder
-3. Run ``pip install -e .`` to install the package (the ``-e`` can be omitted if not editing the source)
+#. Clone the repo to disk (``git clone https://github.com/mdolab/openconcept``)
+#. Navigate to the root ``openconcept`` folder
+#. Run ``pip install -e .`` to install the package (the ``-e`` can be omitted if not editing the source)
 
 Get started by running the ``TBM850`` example:
-1. Navigate to the ``examples`` folder
-2. Run ``python TBM850.py`` to test OpenConcept on a single-engine turboprop aircraft (the TBM 850)
-3. Look at the ``examples/aircraft data/TBM850.py`` file to play with the assumptions / config / geometry and see the effects on the output result
+#. Navigate to the ``examples`` folder
+#. Run ``python TBM850.py`` to test OpenConcept on a single-engine turboprop aircraft (the TBM 850)
+#. Look at the ``examples/aircraft data/TBM850.py`` file to play with the assumptions / config / geometry and see the effects on the output result
 
 ``examples/HybridTwin.py`` is set up to do MDO in a grid of specific energies and design ranges and save the results to disk. Visualization utilities will be added soon (to produce contour plots as shown in this Readme).
 
