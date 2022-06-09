@@ -850,8 +850,8 @@ class Aerostruct(om.Group):
         self.options.declare("surf_options", default=None, desc="Dictionary of OpenAeroStruct surface options")
 
     def setup(self):
-        n_x = int(self.options["num_x"])
-        n_y = int(self.options["num_y"])
+        nx = int(self.options["num_x"])
+        ny = int(self.options["num_y"])
         n_twist = int(self.options["num_twist"])
         n_skin = int(self.options["num_skin"])
         n_spar = int(self.options["num_spar"])
@@ -1120,12 +1120,17 @@ class Aerostruct(om.Group):
             ]
         )
 
+        # This dummy mesh must be passed to the surface dict so OpenAeroStruct
+        # knows the dimensions of the mesh and whether it is a left or right wing
+        dummy_mesh = np.zeros((nx, ny, 3))
+        dummy_mesh[:, :, 0], dummy_mesh[:, :, 1] = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
+
         surf_dict = {
             # Wing definition
             "name": "wing",  # name of surface
             "symmetry": True,  # if true, model half of the wing (reflect across plane y = 0)
             "S_ref_type": "projected",  # how we compute the wing area (can be wetted or projected)
-            "mesh": np.zeros((n_x, n_y, 3)),
+            "mesh": dummy_mesh,
             "fem_model_type": "wingbox",  # wingbox or tube
             "data_x_upper": upper_x,
             "data_x_lower": lower_x,
@@ -1175,7 +1180,7 @@ class Aerostruct(om.Group):
         wing_group = om.Group()
 
         # Add bspline component for twist
-        x_interp = np.linspace(0.0, 1.0, n_y)
+        x_interp = np.linspace(0.0, 1.0, ny)
         comp = wing_group.add_subsystem(
             "twist_bsp",
             om.SplineComp(
@@ -1186,7 +1191,7 @@ class Aerostruct(om.Group):
         comp.add_spline(y_cp_name="twist_cp", y_interp_name="twist", y_units="deg")
 
         # Add bspline component for thickness to chord ratio
-        x_interp = np.linspace(0.0, 1.0, n_y - 1)
+        x_interp = np.linspace(0.0, 1.0, ny - 1)
         comp = wing_group.add_subsystem(
             "t_over_c_bsp",
             om.SplineComp(
@@ -1198,11 +1203,11 @@ class Aerostruct(om.Group):
         comp.add_spline(y_cp_name="t_over_c_cp", y_interp_name="t_over_c")
 
         # Wing mesh generator
-        wing_group.add_subsystem("mesh_gen", PlanformMesh(num_x=n_x, num_y=n_y), promotes_inputs=["*"])
+        wing_group.add_subsystem("mesh_gen", PlanformMesh(num_x=nx, num_y=ny), promotes_inputs=["*"])
 
         # Apply twist spline to mesh
         wing_group.add_subsystem(
-            "twist_mesh", Rotate(val=np.zeros(n_y), mesh_shape=(n_x, n_y, 3), symmetry=True), promotes_outputs=["mesh"]
+            "twist_mesh", Rotate(val=np.zeros(ny), mesh_shape=(nx, ny, 3), symmetry=True), promotes_outputs=["mesh"]
         )
         wing_group.connect("twist_bsp.twist", "twist_mesh.twist")
         wing_group.connect("mesh_gen.mesh", "twist_mesh.in_mesh")
@@ -1280,7 +1285,7 @@ class Aerostruct(om.Group):
         self.set_input_defaults("fltcond|M", 0.1)
         self.set_input_defaults("fltcond|alpha", 0.0)
         self.set_input_defaults("load_factor", 1.0)
-        self.set_input_defaults("aerostruct_point.coupled.wing.nodes", np.zeros((n_y, 3)), units="m")
+        self.set_input_defaults("aerostruct_point.coupled.wing.nodes", np.zeros((ny, 3)), units="m")
         self.set_input_defaults("W0", 1.0, units="kg")  # unused variable but must be set since promoted
         # from multiple locations (may be used in the future)
 

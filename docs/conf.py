@@ -214,8 +214,12 @@ extensions = [
 ]
 autodoc_inherit_docstrings = False
 autodoc_member_order = 'bysource'
+autoclass_content = "class"
 
 autosummary_generate = []
+
+# Ignore docs errors 
+nitpick_ignore_regex = [("py:class", ".*")]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -234,7 +238,7 @@ master_doc = 'index'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 
 # -- Options for HTML output -------------------------------------------------

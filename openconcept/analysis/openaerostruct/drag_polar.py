@@ -712,9 +712,14 @@ class VLM(om.Group):
         # =================================================================
         #                       Call OpenAeroStruct
         # =================================================================
+        # This dummy mesh must be passed to the surface dict so OpenAeroStruct
+        # knows the dimensions of the mesh and whether it is a left or right wing
+        dummy_mesh = np.zeros((nx, ny, 3))
+        dummy_mesh[:, :, 0], dummy_mesh[:, :, 1] = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
+
         surf_dict = {
             "name": "wing",
-            "mesh": np.zeros((nx, ny, 3)),  # this must be defined
+            "mesh": dummy_mesh,  # this must be defined
             # because the VLMGeometry component uses the shape of the mesh in this
             # dictionary to determine the size of the mesh; the values don't matter
             "symmetry": True,  # if true, model one half of wing
