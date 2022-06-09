@@ -214,6 +214,7 @@ extensions = [
 ]
 autodoc_inherit_docstrings = False
 autodoc_member_order = 'bysource'
+autoclass_content = "class"
 
 autosummary_generate = []
 
