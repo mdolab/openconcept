@@ -16,7 +16,7 @@
 
 # Refactoring directory tree
 
-<mark>Note: talk to Neil about the best way to expose this structure to the user. Is it just by using the dot syntax in the import statements directly or using some api file (like OpenMDAO) or something else?</mark>
+### Note: talk to Neil about the best way to expose this structure to the user. Is it just by using the dot syntax in the import statements directly or using some api file (like OpenMDAO) or something else?
 
 - openconcept
   - aerodynamics
