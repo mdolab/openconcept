@@ -1,5 +1,6 @@
 # Changes to make before merging
 
+- Merge Shugo's work
 - Add docs:
   - Introduction
     - Describe generally what it does
