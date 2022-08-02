@@ -93,16 +93,37 @@ I'm open to pull requests and issues in the meantime. Stay tuned. The developmen
 
 .. toctree::
    :maxdepth: 1
-   :caption: Documentation:
+   :caption: Introduction
+   :hidden:
+
+   introduction/overview.rst
+   introduction/install.rst
+   introduction/orientation.rst
+   developer/roadmap.rst
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials
+   :hidden:
+
+   tutorials/minimal_example.rst
+   tutorials/TBM850.rst
+   tutorials/integrator.rst
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Theory Guide
+   :hidden:
+
+   theory/mission_analysis.rst
+   theory/integration.rst
+   theory/models/index.rst
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Other Useful Docs
+   :hidden:
 
    features/index.rst
    _srcdocs/index.rst
-   developer/roadmap.rst
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   publications.rst
