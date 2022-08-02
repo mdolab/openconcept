@@ -5,7 +5,7 @@ from openconcept.analysis.performance.solver_phases import BFLImplicitSolve, Gro
 class MissionWithReserve(oc.TrajectoryGroup):
     """
     This analysis group is set up to compute all the major parameters
-    of a fixed wing mission, including climb, cruise, and descent as well as Part 25 reserve fuel segments.
+    of a fixed wing mission, including climb, cruise, and descent as well as Part 25 reserve fuel phases.
     The 5% of block fuel is not accounted for here.
 
     To use this analysis, pass in an aircraft model following OpenConcept interface.
@@ -46,11 +46,11 @@ class MissionWithReserve(oc.TrajectoryGroup):
     aircraft_model : class
         An aircraft model class with the standard OpenConcept interfaces promoted correctly
     num_nodes : int
-        Number of analysis points per segment. Higher is more accurate but more expensive
+        Number of analysis points per phase. Higher is more accurate but more expensive
     """
 
     def initialize(self):
-        self.options.declare('num_nodes', default=9, desc="Number of points per segment. Needs to be 2N + 1 due to simpson's rule")
+        self.options.declare('num_nodes', default=9, desc="Number of points per phase. Needs to be 2N + 1 due to simpson's rule")
         self.options.declare('aircraft_model', default=None, desc="OpenConcept-compliant airplane model")
 
     def setup(self):
@@ -67,7 +67,7 @@ class MissionWithReserve(oc.TrajectoryGroup):
             mp.add_output('loiter_duration', val=30.*60., units='s')
             mp.add_output('payload',val=1000.,units='lbm')
 
-            # add the climb, cruise, and descent segments
+            # add the climb, cruise, and descent phases
             phase1 = self.add_subsystem('climb',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='climb'),promotes_inputs=['ac|*'])
             # set the climb time such that the specified initial cruise altitude is exactly reached
             phase1.add_subsystem('climbdt',om.BalanceComp(name='duration',units='s',eq_units='m',val=120,upper=2000,lower=0,rhs_name='cruise|h0',lhs_name='fltcond|h_final'),promotes_outputs=['duration'])
@@ -85,7 +85,7 @@ class MissionWithReserve(oc.TrajectoryGroup):
             self.connect('takeoff|h', 'descent.descentdt.takeoff|h')
             phase3.connect('ode_integ_phase.fltcond|h_final','descentdt.fltcond|h_final')
 
-            # add the climb, cruise, and descent segments for the reserve mission
+            # add the climb, cruise, and descent phases for the reserve mission
             phase4 = self.add_subsystem('reserve_climb',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='reserve_climb'),promotes_inputs=['ac|*'])
             # set the climb time such that the specified initial cruise altitude is exactly reached
             phase4.add_subsystem('reserve_climbdt',om.BalanceComp(name='duration',units='s',eq_units='m',val=120,upper=2000,lower=0,rhs_name='reserve|h0',lhs_name='fltcond|h_final'),promotes_outputs=['duration'])
@@ -165,11 +165,11 @@ class BasicMission(oc.TrajectoryGroup):
     aircraft_model : class
         An aircraft model class with the standard OpenConcept interfaces promoted correctly
     num_nodes : int
-        Number of analysis points per segment. Higher is more accurate but more expensive
+        Number of analysis points per phase. Higher is more accurate but more expensive
     """
 
     def initialize(self):
-        self.options.declare('num_nodes', default=9, desc="Number of points per segment. Needs to be 2N + 1 due to simpson's rule")
+        self.options.declare('num_nodes', default=9, desc="Number of points per phase. Needs to be 2N + 1 due to simpson's rule")
         self.options.declare('aircraft_model', default=None, desc="OpenConcept-compliant airplane model")
         self.options.declare('include_ground_roll', default=False, desc='Whether to include groundroll phase')
 
@@ -190,7 +190,7 @@ class BasicMission(oc.TrajectoryGroup):
                 phase0 = self.add_subsystem('groundroll', GroundRollPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='v0v1'), promotes_inputs=['ac|*'])                
                 self.connect('takeoff|v2', 'groundroll.takeoff|v1')
 
-            # add the climb, cruise, and descent segments
+            # add the climb, cruise, and descent phases
             phase1 = self.add_subsystem('climb',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='climb'),promotes_inputs=['ac|*'])
             # set the climb time such that the specified initial cruise altitude is exactly reached
             phase1.add_subsystem('climbdt',om.BalanceComp(name='duration',units='s',eq_units='m',val=120,upper=2000,lower=0,rhs_name='cruise|h0',lhs_name='fltcond|h_final'),promotes_outputs=['duration'])
@@ -263,7 +263,7 @@ class FullMissionAnalysis(oc.TrajectoryGroup):
     aircraft_model : class
         An aircraft model class with the standard OpenConcept interfaces promoted correctly
     num_nodes : int
-        Number of analysis points per segment. Higher is more accurate but more expensive
+        Number of analysis points per phase. Higher is more accurate but more expensive
     transition_method : str
         Analysis method to compute distance, altitude, and time during transition
         Default "simplified" is the Raymer circular arc method and is more robust
@@ -271,7 +271,7 @@ class FullMissionAnalysis(oc.TrajectoryGroup):
     """
 
     def initialize(self):
-        self.options.declare('num_nodes', default=9, desc="Number of points per segment. Needs to be 2N + 1 due to simpson's rule")
+        self.options.declare('num_nodes', default=9, desc="Number of points per phase. Needs to be 2N + 1 due to simpson's rule")
         self.options.declare('aircraft_model', default=None, desc="OpenConcept-compliant airplane model")
         self.options.declare('transition_method', default='simplified', desc="Method to use for computing transition")
 
@@ -280,7 +280,7 @@ class FullMissionAnalysis(oc.TrajectoryGroup):
             acmodelclass = self.options['aircraft_model']
             transition_method = self.options['transition_method']
 
-            # add the four balanced field length takeoff segments and the implicit v1 solver
+            # add the four balanced field length takeoff phases and the implicit v1 solver
             # v0v1 - from a rolling start to v1 speed
             # v1vr - from the decision speed to rotation
             # rotate - in the air following rotation in 2DOF
@@ -312,7 +312,7 @@ class FullMissionAnalysis(oc.TrajectoryGroup):
             self.connect('v1v0.range_final','bfl.distance_abort')
             self.add_subsystem('engineoutclimb',ClimbAnglePhase(num_nodes=1, aircraft_model=acmodelclass, flight_phase='EngineOutClimbAngle'), promotes_inputs=['ac|*'])
 
-            # add the climb, cruise, and descent segments
+            # add the climb, cruise, and descent phases
             climb = self.add_subsystem('climb',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='climb'),promotes_inputs=['ac|*'])
             # set the climb time such that the specified initial cruise altitude is exactly reached
             climb.add_subsystem('climbdt',om.BalanceComp(name='duration',units='s',eq_units='m',val=120,lower=0,upper=3000,rhs_name='cruise|h0',lhs_name='fltcond|h_final'), promotes_outputs=['duration'])
@@ -331,7 +331,7 @@ class FullMissionAnalysis(oc.TrajectoryGroup):
             self.connect('descent.ode_integ_phase.range_final','cruise.cruisedt.range_final')
             self.connect('descent.ode_integ_phase.fltcond|h_final','descent.descentdt.fltcond|h_final')
 
-            # connect range, fuel burn, and altitude from the end of each segment to the beginning of the next, in order
+            # connect range, fuel burn, and altitude from the end of each phase to the beginning of the next, in order
             self.link_phases(v0v1, v1vr, states_to_skip=['fltcond|Utrue','range'])
             self.link_phases(v1vr, rotate, states_to_skip=['fltcond|Utrue','range'])
             self.link_phases(v0v1, v1v0, states_to_skip=['fltcond|Utrue','range'])

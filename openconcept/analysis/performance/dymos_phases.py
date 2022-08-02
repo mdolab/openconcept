@@ -238,13 +238,11 @@ class SteadyFlightCL(ExplicitComponent):
     -------
     num_nodes : int
         Number of analysis nodes to run
-    mission_segments : list
-        The list of mission segments to track
     """
     def initialize(self):
 
         self.options.declare('num_nodes',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-        self.options.declare('mission_segments',default=['climb','cruise','descent'])
+
     def setup(self):
         nn = self.options['num_nodes']
         arange = np.arange(nn)
@@ -273,7 +271,7 @@ class DymosSteadyFlightODE(om.Group):
     Settable mission parameters include:
     Airspeed (fltcond|Ueas)
     Vertical speed (fltcond|vs)
-    Duration of the segment (duration)
+    Duration of the phase (duration)
 
     Throttle is set automatically to ensure steady flight
 

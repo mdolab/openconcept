@@ -411,13 +411,11 @@ class SteadyFlightCL(ExplicitComponent):
     -------
     num_nodes : int
         Number of analysis nodes to run
-    mission_segments : list
-        The list of mission segments to track
     """
     def initialize(self):
 
         self.options.declare('num_nodes',default=5,desc="Number of Simpson intervals to use per seg (eg. climb, cruise, descend). Number of analysis points is 2N+1")
-        self.options.declare('mission_segments',default=['climb','cruise','descent'])
+
     def setup(self):
         nn = self.options['num_nodes']
         arange = np.arange(nn)
@@ -445,7 +443,7 @@ class GroundRollPhase(oc.PhaseGroup):
     This component group models the ground roll phase of a takeoff (acceleration before flight)
     User-settable parameters include:
     throttle (default 100 percent)
-    rolling friction coeff (default 0.03 for accelerating segments and 0.4 for braking)
+    rolling friction coeff (default 0.03 for accelerating phases and 0.4 for braking)
     propulsor_active (default 1 for v0 to v1, 0 for v1 to vr and braking) to model engine failure
     altitude (fltcond|h)
 
@@ -563,7 +561,7 @@ class GroundRollPhase(oc.PhaseGroup):
             self.add_subsystem('v0constraint',BalanceComp(name='duration',units='s',eq_units='m/s',rhs_name='fltcond|Utrue_initial',lhs_name='takeoff|v1',val=10.,upper=100.,lower=1.),
                                        promotes_inputs=['*'],promotes_outputs=['duration'])
         else:
-            # forward shooting for these acceleration segmentes
+            # forward shooting for these acceleration phases
             ode_integ = self.add_subsystem('ode_integ_phase', Integrator(num_nodes=nn, method='simpson', diff_units='s',time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
             ode_integ.add_integrand('fltcond|Utrue', units='m/s', rate_name='accel_horiz', start_name='fltcond|Utrue_initial', end_name='fltcond|Utrue_final', lower=1.5)
             if flight_phase == 'v0v1':
@@ -586,7 +584,7 @@ class RotationPhase(oc.PhaseGroup):
 
     User-settable parameters include:
     throttle (default 100 percent)
-    rolling friction coeff (default 0.03 for accelerating segments and 0.4 for braking)
+    rolling friction coeff (default 0.03 for accelerating phases and 0.4 for braking)
     propulsor_active (default 1 for v0 to v1, 0 for v1 to vr and braking) to model engine failure
     altitude (fltcond|h)
     obstacle clearance hight (h_obs) default 35 feet per FAR 25
@@ -691,7 +689,7 @@ class SteadyFlightPhase(oc.PhaseGroup):
     Settable mission parameters include:
     Airspeed (fltcond|Ueas)
     Vertical speed (fltcond|vs)
-    Duration of the segment (duration)
+    Duration of the phase (duration)
 
     Throttle is set automatically to ensure steady flight
 
