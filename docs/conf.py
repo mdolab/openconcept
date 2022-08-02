@@ -210,7 +210,10 @@ extensions = [
 	'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
-    "sphinx_copybutton",
+    'sphinx_copybutton',
+    'sphinx_mdolab_theme.ext.embed_code',
+    'sphinx_mdolab_theme.ext.embed_compare',
+    'sphinx_mdolab_theme.ext.embed_n2',
 ]
 autodoc_inherit_docstrings = False
 autodoc_member_order = 'bysource'
