@@ -684,6 +684,7 @@ class RotationPhase(oc.PhaseGroup):
         int4.add_integrand('fltcond|h', rate_name='fltcond|vs', units='m', zero_start=True)               
 
 class SteadyFlightPhase(oc.PhaseGroup):
+    # TODO: these inputs and outputs are incorrect (check the other groups in this file also)
     """
     This component group models steady flight conditions.
     Settable mission parameters include:
