@@ -74,9 +74,9 @@ class MissionAnalysis(om.Group):
     def setup(self):
         iv = self.add_subsystem("ac_vars", om.IndepVarComp(), promotes_outputs=["*"])
         iv.add_output("ac|geom|wing|S_ref", val=25.0, units="m**2")
-        iv.add_output("ac|weights|TOW", val=2e3, units="kg")
+        iv.add_output("ac|weights|TOW", val=5e3, units="kg")
         iv.add_output("ac|propulsion|max_thrust", val=1e4, units="N")
-        iv.add_output("ac|aero|L_over_D", val=15.0)
+        iv.add_output("ac|aero|L_over_D", val=10.0)
 
         # Define the mission
         self.add_subsystem(
@@ -125,21 +125,32 @@ if __name__ == "__main__":
     prob = setup_problem()
     prob.run_model()
 
-    om.n2(prob, show_browser=False)
+    # Generate N2 diagram
+    om.n2(prob, outfile="minimal_example_n2.html")
 
-    import matplotlib.pyplot as plt
+    # Create plot with results
+    fig, axs = plt.subplots(2, 2, constrained_layout=True)
+    axs = axs.flatten()  # change 2x2 mtx of axes into 4-element vector
 
-    var = "fltcond|h"
-    units = "ft"
+    # Define variables to plot
+    vars = [
+        {"var": "fltcond|h", "name": "Altitude", "units": "ft"},
+        {"var": "fltcond|vs", "name": "Vertical speed", "units": "ft/min"},
+        {"var": "fltcond|Utrue", "name": "True airspeed", "units": "kn"},
+        {"var": "throttle", "name": "Throttle", "units": None},
+    ]
 
-    for phase in ["climb", "cruise", "descent"]:
-        plt.plot(
-            prob.get_val(f"mission.{phase}.range", units="nmi"),
-            prob.get_val(f"mission.{phase}.{var}", units=units),
-            "-b",
-        )
+    for idx_fig, var in enumerate(vars):
+        axs[idx_fig].set_xlabel("Range (nmi)")
+        axs[idx_fig].set_ylabel(f"{var['name']}" if var["units"] is None else f"{var['name']} ({var['units']})")
 
-    plt.xlabel("Range (nmi)")
-    plt.ylabel(f"{var}, {units}")
-    plt.show()
+        # Loop through each flight phase and plot the current variable from each
+        for phase in ["climb", "cruise", "descent"]:
+            axs[idx_fig].plot(
+                prob.get_val(f"mission.{phase}.range", units="nmi"),
+                prob.get_val(f"mission.{phase}.{var['var']}", units=var["units"]),
+                "-b",
+            )
+
+    fig.savefig("minimal_example_results.svg")
 # rst Run (end)

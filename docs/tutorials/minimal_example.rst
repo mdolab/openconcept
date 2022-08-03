@@ -182,12 +182,15 @@ This way, OpenMDAO will automatically connect the outputs from the ``IndepVarCom
 In this group, we declare an option to set the number of nodes per phase so that the user can initialize the value when the problem is set up.
 
 .. note::
-    ``"ac|geom|wing|S_ref"`` is the only **required** top-level aircraft parameter that must be defined.
+    ``"ac|geom|wing|S_ref"`` is a **required** top-level aircraft parameter that must be defined.
     OpenConcept uses it to compute lift coefficient from lift force.
-    All other aircraft parameters depend on what models the user includes in the aircraft model class.
+    All other aircraft parameters depend on the inputs of the models the user includes in the aircraft model class.
 
 Run script
 ==========
+
+Setup problem
+-------------
 
 Now that we have the necessary models.
 The last step before running the model is setting up the OpenMDAO problem and providing the necessary values to define the mission profile.
@@ -196,7 +199,36 @@ The last step before running the model is setting up the OpenMDAO problem and pr
     :start-after: # rst Setup problem (beg)
     :end-before: # rst Setup problem (end)
 
-Set up, define necessary phase variables.
+We initialize an OpenMDAO Problem and add the ``MissionAnalysis`` class we defined as the problem's model.
+Here is where we specify the number of nodes per flight phase, using 11.
+Next, we add a solver that is used to determine the throttle and lift coefficient values that satisfy the steady flight force balance across the mission.
+We use OpenMDAO's Newton solver and assign a direct linear solver to solve each subiteration of the nonlinear solver.
+
+Once the problem is setup, we set the necessary values to specify the mission profile.
+``BasicMission`` has climb, cruise, and descent phases, but we still need to tell it the speed each is flown at, the cruise altitude, etc.
+This mission requires a vertical speed and airspeed in each phase.
+It also requires an initial cruise altitude and total mission length.
+For more details, see the :ref:`mission analysis documentation <MissionAnalysis>`.
+
+Run it!
+-------
+
+Finally, we actually run the analysis.
+
+.. literalinclude:: ../../examples/minimal.py
+    :start-after: # rst Run (beg)
+    :end-before: # rst Run (end)
+
+After running the model, we do a bit of postprocessing to visualize the results.
+The first thing we do is create an N2 diagram.
+This allows you to explore the structure of the model and the values of each variable.
+Lastly, we get some values from the model and create plot of some values, using matplotlib.
+
+The model should converge in a few iterations and generate a plot that looks like the following:
+
+.. image:: _static/minimal_example_results.svg
+
+.. TODO: possible to include the N2?
 
 Summary
 =======

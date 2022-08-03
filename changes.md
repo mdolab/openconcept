@@ -14,6 +14,7 @@
     - Integration
   - Maybe a list of papers that use OpenConcept like OpenMDAO does?
 - Add linting and formatting
+- Fix TODO on first line of SteadyFlightPhase in solver_phases.py
 
 # Refactoring directory tree
 
