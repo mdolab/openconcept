@@ -107,8 +107,8 @@ I'm open to pull requests and issues in the meantime. Stay tuned. The developmen
    :hidden:
 
    tutorials/minimal_example.rst
-   tutorials/TBM850.rst
    tutorials/integrator.rst
+   tutorials/TBM850.rst
 
 .. toctree::
    :maxdepth: 2

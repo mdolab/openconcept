@@ -31,6 +31,7 @@ class AircraftWithFuelBurn(om.Group):
         # Add the aircraft model from the minimal example to build off of.
         # Don't promote the weight from this model because we're going to compute a new
         # one using the fuel burn.
+        # rst Simple aircraft (beg)
         self.add_subsystem(
             "simple_aircraft",
             Aircraft(num_nodes=nn),
@@ -45,8 +46,10 @@ class AircraftWithFuelBurn(om.Group):
             ],
             promotes_outputs=["thrust", "drag"],
         )
+        # rst Simple aircraft (end)
 
         # Use an OpenMDAO ExecComp to compute the fuel flow rate using the thrust and TSFC
+        # rst Fuel flow (beg)
         self.add_subsystem(
             "fuel_flow_calc",
             om.ExecComp(
@@ -57,14 +60,18 @@ class AircraftWithFuelBurn(om.Group):
             ),
             promotes_inputs=[("TSFC", "ac|propulsion|TSFC"), "thrust"],
         )
+        # rst Fuel flow (end)
 
         # Integrate the fuel flow rate to compute fuel burn
-        integ = self.add_subsystem("fuel_integrator", Integrator(num_nodes=nn, diff_units="s", time_setup="duration"))
+        # rst Integrator (beg)
+        integ = self.add_subsystem("fuel_integrator", Integrator(num_nodes=nn, diff_units="s", time_setup="duration", method="simpson"))
         integ.add_integrand("fuel_burned", rate_name="fuel_flow", units="kg")
 
         self.connect("fuel_flow_calc.fuel_flow", "fuel_integrator.fuel_flow")
+        # rst Integrator (end)
 
         # Compute the current weight by subtracting the fuel burned from the takeoff weight
+        # rst Weight (beg)
         self.add_subsystem(
             "weight_calc",
             om.ExecComp(
@@ -78,6 +85,7 @@ class AircraftWithFuelBurn(om.Group):
             promotes_outputs=["weight"],
         )
         self.connect("fuel_integrator.fuel_burned", "weight_calc.fuel_burned")
+        # rst Weight (end)
 
 
 # rst Mission (beg)

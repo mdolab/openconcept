@@ -505,7 +505,7 @@ class Integrator(ExplicitComponent):
     diff_units : str
         The units of the integrand (none by default)
     method : str
-        Numerical method (default 'bdf3'; alternatively, 'simpson)
+        Numerical method (default 'bdf3'; alternatively, 'simpson')
     time_setup : str
         Time configuration (default 'dt')
         'dt' creates input 'dt'

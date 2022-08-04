@@ -49,6 +49,7 @@ Options
 .. literalinclude:: ../../examples/minimal.py
     :start-after: # rst Options
     :end-before: # rst Setup
+    :dedent: 4
 
 We start by defining the options for the model.
 These two options are **required** for all OpenConcept aircraft models:
@@ -62,6 +63,7 @@ Setup
 .. literalinclude:: ../../examples/minimal.py
     :start-after: # rst Setup
     :end-before: # rst Compute
+    :dedent: 4
 
 Next, we add the inputs and outputs to the aircraft model.
 We start with the lift coefficient and throttle---the inputs required by OpenConcept.
@@ -148,6 +150,7 @@ Compute
 .. literalinclude:: ../../examples/minimal.py
     :start-after: # rst Compute
     :end-before: # rst Aircraft (end)
+    :dedent: 4
 
 In this section, we actually compute the output values using the inputs.
 The weight is simply equal to the defined weight.
