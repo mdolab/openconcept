@@ -187,7 +187,7 @@ In this group, we declare an option to set the number of nodes per phase so that
 .. note::
     ``"ac|geom|wing|S_ref"`` is a **required** top-level aircraft parameter that must be defined.
     OpenConcept uses it to compute lift coefficient from lift force.
-    All other aircraft parameters depend on the inputs of the models the user includes in the aircraft model class.
+    Which other aircraft parameters are required is dependent on which OpenConcept models the user chooses to include in the aircraft model.
 
 Run script
 ==========
