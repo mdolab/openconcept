@@ -14,7 +14,7 @@ If you are not already familiar with OpenMDAO, we strongly recommend going throu
 Imports
 =======
 
-.. literalinclude:: ../../examples/minimal_example.py
+.. literalinclude:: ../../examples/minimal.py
     :start-after: # rst Imports (beg)
     :end-before: # rst Imports (end)
 
@@ -39,14 +39,14 @@ Drag is computed as lift divided by lift-to-drag ratio.
 Let's first take a look at the code for the whole aircraft model, and then we'll explain each part.
 The whole model looks like this:
 
-.. literalinclude:: ../../examples/minimal_example.py
+.. literalinclude:: ../../examples/minimal.py
     :start-after: # rst Aircraft (beg)
     :end-before: # rst Aircraft (end)
 
 Options
 -------
 
-.. literalinclude:: ../../examples/minimal_example.py
+.. literalinclude:: ../../examples/minimal.py
     :start-after: # rst Options
     :end-before: # rst Setup
 
@@ -59,7 +59,7 @@ These two options are **required** for all OpenConcept aircraft models:
 Setup
 -----
 
-.. literalinclude:: ../../examples/minimal_example.py
+.. literalinclude:: ../../examples/minimal.py
     :start-after: # rst Setup
     :end-before: # rst Compute
 
@@ -145,7 +145,7 @@ In practice, analytically defining the partial derivatives offers more accurate 
 Compute
 -------
 
-.. literalinclude:: ../../examples/minimal_example.py
+.. literalinclude:: ../../examples/minimal.py
     :start-after: # rst Compute
     :end-before: # rst Aircraft (end)
 
@@ -157,7 +157,7 @@ The drag is equal to the lift divided by L/D, where lift is computed using the d
 Mission
 =======
 
-.. literalinclude:: ../../examples/minimal_example.py
+.. literalinclude:: ../../examples/minimal.py
     :start-after: # rst Mission (beg)
     :end-before: # rst Mission (end)
 
@@ -195,7 +195,7 @@ Setup problem
 Now that we have the necessary models.
 The last step before running the model is setting up the OpenMDAO problem and providing the necessary values to define the mission profile.
 
-.. literalinclude:: ../../examples/minimal_example.py
+.. literalinclude:: ../../examples/minimal.py
     :start-after: # rst Setup problem (beg)
     :end-before: # rst Setup problem (end)
 
@@ -215,7 +215,7 @@ Run it!
 
 Finally, we actually run the analysis.
 
-.. literalinclude:: ../../examples/minimal_example.py
+.. literalinclude:: ../../examples/minimal.py
     :start-after: # rst Run (beg)
     :end-before: # rst Run (end)
 

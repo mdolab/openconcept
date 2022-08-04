@@ -88,13 +88,13 @@ class MissionAnalysis(om.Group):
 
 
 # rst Setup problem (beg)
-def setup_problem():
+def setup_problem(model=MissionAnalysis):
     """
     Define the OpenMDAO problem
     """
     nn = 11
     prob = om.Problem()
-    prob.model = MissionAnalysis(num_nodes=nn)
+    prob.model = model(num_nodes=nn)
 
     # Set up the solver
     prob.model.nonlinear_solver = om.NewtonSolver(iprint=2, solve_subsystems=True)
@@ -153,4 +153,5 @@ if __name__ == "__main__":
             )
 
     fig.savefig("minimal_example_results.svg")
+    plt.show()
 # rst Run (end)

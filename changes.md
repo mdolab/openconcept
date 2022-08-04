@@ -18,8 +18,6 @@
 
 # Refactoring directory tree
 
-### Note: talk to Neil about the best way to expose this structure to the user. Is it just by using the dot syntax in the import statements directly or using some api file (like OpenMDAO) or something else?
-
 - openconcept
   - aerodynamics
   - atmospherics
@@ -34,3 +32,8 @@
   - utilities
     - math
   - weights
+
+## Other refactoring
+
+- move examples folder to within openconcept directory! Will need to change the paths in the tutorial docs
+- remove old code? For example, `OldIntegrator`
