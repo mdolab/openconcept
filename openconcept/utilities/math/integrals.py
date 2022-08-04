@@ -562,6 +562,8 @@ class Integrator(ExplicitComponent):
             val : float
                 Default value for the integrated output (default 0.0)
                 Can be scalar or shape num_nodes
+            start_val : float
+                Default value for the initial value input (default 0.0)
             upper : float
                 Upper bound on integrated quantity
             lower : float

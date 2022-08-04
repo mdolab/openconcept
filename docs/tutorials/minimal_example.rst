@@ -243,3 +243,7 @@ Nonetheless, it obeys all the input/output requirements of an OpenConcept aircra
 You may notice that the results of this analysis are not particularly useful.
 It does not offer any information about fuel burn, energy usage, component temperatures, or sizing requirements.
 In the next tutorial, we'll develop a more comprehensive aircraft model that is more useful for conceptual design.
+
+The final script looks like this:
+
+.. literalinclude:: ../../examples/minimal.py

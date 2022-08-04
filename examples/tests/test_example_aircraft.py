@@ -13,6 +13,8 @@ from examples.Caravan import run_caravan_analysis
 from examples.KingAirC90GT import run_kingair_analysis
 from examples.ElectricSinglewithThermal import run_electricsingle_analysis
 from examples.N3_HybridSingleAisle_Refrig import run_hybrid_sa_analysis
+from examples.minimal import setup_problem as setup_minimal_problem
+from examples.minimal_integrator import MissionAnalysisWithFuelBurn as MinimalIntegratorMissionAnalysis
 try:
     from examples.B738_VLM_drag import run_738_analysis as run_738VLM_analysis
     from openconcept.analysis.openaerostruct.drag_polar import VLMDataGen
@@ -187,6 +189,27 @@ class N3HSATestCase(unittest.TestCase):
         prob = self.prob
         # block fuel (no reserve, since the N+3 HSA uses the basic 3-phase mission)
         assert_near_equal(prob.get_val('descent.fuel_used_final', units='lbm'), 9006.52397811, tolerance=1e-5)
+
+class MinimalTestCase(unittest.TestCase):
+    def setUp(self):
+        self.prob = setup_minimal_problem()
+        self.prob.run_model()
+    
+    def test_values_minimal(self):
+        # No fuel burn, so check the throttle from the three phases
+        assert_near_equal(self.prob.get_val('mission.climb.throttle'), np.array([0.651459, 0.647949, 0.644480, 0.641052, 0.637664, 0.634317, 0.631010, 0.627744, 0.624519, 0.621333, 0.618189]), tolerance=1e-5)
+        assert_near_equal(self.prob.get_val('mission.cruise.throttle'), np.full(11, 0.490333), tolerance=1e-5)
+        assert_near_equal(self.prob.get_val('mission.descent.throttle'), np.array([0.362142, 0.358981, 0.355778, 0.352535, 0.349250, 0.345924, 0.342557, 0.339149, 0.335699, 0.332207, 0.328674]), tolerance=1e-5)
+
+
+class MinimalIntegratorTestCase(unittest.TestCase):
+    def setUp(self):
+        self.prob = setup_minimal_problem(model=MinimalIntegratorMissionAnalysis)
+        self.prob.run_model()
+
+    def test_values_minimal(self):
+        assert_near_equal(self.prob.get_val('mission.descent.fuel_integrator.fuel_burned_final'), 633.350, tolerance=1e-5)
+
 
 if __name__=="__main__":
     unittest.main()

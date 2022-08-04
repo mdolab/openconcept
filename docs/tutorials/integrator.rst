@@ -114,8 +114,8 @@ The ``time_setup`` option sets what information the integrator uses to figure ou
 The options are ``"dt"duration"``, or ``"bounds"``.
 
 - ``"dt"`` creates an input called ``"dt"`` that specifies the time spacing between each numerical integration point
-- ``"duration"`` creates an input called ``"duration"`` that specifies the total time of the phase. The time between each integration point is computed by dividing the duration by the number of time steps (number of nodes minus one). This is the most common choice for the time setup and has the advantage that OpenConcept automatically connects the ``"duration"`` input to the mission-level duration, so there is no manual time connection needed.
-- ``"bounds"`` creates inputs called ``"t_initial"`` and ``"t_final"`` that specify the initial and final time of the segment. This internally computes duration and then time is computed the same was as for the duration approach.
+- ``"duration"`` creates an input called ``"duration"`` that specifies the total time of the phase. The time between each integration point is computed by dividing the duration by the number of time steps (number of nodes minus one). This is the most common choice for the time setup and has the advantage that **OpenConcept automatically connects the** ``"duration"`` **input to the mission-level duration, so there is no manual time connection needed**.
+- ``"bounds"`` creates inputs called ``"t_initial"`` and ``"t_final"`` that specify the initial and final time of the phase. This internally computes duration and then time is computed the same was as for the duration approach.
 
 The final option is the integration scheme.
 The two options are ``"bdf3"`` and ``"simpson"``.
@@ -125,17 +125,40 @@ Simpson's rule is the most common choice for use in OpenConcept.
 
 In the next line we add information about the quantity we want to integrate.
 We first define the name of the integrated quantity: ``"fuel_burned"``.
-This will become an output of the integrator (accessed in this case as ``"fuel_integrator.fuel_burned"``).
+This will become a vector output of the integrator (accessed in this case as ``"fuel_integrator.fuel_burned"``).
 We then define the rate we want integrated: ``"fuel_flow"``.
+This will create a vector input to the integrator called ``"fuel_flow"``.
+It also automatically adds an input called ``"fuel_flow_initial"`` and an output called ``"fuel_flow_final"``.
+Instead of appending ``"_initial"`` or ``"_final"``, these names can be set manually using the ``start_name`` and ``end_name`` optional arguments.
+The final value variable of each phase is automatically linked to the initial value variable of the following one.
+The initial value in the first mission phase is zero by default but can be changed either using the ``start_val`` optional argument or by setting the variable in a usual OpenMDAO way with an ``IndepVarComp`` or ``set_input_defaults``.
+We set the units of the fuel burn (the integrated quantity) to kilograms.
+Other available options can be found in the ``Integrator`` source docs.
+
+The final step is to connect the fuel flow output from the fuel flow computation component to the integrator's fuel flow input.
 
 Mission
 =======
 
+The rest of the code will look very similar to the :ref:`minimal example <Minimal-example-tutorial>`.
+
+.. literalinclude:: ../../examples/minimal_integrator.py
+    :start-after: # rst Mission (beg)
+    :end-before: # rst Mission (end)
+
+The mission is identical except for two changes.
+Firstly, we set the TSFC variable called ``"ac|propulsion|TSFC"``.
+Secondly, the ``aircraft_model`` passed to the mission analysis component is now ``AircraftWithFuelBurn``.
+
 Run script
 ==========
 
-Run it!
--------
+We reuse the ``setup_problem`` function from the :ref:`minimal example <Minimal-example-tutorial>`.
+The remaining code is the same, except for adding a couple more variables of interest to the output plot.
+
+.. literalinclude:: ../../examples/minimal_integrator.py
+    :start-after: # rst Run (beg)
+    :end-before: # rst Run (end)
 
 The model should converge in a few iterations.
 You can see the N2 diagram for the model :download:`here <assets/minimal_integrator_n2.html>`.
@@ -144,8 +167,21 @@ The plot it generates should look like this:
 .. image:: assets/minimal_integrator_results.svg
 
 You can see that the weight is no longer constant.
-This results in a varying throttle in the cruise segment, unlike the constant throttle from the :ref:`minimal example <Minimal-example-tutorial>`.
+This results in a varying throttle in the cruise phase, unlike the constant throttle from the :ref:`minimal example <Minimal-example-tutorial>`.
 Also notice that the fuel flow and throttle have the exact same shape, which makes sense because they are directly related by a factor of TSFC.
 
 Summary
 =======
+
+In this tutorial, we extended the previous minimal aircraft example to use an integrator to compute fuel burn.
+Our aircraft model is now an OpenMDAO group with a few more components in it.
+We compute fuel flow using thrust output by the aircraft model and TSFC.
+The integrator integrates fuel flow to compute fuel burn.
+Finally, we compute the aircraft weight by subtracting the fuel burned from the takeoff weight.
+
+The time input for the integrator is connected automatically and the final integrated value from one phase is connected to the initial value for the following one with some Ben Brelje magic.
+You're encouraged to figure out how this works for yourself by looking at the source code for the ``PhaseGroup`` and ``TrajectoryGroup`` (these are used by the flight phase and mission analysis groups).
+
+The final script looks like this:
+
+.. literalinclude:: ../../examples/minimal_integrator.py
