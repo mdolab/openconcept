@@ -1,21 +1,25 @@
+# rst Imports (beg)
 import numpy as np
 import openmdao.api as om
 import matplotlib.pyplot as plt
-
-# OpenConcept imports for the airplane model
 import os
 import sys
+
 sys.path.insert(0, os.getcwd())  # TODO: remove this once examples is in the openconcept module
-from examples.aircraft_data.TBM850 import data as acdata
+
+# OpenConcept imports for the airplane model
+from examples.propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
 from openconcept.analysis.aerodynamics import PolarDrag
 from examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
-from examples.propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
-from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from openconcept.utilities.math import AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
+from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis
+from examples.aircraft_data.TBM850 import data as acdata
 
+# rst Imports (end)
 
+# rst Aircraft (beg)
 class TBM850AirplaneModel(om.Group):
     """
     A custom model specific to the TBM 850 airplane
@@ -23,15 +27,18 @@ class TBM850AirplaneModel(om.Group):
 
     """
 
+    # rst Options
     def initialize(self):
         self.options.declare("num_nodes", default=1)
         self.options.declare("flight_phase", default=None)
 
+    # rst Setup
     def setup(self):
         nn = self.options["num_nodes"]
         flight_phase = self.options["flight_phase"]
 
         # ======================================== Propulsion ========================================
+        # rst Propulsion (beg)
         # A propulsion system needs to be defined in order to provide thrust information
         self.add_subsystem(
             "propmodel",
@@ -46,8 +53,10 @@ class TBM850AirplaneModel(om.Group):
             promotes_outputs=["thrust"],
         )
         self.set_input_defaults("propmodel.prop1.rpm", val=np.full(nn, 2000.0), units="rpm")
+        # rst Propulsion (end)
 
         # ======================================== Aerodynamics ========================================
+        # rst Aero (beg)
         # Use a different drag coefficient for takeoff versus cruise
         if flight_phase not in ["v0v1", "v1v0", "v1vr", "rotate"]:
             cd0_source = "ac|aero|polar|CD0_cruise"
@@ -67,8 +76,10 @@ class TBM850AirplaneModel(om.Group):
             ],
             promotes_outputs=["drag"],
         )
+        # rst Aero (end)
 
         # ======================================== Weights ========================================
+        # rst Weight (beg)
         # Empty weight calculation; requires many aircraft inputs, see SingleTurboPropEmptyWeight source for more details.
         # This OEW calculation is not used in the weight calculation, but it is a useful output for aircraft design/optimization.
         self.add_subsystem(
@@ -103,8 +114,10 @@ class TBM850AirplaneModel(om.Group):
             promotes_outputs=["weight"],
         )
         self.connect("intfuel.fuel_used", "weight.fuel_used")
+        # rst Weight (end)
 
 
+# rst Mission (beg)
 class TBMAnalysisGroup(om.Group):
     """
     This is an example of a balanced field takeoff and three-phase mission analysis.
@@ -161,8 +174,10 @@ class TBMAnalysisGroup(om.Group):
             promotes_inputs=["*"],
             promotes_outputs=["*"],
         )
+        # rst Mission (end)
 
 
+# rst Setup problem (beg)
 def run_tbm_analysis():
     # Set up OpenMDAO to analyze the airplane
     nn = 11
@@ -196,16 +211,21 @@ def run_tbm_analysis():
     prob["rotate.throttle"] = np.full(nn, 0.826)
 
     return prob
+    # rst Setup problem (end)
 
 
+# rst Run (beg)
 if __name__ == "__main__":
     # Process command line argument to optionally not show figures and N2 diagram
     import argparse
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hide_visuals",
-                        default=False,
-                        action="store_true",
-                        help="Do not show matplotlib figure or open N2 diagram in browser")
+    parser.add_argument(
+        "--hide_visuals",
+        default=False,
+        action="store_true",
+        help="Do not show matplotlib figure or open N2 diagram in browser",
+    )
     hide_viz = parser.parse_args().hide_visuals
 
     # Run the analysis
@@ -288,3 +308,4 @@ if __name__ == "__main__":
     mission_fig.savefig("turboprop_mission_results.svg")
     if not hide_viz:
         plt.show()
+    # rst Run (end)
