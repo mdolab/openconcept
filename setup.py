@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 import re
 import os
 
@@ -36,18 +36,7 @@ setup(
     url='https://github.com/mdolab/openconcept',
     download_url='https://github.com/mdolab/openconcept',
     license='MIT License',
-    packages=[
-        'openconcept',
-        'openconcept.analysis',
-        'openconcept.analysis.atmospherics',
-        'openconcept.analysis.openaerostruct',
-        'openconcept.analysis.performance',
-        'openconcept.analysis.tests',
-        'openconcept.components',
-        'openconcept.components.empirical_data',
-        'openconcept.utilities',
-        'openconcept.utilities.math'
-    ],
+    packages=find_packages(include=["openconcept*"]),
     install_requires=[
         'six',
         'scipy>=1.0.0',
