@@ -219,25 +219,24 @@ if __name__ == "__main__":
         print(f"{var['name']}: {prob.get_val(var['var'], units=var['units']).item()} {var['units']}")
 
     # =============== Takeoff plot ================
-    takeoff_fig, takeoff_axs = plt.subplots(2, 2, constrained_layout=True)
-    takeoff_axs = takeoff_axs.flatten()  # change 2x2 mtx of axes into 4-element vector
+    takeoff_fig, takeoff_axs = plt.subplots(1, 3, figsize=[9, 2.7], constrained_layout=True)
+    takeoff_axs = takeoff_axs.flatten()  # change 1x3 mtx of axes into 4-element vector
 
     # Define variables to plot
     takeoff_vars = [
         {"var": "fltcond|h", "name": "Altitude", "units": "ft"},
-        {"var": "fltcond|vs", "name": "Vertical speed", "units": "ft/min"},
         {"var": "fltcond|Utrue", "name": "True airspeed", "units": "kn"},
         {"var": "throttle", "name": "Throttle", "units": None},
     ]
 
     for idx_fig, var in enumerate(takeoff_vars):
-        takeoff_axs[idx_fig].set_xlabel("Range (nmi)")
+        takeoff_axs[idx_fig].set_xlabel("Range (ft)")
         takeoff_axs[idx_fig].set_ylabel(f"{var['name']}" if var["units"] is None else f"{var['name']} ({var['units']})")
 
         # Loop through each flight phase and plot the current variable from each
         for phase in ["v0v1", "v1vr", "rotate", "v1v0"]:
             takeoff_axs[idx_fig].plot(
-                prob.get_val(f"{phase}.range", units="nmi"),
+                prob.get_val(f"{phase}.range", units="ft"),
                 prob.get_val(f"{phase}.{var['var']}", units=var["units"]),
                 "-ob",
                 markersize=2.0,
