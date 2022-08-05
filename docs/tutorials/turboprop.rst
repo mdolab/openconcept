@@ -1,8 +1,8 @@
-.. _TBM850-tutorial:
+.. _Turboprop-tutorial:
 
-**************************
-A simple OpenConcept model
-**************************
+*********************
+OpenConcept Turboprop
+*********************
 
 This is a basic turboprop model that uses some of OpenConcept's simple propulsion and aerodynamic models.
 

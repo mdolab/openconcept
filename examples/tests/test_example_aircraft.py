@@ -2,8 +2,7 @@
 from __future__ import division
 import unittest
 import numpy as np
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
-from openmdao.api import IndepVarComp, Group, Problem
+from openmdao.utils.assert_utils import assert_near_equal
 from examples.B738 import run_738_analysis
 from examples.TBM850 import run_tbm_analysis
 from examples.HybridTwin_thermal import run_hybrid_twin_thermal_analysis
@@ -28,6 +27,7 @@ except:
 class TBMAnalysisTestCase(unittest.TestCase):
     def setUp(self):
         self.prob = run_tbm_analysis()
+        self.prob.run_model()
 
     def test_values_TBM(self):
         prob = self.prob

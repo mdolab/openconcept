@@ -3,26 +3,40 @@ from openconcept.components.turboshaft import SimpleTurboshaft
 from openconcept.components.propeller import SimplePropeller
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
-from openmdao.api import Group, IndepVarComp, ExplicitComponent
+from openmdao.api import Group
 
 class TurbopropPropulsionSystem(Group):
-    """This is an example model of the simplest possible propulsion system
-        consisting of a constant-speed prop and a turboshaft.
+    """
+    This is an example model of the simplest possible propulsion system
+    consisting of a constant-speed prop and a turboshaft.
 
-        This is the Pratt and Whitney Canada PT6A-66D with 4-bladed
-        propeller used by the SOCATA-DAHER TBM-850.
+    This is the Pratt and Whitney Canada PT6A-66D with 4-bladed
+    propeller used by the SOCATA-DAHER TBM-850.
 
-        Inputs
-        ------
-        ac|propulsion|engine|rating : float
-            The maximum rated shaft power of the engine
-        ac|propulsion|propeller|diameter : float
-            Diameter of the propeller
+    Inputs
+    ------
+    ac|propulsion|engine|rating : float
+        The maximum rated shaft power of the engine (scalar, default 850 hp)
+    ac|propulsion|propeller|diameter : float
+        Diameter of the propeller (scalar, default 2.3 m)
+    throttle : float
+        Throttle for the turboshaft (vector)
+    fltcond|rho : float
+        Air density (vector, kg/m**3)
+    fltcond|Utrue : float
+        True airspeed (vector, m/s)
+    
+    Outputs
+    -------
+    thrust : float
+        Thrust force (vector, N)
+    fuel_flow : float
+        Fuel mass flow rate (vector, kg/s)
 
-        Options
-        -------
-        num_nodes : float
-            Number of analysis points to run (default 1)
+    Options
+    -------
+    num_nodes : float
+        Number of analysis points to run (default 1)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc="Number of mission analysis points to run")
@@ -39,65 +53,83 @@ class TurbopropPropulsionSystem(Group):
         # introduce model components
         self.add_subsystem('eng1',
                            SimpleTurboshaft(num_nodes=nn, weight_inc=0.14 / 1000, weight_base=104),
-                           promotes_inputs=["throttle"], promotes_outputs=["fuel_flow"])
+                           promotes_inputs=["throttle", ("shaft_power_rating", "ac|propulsion|engine|rating")], promotes_outputs=["fuel_flow"])
         self.add_subsystem('prop1',
                            SimplePropeller(num_nodes=nn, num_blades=4,
                                            design_J=2.2, design_cp=0.55),
-                           promotes_inputs=["fltcond|*"], promotes_outputs=["thrust"])
+                           promotes_inputs=["fltcond|*", ("power_rating", "ac|propulsion|engine|rating"),
+                                            ("diameter", "ac|propulsion|propeller|diameter")],
+                           promotes_outputs=["thrust"])
 
-        # connect design variables to model component inputs
-        self.connect('eng1_rating', 'eng1.shaft_power_rating')
-        self.connect('eng1_rating', 'prop1.power_rating')
-        self.connect('prop1_diameter', 'prop1.diameter')
+        # Set default values for the engine rating and prop diameter
+        self.set_input_defaults("ac|propulsion|engine|rating", 850., units="hp")
+        self.set_input_defaults("ac|propulsion|propeller|diameter", 2.3, units="m")
 
-        # connect components to each other
+        # Connect shaft power from turboshaft to propeller
         self.connect('eng1.shaft_power_out', 'prop1.shaft_power_in')
 
 
 class TwinTurbopropPropulsionSystem(Group):
-    """This is an example model multiple constant-speed props and turboshafts.
-        These are two P&W Canada PT6A-135A with 4-bladed Hartzell propellers used by the Beechcraft King Air C90GT
-        https://www.easa.europa.eu/sites/default/files/dfu/TCDS_EASA-IM-A-503_C90-Series%20issue%206.pdf
-        INPUTS: ac|propulsion|engine|rating - the maximum rated shaft power of the engine (each engine)
-            dv_prop1_diameter - propeller diameter
+    """
+    This is an example model multiple constant-speed props and turboshafts.
+    These are two P&W Canada PT6A-135A with 4-bladed Hartzell propellers used by the Beechcraft King Air C90GT
+    https://www.easa.europa.eu/sites/default/files/dfu/TCDS_EASA-IM-A-503_C90-Series%20issue%206.pdf
+
+    Inputs
+    ------
+    ac|propulsion|engine|rating : float
+        The maximum rated shaft power of the engine (scalar, default 850 hp)
+    ac|propulsion|propeller|diameter : float
+        Diameter of the propeller (scalar, default 2.3 m)
+    throttle : float
+        Throttle for the turboshaft (vector)
+    fltcond|rho : float
+        Air density (vector, kg/m**3)
+    fltcond|Utrue : float
+        True airspeed (vector, m/s)
+    propulsor_active : float
+        1 if second propulsor is active or 0 if not (vector)
+
+    Outputs
+    -------
+    thrust : float
+        Thrust force (vector, N)
+    fuel_flow : float
+        Fuel mass flow rate (vector, kg/s)
+
+    Options
+    -------
+    num_nodes : float
+        Number of analysis points to run (default 1)
     """
     def initialize(self):
         self.options.declare('num_nodes',default=1,desc="Number of mission analysis points to run")
 
     def setup(self):
-        #define design variables that are independent of flight condition or control states
-        dvlist = [['ac|propulsion|engine|rating','eng_rating',750,'hp'],
-                    ['ac|propulsion|propeller|diameter','prop_diameter',2.28,'m'],
-                    ]
-        self.add_subsystem('dvs',DVLabel(dvlist),promotes_inputs=["*"],promotes_outputs=["*"])
         nn = self.options['num_nodes']
-        #introduce model components
-        self.add_subsystem('eng1',SimpleTurboshaft(num_nodes=nn,weight_inc=0.14/1000,weight_base=104),promotes_inputs=['throttle'])
-        self.add_subsystem('prop1',SimplePropeller(num_nodes=nn,num_blades=4,design_J=2.2,design_cp=0.55),promotes_inputs=["fltcond|*"])
-        self.add_subsystem('eng2',SimpleTurboshaft(num_nodes=nn,weight_inc=0.14/1000,weight_base=104))
-        self.add_subsystem('prop2',SimplePropeller(num_nodes=nn,num_blades=4,design_J=2.2,design_cp=0.55),promotes_inputs=["fltcond|*"])
 
-        #connect design variables to model component inputs
-        self.connect('eng_rating','eng1.shaft_power_rating')
-        self.connect('eng_rating','eng2.shaft_power_rating')
-        self.connect('eng_rating','prop1.power_rating')
-        self.connect('eng_rating','prop2.power_rating')
-        self.connect('prop_diameter','prop1.diameter')
-        self.connect('prop_diameter','prop2.diameter')
+        # Introduce turboshaft and propeller components (one for each side)
+        self.add_subsystem('eng1',SimpleTurboshaft(num_nodes=nn,weight_inc=0.14/1000,weight_base=104),promotes_inputs=['throttle', ("shaft_power_rating", "ac|propulsion|engine|rating")])
+        self.add_subsystem('prop1',SimplePropeller(num_nodes=nn,num_blades=4,design_J=2.2,design_cp=0.55),promotes_inputs=["fltcond|*", ("power_rating", "ac|propulsion|engine|rating"), ("diameter", "ac|propulsion|propeller|diameter")])
+        self.add_subsystem('eng2',SimpleTurboshaft(num_nodes=nn,weight_inc=0.14/1000,weight_base=104),promotes_inputs=[("shaft_power_rating", "ac|propulsion|engine|rating")])
+        self.add_subsystem('prop2',SimplePropeller(num_nodes=nn,num_blades=4,design_J=2.2,design_cp=0.55),promotes_inputs=["fltcond|*", ("power_rating", "ac|propulsion|engine|rating"), ("diameter", "ac|propulsion|propeller|diameter")])
 
-        #propulsion models expect a high-level 'throttle' parameter and a 'propulsor_active' flag to set individual throttles
+        # Set default values for the engine rating and prop diameter
+        self.set_input_defaults("ac|propulsion|engine|rating", 750., units="hp")
+        self.set_input_defaults("ac|propulsion|propeller|diameter", 2.28, units="m")
+
+        # Propulsion models expect a high-level 'throttle' parameter and a 'propulsor_active' flag to set individual throttles
         failedengine  = ElementMultiplyDivideComp()
         failedengine.add_equation('eng2throttle',input_names=['throttle','propulsor_active'],vec_size=nn)
         self.add_subsystem('failedengine', failedengine,
                            promotes_inputs=['throttle', 'propulsor_active'])
         self.connect('failedengine.eng2throttle','eng2.throttle')
 
-
-        #connect components to each other
+        # Connect components to each other
         self.connect('eng1.shaft_power_out','prop1.shaft_power_in')
         self.connect('eng2.shaft_power_out','prop2.shaft_power_in')
 
-        #add up the weights, thrusts and fuel flows
+        # Add up the weights, thrusts and fuel flows
         add1 = AddSubtractComp(output_name='fuel_flow',input_names=['eng1_fuel_flow','eng2_fuel_flow'],vec_size=nn, units='kg/s')
         add1.add_equation(output_name='thrust',input_names=['prop1_thrust','prop2_thrust'],vec_size=nn, units='N')
         add1.add_equation(output_name='engines_weight',input_names=['eng1_weight','eng2_weight'], units='kg')

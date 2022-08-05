@@ -149,7 +149,8 @@ if __name__ == "__main__":
             axs[idx_fig].plot(
                 prob.get_val(f"mission.{phase}.range", units="nmi"),
                 prob.get_val(f"mission.{phase}.{var['var']}", units=var["units"]),
-                "-b",
+                "-ob",
+                markersize=2.,
             )
 
     fig.savefig("minimal_example_results.svg")

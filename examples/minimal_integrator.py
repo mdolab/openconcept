@@ -127,7 +127,7 @@ if __name__ == "__main__":
 
     # Create plot with results
     fig, axs = plt.subplots(2, 3, figsize=[9, 4.8], constrained_layout=True)
-    axs = axs.flatten()  # change 2x2 mtx of axes into 4-element vector
+    axs = axs.flatten()  # change 2x3 mtx of axes into 4-element vector
 
     # Define variables to plot
     vars = [
@@ -148,7 +148,8 @@ if __name__ == "__main__":
             axs[idx_fig].plot(
                 prob.get_val(f"mission.{phase}.range", units="nmi"),
                 prob.get_val(f"mission.{phase}.{var['var']}", units=var["units"]),
-                "-b",
+                "-ob",
+                markersize=2.0,
             )
 
     fig.savefig("minimal_integrator_results.svg")

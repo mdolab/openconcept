@@ -108,7 +108,7 @@ I'm open to pull requests and issues in the meantime. Stay tuned. The developmen
 
    tutorials/minimal_example.rst
    tutorials/integrator.rst
-   tutorials/TBM850.rst
+   tutorials/turboprop.rst
 
 .. toctree::
    :maxdepth: 2
