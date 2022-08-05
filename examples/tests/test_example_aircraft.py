@@ -32,9 +32,9 @@ class TBMAnalysisTestCase(unittest.TestCase):
     def test_values_TBM(self):
         prob = self.prob
         assert_near_equal(prob.get_val('climb.OEW', units='lb'), 4756.772140709275, tolerance=1e-5)
-        assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 2489.49501148, tolerance=1e-5)
+        assert_near_equal(prob.get_val('rotate.range_final', units='ft'), 2490.89174399, tolerance=1e-5)
         assert_near_equal(prob.get_val('engineoutclimb.gamma',units='deg'), 8.78263, tolerance=1e-5)
-        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 1607.84846911, tolerance=1e-5)
+        assert_near_equal(prob.get_val('descent.fuel_used_final', units='lb'), 633.58800032, tolerance=1e-5)
 
 class CaravanAnalysisTestCase(unittest.TestCase):
     def setUp(self):
