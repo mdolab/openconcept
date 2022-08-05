@@ -3,10 +3,13 @@ import openmdao.api as om
 import matplotlib.pyplot as plt
 
 # OpenConcept imports for the airplane model
-from .aircraft_data.TBM850 import data as acdata
+import os
+import sys
+sys.path.insert(0, os.getcwd())  # TODO: remove this once examples is in the openconcept module
+from examples.aircraft_data.TBM850 import data as acdata
 from openconcept.analysis.aerodynamics import PolarDrag
-from .methods.weights_turboprop import SingleTurboPropEmptyWeight
-from .propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
+from examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
+from examples.propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from openconcept.utilities.math import AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator

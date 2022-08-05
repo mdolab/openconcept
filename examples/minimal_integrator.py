@@ -4,8 +4,11 @@ but adds a numerical integrator to integrate fuel burn
 and update the weight accordingly.
 """
 # rst Imports (beg)
+import os
+import sys
+sys.path.insert(0, os.getcwd())  # TODO: remove this once examples is in the openconcept module
 import openmdao.api as om
-from .minimal import Aircraft, setup_problem  # build off this aircraft model
+from examples.minimal import Aircraft, setup_problem  # build off this aircraft model
 from openconcept.analysis.performance.mission_profiles import BasicMission
 from openconcept.utilities.math.integrals import Integrator
 import matplotlib.pyplot as plt
