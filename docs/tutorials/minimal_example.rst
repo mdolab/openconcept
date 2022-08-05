@@ -228,10 +228,14 @@ This allows you to explore the structure of the model and the values of each var
 Lastly, we get some values from the model and create plot of some values, using matplotlib.
 
 The model should converge in a few iterations.
-You can see the N2 diagram for the model :download:`here <assets/minimal_example_n2.html>`.
 The plot it generates should look like this:
 
 .. image:: assets/minimal_example_results.svg
+
+The N2 diagram for the model is the following:
+
+.. embed-n2::
+  ../examples/minimal.py
 
 Summary
 =======

@@ -15,6 +15,7 @@
 import os
 import sys
 import openconcept
+import subprocess
 
 from sphinx_mdolab_theme.config import *
 
@@ -155,6 +156,43 @@ Source Docs
 
     # finish and close top-level index file
     index.close()
+
+
+def run_file_move_result(file_name, output_files, destination_files, optional_cl_args=[]):
+    """
+    Run a file (as a subprocess) that produces output file(s) of interest.
+    This function then moves the file(s) to a specified location.
+
+    For example, a file may produce a figure that is used in the docs.
+    This function can be used to automatically generate the figure in the RTD build
+    and move it to a specific location in the RTD build.
+
+    Note that the file is run from the openconcept/docs directory and all relative paths
+    are relative to this directory. If the output file name is defined in the script
+    using a relative path remember to take it into account.
+
+    Parameters
+    ----------
+    file_name : str
+        Python file to be run
+    output_files : list of str
+        Output files produced by running file_name
+    destination_files : list of str
+        Destination paths/file names to move output_file to (must be same length as output_files)
+    optional_cl_args : list of str
+        Optional command line arguments to add when file_name is run by Python
+    """
+    # Error check
+    if len(output_files) != len(destination_files):
+        raise ValueError("The number of output files must be the same as destination file paths")
+
+    # Run the file
+    subprocess.run(["python", file_name] + optional_cl_args)
+
+    # Move the files
+    for output_file, destination_file in zip(output_files, destination_files):
+        os.makedirs(os.path.dirname(destination_file), exist_ok=True)
+        os.replace(output_file, destination_file)
 
 
 # Patch the Napoleon parser to find Inputs, Outputs, and Options headings in docstrings
@@ -310,6 +348,11 @@ texinfo_documents = [
 
 
 # -- Extension configuration -------------------------------------------------
+
+# -- Run examples to get figures for docs ------------------------------------
+run_file_move_result("../examples/minimal.py", ["minimal_example_results.svg"], ["tutorials/assets/minimal_example_results.svg"], optional_cl_args=["--hide_visuals"])
+run_file_move_result("../examples/minimal_integrator.py", ["minimal_integrator_results.svg"], ["tutorials/assets/minimal_integrator_results.svg"], optional_cl_args=["--hide_visuals"])
+run_file_move_result("../examples/TBM850.py", ["turboprop_takeoff_results.svg", "turboprop_mission_results.svg"], ["tutorials/assets/turboprop_takeoff_results.svg", "tutorials/assets/turboprop_mission_results.svg"], optional_cl_args=["--hide_visuals"])
 
 # -- Options for intersphinx extension ---------------------------------------
 

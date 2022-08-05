@@ -161,10 +161,14 @@ The remaining code is the same, except for adding a couple more variables of int
     :end-before: # rst Run (end)
 
 The model should converge in a few iterations.
-You can see the N2 diagram for the model :download:`here <assets/minimal_integrator_n2.html>`.
 The plot it generates should look like this:
 
 .. image:: assets/minimal_integrator_results.svg
+
+The N2 diagram for the model is the following:
+
+.. embed-n2::
+  ../examples/minimal_integrator.py
 
 You can see that the weight is no longer constant.
 This results in a varying throttle in the cruise phase, unlike the constant throttle from the :ref:`minimal example <Minimal-example-tutorial>`.

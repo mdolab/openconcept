@@ -118,12 +118,21 @@ class MissionAnalysisWithFuelBurn(om.Group):
 
 # rst Run (beg)
 if __name__ == "__main__":
+    # Process command line argument to optionally not show figures and N2 diagram
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--hide_visuals",
+                        default=False,
+                        action="store_true",
+                        help="Do not show matplotlib figure or open N2 diagram in browser")
+    hide_viz = parser.parse_args().hide_visuals
+
     # Setup the problem and run the analysis
     prob = setup_problem(model=MissionAnalysisWithFuelBurn)
     prob.run_model()
 
     # Generate N2 diagram
-    om.n2(prob, outfile="minimal_integrator_n2.html")
+    om.n2(prob, outfile="minimal_integrator_n2.html", show_browser=not hide_viz)
 
     # Create plot with results
     fig, axs = plt.subplots(2, 3, figsize=[9, 4.8], constrained_layout=True)
@@ -153,5 +162,6 @@ if __name__ == "__main__":
             )
 
     fig.savefig("minimal_integrator_results.svg")
-    plt.show()
+    if not hide_viz:
+        plt.show()
 # rst Run (end)

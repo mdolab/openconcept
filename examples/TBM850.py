@@ -196,12 +196,21 @@ def run_tbm_analysis():
 
 
 if __name__ == "__main__":
+    # Process command line argument to optionally not show figures and N2 diagram
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--hide_visuals",
+                        default=False,
+                        action="store_true",
+                        help="Do not show matplotlib figure or open N2 diagram in browser")
+    hide_viz = parser.parse_args().hide_visuals
+
     # Run the analysis
     prob = run_tbm_analysis()
     prob.run_model()
 
     # Generate N2 diagram
-    om.n2(prob, outfile="turboprop_n2.html")
+    om.n2(prob, outfile="turboprop_n2.html", show_browser=not hide_viz)
 
     # =============== Print some useful outputs ================
     print_vars = [
@@ -274,4 +283,5 @@ if __name__ == "__main__":
 
     mission_fig.suptitle("Mission")
     mission_fig.savefig("turboprop_mission_results.svg")
-    plt.show()
+    if not hide_viz:
+        plt.show()
