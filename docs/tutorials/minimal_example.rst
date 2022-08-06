@@ -11,6 +11,9 @@ It uses a simplified aircraft model and basic mission profile with climb, cruise
 OpenConcept leans heavily on OpenMDAO for the numerical framework, in particular ``ExplicitComponent``, ``ImplicitComponent``, ``Group``, ``Problem``, the OpenMDAO solvers, and the optimizer interfaces.
 If you are not already familiar with OpenMDAO, we strongly recommend going through their `basic user guide <https://openmdao.org/newdocs/versions/latest/basic_user_guide/basic_user_guide.html>`_.
 
+.. note::
+  The script described in this tutorial is called minimal.py and can be found in the examples folder.
+
 Imports
 =======
 

@@ -14,6 +14,9 @@ This will require the following additions to the previous aircraft model:
 Other than these changes to the aircraft model the code will look very similar to the minimal example, so we will gloss over some details that are described more in the :ref:`minimal example <Minimal-example-tutorial>`.
 If you have not done so already, it is recommended to go through that tutorial first.
 
+.. note::
+  The script described in this tutorial is called minimal_integrator.py and can be found in the examples folder.
+
 Imports
 =======
 

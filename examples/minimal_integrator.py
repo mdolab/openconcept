@@ -164,7 +164,7 @@ if __name__ == "__main__":
                 markersize=2.0,
             )
 
-    fig.savefig("minimal_integrator_results.svg")
+    fig.savefig("minimal_integrator_results.svg", transparent=True)
     if not hide_viz:
         plt.show()
 # rst Run (end)

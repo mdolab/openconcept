@@ -275,7 +275,7 @@ if __name__ == "__main__":
             )
 
     takeoff_fig.suptitle("Takeoff phases")
-    takeoff_fig.savefig("turboprop_takeoff_results.svg")
+    takeoff_fig.savefig("turboprop_takeoff_results.svg", transparent=True)
 
     # =============== Mission plot ================
     mission_fig, mission_axs = plt.subplots(2, 3, figsize=[9, 4.8], constrained_layout=True)
@@ -305,7 +305,7 @@ if __name__ == "__main__":
             )
 
     mission_fig.suptitle("Mission")
-    mission_fig.savefig("turboprop_mission_results.svg")
+    mission_fig.savefig("turboprop_mission_results.svg", transparent=True)
     if not hide_viz:
         plt.show()
     # rst Run (end)
