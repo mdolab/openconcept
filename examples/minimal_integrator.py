@@ -160,7 +160,8 @@ if __name__ == "__main__":
             axs[idx_fig].plot(
                 prob.get_val(f"mission.{phase}.range", units="nmi"),
                 prob.get_val(f"mission.{phase}.{var['var']}", units=var["units"]),
-                "-ob",
+                "-o",
+                c="tab:blue",
                 markersize=2.0,
             )
 

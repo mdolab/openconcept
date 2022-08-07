@@ -266,14 +266,21 @@ if __name__ == "__main__":
         takeoff_axs[idx_fig].set_ylabel(f"{var['name']}" if var["units"] is None else f"{var['name']} ({var['units']})")
 
         # Loop through each flight phase and plot the current variable from each
-        for phase in ["v0v1", "v1vr", "rotate", "v1v0"]:
+        colors = ["tab:blue", "tab:orange", "tab:green", "tab:red"]
+        for i, phase in enumerate(["v0v1", "v1vr", "rotate", "v1v0"]):
             takeoff_axs[idx_fig].plot(
                 prob.get_val(f"{phase}.range", units="ft"),
                 prob.get_val(f"{phase}.{var['var']}", units=var["units"]),
-                "-ob",
+                "-o",
+                c=colors[i],
                 markersize=2.0,
             )
 
+    takeoff_fig.legend(
+        [r"V0 $\rightarrow$ V1", r"V1 $\rightarrow$ Vr", "Rotate", r"V1 $\rightarrow$ V0"],
+        loc=(0.067, 0.6),
+        fontsize="small",
+    )
     takeoff_fig.suptitle("Takeoff phases")
     takeoff_fig.savefig("turboprop_takeoff_results.svg", transparent=True)
 
@@ -300,7 +307,8 @@ if __name__ == "__main__":
             mission_axs[idx_fig].plot(
                 prob.get_val(f"{phase}.range", units="nmi"),
                 prob.get_val(f"{phase}.{var['var']}", units=var["units"]),
-                "-ob",
+                "-o",
+                c="tab:blue",
                 markersize=2.0,
             )
 

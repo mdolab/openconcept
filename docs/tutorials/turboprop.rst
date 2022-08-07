@@ -120,9 +120,13 @@ This provides an easy way to combine variables by adding and subtracting and inc
 Mission
 =======
 
-Add the variables from the data file using a ``DictIndepVarComp`` instead of manually defining them as before.
+This mission group has two changes from previous examples.
+The aircraft parameters are added from the data file using a ``DictIndepVarComp`` instead of manually defining them as before with an ``IndepVarComp``.
+This allows the parameters to be defined in one location (that is not the run script).
+The second change is the switch to using a ``FullMissionAnalysis`` mission, which adds a balanced field length calculation to the ``BasicMission`` we used previously.
 
-Use the ``FullMissionAnalysis``.
+The ``DictIndepVarComp`` takes in a nested Python dictionary, which in this case is imported from the TBM's aircraft data file.
+Values from the dictionary can be added as outputs by calling ``add_output_from_dict`` and passing in a string with the keys for the nested dictionary for the variable you want separated by a pipe.
 
 .. literalinclude:: ../../examples/TBM850.py
     :start-after: # rst Mission (beg)
@@ -132,34 +136,48 @@ Run script
 ==========
 
 Setup problem
-~~~~~~~~~~~~~
+-------------
 
-Functions to set up the mission and solvers.
+We start by writing a function to set up the problem, assign solvers, and define the mission profile, just as we did in the :ref:`minimal example <Minimal-example-tutorial>`.
+The new addition here is the setup of the takeoff segment.
+We set initial guesses for the takeoff speeds to initialize the solver with reasonable guesses.
+This improves the convergence behavior.
+We also set the structural fudge value, a multiplier on the structural weights, to account for additional weights not modeled by the empty weight component.
+Finally, we decrease the throttle values for the takeoff segments from the default of 1 to 0.826.
+
 
 .. literalinclude:: ../../examples/TBM850.py
     :start-after: # rst Setup problem (beg)
     :end-before: # rst Setup problem (end)
 
 Run it!
-~~~~~~~
+-------
 
-Run the thing.
+Now we get to actually run the problem.
+After running it, we print some values from the solved problem.
+The plotting section from previous tutorials is used twice to add a plot showing the takeoff portion of the mission.
 
 .. literalinclude:: ../../examples/TBM850.py
     :start-after: # rst Run (beg)
     :end-before: # rst Run (end)
 
-Most of this part is just plotting.
-
-The takeoff looks like this:
+The plot from the takeoff phases looks like this:
 
 .. image:: assets/turboprop_takeoff_results.svg
 
-Describe each phase.
+The balanced field length consists of four phases.
+The first models accelerating from a standstill to the decision speed, V1.
+If an engine fails (in an airplane with at least two engines) before V1, the pilot brakes to a stop.
+The second phase in the legend models this braking.
+If it fails after V1, the takeoff continues to the rotation speed and takes off with the remaining engine(s).
+This is modeled by the third and fourth phases in the legend.
 
 The mission looks like this:
 
 .. image:: assets/turboprop_mission_results.svg
+
+Compared to the previous tutorial, this model more accurately models the fuel flow and thrust force.
+It also incorporates a better drag model.
 
 The N2 diagram for the model is the following:
 
@@ -168,5 +186,10 @@ The N2 diagram for the model is the following:
 
 Summary
 =======
+
+In this tutorial, we created a more detailed aircraft using OpenConcept's models for propulsion, aerodynamics, and weights.
+We also incorporated a mission profile that includes a balanced field length takeoff.
+
+The final script looks like this:
 
 .. literalinclude:: ../../examples/TBM850.py
