@@ -404,61 +404,59 @@ class VLMDataGen(om.ExplicitComponent):
         partials["CD_train", "ac|aero|CD_nonwing"] = np.ones(VLMDataGen.CD.shape)
 
 
-"""
-Generates training data and its total derivatives by
-calling OpenAeroStruct at each training point.
-
-Inputs
-------
-inputs : dict
-    A dictionary containing the following entries:
-    Mach_number_grid : mdarray
-        Mach number (3D meshgrid 'ij'-style ndarray, dimensionless)
-    alpha_grid : ndarray
-        Angle of attack (3D meshgrid 'ij'-style ndarray, degrees)
-    alt_grid : ndarray
-        Altitude (3D meshgrid 'ij'-style ndarray, m)
-    TempIncrement : float
-        Temperature increment for non-standard day (scalar, degC)
-    S_ref : float
-        Wing planform area (scalar, m^2)
-    AR : float
-        Wing aspect ratio (scalar, dimensionless)
-    taper : float
-        Wing taper ratio (scalar, dimensionless)
-    c4sweep : float
-        Wing sweep measured at quarter chord (scalar, degrees)
-    twist : float
-        List of twist angles at control points of spline (vector, degrees)
-        NOTE: length of vector is num_twist (set in options of VLMDataGen)
-    num_x: int
-        number of points in x (streamwise) direction (scalar, dimensionless)
-    num_y: int
-        number of points in y (spanwise) direction for one wing because
-        uses symmetry (scalar, dimensionless)
-surf_dict : dict
-    Dictionary of OpenAeroStruct surface options; any options provided here
-    will override the default ones; see the OpenAeroStruct documentation for more information.
-    Because the geometry transformations are excluded in this model (to simplify the interface),
-    the <transformation>_cp options are not supported. The input ac|geom|wing|twist is the same
-    as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
-    is limited to adjusting the input parameters to this component.
-
-Outputs
--------
-data : dict
-    A dictionary containing the following entries:
-    CL : ndarray
-        Lift coefficients at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
-    CD : ndarray
-        Drag coefficients at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
-    partials : dict
-        Partial derivatives of the training data flattened in the proper OpenMDAO-style
-        format for use as partial derivatives in the VLMDataGen component
-"""
-
-
 def compute_training_data(inputs, surf_dict=None):
+    """
+    Generates training data and its total derivatives by
+    calling OpenAeroStruct at each training point.
+
+    Inputs
+    ------
+    inputs : dict
+        A dictionary containing the following entries:
+        Mach_number_grid : mdarray
+            Mach number (3D meshgrid 'ij'-style ndarray, dimensionless)
+        alpha_grid : ndarray
+            Angle of attack (3D meshgrid 'ij'-style ndarray, degrees)
+        alt_grid : ndarray
+            Altitude (3D meshgrid 'ij'-style ndarray, m)
+        TempIncrement : float
+            Temperature increment for non-standard day (scalar, degC)
+        S_ref : float
+            Wing planform area (scalar, m^2)
+        AR : float
+            Wing aspect ratio (scalar, dimensionless)
+        taper : float
+            Wing taper ratio (scalar, dimensionless)
+        c4sweep : float
+            Wing sweep measured at quarter chord (scalar, degrees)
+        twist : float
+            List of twist angles at control points of spline (vector, degrees)
+            NOTE: length of vector is num_twist (set in options of VLMDataGen)
+        num_x: int
+            number of points in x (streamwise) direction (scalar, dimensionless)
+        num_y: int
+            number of points in y (spanwise) direction for one wing because
+            uses symmetry (scalar, dimensionless)
+    surf_dict : dict
+        Dictionary of OpenAeroStruct surface options; any options provided here
+        will override the default ones; see the OpenAeroStruct documentation for more information.
+        Because the geometry transformations are excluded in this model (to simplify the interface),
+        the <transformation>_cp options are not supported. The input ac|geom|wing|twist is the same
+        as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
+        is limited to adjusting the input parameters to this component.
+
+    Outputs
+    -------
+    data : dict
+        A dictionary containing the following entries:
+        CL : ndarray
+            Lift coefficients at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
+        CD : ndarray
+            Drag coefficients at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
+        partials : dict
+            Partial derivatives of the training data flattened in the proper OpenMDAO-style
+            format for use as partial derivatives in the VLMDataGen component
+    """
     t_start = time()
     print(f"Generating OpenAeroStruct aerodynamic training data...")
 

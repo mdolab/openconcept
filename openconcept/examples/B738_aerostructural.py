@@ -20,11 +20,11 @@ import numpy as np
 import openmdao.api as om
 import openconcept.api as oc
 # imports for the airplane model itself
-from openconcept.analysis.openaerostruct.aerostructural import OASAerostructDragPolar, OASAerostructDragPolarExact
+from openconcept.aerodynamics import OASAerostructDragPolar
+from openconcept.aerodynamics.openaerostruct import Aerostruct, OASAerostructDragPolarExact
 from openconcept.examples.aircraft_data.B738 import data as acdata
 from openconcept.analysis.performance.mission_profiles import BasicMission
 from openconcept.components.cfm56 import CFM56
-from openconcept.analysis.openaerostruct.aerostructural import Aerostruct
 from openconcept.aerodynamics import Lift
 from openconcept.analysis.atmospherics.dynamic_pressure_comp import DynamicPressureComp
 

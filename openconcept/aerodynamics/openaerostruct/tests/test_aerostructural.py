@@ -7,7 +7,7 @@ import openmdao.api as om
 try:
     from openaerostruct.geometry.geometry_group import Geometry
     from openaerostruct.aerodynamics.aero_groups import AeroPoint
-    from openconcept.analysis.openaerostruct.aerostructural import *
+    from openconcept.aerodynamics.openaerostruct.aerostructural import *
 
     OAS_installed = True
 except:

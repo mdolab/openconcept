@@ -16,9 +16,8 @@ from openconcept.examples.minimal import setup_problem as setup_minimal_problem
 from openconcept.examples.minimal_integrator import MissionAnalysisWithFuelBurn as MinimalIntegratorMissionAnalysis
 try:
     from openconcept.examples.B738_VLM_drag import run_738_analysis as run_738VLM_analysis
-    from openconcept.analysis.openaerostruct.drag_polar import VLMDataGen
+    from openconcept.aerodynamics.openaerostruct import VLMDataGen, OASDataGen
     from openconcept.examples.B738_aerostructural import run_738_analysis as run_738Aerostruct_analysis
-    from openconcept.analysis.openaerostruct.aerostructural import OASDataGen
     OAS_installed = True
 except:
     OAS_installed = False
