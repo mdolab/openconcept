@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # OpenConcept imports for the airplane model
 from openconcept.propulsion import TurbopropPropulsionSystem
 from openconcept.aerodynamics import PolarDrag
-from openconcept.examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
+from openconcept.weights import SingleTurboPropEmptyWeight
 from openconcept.utilities.math import AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp

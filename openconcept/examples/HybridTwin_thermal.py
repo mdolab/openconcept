@@ -3,9 +3,7 @@ import os
 import logging
 import numpy as np
 
-from openmdao.api import Problem, Group, ScipyOptimizeDriver
-from openmdao.api import BalanceComp, ExplicitComponent, ExecComp, SqliteRecorder
-from openmdao.api import DirectSolver, IndepVarComp, NewtonSolver, BoundsEnforceLS
+from openmdao.api import Problem, Group, ScipyOptimizeDriver, ExplicitComponent, ExecComp, SqliteRecorder, DirectSolver, IndepVarComp, NewtonSolver
 
 # imports for the airplane model itself
 from openconcept.aerodynamics import PolarDrag
@@ -13,7 +11,7 @@ from openconcept.utilities.math import AddSubtractComp
 from openconcept.utilities.math.max_min_comp import MaxComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dvlabel import DVLabel
-from openconcept.examples.methods.weights_twin_hybrid import TwinSeriesHybridEmptyWeight
+from openconcept.weights import TwinSeriesHybridEmptyWeight
 from openconcept.propulsion import TwinSeriesHybridElectricThermalPropulsionSystem
 from openconcept.costs import TurbopropOperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp

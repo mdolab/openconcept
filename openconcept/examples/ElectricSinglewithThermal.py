@@ -10,7 +10,7 @@ from openconcept.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dvlabel import DVLabel
-from openconcept.examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
+from openconcept.weights import SingleTurboPropEmptyWeight
 from openconcept.propulsion import AllElectricSinglePropulsionSystemWithThermal_Incompressible, AllElectricSinglePropulsionSystemWithThermal_Compressible
 from openconcept.costs import TurbopropOperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp

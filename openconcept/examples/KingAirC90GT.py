@@ -9,7 +9,7 @@ from openmdao.api import NewtonSolver, BoundsEnforceLS
 from openconcept.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
-from openconcept.examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
+from openconcept.weights import SingleTurboPropEmptyWeight
 from openconcept.propulsion import TwinTurbopropPropulsionSystem
 from openconcept.costs import TurbopropOperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp

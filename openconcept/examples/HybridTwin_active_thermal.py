@@ -13,7 +13,7 @@ from openconcept.utilities.math import AddSubtractComp
 from openconcept.utilities.math.max_min_comp import MaxComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dvlabel import DVLabel
-from openconcept.examples.methods.weights_twin_hybrid import TwinSeriesHybridEmptyWeight
+from openconcept.weights import TwinSeriesHybridEmptyWeight
 from openconcept.propulsion import TwinSeriesHybridElectricThermalPropulsionRefrigerated
 from openconcept.costs import TurbopropOperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
