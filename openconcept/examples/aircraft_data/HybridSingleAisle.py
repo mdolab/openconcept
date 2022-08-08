@@ -2,8 +2,8 @@
 # Collected from various sources
 # including SOCATA pilot manual
 from __future__ import division
-import openconcept.api as oc
 import openmdao.api as om
+from openconcept.mission import IntegratorGroup
 from openconcept.components.thermal import PerfectHeatTransferComp
 from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
 from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
@@ -116,7 +116,7 @@ design_mission['TOW'] = {'value':79002, 'units':'kg'}
 ac['design_mission'] = design_mission
 data['ac'] = ac
 
-class MotorFaultProtection(oc.IntegratorGroup):
+class MotorFaultProtection(IntegratorGroup):
     """
     The fault protection at the motor consumes power and produces heat
     It consumes glycol/water at 3gpm and needs 40C inflow temp

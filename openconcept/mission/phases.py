@@ -1,6 +1,6 @@
 from __future__ import division
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, BalanceComp, ImplicitComponent
-import openconcept.api as oc
+from .mission_groups import PhaseGroup
 from openconcept.atmospherics import ComputeAtmosphericProperties
 from openconcept.aerodynamics import Lift, StallSpeed
 from openconcept.utilities.math import ElementMultiplyDivideComp, AddSubtractComp
@@ -438,7 +438,7 @@ class SteadyFlightCL(ExplicitComponent):
         J['fltcond|CL','ac|geom|wing|S_ref'] = - inputs['fltcond|cosgamma']*g*inputs['weight'] / inputs['fltcond|q'] / inputs['ac|geom|wing|S_ref']**2
         J['fltcond|CL','fltcond|cosgamma'] = g*inputs['weight']/inputs['fltcond|q']/inputs['ac|geom|wing|S_ref']
 
-class GroundRollPhase(oc.PhaseGroup):
+class GroundRollPhase(PhaseGroup):
     """
     This component group models the ground roll phase of a takeoff (acceleration before flight)
     User-settable parameters include:
@@ -577,7 +577,7 @@ class GroundRollPhase(oc.PhaseGroup):
         else:
             ode_integ.add_integrand('range', rate_name='fltcond|groundspeed', units='m')
 
-class RotationPhase(oc.PhaseGroup):
+class RotationPhase(PhaseGroup):
     """
     This group models the transition from ground roll to climb out during a takeoff
     using force balance in the vertical and horizontal directions.
@@ -683,7 +683,7 @@ class RotationPhase(oc.PhaseGroup):
         int4 = self.add_subsystem('inth', Integrator(num_nodes=nn, method='simpson',diff_units='s',time_setup='duration'), promotes_outputs=['*'], promotes_inputs=['*'])
         int4.add_integrand('fltcond|h', rate_name='fltcond|vs', units='m', zero_start=True)               
 
-class SteadyFlightPhase(oc.PhaseGroup):
+class SteadyFlightPhase(PhaseGroup):
     # TODO: these inputs and outputs are incorrect (check the other groups in this file also)
     """
     This component group models steady flight conditions.
@@ -1012,7 +1012,7 @@ class TakeoffClimb(ExplicitComponent):
         J['t_climb','fltcond|Utrue'] = - sc / ut ** 2
 
 
-class RobustRotationPhase(oc.PhaseGroup):
+class RobustRotationPhase(PhaseGroup):
     """
     This adds general mission analysis capabilities to an existing airplane model.
     The BaseAircraftGroup object is passed in. It should be built to accept the following inputs and return the following outputs.

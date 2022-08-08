@@ -11,7 +11,7 @@ from openconcept.examples.methods.weights_turboprop import SingleTurboPropEmptyW
 from openconcept.examples.methods.costs_commuter import OperatingCost
 
 from openconcept.aerodynamics import PolarDrag
-from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis
+from openconcept.mission import FullMissionAnalysis
 
 class CaravanAirplaneModel(om.Group):
     """

@@ -20,7 +20,7 @@ However, ``IntegratorGroup`` instances can be buried deep in a model made up of 
 The following example illustrates the usage of this feature.
 The tags following the "integrate" tag define the name, units, and default values of the integrated output.
 
-.. literalinclude:: /../openconcept/analysis/tests/test_trajectories.py
+.. literalinclude:: /../openconcept/mission/tests/test_trajectories.py
     :pyobject: TestForDocs.trajectory_example
     :language: python
     :dedent: 4

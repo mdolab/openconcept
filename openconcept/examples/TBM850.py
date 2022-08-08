@@ -10,7 +10,7 @@ from openconcept.examples.methods.weights_turboprop import SingleTurboPropEmptyW
 from openconcept.utilities.math import AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
-from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis
+from openconcept.mission import FullMissionAnalysis
 from openconcept.examples.aircraft_data.TBM850 import data as acdata
 
 # rst Imports (end)

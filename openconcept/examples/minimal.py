@@ -7,7 +7,7 @@ does use the mission analysis methods.
 """
 # rst Imports (beg)
 import openmdao.api as om
-from openconcept.analysis.performance.mission_profiles import BasicMission
+from openconcept.mission import BasicMission
 import numpy as np
 import matplotlib.pyplot as plt
 

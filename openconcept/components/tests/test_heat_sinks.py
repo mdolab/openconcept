@@ -69,7 +69,7 @@ class UnsteadyBatteryCoolingTestCase(unittest.TestCase):
         """
         An example demonstrating unsteady battery cooling
         """
-        import openconcept.api as oc
+        from openconcept.mission import PhaseGroup, TrajectoryGroup
         import openmdao.api as om
         import numpy as np
 
@@ -96,13 +96,13 @@ class UnsteadyBatteryCoolingTestCase(unittest.TestCase):
                 self.connect('n_cpb', 'bcs.n_cpb')
                 self.connect('t_channel', 'bcs.t_channel')
 
-        class TrajectoryPhase(oc.PhaseGroup):
+        class TrajectoryPhase(PhaseGroup):
             "An OpenConcept Phase comprises part of a time-based TrajectoryGroup and always needs to have a 'duration' defined"
             def setup(self):
                 self.add_subsystem('ivc', om.IndepVarComp('duration', val=30, units='min'), promotes_outputs=['duration'])
                 self.add_subsystem('vm', VehicleModel(num_nodes=self.options['num_nodes']))
 
-        class Trajectory(oc.TrajectoryGroup):
+        class Trajectory(TrajectoryGroup):
             "An OpenConcept TrajectoryGroup consists of one or more phases that may be linked together. This will often be a top-level model"
             def setup(self):
                 self.add_subsystem('phase1', TrajectoryPhase(num_nodes=nn)) 
@@ -216,7 +216,7 @@ class UnsteadyMotorCoolingTestCase(unittest.TestCase):
         """
         An example demonstrating unsteady motor cooling
         """
-        import openconcept.api as oc
+        from openconcept.mission import PhaseGroup, TrajectoryGroup
         import openmdao.api as om
         import numpy as np
 
@@ -234,13 +234,13 @@ class UnsteadyMotorCoolingTestCase(unittest.TestCase):
                 ivc.add_output('power_rating', 200, units='kW')
                 self.add_subsystem('lcm', LiquidCooledMotor(num_nodes=num_nodes, quasi_steady=False), promotes_inputs=['*'])
 
-        class TrajectoryPhase(oc.PhaseGroup):
+        class TrajectoryPhase(PhaseGroup):
             "An OpenConcept Phase comprises part of a time-based TrajectoryGroup and always needs to have a 'duration' defined"
             def setup(self):
                 self.add_subsystem('ivc', om.IndepVarComp('duration', val=20, units='min'), promotes_outputs=['duration'])
                 self.add_subsystem('vm', VehicleModel(num_nodes=self.options['num_nodes']))
 
-        class Trajectory(oc.TrajectoryGroup):
+        class Trajectory(TrajectoryGroup):
             "An OpenConcept TrajectoryGroup consists of one or more phases that may be linked together. This will often be a top-level model"
             def setup(self):
                 self.add_subsystem('phase1', TrajectoryPhase(num_nodes=nn)) 

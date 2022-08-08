@@ -20,10 +20,10 @@ import numpy as np
 import openmdao.api as om
 import openconcept.api as oc
 # imports for the airplane model itself
+from openconcept.mission import IntegratorGroup, BasicMission
 from openconcept.aerodynamics import OASAerostructDragPolar
 from openconcept.aerodynamics.openaerostruct import Aerostruct, OASAerostructDragPolarExact
 from openconcept.examples.aircraft_data.B738 import data as acdata
-from openconcept.analysis.performance.mission_profiles import BasicMission
 from openconcept.components.cfm56 import CFM56
 from openconcept.aerodynamics import Lift
 from openconcept.atmospherics import DynamicPressureComp
@@ -36,7 +36,7 @@ NUM_SKIN = 3
 NUM_SPAR = 3
 USE_SURROGATE = True
 
-class B738AirplaneModel(oc.IntegratorGroup):
+class B738AirplaneModel(IntegratorGroup):
     """
     A custom model specific to the Boeing 737-800 airplane.
     This class will be passed in to the mission analysis code.

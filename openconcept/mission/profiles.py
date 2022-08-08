@@ -1,8 +1,9 @@
 import openmdao.api as om 
 import openconcept.api as oc
-from openconcept.analysis.performance.solver_phases import BFLImplicitSolve, GroundRollPhase, RotationPhase, RobustRotationPhase, ClimbAnglePhase, SteadyFlightPhase
+from .phases import BFLImplicitSolve, GroundRollPhase, RotationPhase, RobustRotationPhase, ClimbAnglePhase, SteadyFlightPhase
+from .mission_groups import TrajectoryGroup
 
-class MissionWithReserve(oc.TrajectoryGroup):
+class MissionWithReserve(TrajectoryGroup):
     """
     This analysis group is set up to compute all the major parameters
     of a fixed wing mission, including climb, cruise, and descent as well as Part 25 reserve fuel phases.
@@ -126,7 +127,7 @@ class MissionWithReserve(oc.TrajectoryGroup):
             self.link_phases(phase5, phase6)
             self.link_phases(phase6, phase7, states_to_skip=['ode_integ_phase.fltcond|h'])
 
-class BasicMission(oc.TrajectoryGroup):
+class BasicMission(TrajectoryGroup):
     """
     This analysis group is set up to compute all the major parameters
     of a fixed wing mission, including climb, cruise, and descent but no Part 25 reserves
@@ -215,7 +216,7 @@ class BasicMission(oc.TrajectoryGroup):
             self.link_phases(phase1, phase2)
             self.link_phases(phase2, phase3)
 
-class FullMissionAnalysis(oc.TrajectoryGroup):
+class FullMissionAnalysis(TrajectoryGroup):
     """
     This analysis group is set up to compute all the major parameters
     of a fixed wing mission, including balanced-field takeoff, climb, cruise, and descent.

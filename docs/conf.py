@@ -379,8 +379,8 @@ if generate_srcdocs:
         'aerodynamics',
         'aerodynamics.openaerostruct',
         'atmospherics',
-        'analysis.performance',
         'components',
+        'mission',
         'utilities',
         'utilities.math'
     ]

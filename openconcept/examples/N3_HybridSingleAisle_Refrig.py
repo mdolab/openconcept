@@ -7,7 +7,7 @@ import openconcept.api as oc
 from openconcept.aerodynamics import PolarDrag
 from openconcept.examples.aircraft_data.HybridSingleAisle import data as acdata
 from openconcept.examples.aircraft_data.HybridSingleAisle import MotorFaultProtection
-from openconcept.analysis.performance.mission_profiles import MissionWithReserve, BasicMission
+from openconcept.mission import MissionWithReserve, BasicMission, IntegratorGroup
 from openconcept.components.N3 import N3Hybrid
 from openconcept.components.motor import SimpleMotor
 from openconcept.components.battery import SOCBattery
@@ -21,7 +21,7 @@ from openconcept.components.ducts import ImplicitCompressibleDuct_ExternalHX
 from openconcept.components.heat_exchanger import HXGroup
 
 
-class HybridSingleAisleModel(oc.IntegratorGroup):
+class HybridSingleAisleModel(IntegratorGroup):
     """
     Model for NASA N+3 twin hybrid single aisle study
 

@@ -15,7 +15,7 @@ from openconcept.examples.propulsion_layouts.simple_all_electric import AllElect
 from openconcept.examples.methods.costs_commuter import OperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from openconcept.examples.aircraft_data.TBM850 import data as acdata
-from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis
+from openconcept.mission import FullMissionAnalysis
 from openconcept.utilities.visualization import plot_trajectory
 from openconcept.utilities.linearinterp import LinearInterpolator
 

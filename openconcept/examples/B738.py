@@ -6,10 +6,10 @@ import openconcept.api as oc
 # imports for the airplane model itself
 from openconcept.aerodynamics import PolarDrag
 from openconcept.examples.aircraft_data.B738 import data as acdata
-from openconcept.analysis.performance.mission_profiles import MissionWithReserve
+from openconcept.mission import MissionWithReserve, IntegratorGroup
 from openconcept.components.cfm56 import CFM56
 
-class B738AirplaneModel(oc.IntegratorGroup):
+class B738AirplaneModel(IntegratorGroup):
     """
     A custom model specific to the Boeing 737-800 airplane.
     This class will be passed in to the mission analysis code.

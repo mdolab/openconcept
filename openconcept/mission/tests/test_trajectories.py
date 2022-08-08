@@ -2,8 +2,8 @@ from __future__ import division
 import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
-import openconcept.api as oc
 import openmdao.api as om
+from openconcept.mission import IntegratorGroup, PhaseGroup, TrajectoryGroup
 
 """
 What are all the pieces I'm trying to test here?
@@ -40,7 +40,6 @@ class TestForDocs(unittest.TestCase):
 
         It simulates the deceleration of a vehicle under aerodynamic drag.
         """
-        import openconcept.api as oc
         import openmdao.api as om
         import numpy as np
 
@@ -79,7 +78,7 @@ class TestForDocs(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['force'] = -0.10 * inputs['velocity'] ** 2
 
-        class VehicleModel(oc.IntegratorGroup):
+        class VehicleModel(IntegratorGroup):
             """
             A user wishing to integrate an ODE rate will need to subclass 
             this IntegratorGroup instead of the default OpenMDAO Group
@@ -101,13 +100,13 @@ class TestForDocs(unittest.TestCase):
                 self.connect('velocity', 'drag.velocity')
                 self.connect('drag.force','nsl.force')
 
-        class MyPhase(oc.PhaseGroup):
+        class MyPhase(PhaseGroup):
             "An OpenConcept Phase comprises part of a time-based TrajectoryGroup and always needs to have a 'duration' defined"
             def setup(self):
                 self.add_subsystem('ivc', om.IndepVarComp('duration', val=5.0, units='s'), promotes_outputs=['duration'])
                 self.add_subsystem('vm', VehicleModel(time_units='min', num_nodes=self.options['num_nodes']))
 
-        class MyTraj(oc.TrajectoryGroup):
+        class MyTraj(TrajectoryGroup):
             "An OpenConcept TrajectoryGroup consists of one or more phases that may be linked together. This will often be a top-level model"
             def setup(self):
                 self.add_subsystem('phase1', MyPhase(num_nodes=11)) 
@@ -133,7 +132,7 @@ class TestForDocs(unittest.TestCase):
 
 # ============== IntegratorGroup Tests ========== #
 
-class IntegratorGroupTestBase(oc.IntegratorGroup):
+class IntegratorGroupTestBase(IntegratorGroup):
     def initialize(self):
         self.options.declare('num_nodes', default=1)
 
@@ -150,7 +149,7 @@ class IntegratorGroupTestBase(oc.IntegratorGroup):
         self.set_order(['iv', 'ec', 'ode_integ'])
 
 class TestIntegratorSingleState(unittest.TestCase):
-    class TestPhase(oc.PhaseGroup):
+    class TestPhase(PhaseGroup):
         def initialize(self):
             self.options.declare('num_nodes', default=1)
 
@@ -192,7 +191,7 @@ class IntegratorTestMultipleOutputs(IntegratorGroupTestBase):
         self.set_order(['iv', 'ec', 'ec2', 'ode_integ'])
 
 class TestIntegratorMultipleState(unittest.TestCase):
-    class TestPhase(oc.PhaseGroup):
+    class TestPhase(PhaseGroup):
         def initialize(self):
             self.options.declare('num_nodes', default=1)
 
@@ -238,7 +237,7 @@ class IntegratorTestPromotes(IntegratorGroupTestBase):
         self.set_order(['iv', 'ec', 'ec2', 'ode_integ'])
 
 class TestIntegratorPromotes(unittest.TestCase):
-    class TestPhase(oc.PhaseGroup):
+    class TestPhase(PhaseGroup):
         def initialize(self):
             self.options.declare('num_nodes', default=1)
 
@@ -285,7 +284,7 @@ class IntegratorTestValLimits(IntegratorGroupTestBase):
         self.set_order(['iv', 'ec', 'ec2', 'ode_integ'])
 
 class TestIntegratorValLimits(unittest.TestCase):
-    class TestPhase(oc.PhaseGroup):
+    class TestPhase(PhaseGroup):
         def initialize(self):
             self.options.declare('num_nodes', default=1)
 
@@ -329,7 +328,7 @@ class IntegratorTestDuplicateRateNames(IntegratorGroupTestBase):
         self.set_order(['iv', 'ec', 'ec2', 'ode_integ'])
 
 class TestIntegratorDuplicateRateName(unittest.TestCase):
-    class TestPhase(oc.PhaseGroup):
+    class TestPhase(PhaseGroup):
         def initialize(self):
             self.options.declare('num_nodes', default=1)
 
@@ -360,7 +359,7 @@ class IntegratorTestDuplicateStateNames(IntegratorGroupTestBase):
         self.set_order(['iv', 'ec', 'ec2', 'ode_integ'])
 
 class TestIntegratorDuplicateStateName(unittest.TestCase):
-    class TestPhase(oc.PhaseGroup):
+    class TestPhase(PhaseGroup):
         def initialize(self):
             self.options.declare('num_nodes', default=1)
 
@@ -392,9 +391,9 @@ class TestIntegratorOutsideofPhase(unittest.TestCase):
 class TestIntegratorNoIntegratedState(unittest.TestCase):
     def setUp(self):
         self.nn = 5
-        grp = oc.IntegratorGroup()
+        grp = IntegratorGroup()
         grp.add_subsystem('iv', om.IndepVarComp('a', val=1.0))
-        phase = oc.PhaseGroup()
+        phase = PhaseGroup()
         phase.add_subsystem('iv', om.IndepVarComp('duration', val=3.0, units='s'), promotes_outputs=['*'])
         phase.add_subsystem('grp', grp)
         self.p = om.Problem(model=phase)
@@ -410,7 +409,7 @@ class IntegratorGroupWithGroup(IntegratorGroupTestBase):
 
 class TestIntegratorWithGroup(unittest.TestCase):
 
-    class TestPhase(oc.PhaseGroup):
+    class TestPhase(PhaseGroup):
         def initialize(self):
             self.options.declare('num_nodes', default=1)
 
@@ -439,7 +438,7 @@ class TestIntegratorWithGroup(unittest.TestCase):
         assert_check_partials(partials)
 
 
-class IntegratorGroupTestPromotedRate(oc.IntegratorGroup):
+class IntegratorGroupTestPromotedRate(IntegratorGroup):
     def initialize(self):
         self.options.declare('num_nodes', default=1)
 
@@ -456,7 +455,7 @@ class IntegratorGroupTestPromotedRate(oc.IntegratorGroup):
         self.set_order(['iv', 'ec', 'ode_integ'])
 
 class TestIntegratorSingleStatePromotedRate(unittest.TestCase):
-    class TestPhase(oc.PhaseGroup):
+    class TestPhase(PhaseGroup):
         def initialize(self):
             self.options.declare('num_nodes', default=1)
 
@@ -489,9 +488,9 @@ class TestIntegratorSingleStatePromotedRate(unittest.TestCase):
 class TestPhaseNoTime(unittest.TestCase):
     def setUp(self):
         self.nn = 5
-        grp = oc.IntegratorGroup()
+        grp = IntegratorGroup()
         grp.add_subsystem('iv', om.IndepVarComp('a', val=1.0))
-        phase = oc.PhaseGroup()
+        phase = PhaseGroup()
         phase.add_subsystem('grp', grp)
         self.p = om.Problem(model=phase)
         
@@ -506,7 +505,7 @@ class TestPhaseMultipleIntegrators(unittest.TestCase):
         grp2 = om.Group()
         grp2a = grp2.add_subsystem('a', IntegratorGroupTestBase(num_nodes=self.nn))
         grp2b = grp2.add_subsystem('b', IntegratorGroupTestBase(num_nodes=self.nn))
-        phase = oc.PhaseGroup(num_nodes=self.nn)
+        phase = PhaseGroup(num_nodes=self.nn)
         phase.add_subsystem('iv', om.IndepVarComp('duration', val=5.0, units='s'), promotes_outputs=['*'])
         phase.add_subsystem('grp1', grp1)
         phase.add_subsystem('grp2', grp2)
@@ -537,7 +536,7 @@ class TestPhasePromotedDurationVariable(unittest.TestCase):
         grp2 = om.Group()
         grp2a = grp2.add_subsystem('a', IntegratorGroupTestBase(num_nodes=self.nn))
         grp2b = grp2.add_subsystem('b', IntegratorGroupTestBase(num_nodes=self.nn))
-        phase = oc.PhaseGroup(num_nodes=self.nn)
+        phase = PhaseGroup(num_nodes=self.nn)
         phase.add_subsystem('iv', om.IndepVarComp('duration', val=5.0, units='s'), promotes_outputs=['*'])
         phase.add_subsystem('grp1', grp1)
         phase.add_subsystem('grp2', grp2)
@@ -565,7 +564,7 @@ class TestPhasePromotedDurationVariable(unittest.TestCase):
 
 # ============ Trajectory Tests ============ #
 
-class PhaseForTrajTest(oc.PhaseGroup):
+class PhaseForTrajTest(PhaseGroup):
     def initialize(self):
         self.options.declare('num_nodes', default=1)
     
@@ -575,7 +574,7 @@ class PhaseForTrajTest(oc.PhaseGroup):
         a = self.add_subsystem('a', IntegratorGroupTestBase(num_nodes=nn))
         b = self.add_subsystem('b', IntegratorTestMultipleOutputs(num_nodes=nn))
 
-class PhaseForTrajTestWithPromotion(oc.PhaseGroup):
+class PhaseForTrajTestWithPromotion(PhaseGroup):
     def initialize(self):
         self.options.declare('num_nodes', default=1)
     
@@ -586,7 +585,7 @@ class PhaseForTrajTestWithPromotion(oc.PhaseGroup):
         # promote the outputs of b
         b = self.add_subsystem('b', IntegratorTestMultipleOutputs(num_nodes=nn), promotes_outputs=['*f2*'], promotes_inputs=['*df2'])
 
-class PhaseForTrajTestWithPromotionNamesCollide(oc.PhaseGroup):
+class PhaseForTrajTestWithPromotionNamesCollide(PhaseGroup):
     def initialize(self):
         self.options.declare('num_nodes', default=1)
     
@@ -600,7 +599,7 @@ class PhaseForTrajTestWithPromotionNamesCollide(oc.PhaseGroup):
 class TestTrajectoryAllPhaseConnect(unittest.TestCase):
     def setUp(self):
         self.nn = 5
-        traj = oc.TrajectoryGroup()
+        traj = TrajectoryGroup()
        
         phase1 = traj.add_subsystem('phase1', PhaseForTrajTest(num_nodes=5))
         phase2 = traj.add_subsystem('phase2', PhaseForTrajTest(num_nodes=5))
@@ -641,7 +640,7 @@ class TestTrajectoryAllPhaseConnect(unittest.TestCase):
 class TestTrajectoryAllPhaseConnectWithVarPromotion(unittest.TestCase):
     def setUp(self):
         self.nn = 5
-        traj = oc.TrajectoryGroup()
+        traj = TrajectoryGroup()
        
         phase1 = traj.add_subsystem('phase1', PhaseForTrajTestWithPromotion(num_nodes=5))
         phase2 = traj.add_subsystem('phase2', PhaseForTrajTestWithPromotion(num_nodes=5))
@@ -682,7 +681,7 @@ class TestTrajectoryAllPhaseConnectWithVarPromotion(unittest.TestCase):
 class TestTrajectorySkipPromotedVar(unittest.TestCase):
     def setUp(self):
         self.nn = 5
-        traj = oc.TrajectoryGroup()
+        traj = TrajectoryGroup()
        
         phase1 = traj.add_subsystem('phase1', PhaseForTrajTestWithPromotion(num_nodes=5))
         phase2 = traj.add_subsystem('phase2', PhaseForTrajTestWithPromotion(num_nodes=5))
@@ -725,7 +724,7 @@ class TestTrajectoryAllPhaseConnectWithVarPromotionODEIntegCollide(unittest.Test
     # When this happens duplicate connections can occur
     def setUp(self):
         self.nn = 5
-        traj = oc.TrajectoryGroup()
+        traj = TrajectoryGroup()
        
         phase1 = traj.add_subsystem('phase1', PhaseForTrajTestWithPromotionNamesCollide(num_nodes=5))
         phase2 = traj.add_subsystem('phase2', PhaseForTrajTestWithPromotionNamesCollide(num_nodes=5))
@@ -766,7 +765,7 @@ class TestTrajectoryAllPhaseConnectWithVarPromotionODEIntegCollide(unittest.Test
 class TestTrajectoryTwoPhaseConnect(unittest.TestCase):
     def setUp(self):
         self.nn = 5
-        traj = oc.TrajectoryGroup()
+        traj = TrajectoryGroup()
        
         phase1 = traj.add_subsystem('phase1', PhaseForTrajTest(num_nodes=5))
         phase2 = traj.add_subsystem('phase2', PhaseForTrajTest(num_nodes=5))
@@ -801,7 +800,7 @@ class TestTrajectoryTwoPhaseConnect(unittest.TestCase):
 class TestTrajectorySkipState(unittest.TestCase):
     def setUp(self):
         self.nn = 5
-        traj = oc.TrajectoryGroup()
+        traj = TrajectoryGroup()
        
         phase1 = traj.add_subsystem('phase1', PhaseForTrajTest(num_nodes=5))
         phase2 = traj.add_subsystem('phase2', PhaseForTrajTest(num_nodes=5))
@@ -837,7 +836,7 @@ class TestTrajectorySkipState(unittest.TestCase):
 class TestTrajectoryLinkPhaseStrings(unittest.TestCase):
     def test_raises(self):
         self.nn = 5
-        traj = oc.TrajectoryGroup()
+        traj = TrajectoryGroup()
        
         phase1 = traj.add_subsystem('phase1', PhaseForTrajTest(num_nodes=5))
 
@@ -847,7 +846,7 @@ class TestTrajectoryLinkPhaseStrings(unittest.TestCase):
 class TestBuryTrajectoryOneLevelDown(unittest.TestCase):
     def setUp(self):
         self.nn = 5
-        traj = oc.TrajectoryGroup()
+        traj = TrajectoryGroup()
        
         phase1 = traj.add_subsystem('phase1', PhaseForTrajTest(num_nodes=5))
         phase2 = traj.add_subsystem('phase2', PhaseForTrajTest(num_nodes=5))

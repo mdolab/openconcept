@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
-from openconcept.analysis.performance.solver_phases import ClimbAngleComp, FlipVectorComp, Groundspeeds, HorizontalAcceleration, VerticalAcceleration, SteadyFlightCL, TakeoffTransition
+from openconcept.mission import ClimbAngleComp, Groundspeeds, HorizontalAcceleration, VerticalAcceleration, SteadyFlightCL, FlipVectorComp, TakeoffTransition
 
 g = 9.80665 #m/s^2
 
