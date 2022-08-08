@@ -10,7 +10,7 @@ from openconcept.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
-from openconcept.examples.propulsion_layouts.simple_turboprop import TwinTurbopropPropulsionSystem
+from openconcept.propulsion import TwinTurbopropPropulsionSystem
 from openconcept.examples.methods.costs_commuter import OperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from openconcept.examples.aircraft_data.KingAirC90GT import data as acdata

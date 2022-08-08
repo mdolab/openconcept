@@ -15,15 +15,14 @@ from openmdao.api import ExplicitComponent
 
 
 class SeriesHybridElectricPropulsionSystem(Group):
-    """This is an example model of a series-hybrid propulsion system. One motor
-        draws electrical load from two sources in a fractional split| a battery pack,
-        and a turbogenerator setup. The control inputs are the power split fraction and the
-        motor throttle setting; the turboshaft throttle matches the power level necessary
-        to drive the generator at the required power level.
-
-        Fuel flows and prop thrust should be fairly accurate.
-
-        Heat constraints have not yet been incorporated.
+    """
+    This is an example model of a series-hybrid propulsion system. One motor
+    draws electrical load from two sources in a fractional split| a battery pack,
+    and a turbogenerator setup. The control inputs are the power split fraction and the
+    motor throttle setting; the turboshaft throttle matches the power level necessary
+    to drive the generator at the required power level.
+    Fuel flows and prop thrust should be fairly accurate.
+    Heat constraints have not yet been incorporated.
     """
     def initialize(self):
         self.options.declare('num_nodes',default=1,desc="Number of mission analysis points to run")
@@ -80,56 +79,57 @@ class SeriesHybridElectricPropulsionSystem(Group):
 
 
 class SingleSeriesHybridElectricPropulsionSystem(Group):
-    """This is an example model of a series-hybrid propulsion system. One motor
-        draws electrical load from two sources in a fractional split| a battery pack,
-        and a turbogenerator setup. The control inputs are the power split fraction and the
-        motor throttle setting; the turboshaft throttle matches the power level necessary
-        to drive the generator at the required power level.
+    """
+    This is an example model of a series-hybrid propulsion system. One motor
+    draws electrical load from two sources in a fractional split| a battery pack,
+    and a turbogenerator setup. The control inputs are the power split fraction and the
+    motor throttle setting; the turboshaft throttle matches the power level necessary
+    to drive the generator at the required power level.
 
-        Fuel flows and prop thrust should be fairly accurate.
-        Heat constraints haven't yet been incorporated.
+    Fuel flows and prop thrust should be fairly accurate.
+    Heat constraints haven't yet been incorporated.
 
-        The "pilot" controls thrust by varying the motor throttles from 0 to 100+% of rated power.
-        She may also vary the percentage of battery versus fuel being
-        used by varying the power_split_fraction.
+    The "pilot" controls thrust by varying the motor throttles from 0 to 100+% of rated power.
+    She may also vary the percentage of battery versus fuel being
+    used by varying the power_split_fraction.
 
-        This module alone cannot produce accurate fuel flows, battery loads, etc.
-        You must do the following, either with an implicit solver or with the optimizer:
-        - Set eng1.throttle such that gen1.elec_power_out = hybrid_split.power_out_A
+    This module alone cannot produce accurate fuel flows, battery loads, etc.
+    You must do the following, either with an implicit solver or with the optimizer:
+    - Set eng1.throttle such that gen1.elec_power_out = hybrid_split.power_out_A
 
-        The battery does not track its own state of charge (SOC);
-        it is connected to elec_load simply so that the discharge rate can be compared to
-        the discharge rate capability of the battery. SOC and fuel flows should be time-integrated
-        at a higher level (in the mission analysis codes).
+    The battery does not track its own state of charge (SOC);
+    it is connected to elec_load simply so that the discharge rate can be compared to
+    the discharge rate capability of the battery. SOC and fuel flows should be time-integrated
+    at a higher level (in the mission analysis codes).
 
-        Inputs
-        ------
-        ac|propulsion|engine|rating : float
-            Turboshaft range extender power rating (scalar, kW)
-        ac|propulsion|propeller|diameter : float
-            Propeller diameter (scalar, m)
-        ac|propulsion|motor|rating : float
-            Motor power rating (scalar, kW)
-        ac|propulsion|generator|rating : float
-            Range extender elec gen rating (scalar, kW)
-        ac|weights|W_battery : float
-            Battery weight (scalar, kg)
+    Inputs
+    ------
+    ac|propulsion|engine|rating : float
+        Turboshaft range extender power rating (scalar, kW)
+    ac|propulsion|propeller|diameter : float
+        Propeller diameter (scalar, m)
+    ac|propulsion|motor|rating : float
+        Motor power rating (scalar, kW)
+    ac|propulsion|generator|rating : float
+        Range extender elec gen rating (scalar, kW)
+    ac|weights|W_battery : float
+        Battery weight (scalar, kg)
 
-        TODO list all the control inputs
+    TODO list all the control inputs
 
-        Outputs
-        -------
-        thrust : float
-            Propulsion system total thrust (vector, N)
-        fuel_flow : float
-            Fuel flow consumed by the turboshaft (vector, kg/s)
+    Outputs
+    -------
+    thrust : float
+        Propulsion system total thrust (vector, N)
+    fuel_flow : float
+        Fuel flow consumed by the turboshaft (vector, kg/s)
 
-        Options
-        -------
-        num_nodes : float
-            Number of analysis points to run (default 1)
-        specific_energy : float
-            Battery specific energy (default 300 Wh/kg)
+    Options
+    -------
+    num_nodes : float
+        Number of analysis points to run (default 1)
+    specific_energy : float
+        Battery specific energy (default 300 Wh/kg)
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc="Number of mission analysis points to run")
@@ -202,33 +202,35 @@ class SingleSeriesHybridElectricPropulsionSystem(Group):
         self.connect('batt_weight', 'batt1.battery_weight')
 
 class TwinSeriesHybridElectricPropulsionSystem(Group):
-    """This is an example model of a series-hybrid propulsion system. One motor
-        draws electrical load from two sources in a fractional split| a battery pack,
-        and a turbogenerator setup. The control inputs are the power split fraction and the
-        motor throttle setting; the turboshaft throttle matches the power level necessary
-        to drive the generator at the required power level.
+    """
+    This is an example model of a series-hybrid propulsion system. One motor
+    draws electrical load from two sources in a fractional split| a battery pack,
+    and a turbogenerator setup. The control inputs are the power split fraction and the
+    motor throttle setting; the turboshaft throttle matches the power level necessary
+    to drive the generator at the required power level.
 
-        Fuel flows and prop thrust should be fairly accurate. Heat constraints haven't yet been incorporated.
+    Fuel flows and prop thrust should be fairly accurate. Heat constraints haven't yet been incorporated.
 
-        The "pilot" controls thrust by varying the motor throttles from 0 to 100+% of rated power. She may also vary the percentage of battery versus fuel being used
-        by varying the power_split_fraction
+    The "pilot" controls thrust by varying the motor throttles from 0 to 100+% of rated power. She may also vary the percentage of battery versus fuel being used
+    by varying the power_split_fraction
 
-        This module alone cannot produce accurate fuel flows, battery loads, etc. You must do the following, either with an implicit solver or with the optimizer:
-        - Set eng1.throttle such that gen1.elec_power_out = hybrid_split.power_out_A
+    This module alone cannot produce accurate fuel flows, battery loads, etc. You must do the following, either with an implicit solver or with the optimizer:
+    - Set eng1.throttle such that gen1.elec_power_out = hybrid_split.power_out_A
 
-        The battery does not track its own state of charge (SOC); it is connected to elec_load simply so that the discharge rate can be compared to the discharge rate capability of the battery.
-        SOC and fuel flows should be time-integrated at a higher level (in the mission analysis codes)
+    The battery does not track its own state of charge (SOC); it is connected to elec_load simply so that the discharge rate can be compared to the discharge rate capability of the battery.
+    SOC and fuel flows should be time-integrated at a higher level (in the mission analysis codes)
 
-        Arrows show flow of information. In openConcept, mechanical power operates on a 'push' basis, while electrical load operates on a 'pull' basis. We reconcile these flows across an implicit gap by driving a residual to 0 using a solver.
+    Arrows show flow of information. In openConcept, mechanical power operates on a 'push' basis, while electrical load operates on a 'pull' basis. We reconcile these flows across an implicit gap by driving a residual to 0 using a solver.
+
+    .. code::
 
         eng1.throttle                                                           hybrid_split.power_split_fraction           motor1.throttle
             ||                                                                                   ||                             ||
         eng1 --shaft_power_out--> gen1 --elec_power_out--> {IMPLICIT GAP} <--power_out_B         ||           <--elec_load-- motor1 --shaft_power_out --> prop1 -->thrust
-           ||                                                                             hybrid_split <--elec_load  ++
-           ||                                            batt1.elec_load <--power_out_A                       <--elec_load-- motor2 --shaft_power_out --> prop2 -->thrust
+            ||                                                                             hybrid_split <--elec_load  ++
+            ||                                            batt1.elec_load <--power_out_A                       <--elec_load-- motor2 --shaft_power_out --> prop2 -->thrust
             V                                                                   V                                              ||
         fuel_flow (integrate over time)                                   elec_load (integrate over time to obtain SOC)       motor2.throttle
-
 
     """
     def initialize(self):
@@ -325,11 +327,11 @@ class VehicleSizingModel(Group):
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
 
-    from openconcept.simple_series_hybrid import VehicleSizingModel as VSM
     prob = Problem()
 
-    prob.model= VSM()
+    prob.model= VehicleSizingModel()
 
     prob.setup()
     prob.run_model()

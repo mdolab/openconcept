@@ -13,9 +13,9 @@ Single Turboprop Example
 This example illustrates the simples possible case (turboprop engine connected to a propeller).
 The propulsion system is instantiated as an OpenMDAO ``Group``.
 
-Source: ``openconcept/examples/propulsion_layouts/simple_turboprop.py``
+Source: ``openconcept/propulsion/systems/simple_turboprop.py``
 
-.. literalinclude:: /../openconcept/examples/propulsion_layouts/simple_turboprop.py
+.. literalinclude:: /../openconcept/propulsion/systems/simple_turboprop.py
     :pyobject: TurbopropPropulsionSystem
     :language: python
 
@@ -24,9 +24,9 @@ Series Hybrid Example
 
 This example illustrates the complexities which arise when electrical components are included.
 
-Source: ``openconcept/examples/propulsion_layouts/simple_series_hybrid.py``
+Source: ``openconcept/propulsion/systems/simple_series_hybrid.py``
 
-.. literalinclude:: /../openconcept/examples/propulsion_layouts/simple_series_hybrid.py
+.. literalinclude:: /../openconcept/propulsion/systems/simple_series_hybrid.py
     :pyobject: SingleSeriesHybridElectricPropulsionSystem
     :language: python
 

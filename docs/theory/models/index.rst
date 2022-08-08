@@ -11,4 +11,8 @@ It does not include all available models (look at the Source Docs section for th
     :maxdepth: 2
 
     aerodynamics.rst
+    atmospherics.rst
+    cost.rst
     propulsion.rst
+    thermal.rst
+    weight.rst

@@ -383,6 +383,7 @@ if generate_srcdocs:
         'energy_storage',
         'mission',
         'propulsion',
+        'propulsion.systems',
         'utilities',
         'utilities.math'
     ]

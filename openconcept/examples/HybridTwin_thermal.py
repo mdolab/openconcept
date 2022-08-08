@@ -14,7 +14,7 @@ from openconcept.utilities.math.max_min_comp import MaxComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.examples.methods.weights_twin_hybrid import TwinSeriesHybridEmptyWeight
-from openconcept.examples.propulsion_layouts.thermal_series_hybrid import TwinSeriesHybridElectricPropulsionSystem
+from openconcept.propulsion import TwinSeriesHybridElectricThermalPropulsionSystem
 from openconcept.examples.methods.costs_commuter import OperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from openconcept.examples.aircraft_data.KingAirC90GT import data as acdata
@@ -66,7 +66,7 @@ class SeriesHybridTwinModel(Group):
                                       "ac|weights*", 'duration']
 
         self.add_subsystem('propmodel',
-                           TwinSeriesHybridElectricPropulsionSystem(num_nodes=nn),
+                           TwinSeriesHybridElectricThermalPropulsionSystem(num_nodes=nn),
                            promotes_inputs=propulsion_promotes_inputs,
                            promotes_outputs=propulsion_promotes_outputs)
         self.connect('proprpm', ['propmodel.prop1.rpm', 'propmodel.prop2.rpm'])

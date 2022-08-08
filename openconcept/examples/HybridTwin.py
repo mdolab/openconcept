@@ -13,7 +13,7 @@ from openconcept.utilities.math import AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.examples.methods.weights_twin_hybrid import TwinSeriesHybridEmptyWeight
-from openconcept.examples.propulsion_layouts.simple_series_hybrid import TwinSeriesHybridElectricPropulsionSystem
+from openconcept.propulsion import TwinSeriesHybridElectricPropulsionSystem
 from openconcept.examples.methods.costs_commuter import OperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from openconcept.examples.aircraft_data.KingAirC90GT import data as acdata

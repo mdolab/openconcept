@@ -7,7 +7,6 @@ import scipy.sparse as sp
 import sys, os
 sys.path.insert(0,os.getcwd())
 from openconcept.components.ducts import ImplicitCompressibleDuct
-from openconcept.propulsion import SimpleMotor
 from openconcept.utilities.selector import SelectorComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.math.derivatives import FirstDerivative
