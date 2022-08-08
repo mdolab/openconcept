@@ -3,8 +3,8 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import Problem, NewtonSolver, DirectSolver
-from openconcept.components.chiller import (LinearSelector, COPHeatPump, HeatPumpWeight,
-                                           HeatPumpWithIntegratedCoolantLoop, COPExplicit)
+from openconcept.thermal.chiller import (LinearSelector, COPHeatPump, HeatPumpWeight,
+                                         HeatPumpWithIntegratedCoolantLoop, COPExplicit)
 
 class LinearSelectorTestCase(unittest.TestCase):
     def test_bypass(self):

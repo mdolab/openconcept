@@ -4,9 +4,7 @@ from openconcept.energy_storage import SOCBattery
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math import AddSubtractComp
 from openmdao.api import Group, IndepVarComp, ExplicitComponent
-from openconcept.components.thermal import LiquidCooledComp, CoolantReservoir
-from openconcept.components.ducts import ImplicitCompressibleDuct, ExplicitIncompressibleDuct
-from openconcept.components.heat_exchanger import HXGroup
+from openconcept.thermal import LiquidCooledComp, CoolantReservoir, ImplicitCompressibleDuct, ExplicitIncompressibleDuct, HXGroup
 
 import numpy as np
 class AllElectricSinglePropulsionSystemWithThermal_Compressible(Group):

@@ -4,7 +4,6 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group
-#from openmdao.components.add_subtract_comp import AddSubtractComp
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 

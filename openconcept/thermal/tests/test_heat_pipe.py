@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
 from openmdao.api import Problem, NewtonSolver, DirectSolver
-import openconcept.components.heat_pipe as hp
+import openconcept.thermal.heat_pipe as hp
 
 class HeatPipeIntegrationTestCase(unittest.TestCase):
     """

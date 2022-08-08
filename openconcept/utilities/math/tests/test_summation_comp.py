@@ -5,7 +5,6 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp
-#from openmdao.components.sum_comp import SumComp
 from openconcept.utilities.math.sum_comp import SumComp
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 

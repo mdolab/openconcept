@@ -379,11 +379,11 @@ if generate_srcdocs:
         'aerodynamics',
         'aerodynamics.openaerostruct',
         'atmospherics',
-        'components',
         'energy_storage',
         'mission',
         'propulsion',
         'propulsion.systems',
+        'thermal',
         'utilities',
         'utilities.math'
     ]

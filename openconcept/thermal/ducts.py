@@ -2,9 +2,8 @@ from __future__ import division
 import numpy as np
 from openmdao.api import ExplicitComponent, Problem, ImplicitComponent, NewtonSolver, DirectSolver, IndepVarComp, ExecComp
 from openmdao.api import Group, ScipyOptimizeDriver, BoundsEnforceLS
-import sys, os
-sys.path.insert(0,os.getcwd())
-from openconcept.components.heat_exchanger import HXGroup
+
+from .heat_exchanger import HXGroup
 from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
 from openconcept.utilities.dvlabel import DVLabel
 

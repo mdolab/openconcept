@@ -5,7 +5,6 @@ import pytest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp
-#from openmdao.components.multiply_divide_comp import ElementMultiplyDivideComp
 from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 

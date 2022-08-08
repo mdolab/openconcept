@@ -12,7 +12,7 @@ It does not include all available models (look at the Source Docs section for th
 
     aerodynamics.rst
     atmospherics.rst
-    cost.rst
+    costs.rst
     propulsion.rst
     thermal.rst
-    weight.rst
+    weights.rst

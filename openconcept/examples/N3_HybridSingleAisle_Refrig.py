@@ -12,13 +12,18 @@ from openconcept.propulsion import N3Hybrid, SimpleMotor
 from openconcept.energy_storage import SOCBattery
 from openconcept.utilities.linearinterp import LinearInterpolator
 from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
-from openconcept.components.thermal import LiquidCooledComp
-from openconcept.components.chiller import HeatPumpWithIntegratedCoolantLoop
-from openconcept.components.manifold import FlowSplit, FlowCombine
-from openconcept.components.heat_sinks import LiquidCooledMotor, LiquidCooledBattery, SimpleHose, SimplePump
-from openconcept.components.ducts import ImplicitCompressibleDuct_ExternalHX
-from openconcept.components.heat_exchanger import HXGroup
-
+from openconcept.thermal import (
+    LiquidCooledComp,
+    HeatPumpWithIntegratedCoolantLoop,
+    FlowSplit,
+    FlowCombine,
+    LiquidCooledMotor,
+    LiquidCooledBattery,
+    SimpleHose,
+    SimplePump,
+    ImplicitCompressibleDuct_ExternalHX,
+    HXGroup,
+)
 
 class HybridSingleAisleModel(IntegratorGroup):
     """

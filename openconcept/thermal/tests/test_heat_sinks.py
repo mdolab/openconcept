@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 import openmdao.api as om
-from openconcept.components.heat_sinks import LiquidCooledBattery, LiquidCooledMotor, SimpleHose, SimplePump
+from openconcept.thermal import LiquidCooledBattery, LiquidCooledMotor, SimpleHose, SimplePump
 
 class QuasiSteadyBatteryCoolingTestCase(unittest.TestCase):
     """

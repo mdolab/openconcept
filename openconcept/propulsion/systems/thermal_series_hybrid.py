@@ -6,11 +6,15 @@ from openconcept.energy_storage import SimpleBattery, SOCBattery
 from openconcept.atmospherics import ComputeAtmosphericProperties
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
-from openconcept.components.thermal import LiquidCooledComp, CoolantReservoir, ConstantSurfaceTemperatureColdPlate_NTU
-from openconcept.components.chiller import HeatPumpWithIntegratedCoolantLoop
-from openconcept.components.ducts import ImplicitCompressibleDuct, ExplicitIncompressibleDuct
-from openconcept.components.heat_exchanger import HXGroup
-
+from openconcept.thermal import (
+    LiquidCooledComp,
+    CoolantReservoir,
+    ConstantSurfaceTemperatureColdPlate_NTU,
+    HeatPumpWithIntegratedCoolantLoop,
+    ImplicitCompressibleDuct,
+    ExplicitIncompressibleDuct,
+    HXGroup,
+)
 
 from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, DirectSolver, NewtonSolver, ScipyKrylov
 

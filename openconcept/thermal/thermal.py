@@ -4,9 +4,7 @@ from openmdao.api import ScipyOptimizeDriver, ExplicitComponent, ImplicitCompone
 
 import numpy as np
 import scipy.sparse as sp
-import sys, os
-sys.path.insert(0,os.getcwd())
-from openconcept.components.ducts import ImplicitCompressibleDuct
+from .ducts import ImplicitCompressibleDuct
 from openconcept.utilities.selector import SelectorComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.math.derivatives import FirstDerivative

@@ -2,7 +2,7 @@ from __future__ import division
 import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
-from openconcept.components.ducts import ImplicitCompressibleDuct_ExternalHX
+from openconcept.thermal import ImplicitCompressibleDuct_ExternalHX
 import openmdao.api as om 
 import warnings
 

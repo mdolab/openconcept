@@ -1,10 +1,9 @@
 from __future__ import division
 import openmdao.api as om
 import numpy as np
-import sys, os
-sys.path.insert(0,os.getcwd())
+
 from openconcept.utilities.linearinterp import LinearInterpolator
-from openconcept.components.thermal import PerfectHeatTransferComp
+from .thermal import PerfectHeatTransferComp
 
 class LinearSelector(om.ExplicitComponent):
     """
