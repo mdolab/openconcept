@@ -4,18 +4,19 @@
 Mission Analysis
 ****************
 
-The mission analysis computes the fuel and/or battery energy consumption as well as the change of component temperatures for a specified flight mission.
-OpenConcept implements several mission profiles that can be used for an analysis.
+The mission analysis computes the fuel and/or battery energy consumption for a specified flight mission.
+You can also keep track of the temperature of components if you have thermal models.
 
-A **mission** consists of multiple **phases**, which are building blocks of the mission.
-For example, a basic three-phase mission includes a climb phase, cruise phase, and descent phase.
-
+In OpenConcept, a **mission** consists of multiple **phases**:
+*phases* are the building blocks of the mission.
+For example, a basic three-phase mission is composed of a climb phase, cruise phase, and descent phase.
 
 Available missions
 ==================
 
+OpenConcept implements several mission profiles that users can use for an analysis.
 The missions are implemented in ``openconcept/PATH/mission_profiles.py``.
-You can make your own mission profile following the format from these examples.
+You can also make your own mission profile following the format from these examples.
 
 Basic three-phase mission: ``BasicMission``
 -------------------------------------------
@@ -65,8 +66,9 @@ Additional variables you need to set in the runscript are
 
 Phase types
 ===========
-The phase is a building block of a mission profiles.
-The phases and relevant classes are implemented in ``openconcept/PATH/mission_profiles.py``; users usually don't need to touch the code.
+A phase is a building block of a mission profiles.
+The phases and relevant classes are implemented in ``openconcept/PATH/mission_profiles.py``.
+Users usually don't need to modify these code when creating their own mission profile.
 
 Steady flight
 -------------
