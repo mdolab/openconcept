@@ -4,19 +4,29 @@
 - [ ] Add docs:
   - [ ] Introduction
     - [ ] Describe generally what it does
-    - [ ] What an aircraft model requires (throttle and CL in, thrust lift and drag out)
+    - [x] What an aircraft model requires (throttle and CL in, thrust lift and drag out)
   - [ ] Examples
     - [x] Do simple example
     - [x] Show how aircraft model is made and how variables are passed
     - [x] Show analysis group
     - [x]  Show running the thing
-  - [ ] Theory guide
-    - [ ] Integration
+  - [ ] Describe features
+    - [x] Aerodynamics
+    - [ ] Atmospherics
+    - [ ] Costs
+    - [x] Mission analysis
+    - [x] Propulsion
+    - [ ] Thermal
+    - [ ] Utilities
+    - [ ] Weights
   - [x] Maybe a list of papers that use OpenConcept like OpenMDAO does?
-- [ ] Add linting and formatting
+- [x] Add linting and formatting
 - [ ] Fix TODO on first line of SteadyFlightPhase in solver_phases.py
+- [ ] Remove old docs (old "features")
 
 # Refactoring directory tree
+
+- [x] Refactoring is done!
 
 - openconcept
   - aerodynamics

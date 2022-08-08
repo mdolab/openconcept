@@ -1,8 +1,8 @@
 .. _Aerodynamics:
 
-******************
-Aerodynamic models
-******************
+************
+Aerodynamics
+************
 
 This document has some stuff in it.
 Can be used 

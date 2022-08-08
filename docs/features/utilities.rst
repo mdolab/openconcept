@@ -1,8 +1,16 @@
-.. _Integration:
+.. _Utilities:
 
-****************
-Time Integration
-****************
+*********
+Utilities
+*********
+
+Math
+====
+
+Time integration
+----------------
+
+``Integrator``
 
 Discuss the time integration scheme (default bdf3, usually use simpson though).
 Perhaps the most important part of the OpenConcept interface.

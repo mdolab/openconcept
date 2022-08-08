@@ -112,18 +112,23 @@ I'm open to pull requests and issues in the meantime. Stay tuned. The developmen
 
 .. toctree::
    :maxdepth: 2
-   :caption: Theory Guide
+   :caption: Features
    :hidden:
 
-   theory/mission_analysis.rst
-   theory/integration.rst
-   theory/models/index.rst
+   features/aerodynamics.rst
+   features/atmospherics.rst
+   features/costs.rst
+   features/mission_analysis.rst
+   features/propulsion.rst
+   features/thermal.rst
+   features/weights.rst
+   features/utilities.rst
 
 .. toctree::
    :maxdepth: 2
    :caption: Other Useful Docs
    :hidden:
 
-   features/index.rst
+   features_old/index.rst
    _srcdocs/index.rst
    publications.rst
