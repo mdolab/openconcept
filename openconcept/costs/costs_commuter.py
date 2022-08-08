@@ -8,7 +8,7 @@ from openmdao.api import ExplicitComponent
 import numpy as np
 
 
-class OperatingCost(ExplicitComponent):
+class TurbopropOperatingCost(ExplicitComponent):
     def initialize(self):
         self.options.declare('n_components',default=1,desc='Number of propulsion components, e.g. engines, motors, generators. Inputs will be numbered "component_1" thru n ')
         self.options.declare('n_batteries',default=None,desc='Number of batteries. These should NOT be counted as components as they are not to be subtracted from OEW. Numbered "battery_1" through n')

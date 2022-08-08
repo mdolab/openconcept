@@ -8,7 +8,7 @@ import openconcept.api as oc
 from openconcept.examples.aircraft_data.caravan import data as acdata
 from openconcept.propulsion import TurbopropPropulsionSystem
 from openconcept.examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
-from openconcept.examples.methods.costs_commuter import OperatingCost
+from openconcept.costs import TurbopropOperatingCost
 
 from openconcept.aerodynamics import PolarDrag
 from openconcept.mission import FullMissionAnalysis

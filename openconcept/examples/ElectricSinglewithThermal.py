@@ -12,7 +12,7 @@ from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
 from openconcept.propulsion import AllElectricSinglePropulsionSystemWithThermal_Incompressible, AllElectricSinglePropulsionSystemWithThermal_Compressible
-from openconcept.examples.methods.costs_commuter import OperatingCost
+from openconcept.costs import TurbopropOperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from openconcept.examples.aircraft_data.TBM850 import data as acdata
 from openconcept.mission import FullMissionAnalysis
