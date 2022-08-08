@@ -2,21 +2,17 @@ from __future__ import division
 import numpy as np
 
 import openmdao.api as om
-import openconcept.api as oc
+from openconcept.utilities import AddSubtractComp, LinearInterpolator, DictIndepVarComp, plot_trajectory
+
 # imports for the airplane model itself
 from openconcept.aerodynamics import PolarDrag
 from openconcept.examples.aircraft_data.HybridSingleAisle import data as acdata
 from openconcept.examples.aircraft_data.HybridSingleAisle import MotorFaultProtection
-from openconcept.mission import MissionWithReserve, BasicMission, IntegratorGroup
+from openconcept.mission import BasicMission, IntegratorGroup
 from openconcept.propulsion import N3Hybrid, SimpleMotor, LiquidCooledMotor
 from openconcept.energy_storage import SOCBattery, LiquidCooledBattery
-from openconcept.utilities.linearinterp import LinearInterpolator
-from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
 from openconcept.thermal import (
-    LiquidCooledComp,
     HeatPumpWithIntegratedCoolantLoop,
-    FlowSplit,
-    FlowCombine,
     SimpleHose,
     SimplePump,
     ImplicitCompressibleDuct_ExternalHX,
@@ -218,7 +214,7 @@ class HybridSingleAisleModel(IntegratorGroup):
                          prom_name='OEW',
                          factors=[2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.0], vec_size=1, units='kg')
 
-        self.add_subsystem('weight', oc.AddSubtractComp(output_name='weight',
+        self.add_subsystem('weight', AddSubtractComp(output_name='weight',
                                                      input_names=['ac|design_mission|TOW', 'fuel_used'],
                                                      units='kg', vec_size=[1, nn], scaling_factors=[1, -1]),
                            promotes_inputs=['*'],
@@ -239,7 +235,7 @@ class HybridSingleAisleAnalysisGroup(om.Group):
         nn = 21
 
         # Define a bunch of design varaiables and airplane-specific parameters
-        dv_comp = self.add_subsystem('dv_comp',  oc.DictIndepVarComp(acdata),
+        dv_comp = self.add_subsystem('dv_comp',  DictIndepVarComp(acdata),
                                      promotes_outputs=["*"])
         dv_comp.add_output_from_dict('ac|aero|CLmax_TO')
         dv_comp.add_output_from_dict('ac|aero|polar|e')
@@ -385,7 +381,7 @@ def show_outputs(prob):
                     'Battery Coolant Inflow Temp', 'Batt duct cooling Net Force (lb)', 'Motor Coolant Inflow Temp',
                     'Motor duct cooling Net Force (lb)','Motor fault prot inflow temp (C)']
         phases = ['groundroll','climb', 'cruise', 'descent']
-        oc.plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
+        plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels, marker='-',
                         plot_title='Hybrid Single Aisle Mission')
     # prob.model.list_outputs()

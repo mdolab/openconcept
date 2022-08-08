@@ -1,8 +1,6 @@
 import openmdao.api as om 
 import numpy as np
-from openconcept.utilities.math.integrals import Integrator
-from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
-from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
+from openconcept.utilities import Integrator, AddSubtractComp, ElementMultiplyDivideComp
 
 import warnings 
 

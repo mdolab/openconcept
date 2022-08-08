@@ -9,17 +9,11 @@ from openmdao.api import DirectSolver, IndepVarComp, NewtonSolver, BoundsEnforce
 
 # imports for the airplane model itself
 from openconcept.aerodynamics import PolarDrag
-from openconcept.utilities.math import AddSubtractComp
-from openconcept.utilities.math.integrals import Integrator
-from openconcept.utilities.dvlabel import DVLabel
 from openconcept.weights import TwinSeriesHybridEmptyWeight
 from openconcept.propulsion import TwinSeriesHybridElectricPropulsionSystem
-from openconcept.costs import TurbopropOperatingCost
-from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
-from openconcept.examples.aircraft_data.KingAirC90GT import data as acdata
 from openconcept.mission import FullMissionAnalysis
-from openconcept.utilities.linearinterp import LinearInterpolator
-from openconcept.utilities.visualization import plot_trajectory
+from openconcept.examples.aircraft_data.KingAirC90GT import data as acdata
+from openconcept.utilities import AddSubtractComp, Integrator, DictIndepVarComp, LinearInterpolator, plot_trajectory
 
 class AugmentedFBObjective(ExplicitComponent):
     def setup(self):

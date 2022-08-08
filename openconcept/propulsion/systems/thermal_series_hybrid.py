@@ -2,25 +2,18 @@
 from __future__ import division
 from openconcept.propulsion import SimpleMotor, PowerSplit, SimpleGenerator, SimpleTurboshaft, SimplePropeller
 # I had to move specific energy into a design variable to get this outer loop to work correctly
-from openconcept.energy_storage import SimpleBattery, SOCBattery
-from openconcept.atmospherics import ComputeAtmosphericProperties
-from openconcept.utilities.dvlabel import DVLabel
-from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
+from openconcept.energy_storage import SOCBattery
+from openconcept.utilities import DVLabel, AddSubtractComp, ElementMultiplyDivideComp
 from openconcept.thermal import (
     LiquidCooledComp,
     CoolantReservoir,
-    ConstantSurfaceTemperatureColdPlate_NTU,
     HeatPumpWithIntegratedCoolantLoop,
-    ImplicitCompressibleDuct,
     ExplicitIncompressibleDuct,
     HXGroup,
 )
 
-from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, DirectSolver, NewtonSolver, ScipyKrylov
-
+from openmdao.api import Problem, Group, IndepVarComp, BalanceComp
 import numpy as np
-
-from openmdao.api import ExplicitComponent, ExecComp
 
 class TwinSeriesHybridElectricThermalPropulsionSystem(Group):
     """

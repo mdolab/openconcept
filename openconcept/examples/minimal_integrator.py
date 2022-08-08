@@ -7,7 +7,7 @@ and update the weight accordingly.
 import openmdao.api as om
 from openconcept.examples.minimal import Aircraft, setup_problem  # build off this aircraft model
 from openconcept.mission import BasicMission
-from openconcept.utilities.math.integrals import Integrator
+from openconcept.utilities import Integrator
 import matplotlib.pyplot as plt
 
 # rst Imports (end)

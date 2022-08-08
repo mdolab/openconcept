@@ -1,11 +1,9 @@
 from __future__ import division
 import numpy as np
-from openmdao.api import ExplicitComponent, Problem, ImplicitComponent, NewtonSolver, DirectSolver, IndepVarComp, ExecComp
-from openmdao.api import Group, ScipyOptimizeDriver, BoundsEnforceLS
+from openmdao.api import ExplicitComponent, ImplicitComponent, IndepVarComp, ExecComp, Group
 
 from .heat_exchanger import HXGroup
-from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
-from openconcept.utilities.dvlabel import DVLabel
+from openconcept.utilities import AddSubtractComp, DVLabel
 
 class ExplicitIncompressibleDuct(ExplicitComponent):
     """

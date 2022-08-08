@@ -29,7 +29,7 @@ except ImportError:
 from openconcept.atmospherics import TemperatureComp, PressureComp, DensityComp, SpeedOfSoundComp
 
 # Utitilty for vector manipulation
-from openconcept.utilities.math.combine_split_comp import VectorConcatenateComp
+from openconcept.utilities import VectorConcatenateComp
 
 CITATION = """
 @InProceedings{Adler2022a,

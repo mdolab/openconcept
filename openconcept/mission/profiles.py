@@ -1,5 +1,5 @@
 import openmdao.api as om 
-import openconcept.api as oc
+from openconcept.utilities import DVLabel
 from .phases import BFLImplicitSolve, GroundRollPhase, RotationPhase, RobustRotationPhase, ClimbAnglePhase, SteadyFlightPhase
 from .mission_groups import TrajectoryGroup
 
@@ -116,7 +116,7 @@ class MissionWithReserve(TrajectoryGroup):
 
             phase7 = self.add_subsystem('loiter',SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase='loiter'),promotes_inputs=['ac|*'])
             dvlist = [['duration_in', 'duration', 300, 's']]
-            phase7.add_subsystem('loiter_dt', oc.DVLabel(dvlist), promotes_inputs=["*"], promotes_outputs=["*"])
+            phase7.add_subsystem('loiter_dt', DVLabel(dvlist), promotes_inputs=["*"], promotes_outputs=["*"])
             self.connect('loiter|h0','loiter.ode_integ_phase.fltcond|h_initial')
             self.connect('loiter_duration','loiter.duration_in')
 

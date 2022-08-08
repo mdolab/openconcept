@@ -1,7 +1,7 @@
 from __future__ import division
 import numpy as np
-from openmdao.api import ExplicitComponent, Problem, NewtonSolver, Group, MetaModelStructuredComp, ExecComp, n2
-from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
+from openmdao.api import ExplicitComponent, Group, MetaModelStructuredComp, ExecComp
+from openconcept.utilities import ElementMultiplyDivideComp
 import warnings
 
 class HeatPipe(Group):

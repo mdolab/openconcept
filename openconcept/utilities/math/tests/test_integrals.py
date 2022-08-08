@@ -4,7 +4,7 @@ import pytest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
-from openconcept.utilities.math.integrals import Integrator
+from openconcept.utilities import Integrator
 
 class IntegratorTestGroup(Group):
     """An OpenMDAO group to test the every-node integrator component

@@ -2,7 +2,7 @@ from __future__ import division
 import openmdao.api as om
 import numpy as np
 
-from openconcept.utilities.linearinterp import LinearInterpolator
+from openconcept.utilities import LinearInterpolator
 from .thermal import PerfectHeatTransferComp
 
 class LinearSelector(om.ExplicitComponent):

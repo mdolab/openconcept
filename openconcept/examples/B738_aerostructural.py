@@ -18,7 +18,8 @@ from __future__ import division
 import numpy as np
 
 import openmdao.api as om
-import openconcept.api as oc
+from openconcept.utilities import AddSubtractComp, DictIndepVarComp, plot_trajectory
+
 # imports for the airplane model itself
 from openconcept.mission import IntegratorGroup, BasicMission
 from openconcept.aerodynamics import AerostructDragPolar
@@ -111,7 +112,7 @@ class B738AirplaneModel(IntegratorGroup):
 
         # Use Raymer as estimate for 737 original wing weight, subtract it
         # out, then add in OpenAeroStruct wing weight estimate
-        self.add_subsystem('weight', oc.AddSubtractComp(output_name='weight',
+        self.add_subsystem('weight', AddSubtractComp(output_name='weight',
                                                      input_names=['ac|weights|MTOW', 'fuel_used',
                                                                   'ac|weights|orig_W_wing',
                                                                   'ac|weights|W_wing'],
@@ -146,7 +147,7 @@ class B738AnalysisGroup(om.Group):
         USE_SURROGATE = self.options['use_surrogate']
 
         # Define a bunch of design varaiables and airplane-specific parameters
-        dv_comp = self.add_subsystem('dv_comp',  oc.DictIndepVarComp(acdata),
+        dv_comp = self.add_subsystem('dv_comp',  DictIndepVarComp(acdata),
                                      promotes_outputs=["*"])
         dv_comp.add_output_from_dict('ac|aero|CLmax_TO')
         dv_comp.add_output_from_dict('ac|aero|polar|e')
@@ -312,7 +313,7 @@ def show_outputs(prob, plots=True):
         x_label = 'Range (nmi)'
         y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)', 'Mach number', 'CL']
         phases = ['climb', 'cruise', 'descent']
-        oc.plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
+        plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels, marker='-',
                         plot_title='737-800 Mission Profile')
 

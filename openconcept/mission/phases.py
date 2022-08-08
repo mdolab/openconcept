@@ -3,12 +3,8 @@ from openmdao.api import Group, ExplicitComponent, IndepVarComp, BalanceComp, Im
 from .mission_groups import PhaseGroup
 from openconcept.atmospherics import ComputeAtmosphericProperties
 from openconcept.aerodynamics import Lift, StallSpeed
-from openconcept.utilities.math import ElementMultiplyDivideComp, AddSubtractComp
-from openconcept.utilities.math.integrals import Integrator
-from openconcept.utilities.linearinterp import LinearInterpolator
-from openconcept.utilities.math.integrals import Integrator
+from openconcept.utilities import ElementMultiplyDivideComp, AddSubtractComp, Integrator, LinearInterpolator
 import numpy as np
-import copy
 
 class ClimbAngleComp(ExplicitComponent):
     """

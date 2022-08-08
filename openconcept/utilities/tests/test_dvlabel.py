@@ -5,7 +5,7 @@ import imp
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp
-from openconcept.utilities.dvlabel import DVLabel
+from openconcept.utilities import DVLabel
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 class TestBasic(unittest.TestCase):

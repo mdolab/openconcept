@@ -2,14 +2,15 @@ from __future__ import division
 import numpy as np
 
 import openmdao.api as om
-import openconcept.api as oc
+from openconcept.utilities import AddSubtractComp, DictIndepVarComp, plot_trajectory
+
 # imports for the airplane model itself
 from openconcept.aerodynamics import PolarDrag
 from openconcept.examples.aircraft_data.B738 import data as acdata
 from openconcept.mission import MissionWithReserve, IntegratorGroup
 from openconcept.propulsion import CFM56
 
-class B738AirplaneModel(oc.IntegratorGroup):
+class B738AirplaneModel(IntegratorGroup):
     """
     A custom model specific to the Boeing 737-800 airplane.
     This class will be passed in to the mission analysis code.
@@ -66,7 +67,7 @@ class B738AirplaneModel(oc.IntegratorGroup):
                            promotes_inputs=[('x', 'ac|weights|OEW')],
                            promotes_outputs=['OEW'])
 
-        self.add_subsystem('weight', oc.AddSubtractComp(output_name='weight',
+        self.add_subsystem('weight', AddSubtractComp(output_name='weight',
                                                      input_names=['ac|weights|MTOW', 'fuel_used'],
                                                      units='kg', vec_size=[1, nn],
                                                      scaling_factors=[1, -1]),
@@ -79,7 +80,7 @@ class B738AnalysisGroup(om.Group):
         nn = 11
 
         # Define a bunch of design varaiables and airplane-specific parameters
-        dv_comp = self.add_subsystem('dv_comp',  oc.DictIndepVarComp(acdata),
+        dv_comp = self.add_subsystem('dv_comp',  DictIndepVarComp(acdata),
                                      promotes_outputs=["*"])
         dv_comp.add_output_from_dict('ac|aero|CLmax_TO')
         dv_comp.add_output_from_dict('ac|aero|polar|e')
@@ -165,7 +166,7 @@ def show_outputs(prob):
         x_label = 'Range (nmi)'
         y_labels = ['Altitude (ft)', 'Veas airspeed (knots)', 'Fuel used (lb)', 'Throttle setting', 'Vertical speed (ft/min)', 'Mach number', 'CL']
         phases = ['climb', 'cruise', 'descent','reserve_climb','reserve_cruise','reserve_descent','loiter']
-        oc.plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
+        plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases,
                         x_label=x_label, y_labels=y_labels, marker='-',
                         plot_title='737-800 Mission Profile')
 

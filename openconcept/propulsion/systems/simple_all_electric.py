@@ -1,9 +1,8 @@
 from __future__ import division
 from openconcept.propulsion import SimpleMotor, SimplePropeller
 from openconcept.energy_storage import SOCBattery
-from openconcept.utilities.dvlabel import DVLabel
-from openconcept.utilities.math import AddSubtractComp
-from openmdao.api import Group, IndepVarComp, ExplicitComponent
+from openconcept.utilities import DVLabel
+from openmdao.api import Group, IndepVarComp
 from openconcept.thermal import LiquidCooledComp, CoolantReservoir, ImplicitCompressibleDuct, ExplicitIncompressibleDuct, HXGroup
 
 import numpy as np

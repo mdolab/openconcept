@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp
-from openconcept.utilities.math.sum_comp import SumComp
+from openconcept.utilities import SumComp
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 class TestSummation1x1(unittest.TestCase):
@@ -358,8 +358,7 @@ class TestForDocs(unittest.TestCase):
         A simple example to compute total fuel burn over an aircraft mission
         """
         import numpy as np
-        #from openmdao.api import Problem, Group, IndepVarComp
-        from openconcept.utilities.math.sum_comp import SumComp
+        from openconcept.utilities import SumComp
         from openmdao.utils.assert_utils import assert_near_equal
 
         n = 10

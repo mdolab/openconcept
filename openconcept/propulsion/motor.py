@@ -1,7 +1,7 @@
 from __future__ import division
 import numpy as np
 from openmdao.api import ExplicitComponent, Group, BalanceComp
-from openconcept.utilities.math.integrals import Integrator
+from openconcept.utilities import Integrator
 from openconcept.thermal import MotorCoolingJacket
 
 

@@ -3,24 +3,15 @@ import os
 import logging
 import numpy as np
 
-from openmdao.api import Problem, Group, ScipyOptimizeDriver
-from openmdao.api import BalanceComp, ExplicitComponent, ExecComp, SqliteRecorder
-from openmdao.api import DirectSolver, IndepVarComp, NewtonSolver, BoundsEnforceLS
+from openmdao.api import Problem, Group, ScipyOptimizeDriver, ExplicitComponent, ExecComp, SqliteRecorder, DirectSolver, IndepVarComp, NewtonSolver, BoundsEnforceLS
 
 # imports for the airplane model itself
 from openconcept.aerodynamics import PolarDrag
-from openconcept.utilities.math import AddSubtractComp
-from openconcept.utilities.math.max_min_comp import MaxComp
-from openconcept.utilities.math.integrals import Integrator
-from openconcept.utilities.dvlabel import DVLabel
 from openconcept.weights import TwinSeriesHybridEmptyWeight
 from openconcept.propulsion import TwinSeriesHybridElectricThermalPropulsionRefrigerated
-from openconcept.costs import TurbopropOperatingCost
-from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
-from openconcept.examples.aircraft_data.KingAirC90GT import data as acdata
 from openconcept.mission import BasicMission
-from openconcept.utilities.linearinterp import LinearInterpolator
-from openconcept.utilities.visualization import plot_trajectory
+from openconcept.examples.aircraft_data.KingAirC90GT import data as acdata
+from openconcept.utilities import AddSubtractComp, MaxComp, Integrator, DictIndepVarComp, LinearInterpolator, plot_trajectory
 
 """
 WARNING: This example has known convergence problems because of the chiller in the

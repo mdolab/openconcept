@@ -1,9 +1,7 @@
 from __future__ import division
 import numpy as np
 from openmdao.api import ExplicitComponent, Group, BalanceComp
-from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
-from openconcept.utilities.math.integrals import Integrator
-from openconcept.utilities.dvlabel import DVLabel
+from openconcept.utilities import ElementMultiplyDivideComp, Integrator
 from openconcept.thermal import BandolierCoolingSystem
 
 class SOCBattery(Group):

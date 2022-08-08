@@ -1,8 +1,8 @@
 from __future__ import division
 import numpy as np
 
-import openmdao.api as om 
-import openconcept.api as oc
+import openmdao.api as om
+from openconcept.utilities import Integrator, AddSubtractComp, DictIndepVarComp
 
 # imports for the airplane model itself
 from openconcept.examples.aircraft_data.caravan import data as acdata
@@ -60,10 +60,10 @@ class CaravanAirplaneModel(om.Group):
 
         # airplanes which consume fuel will need to integrate
         # fuel usage across the mission and subtract it from TOW
-        intfuel = self.add_subsystem('intfuel', oc.Integrator(num_nodes=nn, method='simpson', diff_units='s',
+        intfuel = self.add_subsystem('intfuel', Integrator(num_nodes=nn, method='simpson', diff_units='s',
                                                               time_setup='duration'), promotes_inputs=['*'], promotes_outputs=['*'])
         intfuel.add_integrand('fuel_used', rate_name='fuel_flow', val=1.0, units='kg')
-        self.add_subsystem('weight', oc.AddSubtractComp(output_name='weight',
+        self.add_subsystem('weight', AddSubtractComp(output_name='weight',
                                                      input_names=['ac|weights|MTOW', 'fuel_used'],
                                                      units='kg', vec_size=[1, nn],
                                                      scaling_factors=[1, -1]),
@@ -79,7 +79,7 @@ class CaravanAnalysisGroup(om.Group):
         nn = 11
 
         # Define a bunch of design varaiables and airplane-specific parameters
-        dv_comp = self.add_subsystem('dv_comp',  oc.DictIndepVarComp(acdata),
+        dv_comp = self.add_subsystem('dv_comp',  DictIndepVarComp(acdata),
                                      promotes_outputs=["*"])
         dv_comp.add_output_from_dict('ac|aero|CLmax_TO')
         dv_comp.add_output_from_dict('ac|aero|polar|e')

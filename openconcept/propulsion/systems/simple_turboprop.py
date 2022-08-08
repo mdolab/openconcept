@@ -1,7 +1,6 @@
 from __future__ import division
 from openconcept.propulsion import SimpleTurboshaft, SimplePropeller
-from openconcept.utilities.dvlabel import DVLabel
-from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
+from openconcept.utilities import DVLabel, AddSubtractComp, ElementMultiplyDivideComp
 from openmdao.api import Group
 
 class TurbopropPropulsionSystem(Group):

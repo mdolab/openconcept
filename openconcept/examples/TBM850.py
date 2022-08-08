@@ -7,11 +7,9 @@ import matplotlib.pyplot as plt
 from openconcept.propulsion import TurbopropPropulsionSystem
 from openconcept.aerodynamics import PolarDrag
 from openconcept.weights import SingleTurboPropEmptyWeight
-from openconcept.utilities.math import AddSubtractComp
-from openconcept.utilities.math.integrals import Integrator
-from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
 from openconcept.mission import FullMissionAnalysis
 from openconcept.examples.aircraft_data.TBM850 import data as acdata
+from openconcept.utilities import AddSubtractComp, Integrator, DictIndepVarComp
 
 # rst Imports (end)
 

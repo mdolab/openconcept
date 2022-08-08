@@ -1,7 +1,6 @@
 from __future__ import division
-from openmdao.api import IndepVarComp
-from openmdao.api import Group
-from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
+from openmdao.api import IndepVarComp, Group
+from openconcept.utilities import AddSubtractComp, ElementMultiplyDivideComp
 from .weights_turboprop import (
     WingWeight_SmallTurboprop,
     EmpennageWeight_SmallTurboprop,

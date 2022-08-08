@@ -1,8 +1,7 @@
 from __future__ import division
 import numpy as np
-from openmdao.api import ExplicitComponent, Problem, IndepVarComp
-from openmdao.api import Group, ScipyOptimizeDriver
-from openconcept.utilities.dvlabel import DVLabel
+from openmdao.api import ExplicitComponent, IndepVarComp, Group
+from openconcept.utilities import DVLabel
 
 class OffsetStripFinGeometry(ExplicitComponent):
     """

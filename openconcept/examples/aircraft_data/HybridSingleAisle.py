@@ -5,8 +5,7 @@ from __future__ import division
 import openmdao.api as om
 from openconcept.mission import IntegratorGroup
 from openconcept.thermal import PerfectHeatTransferComp
-from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
-from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
+from openconcept.utilities import ElementMultiplyDivideComp, AddSubtractComp
 
 data = dict()
 ac = dict()

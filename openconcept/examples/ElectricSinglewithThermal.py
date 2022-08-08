@@ -1,23 +1,14 @@
 from __future__ import division
 import numpy as np
 
-from openmdao.api import Problem, Group, ScipyOptimizeDriver
-from openmdao.api import DirectSolver, SqliteRecorder, IndepVarComp
-from openmdao.api import NewtonSolver,BoundsEnforceLS
+from openmdao.api import Problem, Group, ScipyOptimizeDriver, DirectSolver, IndepVarComp, NewtonSolver,BoundsEnforceLS
+from openconcept.utilities import DictIndepVarComp, plot_trajectory, LinearInterpolator
 
 # imports for the airplane model itself
 from openconcept.aerodynamics import PolarDrag
-from openconcept.utilities.math import AddSubtractComp
-from openconcept.utilities.math.integrals import Integrator
-from openconcept.utilities.dvlabel import DVLabel
-from openconcept.weights import SingleTurboPropEmptyWeight
-from openconcept.propulsion import AllElectricSinglePropulsionSystemWithThermal_Incompressible, AllElectricSinglePropulsionSystemWithThermal_Compressible
-from openconcept.costs import TurbopropOperatingCost
-from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
+from openconcept.propulsion import AllElectricSinglePropulsionSystemWithThermal_Incompressible
 from openconcept.examples.aircraft_data.TBM850 import data as acdata
 from openconcept.mission import FullMissionAnalysis
-from openconcept.utilities.visualization import plot_trajectory
-from openconcept.utilities.linearinterp import LinearInterpolator
 
 
 

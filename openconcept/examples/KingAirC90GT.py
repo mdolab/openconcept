@@ -7,15 +7,11 @@ from openmdao.api import NewtonSolver, BoundsEnforceLS
 
 # imports for the airplane model itself
 from openconcept.aerodynamics import PolarDrag
-from openconcept.utilities.math import AddSubtractComp
-from openconcept.utilities.math.integrals import Integrator
 from openconcept.weights import SingleTurboPropEmptyWeight
 from openconcept.propulsion import TwinTurbopropPropulsionSystem
-from openconcept.costs import TurbopropOperatingCost
-from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
-from openconcept.examples.aircraft_data.KingAirC90GT import data as acdata
 from openconcept.mission import FullMissionAnalysis
-from openconcept.utilities.visualization import plot_trajectory
+from openconcept.examples.aircraft_data.KingAirC90GT import data as acdata
+from openconcept.utilities import AddSubtractComp, Integrator, DictIndepVarComp, plot_trajectory
 
 class KingAirC90GTModel(Group):
     """

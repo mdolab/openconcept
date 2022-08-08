@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp
-from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
+from openconcept.utilities import AddSubtractComp
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 class TestAddSubtractCompScalars(unittest.TestCase):
@@ -332,8 +332,7 @@ class TestForDocs(unittest.TestCase):
         A simple example to compute the resultant force on an aircraft and demonstrate the AddSubtract component
         """
         import numpy as np
-        #from openmdao.api import Problem, Group, IndepVarComp
-        from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
+        from openconcept.utilities import AddSubtractComp
         from openmdao.utils.assert_utils import assert_near_equal
 
         n = 3

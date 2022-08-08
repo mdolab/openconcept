@@ -5,7 +5,7 @@ import pytest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp
-from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
+from openconcept.utilities import ElementMultiplyDivideComp
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 class TestElementMultiplyDivideCompScalars(unittest.TestCase):
@@ -451,8 +451,7 @@ class TestForDocs(unittest.TestCase):
             a number of analysis points (F_inertial = - m*a)
         """
         import numpy as np
-        #from openmdao.api import Problem, Group, IndepVarComp
-        from openconcept.utilities.math.multiply_divide_comp import ElementMultiplyDivideComp
+        from openconcept.utilities import ElementMultiplyDivideComp
         from openmdao.utils.assert_utils import assert_near_equal
 
         n = 5
