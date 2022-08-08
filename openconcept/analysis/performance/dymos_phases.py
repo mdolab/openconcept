@@ -3,7 +3,7 @@ from openmdao.api import Group, ExplicitComponent, IndepVarComp, BalanceComp, Im
 import openmdao.api as om
 import openconcept.api as oc
 from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
-from openconcept.analysis.aerodynamics import Lift, StallSpeed
+from openconcept.aerodynamics import Lift, StallSpeed
 from openconcept.utilities.math import ElementMultiplyDivideComp, AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.linearinterp import LinearInterpolator

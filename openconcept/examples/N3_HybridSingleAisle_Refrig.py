@@ -4,7 +4,7 @@ import numpy as np
 import openmdao.api as om
 import openconcept.api as oc
 # imports for the airplane model itself
-from openconcept.analysis.aerodynamics import PolarDrag
+from openconcept.aerodynamics import PolarDrag
 from openconcept.examples.aircraft_data.HybridSingleAisle import data as acdata
 from openconcept.examples.aircraft_data.HybridSingleAisle import MotorFaultProtection
 from openconcept.analysis.performance.mission_profiles import MissionWithReserve, BasicMission

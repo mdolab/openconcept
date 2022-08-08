@@ -6,7 +6,7 @@ from openmdao.api import DirectSolver, SqliteRecorder, IndepVarComp
 from openmdao.api import NewtonSolver, BoundsEnforceLS
 
 # imports for the airplane model itself
-from openconcept.analysis.aerodynamics import PolarDrag
+from openconcept.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.examples.methods.weights_turboprop import SingleTurboPropEmptyWeight

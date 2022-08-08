@@ -25,7 +25,7 @@ from openconcept.examples.aircraft_data.B738 import data as acdata
 from openconcept.analysis.performance.mission_profiles import BasicMission
 from openconcept.components.cfm56 import CFM56
 from openconcept.analysis.openaerostruct.aerostructural import Aerostruct
-from openconcept.analysis.aerodynamics import Lift
+from openconcept.aerodynamics import Lift
 from openconcept.analysis.atmospherics.dynamic_pressure_comp import DynamicPressureComp
 
 NUM_X = 5

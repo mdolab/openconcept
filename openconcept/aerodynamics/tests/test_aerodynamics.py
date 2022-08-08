@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
-from openconcept.analysis.aerodynamics import PolarDrag, Lift, StallSpeed
+from openconcept.aerodynamics import PolarDrag, Lift, StallSpeed
 
 class PolarDragTestGroup(Group):
     """

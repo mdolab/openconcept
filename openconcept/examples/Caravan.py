@@ -10,7 +10,7 @@ from openconcept.examples.propulsion_layouts.simple_turboprop import TurbopropPr
 from openconcept.examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
 from openconcept.examples.methods.costs_commuter import OperatingCost
 
-from openconcept.analysis.aerodynamics import PolarDrag
+from openconcept.aerodynamics import PolarDrag
 from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis
 
 class CaravanAirplaneModel(om.Group):
