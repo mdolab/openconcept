@@ -9,7 +9,7 @@ from openconcept.examples.aircraft_data.HybridSingleAisle import data as acdata
 from openconcept.examples.aircraft_data.HybridSingleAisle import MotorFaultProtection
 from openconcept.mission import MissionWithReserve, BasicMission, IntegratorGroup
 from openconcept.propulsion import N3Hybrid, SimpleMotor
-from openconcept.components.battery import SOCBattery
+from openconcept.energy_storage import SOCBattery
 from openconcept.utilities.linearinterp import LinearInterpolator
 from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
 from openconcept.components.thermal import LiquidCooledComp

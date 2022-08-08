@@ -380,6 +380,7 @@ if generate_srcdocs:
         'aerodynamics.openaerostruct',
         'atmospherics',
         'components',
+        'energy_storage',
         'mission',
         'propulsion',
         'utilities',

@@ -2,7 +2,7 @@
 from __future__ import division
 from openconcept.propulsion import SimpleMotor, PowerSplit, SimpleGenerator, SimpleTurboshaft, SimplePropeller
 # I had to move specific energy into a design variable to get this outer loop to work correctly
-from openconcept.components.battery import SimpleBattery, SOCBattery
+from openconcept.energy_storage import SimpleBattery, SOCBattery
 from openconcept.atmospherics import ComputeAtmosphericProperties
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
