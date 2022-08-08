@@ -1,7 +1,78 @@
 from __future__ import division
 import numpy as np
-from openmdao.api import ExplicitComponent
-from openmdao.api import Group
+from openmdao.api import ExplicitComponent, Group, BalanceComp
+from openconcept.utilities.math.integrals import Integrator
+from openconcept.thermal import MotorCoolingJacket
+
+
+class LiquidCooledMotor(Group):
+    """A component (heat producing) with thermal mass
+    cooled by a cold plate.
+
+    Inputs
+    ------
+    q_in : float
+        Heat produced by the operating component (vector, W)
+    mdot_coolant : float
+        Coolant mass flow rate (vector, kg/s)
+    T_in : float
+        Instantaneous coolant inflow temperature (vector, K)
+    motor_weight : float
+        Object mass (only required in thermal mass mode) (scalar, kg)
+    T_initial : float
+        Initial temperature of the cold plate (only required in thermal mass mode) / object (scalar, K)
+    duration : float
+        Duration of mission segment, only required in unsteady mode
+    power_rating : float
+        Rated power of the motor (scalar, kW)
+
+    Outputs
+    -------
+    T_out : float
+        Instantaneous coolant outlet temperature (vector, K)
+    T: float
+        Windings temperature (vector, K)
+
+    Options
+    -------
+    motor_specific_heat : float
+        Specific heat capacity of the object in J / kg / K (default 921 = aluminum)
+    coolant_specific_heat : float
+        Specific heat capacity of the coolant in J / kg / K (default 3801, glycol/water)
+    num_nodes : int
+        Number of analysis points to run
+    quasi_steady : bool
+        Whether or not to treat the component as having thermal mass
+    case_cooling_coefficient : float
+        Watts of heat transfer per square meter of case surface area per K
+        temperature differential (default 1100 W/m^2/K)
+    """
+
+    def initialize(self):
+        self.options.declare('motor_specific_heat', default=921.0, desc='Specific heat in J/kg/K')
+        self.options.declare('coolant_specific_heat', default=3801, desc='Specific heat in J/kg/K')
+        self.options.declare('quasi_steady', default=False, desc='Treat the component as quasi-steady or with thermal mass')
+        self.options.declare('num_nodes', default=1, desc='Number of quasi-steady points to runs')
+        self.options.declare('case_cooling_coefficient', default=1100.)
+
+    def setup(self):
+        nn = self.options['num_nodes']
+        quasi_steady = self.options['quasi_steady']
+        self.add_subsystem('hex',
+                           MotorCoolingJacket(num_nodes=nn, coolant_specific_heat=self.options['coolant_specific_heat'],
+                                              motor_specific_heat=self.options['motor_specific_heat'],
+                                              case_cooling_coefficient=self.options['case_cooling_coefficient']),
+                           promotes_inputs=['q_in','T_in', 'T','power_rating','mdot_coolant','motor_weight'],
+                           promotes_outputs=['T_out', 'dTdt'])
+        if not quasi_steady:
+            ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
+                                           promotes_outputs=['*'], promotes_inputs=['*'])
+            ode_integ.add_integrand('T', rate_name='dTdt', units='K', lower=1e-10)
+        else:
+            self.add_subsystem('thermal_bal',
+                               BalanceComp('T', eq_units='K/s', lhs_name='dTdt', rhs_val=0.0, units='K', lower=1.0, val=299.*np.ones((nn,))),
+                               promotes_inputs=['dTdt'],
+                               promotes_outputs=['T'])
 
 
 class SimpleMotor(ExplicitComponent):
