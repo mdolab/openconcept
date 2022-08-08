@@ -1,17 +1,14 @@
 from __future__ import division
-import sys
-import os
 import numpy as np
 
-sys.path.insert(0, os.getcwd())
 import openmdao.api as om 
 import openconcept.api as oc
 
 # imports for the airplane model itself
-from examples.aircraft_data.caravan import data as acdata
-from examples.propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
-from examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
-from examples.methods.costs_commuter import OperatingCost
+from openconcept.examples.aircraft_data.caravan import data as acdata
+from openconcept.examples.propulsion_layouts.simple_turboprop import TurbopropPropulsionSystem
+from openconcept.examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
+from openconcept.examples.methods.costs_commuter import OperatingCost
 
 from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis

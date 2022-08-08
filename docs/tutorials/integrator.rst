@@ -20,7 +20,7 @@ If you have not done so already, it is recommended to go through that tutorial f
 Imports
 =======
 
-.. literalinclude:: ../../examples/minimal_integrator.py
+.. literalinclude:: ../../openconcept/examples/minimal_integrator.py
     :start-after: # rst Imports (beg)
     :end-before: # rst Imports (end)
 
@@ -35,7 +35,7 @@ For this reason, the aircraft model is now an OpenMDAO ``Group`` instead of an `
 
 Let's first take a look at the code for the entire aircraft model and then we will break down what is happening in each section.
 
-.. literalinclude:: ../../examples/minimal_integrator.py
+.. literalinclude:: ../../openconcept/examples/minimal_integrator.py
     :start-after: # rst Aircraft (beg)
     :end-at: # rst Weight (end)
 
@@ -44,7 +44,7 @@ Options
 
 The options are the same as the minimal example tutorial.
 
-.. literalinclude:: ../../examples/minimal_integrator.py
+.. literalinclude:: ../../openconcept/examples/minimal_integrator.py
     :start-after: # rst Options
     :end-before: # rst Setup
     :dedent: 4
@@ -67,7 +67,7 @@ For this reason, we promote only the thrust and drag outputs to the new aircraft
 All the inputs are still required, so we promote them all to the group level (this way OpenConcept will automatically connect them as we discussed last time).
 If you are confused about the promotion, check out the OpenMDAO documentation.
 
-.. literalinclude:: ../../examples/minimal_integrator.py
+.. literalinclude:: ../../openconcept/examples/minimal_integrator.py
     :start-after: # rst Simple aircraft (beg)
     :end-before: # rst Simple aircraft (end)
     :dedent: 8
@@ -84,7 +84,7 @@ Finally, we promote the inputs.
 Thrust is automatically connected to the thrust output from the minimal aircraft model.
 TSFC is promoted to a name beginning with ``"ac|"`` so that the mission analysis promotes the variable to the top level so we can set it the same way as the other aircraft parameters.
 
-.. literalinclude:: ../../examples/minimal_integrator.py
+.. literalinclude:: ../../openconcept/examples/minimal_integrator.py
     :start-after: # rst Fuel flow (beg)
     :end-before: # rst Fuel flow (end)
     :dedent: 8
@@ -97,7 +97,7 @@ This is done by adding an OpenConcept ``Integrator`` component to the model.
 After adding the integrator, we add an integrated variable and associated variable to integrate using the integrator's ``add_integrand`` method.
 Let's step through all the details of these calls---there's a lot to unpack.
 
-.. literalinclude:: ../../examples/minimal_integrator.py
+.. literalinclude:: ../../openconcept/examples/minimal_integrator.py
     :start-after: # rst Integrator (beg)
     :end-before: # rst Integrator (end)
     :dedent: 8
@@ -145,7 +145,7 @@ Mission
 
 The rest of the code will look very similar to the :ref:`minimal example <Minimal-example-tutorial>`.
 
-.. literalinclude:: ../../examples/minimal_integrator.py
+.. literalinclude:: ../../openconcept/examples/minimal_integrator.py
     :start-after: # rst Mission (beg)
     :end-before: # rst Mission (end)
 
@@ -159,7 +159,7 @@ Run script
 We reuse the ``setup_problem`` function from the :ref:`minimal example <Minimal-example-tutorial>`.
 The remaining code is the same, except for adding a couple more variables of interest to the output plot.
 
-.. literalinclude:: ../../examples/minimal_integrator.py
+.. literalinclude:: ../../openconcept/examples/minimal_integrator.py
     :start-after: # rst Run (beg)
     :end-before: # rst Run (end)
 
@@ -171,7 +171,7 @@ The plot it generates should look like this:
 The N2 diagram for the model is the following:
 
 .. embed-n2::
-  ../examples/minimal_integrator.py
+  ../openconcept/examples/minimal_integrator.py
 
 You can see that the weight is no longer constant.
 This results in a varying throttle in the cruise phase, unlike the constant throttle from the :ref:`minimal example <Minimal-example-tutorial>`.
@@ -191,4 +191,4 @@ You're encouraged to figure out how this works for yourself by looking at the so
 
 The final script looks like this:
 
-.. literalinclude:: ../../examples/minimal_integrator.py
+.. literalinclude:: ../../openconcept/examples/minimal_integrator.py

@@ -350,9 +350,9 @@ texinfo_documents = [
 # -- Extension configuration -------------------------------------------------
 
 # -- Run examples to get figures for docs ------------------------------------
-run_file_move_result("../examples/minimal.py", ["minimal_example_results.svg"], ["tutorials/assets/minimal_example_results.svg"], optional_cl_args=["--hide_visuals"])
-run_file_move_result("../examples/minimal_integrator.py", ["minimal_integrator_results.svg"], ["tutorials/assets/minimal_integrator_results.svg"], optional_cl_args=["--hide_visuals"])
-run_file_move_result("../examples/TBM850.py", ["turboprop_takeoff_results.svg", "turboprop_mission_results.svg"], ["tutorials/assets/turboprop_takeoff_results.svg", "tutorials/assets/turboprop_mission_results.svg"], optional_cl_args=["--hide_visuals"])
+run_file_move_result("../openconcept/examples/minimal.py", ["minimal_example_results.svg"], ["tutorials/assets/minimal_example_results.svg"], optional_cl_args=["--hide_visuals"])
+run_file_move_result("../openconcept/examples/minimal_integrator.py", ["minimal_integrator_results.svg"], ["tutorials/assets/minimal_integrator_results.svg"], optional_cl_args=["--hide_visuals"])
+run_file_move_result("../openconcept/examples/TBM850.py", ["turboprop_takeoff_results.svg", "turboprop_mission_results.svg"], ["tutorials/assets/turboprop_takeoff_results.svg", "tutorials/assets/turboprop_mission_results.svg"], optional_cl_args=["--hide_visuals"])
 
 # -- Options for intersphinx extension ---------------------------------------
 

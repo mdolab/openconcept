@@ -508,46 +508,44 @@ class PlanformMeshTestCase(unittest.TestCase):
         assert_check_partials(partials, atol=2e-5)
 
 
-"""
-Runs OpenAeroStruct with flight condition and mesh inputs.
-
-Inputs
-------
-inputs : dict
-    Input dictionary containing
-        mesh : ndarray
-            Flat wing mesh (m)
-        twist : ndarray
-            Twist control points (deg)
-        v : float
-            Flight speed (m/s)
-        alpha : float
-            Angle of attack (deg)
-        Mach_number : float
-            Mach number
-        re : float
-            Dimensional Reynolds number (1/m)
-        rho : float
-            Flow density (kg/m^3)
-with_viscous : bool (optional)
-    Include viscous drag
-with_wave : bool (optional)
-    Include wave drag
-t_over_c : float (optional)
-    Thickness to chord ratio of the airfoil
-
-Outputs
--------
-outputs : dict
-    Output dictionary containing
-        CL : float
-            Lift coefficient
-        CD : float
-            Drag coefficient
-"""
-
-
 def run_OAS(inputs, with_viscous=True, with_wave=True, t_over_c=np.array([0.12])):
+    """
+    Runs OpenAeroStruct with flight condition and mesh inputs.
+
+    Inputs
+    ------
+    inputs : dict
+        Input dictionary containing
+            mesh : ndarray
+                Flat wing mesh (m)
+            twist : ndarray
+                Twist control points (deg)
+            v : float
+                Flight speed (m/s)
+            alpha : float
+                Angle of attack (deg)
+            Mach_number : float
+                Mach number
+            re : float
+                Dimensional Reynolds number (1/m)
+            rho : float
+                Flow density (kg/m^3)
+    with_viscous : bool (optional)
+        Include viscous drag
+    with_wave : bool (optional)
+        Include wave drag
+    t_over_c : float (optional)
+        Thickness to chord ratio of the airfoil
+
+    Outputs
+    -------
+    outputs : dict
+        Output dictionary containing
+            CL : float
+                Lift coefficient
+            CD : float
+                Drag coefficient
+    """
     # Create a dictionary with info and options about the aerodynamic
     # lifting surface
     surface = {
@@ -628,6 +626,14 @@ class ExampleUsageTestCase(unittest.TestCase):
     def test(self):
         # Test that it runs with no errors
         example_usage()
+
+        # Get rid of any specified surface options in the VLMDataGen
+        # class after every test. This is necessary because the class
+        # stores the surface options as a "static" variable and
+        # prevents multiple VLMDataGen instances with different
+        # surface options. Doing this prevents that error when doing
+        # multiple tests with different surface options.
+        del VLMDataGen.surf_options
 
 
 if __name__ == "__main__":

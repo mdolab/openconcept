@@ -15,17 +15,13 @@ Eytan Adler (Jan 2022)
 """
 
 from __future__ import division
-import sys
-import os
-import warnings
 import numpy as np
 
-sys.path.insert(0, os.getcwd())
 import openmdao.api as om
 import openconcept.api as oc
 # imports for the airplane model itself
 from openconcept.analysis.openaerostruct.aerostructural import OASAerostructDragPolar, OASAerostructDragPolarExact
-from examples.aircraft_data.B738 import data as acdata
+from openconcept.examples.aircraft_data.B738 import data as acdata
 from openconcept.analysis.performance.mission_profiles import BasicMission
 from openconcept.components.cfm56 import CFM56
 from openconcept.analysis.openaerostruct.aerostructural import Aerostruct

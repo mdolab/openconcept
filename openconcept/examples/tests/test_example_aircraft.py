@@ -3,21 +3,21 @@ from __future__ import division
 import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal
-from examples.B738 import run_738_analysis
-from examples.TBM850 import run_tbm_analysis
-from examples.HybridTwin_thermal import run_hybrid_twin_thermal_analysis
-from examples.HybridTwin_active_thermal import run_hybrid_twin_active_thermal_analysis
-from examples.HybridTwin import run_hybrid_twin_analysis
-from examples.Caravan import run_caravan_analysis
-from examples.KingAirC90GT import run_kingair_analysis
-from examples.ElectricSinglewithThermal import run_electricsingle_analysis
-from examples.N3_HybridSingleAisle_Refrig import run_hybrid_sa_analysis
-from examples.minimal import setup_problem as setup_minimal_problem
-from examples.minimal_integrator import MissionAnalysisWithFuelBurn as MinimalIntegratorMissionAnalysis
+from openconcept.examples.B738 import run_738_analysis
+from openconcept.examples.TBM850 import run_tbm_analysis
+from openconcept.examples.HybridTwin_thermal import run_hybrid_twin_thermal_analysis
+from openconcept.examples.HybridTwin_active_thermal import run_hybrid_twin_active_thermal_analysis
+from openconcept.examples.HybridTwin import run_hybrid_twin_analysis
+from openconcept.examples.Caravan import run_caravan_analysis
+from openconcept.examples.KingAirC90GT import run_kingair_analysis
+from openconcept.examples.ElectricSinglewithThermal import run_electricsingle_analysis
+from openconcept.examples.N3_HybridSingleAisle_Refrig import run_hybrid_sa_analysis
+from openconcept.examples.minimal import setup_problem as setup_minimal_problem
+from openconcept.examples.minimal_integrator import MissionAnalysisWithFuelBurn as MinimalIntegratorMissionAnalysis
 try:
-    from examples.B738_VLM_drag import run_738_analysis as run_738VLM_analysis
+    from openconcept.examples.B738_VLM_drag import run_738_analysis as run_738VLM_analysis
     from openconcept.analysis.openaerostruct.drag_polar import VLMDataGen
-    from examples.B738_aerostructural import run_738_analysis as run_738Aerostruct_analysis
+    from openconcept.examples.B738_aerostructural import run_738_analysis as run_738Aerostruct_analysis
     from openconcept.analysis.openaerostruct.aerostructural import OASDataGen
     OAS_installed = True
 except:

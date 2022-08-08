@@ -1,9 +1,6 @@
 from __future__ import division
-import sys
-import os
 import numpy as np
 
-sys.path.insert(0, os.getcwd())
 from openmdao.api import Problem, Group, ScipyOptimizeDriver
 from openmdao.api import DirectSolver, SqliteRecorder, IndepVarComp
 from openmdao.api import NewtonSolver,BoundsEnforceLS
@@ -13,11 +10,11 @@ from openconcept.analysis.aerodynamics import PolarDrag
 from openconcept.utilities.math import AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.dvlabel import DVLabel
-from examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
-from examples.propulsion_layouts.simple_all_electric import AllElectricSinglePropulsionSystemWithThermal_Incompressible, AllElectricSinglePropulsionSystemWithThermal_Compressible
-from examples.methods.costs_commuter import OperatingCost
+from openconcept.examples.methods.weights_turboprop import SingleTurboPropEmptyWeight
+from openconcept.examples.propulsion_layouts.simple_all_electric import AllElectricSinglePropulsionSystemWithThermal_Incompressible, AllElectricSinglePropulsionSystemWithThermal_Compressible
+from openconcept.examples.methods.costs_commuter import OperatingCost
 from openconcept.utilities.dict_indepvarcomp import DictIndepVarComp
-from examples.aircraft_data.TBM850 import data as acdata
+from openconcept.examples.aircraft_data.TBM850 import data as acdata
 from openconcept.analysis.performance.mission_profiles import FullMissionAnalysis
 from openconcept.utilities.visualization import plot_trajectory
 from openconcept.utilities.linearinterp import LinearInterpolator

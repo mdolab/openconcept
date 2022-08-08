@@ -1,30 +1,11 @@
-"""
-This work was the basis of the following paper.
-Please cite it if you use this for your own publication!
-
-@InProceedings{Adler2022a,
-    author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
-    title       = {Aerostructural wing design optimization considering full mission analysis},
-    booktitle   = {AIAA SciTech Forum},
-    doi         = {10.2514/6.2022-0382},
-    month       = {January},
-    year        = {2022}
-}
-
-Eytan Adler (Jan 2022)
-"""
-
 from __future__ import division
-import sys
-import os
 import numpy as np
 
-sys.path.insert(0, os.getcwd())
 import openmdao.api as om
 import openconcept.api as oc
 # imports for the airplane model itself
-from openconcept.analysis.openaerostruct.drag_polar import OASDragPolar
-from examples.aircraft_data.B738 import data as acdata
+from openconcept.analysis.aerodynamics import PolarDrag
+from openconcept.examples.aircraft_data.B738 import data as acdata
 from openconcept.analysis.performance.mission_profiles import MissionWithReserve
 from openconcept.components.cfm56 import CFM56
 
@@ -66,15 +47,14 @@ class B738AirplaneModel(oc.IntegratorGroup):
         self.connect('propmodel.fuel_flow', 'doubler.fuel_flow_in')
 
         # use a different drag coefficient for takeoff versus cruise
-        oas_surf_dict = {}  # options for OpenAeroStruct
-        oas_surf_dict['t_over_c'] = acdata['ac']['geom']['wing']['toverc']['value']
-        self.add_subsystem('drag', OASDragPolar(num_nodes=nn, num_x=3, num_y=7,
-                                                num_twist=3, surf_options=oas_surf_dict),
-                           promotes_inputs=['fltcond|CL', 'fltcond|M', 'fltcond|h', 'fltcond|q', 'ac|geom|wing|S_ref',
-                                            'ac|geom|wing|AR', 'ac|geom|wing|taper', 'ac|geom|wing|c4sweep',
-                                            'ac|geom|wing|twist', 'ac|aero|CD_nonwing'],
+        if flight_phase not in ['v0v1', 'v1v0', 'v1vr', 'rotate']:
+            cd0_source = 'ac|aero|polar|CD0_cruise'
+        else:
+            cd0_source = 'ac|aero|polar|CD0_TO'
+        self.add_subsystem('drag', PolarDrag(num_nodes=nn),
+                           promotes_inputs=['fltcond|CL', 'ac|geom|*', ('CD0', cd0_source),
+                                            'fltcond|q', ('e', 'ac|aero|polar|e')],
                            promotes_outputs=['drag'])
-        self.set_input_defaults('ac|aero|CD_nonwing', 0.0145)  # based on matching fuel burn of B738.py example
 
         # generally the weights module will be custom to each airplane
         passthru = om.ExecComp('OEW=x',
@@ -136,29 +116,13 @@ class B738AnalysisGroup(om.Group):
 
 def configure_problem():
     prob = om.Problem()
-    prob.model.add_subsystem('analysis', B738AnalysisGroup(), promotes=['*'])
+    prob.model = B738AnalysisGroup()
     prob.model.nonlinear_solver = om.NewtonSolver(iprint=2,solve_subsystems=True)
     prob.model.linear_solver = om.DirectSolver()
-    prob.model.nonlinear_solver.options['maxiter'] = 10
+    prob.model.nonlinear_solver.options['maxiter'] = 20
     prob.model.nonlinear_solver.options['atol'] = 1e-6
     prob.model.nonlinear_solver.options['rtol'] = 1e-6
-    prob.model.nonlinear_solver.options['err_on_non_converge'] = True
     prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar', print_bound_enforce=False)
-
-    prob.driver = om.ScipyOptimizeDriver()
-    prob.driver.options['optimizer'] = 'SLSQP'
-    prob.driver.opt_settings['tol'] = 1e-5
-    prob.driver.options['debug_print'] = ['objs', 'desvars', 'nl_cons']
-    prob.model.add_design_var('cruise|h0', upper=45e3, units='ft')
-    prob.model.add_constraint('climb.throttle', lower=0.01, upper=1.05)
-    prob.model.add_constraint('cruise.throttle', lower=0.01, upper=1.05)
-    prob.model.add_constraint('descent.throttle', lower=0.01, upper=1.05)
-    # Find twist distribution that minimizes fuel burn; lock the twist tip in place
-    # to prevent rigid rotation of the whole wing
-    prob.model.add_design_var('ac|geom|wing|twist', lower=np.array([0, -10, -10]),
-                              upper=np.array([0, 10, 10]), units='deg')
-    prob.model.add_objective('descent.fuel_used_final')
-    
     return prob
 
 def set_values(prob, num_nodes):
@@ -182,7 +146,7 @@ def set_values(prob, num_nodes):
     prob.set_val('reserve|h0',15000.,units='ft')
     prob.set_val('mission_range',2050,units='NM')
 
-def show_outputs(prob, plots=True):
+def show_outputs(prob):
     # print some outputs
     vars_list = ['descent.fuel_used_final','loiter.fuel_used_final']
     units = ['lb','lb']
@@ -192,6 +156,7 @@ def show_outputs(prob, plots=True):
         print(nice_print_names[i]+': '+str(prob.get_val(thing,units=units[i])[0])+' '+units[i])
 
     # plot some stuff
+    plots = True
     if plots:
         x_var = 'range'
         x_unit = 'NM'
@@ -210,20 +175,11 @@ def run_738_analysis(plots=False):
     prob.setup(check=True, mode='fwd')
     set_values(prob, num_nodes)
     prob.run_model()
-    show_outputs(prob, plots=plots)
-    return prob
-
-def run_738_optimization(plots=False):
-    num_nodes = 11
-    prob = configure_problem()
-    prob.setup(check=True, mode='fwd')
-    set_values(prob, num_nodes)
-    prob.run_driver()
+    prob.model.list_outputs()
     if plots:
         show_outputs(prob)
     return prob
 
 
 if __name__ == "__main__":
-    run_738_analysis(plots=False)
-    # run_738_optimization(plots=True)
+    run_738_analysis(plots=True)    

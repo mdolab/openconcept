@@ -16,11 +16,11 @@ This aircraft model is based on the Socata TBM 850 aircraft.
 Imports
 =======
 
-.. literalinclude:: ../../examples/TBM850.py
+.. literalinclude:: ../../openconcept/examples/TBM850.py
     :start-after: # rst Imports (beg)
     :end-before: # rst Imports (end)
 
-Compared to the previous examples, this adds a handful of imports from OpenConcept.
+Compared to the previous openconcept/examples, this adds a handful of imports from OpenConcept.
 We import the propulsion system, aerodynamic model, weight estimate, and a few math utilities.
 We also import a new type of mission analysis we haven't seen in previous tutorials: ``FullMissionAnalysis``.
 This includes a balanced field length takeoff calculation.
@@ -38,7 +38,7 @@ The OEW output is not used in the weight calculation, but it is a useful output 
 
 Let's take a look at the aircraft model as a whole and then we'll dive into each part.
 
-.. literalinclude:: ../../examples/TBM850.py
+.. literalinclude:: ../../openconcept/examples/TBM850.py
     :start-after: # rst Aircraft (beg)
     :end-at: # rst Weight (end)
 
@@ -47,7 +47,7 @@ Options
 
 The options are the same as the previous tutorials.
 
-.. literalinclude:: ../../examples/TBM850.py
+.. literalinclude:: ../../openconcept/examples/TBM850.py
     :start-after: # rst Options
     :end-before: # rst Setup
     :dedent: 4
@@ -63,7 +63,7 @@ Propulsion
 We use OpenConcept's ``TurbopropPropulsionSystem`` to estimate the thrust as a function of throttle.
 It uses a turboshaft, which assumes constant TSFC, connected to a constant speed propeller, which uses a propeller map.
 
-.. literalinclude:: ../../examples/TBM850.py
+.. literalinclude:: ../../openconcept/examples/TBM850.py
     :start-after: # rst Propulsion (beg)
     :end-before: # rst Propulsion (end)
     :dedent: 8
@@ -82,7 +82,7 @@ For the aerodynamics, we use a simple drag polar that computes drag using the eq
 
 where :math:`q` is dynamic pressure, :math:`S` is wing reference area, :math:`C_{D0}` is the zero-lift drag coefficient, :math:`C_L` is the lift coefficient, :math:`e` is the span efficiency, and :math:`AR` is the aspect ratio.
 
-.. literalinclude:: ../../examples/TBM850.py
+.. literalinclude:: ../../openconcept/examples/TBM850.py
     :start-after: # rst Aero (beg)
     :end-before: # rst Aero (end)
     :dedent: 8
@@ -98,7 +98,7 @@ Weights
 
 Finally, we add the weight models.
 
-.. literalinclude:: ../../examples/TBM850.py
+.. literalinclude:: ../../openconcept/examples/TBM850.py
     :start-after: # rst Weight (beg)
     :end-before: # rst Weight (end)
     :dedent: 8
@@ -120,7 +120,7 @@ This provides an easy way to combine variables by adding and subtracting and inc
 Mission
 =======
 
-This mission group has two changes from previous examples.
+This mission group has two changes from previous openconcept/examples.
 The aircraft parameters are added from the data file using a ``DictIndepVarComp`` instead of manually defining them as before with an ``IndepVarComp``.
 This allows the parameters to be defined in one location (that is not the run script).
 The second change is the switch to using a ``FullMissionAnalysis`` mission, which adds a balanced field length calculation to the ``BasicMission`` we used previously.
@@ -128,7 +128,7 @@ The second change is the switch to using a ``FullMissionAnalysis`` mission, whic
 The ``DictIndepVarComp`` takes in a nested Python dictionary, which in this case is imported from the TBM's aircraft data file.
 Values from the dictionary can be added as outputs by calling ``add_output_from_dict`` and passing in a string with the keys for the nested dictionary for the variable you want separated by a pipe.
 
-.. literalinclude:: ../../examples/TBM850.py
+.. literalinclude:: ../../openconcept/examples/TBM850.py
     :start-after: # rst Mission (beg)
     :end-before: # rst Mission (end)
 
@@ -146,7 +146,7 @@ We also set the structural fudge value, a multiplier on the structural weights, 
 Finally, we decrease the throttle values for the takeoff segments from the default of 1 to 0.826.
 
 
-.. literalinclude:: ../../examples/TBM850.py
+.. literalinclude:: ../../openconcept/examples/TBM850.py
     :start-after: # rst Setup problem (beg)
     :end-before: # rst Setup problem (end)
 
@@ -157,7 +157,7 @@ Now we get to actually run the problem.
 After running it, we print some values from the solved problem.
 The plotting section from previous tutorials is used twice to add a plot showing the takeoff portion of the mission.
 
-.. literalinclude:: ../../examples/TBM850.py
+.. literalinclude:: ../../openconcept/examples/TBM850.py
     :start-after: # rst Run (beg)
     :end-before: # rst Run (end)
 
@@ -182,7 +182,7 @@ It also incorporates a better drag model.
 The N2 diagram for the model is the following:
 
 .. embed-n2::
-  ../examples/TBM850.py
+  ../openconcept/examples/TBM850.py
 
 Summary
 =======
@@ -192,4 +192,4 @@ We also incorporated a mission profile that includes a balanced field length tak
 
 The final script looks like this:
 
-.. literalinclude:: ../../examples/TBM850.py
+.. literalinclude:: ../../openconcept/examples/TBM850.py
