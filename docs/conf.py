@@ -354,6 +354,11 @@ run_file_move_result("../openconcept/examples/minimal.py", ["minimal_example_res
 run_file_move_result("../openconcept/examples/minimal_integrator.py", ["minimal_integrator_results.svg"], ["tutorials/assets/minimal_integrator_results.svg"], optional_cl_args=["--hide_visuals"])
 run_file_move_result("../openconcept/examples/TBM850.py", ["turboprop_takeoff_results.svg", "turboprop_mission_results.svg"], ["tutorials/assets/turboprop_takeoff_results.svg", "tutorials/assets/turboprop_mission_results.svg"], optional_cl_args=["--hide_visuals"])
 
+# Remove the N2 diagrams it also created
+files_remove = ["minimal_example_n2.html", "minimal_integrator_n2.html", "turboprop_n2.html"]
+for file in files_remove:
+    os.remove(file)
+
 # -- Options for intersphinx extension ---------------------------------------
 
 # Example configuration for intersphinx: refer to the Python standard library.
