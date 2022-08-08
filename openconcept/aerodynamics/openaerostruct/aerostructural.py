@@ -23,7 +23,7 @@ try:
     from openaerostruct.structures.wingbox_group import WingboxGroup
     from openconcept.aerodynamics.openaerostruct.drag_polar import PlanformMesh
 except ImportError:
-    raise ImportError("OpenAeroStruct must be installed to use the OASAerostructDragPolar component")
+    raise ImportError("OpenAeroStruct must be installed to use the AerostructDragPolar component")
 
 # Atmospheric calculations
 from openconcept.atmospherics import TemperatureComp, PressureComp, DensityComp, SpeedOfSoundComp
@@ -43,7 +43,7 @@ CITATION = """
 """
 
 
-class OASAerostructDragPolar(om.Group):
+class AerostructDragPolar(om.Group):
     """
     Drag polar and wing weight estimate generated using OpenAeroStruct's
     aerostructural analysis capabilities and a surrogate
@@ -413,7 +413,7 @@ class OASDataGen(om.ExplicitComponent):
                     error = error or OASDataGen.surf_options[key] != self.options["surf_options"][key]
             if error:
                 raise ValueError(
-                    "The OASDataGen and OASAerostructDragPolar components do not support\n"
+                    "The OASDataGen and AerostructDragPolar components do not support\n"
                     "differently-valued surf_options within an OpenMDAO model. Trying to replace:\n"
                     f"{OASDataGen.surf_options}\n"
                     f"with new options:\n{self.options['surf_options']}"
@@ -1302,16 +1302,16 @@ class Aerostruct(om.Group):
         self.connect("aerostruct_point.fuelburn", "aerostruct_point.total_perf.L_equals_W.fuelburn")
 
 
-class OASAerostructDragPolarExact(om.Group):
+class AerostructDragPolarExact(om.Group):
     """
     .. warning:: This component is far more computationally expensive than the
-                 OASAerostructDragPolar component, which uses a surrogate. For missions
+                 AerostructDragPolar component, which uses a surrogate. For missions
                  with many flight segments, many num_nodes, or wing models with high
                  num_x and num_y values this component will result in a system that
                  returns a memory error when solved with a DirectSolver linear solver
                  because the Jacobian is too large to be factorized. Unless you know
                  what you're doing, this component should not be used (use
-                 OASAerostructDragPolar instead).
+                 AerostructDragPolar instead).
 
     Drag polar and wing weight estimate generated using OpenAeroStruct's
     aerostructural analysis capabilities directly, without a surrogate in the loop.
@@ -1515,7 +1515,7 @@ def example_usage():
     p = om.Problem()
     p.model.add_subsystem(
         "aerostruct",
-        OASAerostructDragPolar(
+        AerostructDragPolar(
             num_nodes=nn,
             num_x=num_x,
             num_y=num_y,

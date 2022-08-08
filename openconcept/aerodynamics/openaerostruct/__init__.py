@@ -1,2 +1,2 @@
-from .drag_polar import OASDragPolar, VLMDataGen, VLM, PlanformMesh
-from .aerostructural import OASAerostructDragPolar, OASDataGen, Aerostruct, OASAerostructDragPolarExact
+from .drag_polar import VLMDragPolar, VLMDataGen, VLM, PlanformMesh
+from .aerostructural import AerostructDragPolar, OASDataGen, Aerostruct, AerostructDragPolarExact

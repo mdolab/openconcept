@@ -21,7 +21,7 @@ import openmdao.api as om
 import openconcept.api as oc
 # imports for the airplane model itself
 from openconcept.mission import MissionWithReserve, IntegratorGroup
-from openconcept.aerodynamics import OASDragPolar
+from openconcept.aerodynamics import VLMDragPolar
 from openconcept.examples.aircraft_data.B738 import data as acdata
 from openconcept.propulsion import CFM56
 
@@ -65,7 +65,7 @@ class B738AirplaneModel(IntegratorGroup):
         # use a different drag coefficient for takeoff versus cruise
         oas_surf_dict = {}  # options for OpenAeroStruct
         oas_surf_dict['t_over_c'] = acdata['ac']['geom']['wing']['toverc']['value']
-        self.add_subsystem('drag', OASDragPolar(num_nodes=nn, num_x=3, num_y=7,
+        self.add_subsystem('drag', VLMDragPolar(num_nodes=nn, num_x=3, num_y=7,
                                                 num_twist=3, surf_options=oas_surf_dict),
                            promotes_inputs=['fltcond|CL', 'fltcond|M', 'fltcond|h', 'fltcond|q', 'ac|geom|wing|S_ref',
                                             'ac|geom|wing|AR', 'ac|geom|wing|taper', 'ac|geom|wing|c4sweep',

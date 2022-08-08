@@ -21,8 +21,8 @@ import openmdao.api as om
 import openconcept.api as oc
 # imports for the airplane model itself
 from openconcept.mission import IntegratorGroup, BasicMission
-from openconcept.aerodynamics import OASAerostructDragPolar
-from openconcept.aerodynamics.openaerostruct import Aerostruct, OASAerostructDragPolarExact
+from openconcept.aerodynamics import AerostructDragPolar
+from openconcept.aerodynamics.openaerostruct import Aerostruct, AerostructDragPolarExact
 from openconcept.examples.aircraft_data.B738 import data as acdata
 from openconcept.propulsion import CFM56
 from openconcept.aerodynamics import Lift
@@ -77,7 +77,7 @@ class B738AirplaneModel(IntegratorGroup):
         # Grid size and number of spline control points (must be same as B738AnalysisGroup)
         global NUM_X, NUM_Y, NUM_TWIST, NUM_TOVERC, NUM_SKIN, NUM_SPAR, USE_SURROGATE
         if USE_SURROGATE:
-            self.add_subsystem('drag', OASAerostructDragPolar(num_nodes=nn, num_x=NUM_X, num_y=NUM_Y,
+            self.add_subsystem('drag', AerostructDragPolar(num_nodes=nn, num_x=NUM_X, num_y=NUM_Y,
                                                     num_twist=NUM_TWIST, num_toverc=NUM_TOVERC,
                                                     num_skin=NUM_SKIN, num_spar=NUM_SPAR,
                                                     surf_options=oas_surf_dict),
@@ -88,7 +88,7 @@ class B738AirplaneModel(IntegratorGroup):
                                                 'ac|aero|CD_nonwing'],
                             promotes_outputs=['drag', 'ac|weights|W_wing', ('failure', 'ac|struct|failure')])
         else:
-            self.add_subsystem('drag', OASAerostructDragPolarExact(num_nodes=nn, num_x=NUM_X, num_y=NUM_Y,
+            self.add_subsystem('drag', AerostructDragPolarExact(num_nodes=nn, num_x=NUM_X, num_y=NUM_Y,
                                                     num_twist=NUM_TWIST, num_toverc=NUM_TOVERC,
                                                     num_skin=NUM_SKIN, num_spar=NUM_SPAR,
                                                     surf_options=oas_surf_dict),

@@ -15,7 +15,7 @@ except:
 
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
-class OASAerostructDragPolarTestCase(unittest.TestCase):
+class AerostructDragPolarTestCase(unittest.TestCase):
     def tearDown(self):
         # Get rid of any specified surface options in the OASDataGen
         # class after every test. This is necessary because the class
@@ -69,7 +69,7 @@ class OASAerostructDragPolarTestCase(unittest.TestCase):
         mesh.run_model()
 
         p = om.Problem(
-            OASAerostructDragPolar(
+            AerostructDragPolar(
                 num_nodes=1,
                 num_x=3,
                 num_y=7,
@@ -138,7 +138,7 @@ class OASAerostructDragPolarTestCase(unittest.TestCase):
         t_skin = np.array([5, 13, 15])  # mm
         t_spar = np.array([5, 13, 15])  # mm
         p = om.Problem(
-            OASAerostructDragPolar(
+            AerostructDragPolar(
                 num_nodes=nn,
                 num_x=3,
                 num_y=7,
@@ -181,7 +181,7 @@ class OASAerostructDragPolarTestCase(unittest.TestCase):
         t_skin = np.array([5, 13, 15])  # mm
         t_spar = np.array([5, 13, 15])  # mm
         p = om.Problem(
-            OASAerostructDragPolar(
+            AerostructDragPolar(
                 num_nodes=nn,
                 num_x=3,
                 num_y=7,
@@ -360,14 +360,14 @@ class AerostructTestCase(unittest.TestCase):
 
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
-class OASAerostructDragPolarExactTestCase(unittest.TestCase):
+class AerostructDragPolarExactTestCase(unittest.TestCase):
     def test_defaults(self):
         S = 427.8
         CD0 = 0.01
         q = 0.5 * 0.55427276 * 264.20682682 ** 2
         nn = 3
         p = om.Problem(
-            OASAerostructDragPolarExact(
+            AerostructDragPolarExact(
                 num_nodes=nn, num_x=3, num_y=5, num_twist=2, num_toverc=2, num_skin=2, num_spar=2
             )
         )

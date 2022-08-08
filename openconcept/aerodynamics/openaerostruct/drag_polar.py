@@ -19,7 +19,7 @@ try:
     from openaerostruct.geometry.geometry_mesh_transformations import Rotate
     from openaerostruct.aerodynamics.aero_groups import AeroPoint
 except ImportError:
-    raise ImportError("OpenAeroStruct must be installed to use the OASDragPolar component")
+    raise ImportError("OpenAeroStruct must be installed to use the VLMDragPolar component")
 
 # Atmospheric calculations
 from openconcept.atmospherics import TemperatureComp, PressureComp, DensityComp, SpeedOfSoundComp
@@ -36,7 +36,7 @@ CITATION = """
 """
 
 
-class OASDragPolar(om.Group):
+class VLMDragPolar(om.Group):
     """
     Drag polar generated using OpenAeroStruct's vortex lattice method and a surrogate
     model to decrease the computational cost.
@@ -318,7 +318,7 @@ class VLMDataGen(om.ExplicitComponent):
                     error = error or VLMDataGen.surf_options[key] != self.options["surf_options"][key]
             if error:
                 raise ValueError(
-                    "The VLMDataGen and OASDragPolar components do not support\n"
+                    "The VLMDataGen and VLMDragPolar components do not support\n"
                     "differently-valued surf_options within an OpenMDAO model. Trying to replace:\n"
                     f"{VLMDataGen.surf_options}\n"
                     f"with new options:\n{self.options['surf_options']}"
@@ -945,7 +945,7 @@ def example_usage():
     p = om.Problem()
     p.model.add_subsystem(
         "drag_polar",
-        OASDragPolar(
+        VLMDragPolar(
             num_nodes=nn,
             num_x=num_x,
             num_y=num_y,

@@ -15,7 +15,7 @@ except:
 
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
-class OASDragPolarTestCase(unittest.TestCase):
+class VLMDragPolarTestCase(unittest.TestCase):
     def tearDown(self):
         # Get rid of any specified surface options in the VLMDataGen
         # class after every test. This is necessary because the class
@@ -42,7 +42,7 @@ class OASDragPolarTestCase(unittest.TestCase):
         mesh.run_model()
 
         p = om.Problem(
-            OASDragPolar(
+            VLMDragPolar(
                 num_nodes=1,
                 num_x=3,
                 num_y=5,
@@ -98,7 +98,7 @@ class OASDragPolarTestCase(unittest.TestCase):
         nn = 1
         twist = np.array([-1, 0, 1])
         p = om.Problem(
-            OASDragPolar(
+            VLMDragPolar(
                 num_nodes=nn,
                 num_x=3,
                 num_y=5,
@@ -132,7 +132,7 @@ class OASDragPolarTestCase(unittest.TestCase):
         nn = 7
         twist = np.array([-1, 0, 1])
         p = om.Problem(
-            OASDragPolar(
+            VLMDragPolar(
                 num_nodes=nn,
                 num_x=3,
                 num_y=5,
