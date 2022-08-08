@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
-from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
+from openconcept.atmospherics import ComputeAtmosphericProperties
 
 class AtmosTestGroup(Group):
     """This computes pressure, temperature, and density for a given altitude at ISA condtions. Also true airspeed from equivalent ~ indicated airspeed

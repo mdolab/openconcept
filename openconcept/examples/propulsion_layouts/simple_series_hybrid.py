@@ -6,7 +6,7 @@ from openconcept.components.generator import SimpleGenerator
 from openconcept.components.turboshaft import SimpleTurboshaft
 from openconcept.components.battery import SimpleBattery, SOCBattery
 from openconcept.components.propeller import SimplePropeller
-from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
+from openconcept.atmospherics import ComputeAtmosphericProperties
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
 

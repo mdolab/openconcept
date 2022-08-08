@@ -375,11 +375,13 @@ if generate_srcdocs:
     # subprocess.call(['sphinx-apidoc','-o','_srcdocs_native','../openconcept'])
     # os.rename('_srcdocs_native/modules.rst','_srcdocs_native/index.rst')
     # openmdao way
-    packages = ['analysis',
-                'analysis.openaerostruct',
-                'analysis.atmospherics',
-                'analysis.performance',
-                'components',
-                'utilities',
-                'utilities.math']
+    packages = [
+        'aerodynamics',
+        'aerodynamics.openaerostruct',
+        'atmospherics',
+        'analysis.performance',
+        'components',
+        'utilities',
+        'utilities.math'
+    ]
     generate_src_docs(".", "../openconcept", packages)

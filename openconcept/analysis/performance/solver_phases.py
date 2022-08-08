@@ -1,7 +1,7 @@
 from __future__ import division
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, BalanceComp, ImplicitComponent
 import openconcept.api as oc
-from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
+from openconcept.atmospherics import ComputeAtmosphericProperties
 from openconcept.aerodynamics import Lift, StallSpeed
 from openconcept.utilities.math import ElementMultiplyDivideComp, AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator

@@ -26,10 +26,7 @@ except ImportError:
     raise ImportError("OpenAeroStruct must be installed to use the OASAerostructDragPolar component")
 
 # Atmospheric calculations
-from openconcept.analysis.atmospherics.temperature_comp import TemperatureComp
-from openconcept.analysis.atmospherics.pressure_comp import PressureComp
-from openconcept.analysis.atmospherics.density_comp import DensityComp
-from openconcept.analysis.atmospherics.speedofsound_comp import SpeedOfSoundComp
+from openconcept.atmospherics import TemperatureComp, PressureComp, DensityComp, SpeedOfSoundComp
 
 # Utitilty for vector manipulation
 from openconcept.utilities.math.combine_split_comp import VectorConcatenateComp
@@ -523,73 +520,72 @@ class OASDataGen(om.ExplicitComponent):
             partials[key][:] = value
         partials["CD_train", "ac|aero|CD_nonwing"] = np.ones(OASDataGen.CD.shape)
 
+"""
+Generates training data and its total derivatives by
+calling OpenAeroStruct at each training point.
 
+Parameters
+----------
+inputs : dict
+    A dictionary containing the following entries:
+    Mach_number_grid : mdarray
+        Mach number (3D meshgrid 'ij'-style ndarray, dimensionless)
+    alpha_grid : ndarray
+        Angle of attack (3D meshgrid 'ij'-style ndarray, degrees)
+    alt_grid : ndarray
+        Altitude (3D meshgrid 'ij'-style ndarray, m)
+    TempIncrement : float
+        Temperature increment for non-standard day (scalar, degC)
+    S_ref : float
+        Wing planform area (scalar, m^2)
+    AR : float
+        Wing aspect ratio (scalar, dimensionless)
+    taper : float
+        Wing taper ratio (scalar, dimensionless)
+    c4sweep : float
+        Wing sweep measured at quarter chord (scalar, degrees)
+    twist : float
+        List of twist angles at control points of spline (vector, degrees)
+        NOTE: length of vector is num_twist (set in options of OASDataGen)
+    toverc : float
+        List of thickness to chord ratios at control points of spline (vector, dimensionless)
+        NOTE: length of vector is num_toverc (set in options of OASDataGen)
+    skin : float
+        List of skin thicknesses at control points of spline (vector, m)
+        NOTE: length of vector is num_skin (set in options of OASDataGen)
+    spar : float
+        List of spar thicknesses at control points of spline (vector, m)
+        NOTE: length of vector is num_spar (set in options of OASDataGen)
+    num_x: int
+        number of points in x (streamwise) direction (scalar, dimensionless)
+    num_y: int
+        number of points in y (spanwise) direction for one wing because
+        uses symmetry (scalar, dimensionless)
+surf_dict : dict
+    Dictionary of OpenAeroStruct surface options; any options provided here
+    will override the default ones; see the OpenAeroStruct documentation for more information.
+    Because the geometry transformations are excluded in this model (to simplify the interface),
+    the <transformation>_cp options are not supported. The input ac|geom|wing|twist is the same
+    as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
+    is limited to adjusting the input parameters to this component.
+
+Returns
+-------
+data : dict
+    A dictionary containing the following entries:
+    CL : ndarray
+        Lift coefficients at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
+    CD : ndarray
+        Drag coefficients at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
+    failure : ndarray
+        KS structural failure constraint at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
+    W_wing : float
+        Wing structural weight; same regardless of flight condition (scalar, kg)
+    partials : dict
+        Partial derivatives of the training data flattened in the proper OpenMDAO-style
+        format for use as partial derivatives in the OASDataGen component
+"""
 def compute_training_data(inputs, surf_dict=None):
-    """
-    Generates training data and its total derivatives by
-    calling OpenAeroStruct at each training point.
-
-    Inputs
-    ------
-    inputs : dict
-        A dictionary containing the following entries:
-        Mach_number_grid : mdarray
-            Mach number (3D meshgrid 'ij'-style ndarray, dimensionless)
-        alpha_grid : ndarray
-            Angle of attack (3D meshgrid 'ij'-style ndarray, degrees)
-        alt_grid : ndarray
-            Altitude (3D meshgrid 'ij'-style ndarray, m)
-        TempIncrement : float
-            Temperature increment for non-standard day (scalar, degC)
-        S_ref : float
-            Wing planform area (scalar, m^2)
-        AR : float
-            Wing aspect ratio (scalar, dimensionless)
-        taper : float
-            Wing taper ratio (scalar, dimensionless)
-        c4sweep : float
-            Wing sweep measured at quarter chord (scalar, degrees)
-        twist : float
-            List of twist angles at control points of spline (vector, degrees)
-            NOTE: length of vector is num_twist (set in options of OASDataGen)
-        toverc : float
-            List of thickness to chord ratios at control points of spline (vector, dimensionless)
-            NOTE: length of vector is num_toverc (set in options of OASDataGen)
-        skin : float
-            List of skin thicknesses at control points of spline (vector, m)
-            NOTE: length of vector is num_skin (set in options of OASDataGen)
-        spar : float
-            List of spar thicknesses at control points of spline (vector, m)
-            NOTE: length of vector is num_spar (set in options of OASDataGen)
-        num_x: int
-            number of points in x (streamwise) direction (scalar, dimensionless)
-        num_y: int
-            number of points in y (spanwise) direction for one wing because
-            uses symmetry (scalar, dimensionless)
-    surf_dict : dict
-        Dictionary of OpenAeroStruct surface options; any options provided here
-        will override the default ones; see the OpenAeroStruct documentation for more information.
-        Because the geometry transformations are excluded in this model (to simplify the interface),
-        the <transformation>_cp options are not supported. The input ac|geom|wing|twist is the same
-        as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
-        is limited to adjusting the input parameters to this component.
-
-    Outputs
-    -------
-    data : dict
-        A dictionary containing the following entries:
-        CL : ndarray
-            Lift coefficients at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
-        CD : ndarray
-            Drag coefficients at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
-        failure : ndarray
-            KS structural failure constraint at training points (3D meshgrid 'ij'-style ndarray, dimensionless)
-        W_wing : float
-            Wing structural weight; same regardless of flight condition (scalar, kg)
-        partials : dict
-            Partial derivatives of the training data flattened in the proper OpenMDAO-style
-            format for use as partial derivatives in the OASDataGen component
-    """
     t_start = time()
     print(f"Generating OpenAeroStruct aerostructural training data...")
 

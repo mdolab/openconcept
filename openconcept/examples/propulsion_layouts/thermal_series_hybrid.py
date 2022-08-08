@@ -7,7 +7,7 @@ from openconcept.components.turboshaft import SimpleTurboshaft
 # I had to move specific energy into a design variable to get this outer loop to work correctly
 from openconcept.components.battery import SimpleBattery, SOCBattery
 from openconcept.components.propeller import SimplePropeller
-from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
+from openconcept.atmospherics import ComputeAtmosphericProperties
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
 from openconcept.components.thermal import LiquidCooledComp, CoolantReservoir, ConstantSurfaceTemperatureColdPlate_NTU

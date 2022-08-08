@@ -12,7 +12,7 @@ from openconcept.utilities.selector import SelectorComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.math.derivatives import FirstDerivative
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp, VectorConcatenateComp, VectorSplitComp
-from openconcept.analysis.atmospherics.compute_atmos_props import ComputeAtmosphericProperties
+from openconcept.atmospherics import ComputeAtmosphericProperties
 from openconcept.utilities.linearinterp import LinearInterpolator
 
 class PerfectHeatTransferComp(ExplicitComponent):

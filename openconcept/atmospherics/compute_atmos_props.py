@@ -1,13 +1,6 @@
 from __future__ import division
-from openconcept.analysis.atmospherics.temperature_comp import TemperatureComp
-from openconcept.analysis.atmospherics.pressure_comp import PressureComp
-from openconcept.analysis.atmospherics.density_comp import DensityComp
-from openconcept.analysis.atmospherics.dynamic_pressure_comp import DynamicPressureComp
-from openconcept.analysis.atmospherics.true_airspeed import TrueAirspeedComp, EquivalentAirspeedComp
-from openconcept.analysis.atmospherics.speedofsound_comp import SpeedOfSoundComp
-from openconcept.analysis.atmospherics.mach_number_comp import MachNumberComp
-import numpy as np
-from openmdao.api import ExplicitComponent, Group, Problem, IndepVarComp
+from openconcept.atmospherics import TemperatureComp, PressureComp, DensityComp, DynamicPressureComp, TrueAirspeedComp, EquivalentAirspeedComp, SpeedOfSoundComp, MachNumberComp
+from openmdao.api import Group
 
 
 class ComputeAtmosphericProperties(Group):
