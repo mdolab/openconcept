@@ -1,6 +1,5 @@
 from __future__ import division
-from openconcept.components.motor import SimpleMotor
-from openconcept.components.propeller import SimplePropeller
+from openconcept.propulsion import SimpleMotor, SimplePropeller
 from openconcept.components.battery import SOCBattery
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math import AddSubtractComp

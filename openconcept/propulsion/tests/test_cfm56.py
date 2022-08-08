@@ -5,10 +5,10 @@ import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import Problem
 import openconcept
-from openconcept.components.cfm56 import CFM56
+from openconcept.propulsion import CFM56
 
 # Skip these test cases if the cached surrogate files don't exist
-file_root = openconcept.__path__[0] + r'/components/empirical_data/cfm56/'
+file_root = openconcept.__path__[0] + r'/propulsion/empirical_data/cfm56/'
 cached_thrust = os.path.exists(file_root + 'cfm56thrust_trained.zip')
 cached_fuelburn = os.path.exists(file_root + 'cfm56fuelburn_trained.zip')
 cached_T4 = os.path.exists(file_root + 'cfm56T4_trained.zip')

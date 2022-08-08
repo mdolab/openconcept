@@ -381,6 +381,7 @@ if generate_srcdocs:
         'atmospherics',
         'components',
         'mission',
+        'propulsion',
         'utilities',
         'utilities.math'
     ]

@@ -24,7 +24,7 @@ from openconcept.mission import IntegratorGroup, BasicMission
 from openconcept.aerodynamics import OASAerostructDragPolar
 from openconcept.aerodynamics.openaerostruct import Aerostruct, OASAerostructDragPolarExact
 from openconcept.examples.aircraft_data.B738 import data as acdata
-from openconcept.components.cfm56 import CFM56
+from openconcept.propulsion import CFM56
 from openconcept.aerodynamics import Lift
 from openconcept.atmospherics import DynamicPressureComp
 

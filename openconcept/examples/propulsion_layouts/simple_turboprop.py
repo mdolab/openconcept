@@ -1,6 +1,5 @@
 from __future__ import division
-from openconcept.components.turboshaft import SimpleTurboshaft
-from openconcept.components.propeller import SimplePropeller
+from openconcept.propulsion import SimpleTurboshaft, SimplePropeller
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
 from openmdao.api import Group

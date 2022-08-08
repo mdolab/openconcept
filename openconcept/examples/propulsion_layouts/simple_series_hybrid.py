@@ -1,11 +1,7 @@
 
 from __future__ import division
-from openconcept.components.motor import SimpleMotor
-from openconcept.components.splitter import PowerSplit
-from openconcept.components.generator import SimpleGenerator
-from openconcept.components.turboshaft import SimpleTurboshaft
+from openconcept.propulsion import SimpleMotor, PowerSplit, SimpleGenerator, SimpleTurboshaft, SimplePropeller
 from openconcept.components.battery import SimpleBattery, SOCBattery
-from openconcept.components.propeller import SimplePropeller
 from openconcept.atmospherics import ComputeAtmosphericProperties
 from openconcept.utilities.dvlabel import DVLabel
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp

@@ -5,11 +5,11 @@ import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import Problem
 import openconcept
-from openconcept.components.N3 import N3, N3Hybrid
+from openconcept.propulsion import N3, N3Hybrid
 
 # Skip these test cases if the cached surrogate files don't exist
 # N+3 hybrid
-hybrid_file_root = openconcept.__path__[0] + r'/components/empirical_data/n+3_hybrid/'
+hybrid_file_root = openconcept.__path__[0] + r'/propulsion/empirical_data/n+3_hybrid/'
 hybrid_cached_thrust = os.path.exists(hybrid_file_root + r'/n3_hybrid_thrust_trained.zip')
 hybrid_cached_fuelburn = os.path.exists(hybrid_file_root + r'n3_hybrid_fuelflow_trained.zip')
 hybrid_cached_surge = os.path.exists(hybrid_file_root + 'n3_hybrid_smw_trained.zip')
@@ -18,7 +18,7 @@ if hybrid_cached_thrust and hybrid_cached_fuelburn and hybrid_cached_surge:
     hybrid_skip_tests = False
 
 # N+3
-file_root = openconcept.__path__[0] + r'/components/empirical_data/n+3/'
+file_root = openconcept.__path__[0] + r'/propulsion/empirical_data/n+3/'
 cached_thrust = os.path.exists(file_root + r'/n3_thrust_trained.zip')
 cached_fuelburn = os.path.exists(file_root + r'n3_fuelflow_trained.zip')
 cached_T4 = os.path.exists(file_root + r'n3_smw_trained.zip')

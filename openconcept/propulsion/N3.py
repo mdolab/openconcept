@@ -39,7 +39,7 @@ def N3Hybrid(num_nodes=1, plot=False):
     num_nodes : int
         Number of analysis points to run (sets vec length; default 1)
     """
-    file_root = openconcept.__path__[0] + r'/components/empirical_data/n+3_hybrid/'
+    file_root = openconcept.__path__[0] + r'/propulsion/empirical_data/n+3_hybrid/'
     thrustdata = np.load(file_root + r'/power_off/thrust.npy')
     fuelburndata_0 = np.load(file_root + r'/power_off/wf.npy')
     smwdata_0 = np.load(file_root + r'/power_off/SMW.npy')
@@ -269,7 +269,7 @@ def N3(num_nodes=1, plot=False):
     num_nodes : int
         Number of analysis points to run (sets vec length; default 1)
     """
-    file_root = openconcept.__path__[0] + r'/components/empirical_data/n+3/'
+    file_root = openconcept.__path__[0] + r'/propulsion/empirical_data/n+3/'
     thrustdata = np.load(file_root + r'/power_off/thrust.npy')
     fuelburndata_0 = np.load(file_root + r'/power_off/wf.npy')
     smwdata_0 = np.load(file_root + r'/power_off/SMW.npy')
@@ -387,7 +387,7 @@ def N3(num_nodes=1, plot=False):
 def compare_thrust_decks():
     import matplotlib.pyplot as plt
     prob = om.Problem()
-    from openconcept.components.N3 import N3, N3Hybrid
+    from openconcept.propulsion import N3, N3Hybrid
 
     prob.model.add_subsystem('n3', N3(num_nodes=1))
     prob.model.add_subsystem('n3hybrid', N3Hybrid(num_nodes=1))

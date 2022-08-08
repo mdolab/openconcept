@@ -8,14 +8,13 @@ from openconcept.aerodynamics import PolarDrag
 from openconcept.examples.aircraft_data.HybridSingleAisle import data as acdata
 from openconcept.examples.aircraft_data.HybridSingleAisle import MotorFaultProtection
 from openconcept.mission import MissionWithReserve, BasicMission, IntegratorGroup
-from openconcept.components.N3 import N3Hybrid
-from openconcept.components.motor import SimpleMotor
+from openconcept.propulsion import N3Hybrid, SimpleMotor
 from openconcept.components.battery import SOCBattery
 from openconcept.utilities.linearinterp import LinearInterpolator
 from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
 from openconcept.components.thermal import LiquidCooledComp
 from openconcept.components.chiller import HeatPumpWithIntegratedCoolantLoop
-from openconcept.components.splitter import FlowSplit, FlowCombine
+from openconcept.components.manifold import FlowSplit, FlowCombine
 from openconcept.components.heat_sinks import LiquidCooledMotor, LiquidCooledBattery, SimpleHose, SimplePump
 from openconcept.components.ducts import ImplicitCompressibleDuct_ExternalHX
 from openconcept.components.heat_exchanger import HXGroup

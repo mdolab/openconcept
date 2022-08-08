@@ -7,7 +7,7 @@ import openconcept.api as oc
 from openconcept.aerodynamics import PolarDrag
 from openconcept.examples.aircraft_data.B738 import data as acdata
 from openconcept.mission import MissionWithReserve, IntegratorGroup
-from openconcept.components.cfm56 import CFM56
+from openconcept.propulsion import CFM56
 
 class B738AirplaneModel(oc.IntegratorGroup):
     """

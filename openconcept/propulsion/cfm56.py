@@ -36,7 +36,7 @@ def CFM56(num_nodes=1, plot=False):
     num_nodes : int
         Number of analysis points to run (sets vec length; default 1)
     """
-    file_root = openconcept.__path__[0] + r'/components/empirical_data/cfm56/'
+    file_root = openconcept.__path__[0] + r'/propulsion/empirical_data/cfm56/'
     thrustdata = np.load(file_root + 'cfm56thrust.npy')
     fuelburndata = np.load(file_root + 'cfm56wf.npy')
     t4data = np.load(file_root + r'cfm56t4.npy')

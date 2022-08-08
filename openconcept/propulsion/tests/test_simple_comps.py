@@ -3,7 +3,8 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
-from openconcept.components import SimpleBattery, SimpleGenerator, SimpleMotor, SimplePropeller, SimpleTurboshaft, PowerSplit
+from openconcept.propulsion import SimpleGenerator, SimpleMotor, SimplePropeller, SimpleTurboshaft, PowerSplit
+from openconcept.components.battery import SimpleBattery
 
 class BatteryTestGroup(Group):
     """
