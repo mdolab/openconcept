@@ -1,7 +1,6 @@
 from __future__ import division
 import numpy as np
 from openmdao.api import ExplicitComponent
-from openmdao.api import Group
 
 
 class SimpleGenerator(ExplicitComponent):

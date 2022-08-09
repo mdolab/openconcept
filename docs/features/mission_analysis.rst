@@ -11,8 +11,8 @@ In OpenConcept, a **mission** consists of multiple **phases**:
 *phases* are the building blocks of the mission.
 For example, a basic three-phase mission is composed of a climb phase, cruise phase, and descent phase.
 
-Available missions
-==================
+Mission profiles
+================
 
 OpenConcept implements several mission profiles that users can use for an analysis.
 The missions are implemented in ``openconcept/mission/profiles.py``.
@@ -71,7 +71,7 @@ The phases and relevant classes are implemented in ``openconcept/mission/phases.
 Users usually don't need to modify these code when creating their own mission profile.
 
 Steady flight: ``SteadyFlightPhase``
------------------------------------
+------------------------------------
 Class ``SteadyFlightPhase`` can be instantiated for steady climb, cruise, descent, and loiter phases.
 For this phase, you need to specify the airspeed (``<phase_name>.fltcond|Ueas``) and vertical speed (``<phase_name>.fltcond|Ueas``) in your run script.
 You may optionally set the duration of the phase (``<phase_name>.duration``), or alternatively, the duration can be set automatically in the mission profile group.
