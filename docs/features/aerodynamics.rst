@@ -122,7 +122,7 @@ Like the ``num_twist`` option, You may need to set the options ``num_toverc, num
 In addition to the drag, the aerostructural model also outputs the structural failure indicator (``failure``) and wing weight (``ac|weights|W_wing``).
 The `failure` variable must be negative, i.e., ``failure <= 0`` to constrain wingboxes stresses to be less than yield stress.
 
-Understanding the surrogade modeling
+Understanding the surrogate modeling
 ------------------------------------
 
 OpenConcept uses surrogate models based on the OpenAeroStruct to reduce the computational cost for mission analysis.
@@ -130,3 +130,11 @@ The surrogate models are trained in the 3D input space of Mach number, angle of 
 The outputs of the surrogate models are CL, CD, and failure (only for ``AeroStructDragPolar``).
 
 For more details about the surrogate models, see our `paper <https://www.researchgate.net/publication/357559489_Aerostructural_wing_design_optimization_considering_full_mission_analysis>`_.
+
+Other models
+============
+
+The aerodynamics module also includes a couple components that may be useful to be aware of:
+
+  - ``StallSpeed``, which uses :math:`C_{L, \text{max}}`, aircraft weight, and wing area to compute the stall speed
+  - ``Lift``, which computes lift force using lift coefficient, wing area, and dynamic pressure

@@ -131,9 +131,9 @@ class StallSpeed(ExplicitComponent):
     Inputs
     ------
     CLmax : float
-        Maximum lfit coefficient (scalar, dimensionless)
+        Maximum lift coefficient (scalar, dimensionless)
     weight : float
-        Dynamic pressure (scalar, kg)
+        Aircraft weight (scalar, kg)
     ac|geom|wing|S_ref : float
         Reference wing area (scalar, m**2)
 

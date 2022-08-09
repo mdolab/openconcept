@@ -8,6 +8,7 @@ Most of OpenConcept's atmospheric models use the 1976 Standard Atmosphere.
 For more details, see the source documentation for the ``ComputeAtmosphericProperties`` component.
 
 Models for specific atmospheric properties are also available on their own:
+
     - ``TrueAirspeedComp``
     - ``EquivalentAirpseedComp``
     - ``TemperatureComp``
