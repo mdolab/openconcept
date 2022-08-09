@@ -9,14 +9,16 @@ from openconcept.aerodynamics import PolarDrag
 from openconcept.examples.aircraft_data.HybridSingleAisle import data as acdata
 from openconcept.examples.aircraft_data.HybridSingleAisle import MotorFaultProtection
 from openconcept.mission import BasicMission, IntegratorGroup
-from openconcept.propulsion import N3Hybrid, SimpleMotor, LiquidCooledMotor
-from openconcept.energy_storage import SOCBattery, LiquidCooledBattery
+from openconcept.propulsion import N3Hybrid, SimpleMotor
+from openconcept.energy_storage import SOCBattery
 from openconcept.thermal import (
     HeatPumpWithIntegratedCoolantLoop,
     SimpleHose,
     SimplePump,
     ImplicitCompressibleDuct_ExternalHX,
     HXGroup,
+    LiquidCooledBattery,
+    LiquidCooledMotor,
 )
 
 class HybridSingleAisleModel(IntegratorGroup):

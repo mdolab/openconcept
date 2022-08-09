@@ -1,1 +1,1 @@
-from .battery import SimpleBattery, SOCBattery, LiquidCooledBattery
+from .battery import SimpleBattery, SOCBattery
