@@ -131,7 +131,7 @@ Eytan J. Adler and Joaquim R.R.A. Martins, "Aerostructural wing design optimizat
    features/atmospherics.rst
    features/costs.rst
    features/energy_storage.rst
-   features/mission_analysis.rst
+   features/mission.rst
    features/propulsion.rst
    features/thermal.rst
    features/weights.rst
@@ -142,7 +142,6 @@ Eytan J. Adler and Joaquim R.R.A. Martins, "Aerostructural wing design optimizat
    :caption: Other Useful Docs
    :hidden:
 
-   features_old/index.rst
    _srcdocs/index.rst
    developer/roadmap.rst
    publications.rst

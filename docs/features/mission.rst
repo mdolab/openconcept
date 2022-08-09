@@ -1,8 +1,8 @@
 .. _MissionAnalysis:
 
-****************
-Mission Analysis
-****************
+*******
+Mission
+*******
 
 The mission analysis computes the fuel and/or battery energy consumption for a specified flight mission.
 You can also keep track of the temperature of components if you have thermal models.
@@ -62,7 +62,6 @@ Additional variables you need to set in the run script are
 - vertical speed and air speed for additional phases: ``<reserve_climb, reserve_cruise, reserve_descent, loiter>.<fltcond|Ueas, fltcond|vs>``
 - reserve range ``reserve_range`` and altitude ``reserve|h0``.
 - loiter duration ``loiter_duration`` and loiter altitude ``loiter|h0``.
-  
 
 Phase types
 ===========
@@ -92,3 +91,23 @@ The acceleration is then integrated to compute the velocity.
 VTOL transition
 ---------------
 This is only relevant to VTOL configurations. Maybe move to a different page (like eVTOL mission and phases) to avoid confusion?
+
+Mission groups
+==============
+OpenConcept provides some groups that make mission analysis and phase definition easier.
+
+``PhaseGroup``
+--------------
+This is the base class for an OpenConcept mission phase.
+It automatically identifies ``Integrator`` instances within the model and links the time duration variable to them.
+It also collects the names of all the integrand states so that the ``TrajectoryGroup`` can find them to link across phases.
+
+``IntegratorGroup``
+-------------------
+The ``IntegratorGroup`` is an alternative way of setting up and integrator (the ``Integrator`` component is used more frequently).
+This group adds an ODE integration component (called ``"ode_integ"``), locates output variables tagged with the "integrate" tag, and automatically connects the tagged rate source to the integrator.
+
+``TrajectoryGroup``
+-------------------
+This is the base class for a mission profile.
+It provides the ``link_phases`` method which is used to connect integration variables across mission phases.
