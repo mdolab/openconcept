@@ -2,8 +2,6 @@
 
 from collections.abc import Iterable
 import numpy as np
-from scipy import sparse as sp
-from six import string_types
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 
@@ -69,7 +67,7 @@ class SumComp(ExplicitComponent):
 
         self._add_systems = []
 
-        if isinstance(output_name, string_types):
+        if isinstance(output_name, str):
             self._add_systems.append((output_name, input_name, vec_size, length, val,
                                       scaling_factor, kwargs))
         elif isinstance(output_name, Iterable):

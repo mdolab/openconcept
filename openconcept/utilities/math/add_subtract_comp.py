@@ -1,8 +1,6 @@
 """Definition of the Add/Subtract Component."""
 
 import numpy as np
-from scipy import sparse as sp
-from six import string_types
 from collections.abc import Iterable
 from openmdao.core.explicitcomponent import ExplicitComponent
 
@@ -75,7 +73,7 @@ class AddSubtractComp(ExplicitComponent):
 
         self._add_systems = []
 
-        if isinstance(output_name, string_types):
+        if isinstance(output_name, str):
             self._add_systems.append((output_name, input_names, vec_size, length, val,
                                       scaling_factors, kwargs))
         elif isinstance(output_name, Iterable):
@@ -166,7 +164,7 @@ class AddSubtractComp(ExplicitComponent):
         """
         for (output_name, input_names, vec_size, length, val,
              scaling_factors, kwargs) in self._add_systems:
-            if isinstance(input_names, string_types):
+            if isinstance(input_names, str):
                 input_names = [input_names]
 
             if scaling_factors is None:
@@ -232,7 +230,7 @@ class AddSubtractComp(ExplicitComponent):
         """
         for (output_name, input_names, vec_size, length, val, scaling_factors,
              kwargs) in self._add_systems:
-            if isinstance(input_names, string_types):
+            if isinstance(input_names, str):
                 input_names = [input_names]
 
             if isinstance(vec_size, Iterable):

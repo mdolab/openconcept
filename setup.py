@@ -38,7 +38,6 @@ setup(
     license='MIT License',
     packages=find_packages(include=["openconcept*"]),
     install_requires=[
-        'six',
         'scipy>=1.0.0',
         'numpy>=1.14.0',
         'openmdao>=3.10.0',
