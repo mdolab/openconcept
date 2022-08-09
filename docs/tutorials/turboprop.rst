@@ -190,6 +190,10 @@ Summary
 In this tutorial, we created a more detailed aircraft using OpenConcept's models for propulsion, aerodynamics, and weights.
 We also incorporated a mission profile that includes a balanced field length takeoff.
 
+Hopefully, the tutorials this far have given you a baseline knowledge that is sufficient to have a general idea of what is going on in each part of OpenConcept.
+From here we recommend diving into different parts of the OpenConcept source code to gain an idea of how to build more complex models.
+:ref:`This page <More-examples>` recommends some models to dig through next to learn more about OpenConcept.
+
 The final script looks like this:
 
 .. literalinclude:: ../../openconcept/examples/TBM850.py

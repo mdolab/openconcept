@@ -1,7 +1,7 @@
 .. _Energy-storage:
 
 **************
-Energy storage
+Energy Storage
 **************
 
 Energy storage models.

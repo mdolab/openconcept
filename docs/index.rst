@@ -109,6 +109,7 @@ I'm open to pull requests and issues in the meantime. Stay tuned. The developmen
    tutorials/minimal_example.rst
    tutorials/integrator.rst
    tutorials/turboprop.rst
+   tutorials/more_examples.rst
 
 .. toctree::
    :maxdepth: 2
@@ -118,6 +119,7 @@ I'm open to pull requests and issues in the meantime. Stay tuned. The developmen
    features/aerodynamics.rst
    features/atmospherics.rst
    features/costs.rst
+   features/energy_storage.rst
    features/mission_analysis.rst
    features/propulsion.rst
    features/thermal.rst

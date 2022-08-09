@@ -109,9 +109,7 @@ class TwinSeriesHybridElectricThermalPropulsionSystem(Group):
 
         self.add_subsystem('batt1', SOCBattery(num_nodes=nn, efficiency=0.97),promotes_inputs=["duration",'specific_energy'])
         self.connect('hybrid_split.power_out_A','batt1.elec_load')
-        # TODO set val= right number of nn
         self.add_subsystem('eng_throttle_set',BalanceComp(name='eng_throttle', val=np.ones((nn,))*0.5, units=None, eq_units='kW', rhs_name='gen_power_required',lhs_name='gen_power_available'))
-        #need to use the optimizer to drive hybrid_split.power_out_B to the same value as gen1.elec_power_out
         self.connect('hybrid_split.power_out_B','eng_throttle_set.gen_power_required')
         self.connect('gen1.elec_power_out','eng_throttle_set.gen_power_available')
         self.connect('eng_throttle_set.eng_throttle','eng1.throttle')
