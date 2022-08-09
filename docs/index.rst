@@ -11,6 +11,13 @@ It is open source (GitHub: https://github.com/mdolab/openconcept) and MIT licens
 OpenConcept was developed in order to model and optimize aircraft with electric propulsion at low computational cost.
 The tools are built on top of NASA Glenn's `OpenMDAO <http://openmdao.org/>`__ framework, which in turn is written in Python.
 
+OpenConcept is capable of modeling a wide range of propulsion systems, including detailed thermal management systems.
+The following figure (from `this paper <https://doi.org/10.3390/aerospace9050243>`__) shows one such system that is modeled in the ``N3_HybridSingleAisle_Refrig.py`` example.
+
+.. image:: _static/images/full_parallel_system_chiller.png
+    :width: 500px
+    :align: center
+
 The following charts show more than 250 individually optimized hybrid-electric light twin aircraft (similar to a King Air C90GT).
 Optimizing hundreds of configurations can be done in a couple of hours on a standard laptop computer.
 
@@ -31,19 +38,34 @@ To run the examples or edit the source code:
 #. Navigate to the root ``openconcept`` folder
 #. Run ``pip install -e .`` to install the package (the ``-e`` can be omitted if not editing the source)
 
-Get started by running the ``TBM850`` example:
-
-#. Navigate to the ``examples`` folder
-#. Run ``python TBM850.py`` to test OpenConcept on a single-engine turboprop aircraft (the TBM 850)
-#. Look at the ``examples/aircraft data/TBM850.py`` file to play with the assumptions / config / geometry and see the effects on the output result
-
-``examples/HybridTwin.py`` is set up to do MDO in a grid of specific energies and design ranges and save the results to disk. Visualization utilities will be added soon (to produce contour plots as shown in this Readme).
+Get started by following the tutorials to learn the most important parts of OpenConcept.
+The features section of the documentation describes most of the components and system models available in OpenConcept.
 
 ------------
 Dependencies
 ------------
-This toolkit requires the use of `OpenMDAO <https://openmdao.org>`__ 3.10.0 or later due to backward-incompatible changes. OpenMDAO requires a recent NumPy and SciPy.
-Python 3.8 is recommended since it is the version with which the code is tested, but newer Python versions will likely work as well.
+
+.. Remember to change in the readme too!
+
+This toolkit requires the use of `OpenMDAO <https://openmdao.org>`__ 3.10.0 or later due to backward-incompatible changes.
+OpenMDAO requires a recent NumPy and SciPy.
+Python 3.8, 3.9, or 3.10 are recommended since they are the versions with which the code is tested, but newer Python versions will likely work as well.
+
+.. list-table:: Latest tested dependencies
+   :header-rows: 1
+
+   * - Package
+     - Version
+   * - Python
+     - 3.10.4
+   * - OpenMDAO
+     - 3.16.0
+   * - NumPy
+     - 1.22.4
+   * - SciPy
+     - 1.7.3
+   * - OpenAeroStruct
+     - 2.5.1
 
 ---------------
 Please Cite Us!
@@ -83,23 +105,7 @@ Eytan J. Adler and Joaquim R.R.A. Martins, "Aerostructural wing design optimizat
 	year        = {2022}
 	}
 
-------------
-Contributing
-------------
-A contributor's guide is coming third (after completing documentation and automatic testing coverage).
-I'm open to pull requests and issues in the meantime. Stay tuned. The development roadmap is :ref:`here <DevRoadmap>`.
-
 .. currentmodule:: openconcept
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Introduction
-   :hidden:
-
-   introduction/overview.rst
-   introduction/install.rst
-   introduction/orientation.rst
-   developer/roadmap.rst
 
 .. toctree::
    :maxdepth: 2
@@ -133,4 +139,5 @@ I'm open to pull requests and issues in the meantime. Stay tuned. The developmen
 
    features_old/index.rst
    _srcdocs/index.rst
+   developer/roadmap.rst
    publications.rst
