@@ -18,6 +18,7 @@ jobs:
     strategy:
       matrix:
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        python-version: [3.8, 3.9, 3.10]
       fail-fast: false
     env:
       OMP_NUM_THREADS: 1
@@ -30,7 +31,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
-        python-version: 3.8
+        python-version: ${{ matrix.python-version }}
     - name: Setup conda
       run: |
         conda config --set always_yes yes
@@ -39,8 +40,9 @@ jobs:
       run: |
         pip install .[testing]
         pip install .[docs]
-    - name: List Python packages
+    - name: List Python and package info
       run: |
+        python --version
         pip list
     - name: Download engine deck surrogate model
       run: |
