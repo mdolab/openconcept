@@ -70,7 +70,7 @@ A phase is a building block of a mission profiles.
 The phases and relevant classes are implemented in ``openconcept/mission/phases.py``.
 Users usually don't need to modify these code when creating their own mission profile.
 
-Steady flight: ``SteadFlightPhase``
+Steady flight: ``SteadyFlightPhase``
 -----------------------------------
 Class ``SteadyFlightPhase`` can be instantiated for steady climb, cruise, descent, and loiter phases.
 For this phase, you need to specify the airspeed (``<phase_name>.fltcond|Ueas``) and vertical speed (``<phase_name>.fltcond|Ueas``) in your runscript.
