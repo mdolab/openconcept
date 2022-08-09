@@ -7,8 +7,8 @@ Aerodynamics
 This document has some stuff in it.
 Can be used 
 
-Simple drag polar
-=================
+Simple drag polar: ``PolarDrag``
+================================
 The class ``PolarDrag`` is the most basic aerodynamic model that uses the drag polar model.
 This component computes the drag force given the flight condition (to be specific, dynamic pressure and lift coefficient) at each node along the mission profile.
 In runscript, users should set the values for the following aircraft design parameters, or declare them as design variables.
@@ -38,7 +38,7 @@ For more detail, please check the `documentation <https://mdolab-openaerostruct.
 OpenConcept also uses a surrogate model trained by OpenAeroStruct analyses to reduce the computational cost.
 The data generation and surrogate training is automated, thus the users don't need to do anything about it by themselves.
 
-VLM-based aerodynamic model (class VLMDragPolar)
+VLM-based aerodynamic model: ``VLMDragPolar``
 ------------------------------------------------
 This model uses the vortex-lattice method (VLM) and a surrogate model to compute the drag.
 The inputs to this model are the flight conditions (Mach number, altitude, dynamic pressure, lift coefficient) and aircraft design parameters.
@@ -94,7 +94,7 @@ Users should set the following design parameters and options in the runscript.
 There are other advanced options, e.g., the surrogate training points in Mach-alpha-altitude space.
 The default settings should work fine for these advanced options, but if you want to make changes, please refer to the source docs.
 
-Aerostructural model (class AeroStructDragPolar)
+Aerostructural model: ``AeroStructDragPolar``
 -----------------------------------------------------
 This model is similar to the VLM-based aerodynamic model, but it performs aerostructural analysis (that coupled VLM and structural FEM) instead of aerodynamic analysis (just FEM).
 This means that we now consider the wing deformation due to aerodynamic loads, which is important for high aspect ratio wings.

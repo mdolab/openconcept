@@ -15,7 +15,7 @@ Available missions
 ==================
 
 OpenConcept implements several mission profiles that users can use for an analysis.
-The missions are implemented in ``openconcept/PATH/mission_profiles.py``.
+The missions are implemented in ``openconcept/mission/profiles.py``.
 You can also make your own mission profile following the format from these examples.
 
 Basic three-phase mission: ``BasicMission``
@@ -67,11 +67,11 @@ Additional variables you need to set in the runscript are
 Phase types
 ===========
 A phase is a building block of a mission profiles.
-The phases and relevant classes are implemented in ``openconcept/PATH/mission_profiles.py``.
+The phases and relevant classes are implemented in ``openconcept/mission/phases.py``.
 Users usually don't need to modify these code when creating their own mission profile.
 
-Steady flight
--------------
+Steady flight: ``SteadFlightPhase``
+-----------------------------------
 Class ``SteadyFlightPhase`` can be instantiated for steady climb, cruise, descent, and loiter phases.
 For this phase, you need to specify the airspeed (``<phase_name>.fltcond|Ueas``) and vertical speed (``<phase_name>.fltcond|Ueas``) in your runscript.
 You may optionally set the duration of the phase (``<phase_name>.duration``), or alternatively, the duration can be set automatically in the mission profile group.
@@ -92,5 +92,3 @@ The acceleration is then integrated to compute the velocity.
 VTOL transition
 ---------------
 This is only relevant to VTOL configurations. Maybe move to a different page (like eVTOL mission and phases) to avoid confusion?
-
-
