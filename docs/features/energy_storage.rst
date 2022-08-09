@@ -13,13 +13,13 @@ Battery models
 ``SimpleBattery``
 -----------------
 
-.. warning::
-    This component does not track its state of charge, so without an additional integrator there is no way to know when the battery has been depleted. For this reason, it is recommended to use the ``SOCBattery``.
-
 This component simple uses a simple equation to relate the electrical power draw to the heat generated: :math:`\text{heat} = \text{electricity load} (1 - \eta)`.
 Cost is assumed to be a linear function of weight.
 Component sizing margin is computed which describes the electrical load to the max power of the battery (defined by battery weight and specific power).
 This is not automatically forced to be less than one, so the user is responsible for checking/enforcing this in an analysis or optimization.
+
+.. warning::
+    This component does not track its state of charge, so without an additional integrator there is no way to know when the battery has been depleted. For this reason, it is recommended to use the ``SOCBattery``.
 
 ``SOCBattery``
 --------------

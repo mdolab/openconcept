@@ -22,7 +22,7 @@ Basic three-phase mission: ``BasicMission``
 -------------------------------------------
 This is a basic climb-cruise-descent mission for a fixed-wing aircraft.
 
-For this mission, users should specify the following variables in the runscript:
+For this mission, users should specify the following variables in the run script:
 
 - takeoff altitude ``takeoff|h0``, default is 0 ft.
 - cruise altitude ``cruise|h0``.
@@ -46,7 +46,7 @@ The additional takeoff phases are:
 
 We use ``BLIImplicitSolve`` to solve for the decision speed ``v1`` where the one-engine-out takeoff distance is equal to the braking distance for rejected takeoff.
 
-The optional variables you may set in the runscripts are
+The optional variables you may set in the run scripts are
 
 - throttle for takeoff phases ``<v0v1, v1vr, rotate>.throttle``, default is 1.0.
 - ground rolling friction coefficient ``<v0v1, v1vr, v1v0>.braking``, default is 0.03 for accelerating phases and 0.4 for braking.
@@ -57,7 +57,7 @@ The optional variables you may set in the runscripts are
 Mission with reserve: ``MissionWithReserve``
 --------------------------------------------
 This adds a reserve mission and loiter phase to the three-phase mission.
-Additional variables you need to set in the runscript are
+Additional variables you need to set in the run script are
 
 - vertical speed and air speed for additional phases: ``<reserve_climb, reserve_cruise, reserve_descent, loiter>.<fltcond|Ueas, fltcond|vs>``
 - reserve range ``reserve_range`` and altitude ``reserve|h0``.
@@ -73,7 +73,7 @@ Users usually don't need to modify these code when creating their own mission pr
 Steady flight: ``SteadyFlightPhase``
 -----------------------------------
 Class ``SteadyFlightPhase`` can be instantiated for steady climb, cruise, descent, and loiter phases.
-For this phase, you need to specify the airspeed (``<phase_name>.fltcond|Ueas``) and vertical speed (``<phase_name>.fltcond|Ueas``) in your runscript.
+For this phase, you need to specify the airspeed (``<phase_name>.fltcond|Ueas``) and vertical speed (``<phase_name>.fltcond|Ueas``) in your run script.
 You may optionally set the duration of the phase (``<phase_name>.duration``), or alternatively, the duration can be set automatically in the mission profile group.
 
 To ensure the steady flight, both vertical and horizontal accelerations will be set to 0.
@@ -86,7 +86,7 @@ Balanced-field takeoff
 Balanced-field takeoff analysis is implemented in the following classes: ``BFLImplicitSolve, GroundRollPhase, RotationPhase, RobustRotationPhase, ClimbAnglePhase``.
 Unlike the steady flight phases, the takeoff phases are not steady and acceleration is non-zero.
 Therefore, the engine throttle needs to be specified to compute the acceleration, which is 100% by defalut for accelerating phases and 0 for braking.
-Users can also set the throttle manually in the runscript.
+Users can also set the throttle manually in the run script.
 The acceleration is then integrated to compute the velocity.
 
 VTOL transition
