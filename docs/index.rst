@@ -18,11 +18,16 @@ The following figure (from `this paper <https://doi.org/10.3390/aerospace9050243
     :width: 500px
     :align: center
 
+|
+
 The following charts show more than 250 individually optimized hybrid-electric light twin aircraft (similar to a King Air C90GT).
 Optimizing hundreds of configurations can be done in a couple of hours on a standard laptop computer.
 
 .. image:: _static/images/readme_charts.png
-    :width: 800px
+    :width: 600px
+    :align: center
+
+|
 
 The reason for OpenConcept's efficiency is the analytic derivatives built into each analysis routine and component.
 Accurate, efficient derivatives enable the use of Newton nonlinear equation solutions and gradient-based optimization at low computational cost.
