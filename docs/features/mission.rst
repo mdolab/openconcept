@@ -29,8 +29,8 @@ For this mission, users should specify the following variables in the run script
 - mission range ``mission_range``.
 - payload weight ``payload``.
 - vertical speed ``<climb, cruise, descent>.fltcond|vs`` for each phase.
-- air speed ``<climb, cruise, descent>.fltcond|Ueas`` for each phase.
-- (Optional) ``takeoff|v2`` is you include a ground roll phase before climb. The ground roll phase is not included by default.
+- airspeed ``<climb, cruise, descent>.fltcond|Ueas`` for each phase.
+- (optional) ``takeoff|v2`` if you include a ground roll phase before climb. The ground roll phase is not included by default.
   
 The duration of each phase is automatically set given the cruise altitude and mission range.  
 
@@ -54,43 +54,45 @@ The optional variables you may set in the run scripts are
 - obstacle clearance height ``rotate.h_obs``, default is 35 ft.
 - CL/CLmax ration in rotation ``rotate.CL_rotate_mult``, default is 0.83.
 
+It may be necessary to set initial values for the takeoff airspeeds (``<v0v1, v1vr, v1v0>.fltcond|Utrue``) before the solver is called to improve convergence.
+
 Mission with reserve: ``MissionWithReserve``
 --------------------------------------------
 This adds a reserve mission and loiter phase to the three-phase mission.
 Additional variables you need to set in the run script are
 
-- vertical speed and air speed for additional phases: ``<reserve_climb, reserve_cruise, reserve_descent, loiter>.<fltcond|Ueas, fltcond|vs>``
+- vertical speed and airspeed for additional phases: ``<reserve_climb, reserve_cruise, reserve_descent, loiter>.<fltcond|Ueas, fltcond|vs>``
 - reserve range ``reserve_range`` and altitude ``reserve|h0``.
 - loiter duration ``loiter_duration`` and loiter altitude ``loiter|h0``.
 
 Phase types
 ===========
-A phase is a building block of a mission profiles.
+A phase is a building block of a mission profile.
 The phases and relevant classes are implemented in ``openconcept/mission/phases.py``.
 Users usually don't need to modify these code when creating their own mission profile.
 
 Steady flight: ``SteadyFlightPhase``
 ------------------------------------
-Class ``SteadyFlightPhase`` can be instantiated for steady climb, cruise, descent, and loiter phases.
+The ``SteadyFlightPhase`` class can be instantiated for steady climb, cruise, descent, and loiter phases.
 For this phase, you need to specify the airspeed (``<phase_name>.fltcond|Ueas``) and vertical speed (``<phase_name>.fltcond|Ueas``) in your run script.
 You may optionally set the duration of the phase (``<phase_name>.duration``), or alternatively, the duration can be set automatically in the mission profile group.
 
-To ensure the steady flight, both vertical and horizontal accelerations will be set to 0.
-It first computes the lift coefficient required for zero vertical accelration; CL is then passes to the aircraft model, which returns the lift and drag.
-Then, it automatically finds the time history of throttle such that horizontal acceleration is zero.
-This is done by solving a system of nonlinear equations (``horizontal acceleration = 0``) w.r.t. throttle using `BalanceComp <https://openmdao.org/newdocs/versions/latest/features/building_blocks/components/balance_comp.html>`_ for each phase.
+To ensure steady flight, both vertical and horizontal accelerations will be set to 0.
+It first computes the lift coefficient required for zero vertical accelration; CL is then passed to the aircraft model, which returns the lift and drag.
+Then, it solves for the throttle values such that horizontal acceleration is zero.
+This is done by solving a system of nonlinear equations (``horizontal acceleration = 0``) w.r.t. throttle using a `BalanceComp <https://openmdao.org/newdocs/versions/latest/features/building_blocks/components/balance_comp.html>`_ for each phase.
 
 Balanced-field takeoff
 ----------------------
-Balanced-field takeoff analysis is implemented in the following classes: ``BFLImplicitSolve, GroundRollPhase, RotationPhase, RobustRotationPhase, ClimbAnglePhase``.
+Balanced-field takeoff analysis is implemented in the following classes: ``BFLImplicitSolve``, ``GroundRollPhase``, ``RotationPhase``, ``RobustRotationPhase``, ``ClimbAnglePhase``.
 Unlike the steady flight phases, the takeoff phases are not steady and acceleration is non-zero.
-Therefore, the engine throttle needs to be specified to compute the acceleration, which is 100% by defalut for accelerating phases and 0 for braking.
+Therefore, the engine throttle needs to be specified to compute the acceleration (100% by defalut for accelerating phases and 0 for braking).
 Users can also set the throttle manually in the run script.
 The acceleration is then integrated to compute the velocity.
 
-VTOL transition
----------------
-This is only relevant to VTOL configurations. Maybe move to a different page (like eVTOL mission and phases) to avoid confusion?
+.. VTOL transition
+.. ---------------
+.. This is only relevant to VTOL configurations. Maybe move to a different page (like eVTOL mission and phases) to avoid confusion?
 
 Mission groups
 ==============

@@ -1,28 +1,25 @@
 # Changes to make before merging
 
 - [ ] Merge Shugo's work
-- [ ] Add docs:
-  - [ ] Introduction
-    - [ ] Describe generally what it does
-    - [x] What an aircraft model requires (throttle and CL in, thrust lift and drag out)
-  - [ ] Examples
+- [x] Add docs:
+  - [x] Examples
     - [x] Do simple example
     - [x] Show how aircraft model is made and how variables are passed
     - [x] Show analysis group
     - [x]  Show running the thing
-  - [ ] Describe features
+  - [x] Describe features
     - [x] Aerodynamics
-    - [ ] Atmospherics
-    - [ ] Costs
+    - [x] Atmospherics
+    - [x] Costs
     - [x] Mission analysis
     - [x] Propulsion
-    - [ ] Thermal
-    - [ ] Utilities
-    - [ ] Weights
+    - [x] Thermal
+    - [x] Utilities
+    - [x] Weights
   - [x] Maybe a list of papers that use OpenConcept like OpenMDAO does?
 - [x] Add linting and formatting
-- [ ] Fix TODO on first line of SteadyFlightPhase in solver_phases.py
-- [ ] Remove old docs (old "features")
+- [ ] Fix TODO on first line of SteadyFlightPhase in solver_phases.py (ehh, it's one of the fun features of OpenConcept)
+- [x] Remove old docs (old "features")
 
 # Refactoring directory tree
 
