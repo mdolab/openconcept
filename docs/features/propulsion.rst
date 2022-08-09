@@ -9,7 +9,7 @@ Propulsion systems
 User can build their own propulsion systems following the format of the example systems listed here.
 For details of each propulsion systems, see the :ref:`source docs <source_documentation>`.
 
-All-electric propulsion:
+All-electric propulsion
 -----------------------
 This is an electric propulsion system consisting of a constant-speed propeller, motor, and battery.
 In addition, this models a thermal management system using a compressible (``AllElectricSinglePropulsionSystemWithThermal_Compressible``) or incompressible (``AllElectricSinglePropulsionSystemWithThermal_Incompressible``) 1D duct with heat exchanger.

@@ -496,8 +496,9 @@ class QMaxAnalyticalPart(ExplicitComponent):
     Computes the analytical part of the Q max calculation. For the overall
     Q max calculation, use the QMaxHeatPipe group, not this component.
 
-    Equations from https://www.1-act.com/resources/heat-pipe-performance/flooding-limit-thermosyphons/
-    Surface tension data from page 16 of http://web.iiar.org/membersonly/PDF/CO/databook_ch2.pdf
+    Equations from https://www.1-act.com/resources/heat-pipe-performance/.
+    Surface tension data from page 16 of http://web.iiar.org/membersonly/PDF/CO/databook_ch2.pdf.
+    Both accessed on Aug 9, 2022.
 
     Inputs
     ------
@@ -559,10 +560,10 @@ class QMaxAnalyticalPart(ExplicitComponent):
         latent = self.options['latent_heat']
         th_rad = self.options['theta'] * np.pi / 180  # rad
 
-        # Use linear estimate for surface tension, see p. 16 of http://web.iiar.org/membersonly/PDF/CO/databook_ch2.pdf
+        # Use linear estimate for surface tension, see p. 16 of http://web.iiar.org/membersonly/PDF/CO/databook_ch2.pdf (accessed Aug 9 2022)
         surface_tension = self.options['surface_tension_base'] + self.options['surface_tension_incr'] * inputs['temp']
 
-        # Compute Q max using equations from https://www.1-act.com/resources/heat-pipe-performance/flooding-limit-thermosyphons/
+        # Compute Q max using equations from https://www.1-act.com/resources/heat-pipe-performance/ (accessed Aug 9 2022)
         bond_number = inputs['inner_diam'] * np.sqrt(g/surface_tension * (rho_L - rho_V))
         k_flooding = (rho_L/rho_V)**0.14 * np.tanh(bond_number**0.25)**2
         q_max_numer = k_flooding * A_vapor * latent * (g * np.sin(np.pi/2 - th_rad) * surface_tension * (rho_L - rho_V))**0.25

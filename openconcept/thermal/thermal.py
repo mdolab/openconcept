@@ -1,16 +1,7 @@
 from __future__ import division
-from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, NewtonSolver, DirectSolver, BoundsEnforceLS
-from openmdao.api import ScipyOptimizeDriver, ExplicitComponent, ImplicitComponent, ExecComp
-
+from openmdao.api import Group, ExplicitComponent, ImplicitComponent
 import numpy as np
-import scipy.sparse as sp
-from .ducts import ImplicitCompressibleDuct
-from openconcept.utilities.selector import SelectorComp
 from openconcept.utilities.math.integrals import Integrator
-from openconcept.utilities.math.derivatives import FirstDerivative
-from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp, VectorConcatenateComp, VectorSplitComp
-from openconcept.atmospherics import ComputeAtmosphericProperties
-from openconcept.utilities.linearinterp import LinearInterpolator
 
 class PerfectHeatTransferComp(ExplicitComponent):
     """
