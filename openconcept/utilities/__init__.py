@@ -14,5 +14,4 @@ from .math import (
     MaxComp,
     MinComp,
     ElementMultiplyDivideComp,
-    SumComp,
 )
