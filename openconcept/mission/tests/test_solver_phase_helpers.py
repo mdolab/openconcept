@@ -4,8 +4,7 @@ import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
 from openconcept.mission import ClimbAngleComp, Groundspeeds, HorizontalAcceleration, VerticalAcceleration, SteadyFlightCL, FlipVectorComp, TakeoffTransition
-
-g = 9.80665 #m/s^2
+from openconcept.utilities.constants import GRAV_CONST
 
 # TESTS FOR ClimbAngleComp ===================================
 
@@ -35,7 +34,7 @@ class ClimbAngleTestCase_Scalar(unittest.TestCase):
     def test_climb_flight(self):
         self.prob['thrust'] = np.ones((1,))*1200
         self.prob.run_model()
-        assert_near_equal(self.prob['gamma'][0], np.arcsin(200 / 1000 / g), tolerance=1e-10)
+        assert_near_equal(self.prob['gamma'][0], np.arcsin(200 / 1000 / GRAV_CONST), tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -169,7 +168,7 @@ class HorizontalAccelerationTestCase_SteadyClimb(unittest.TestCase):
     def setUp(self):
         self.prob = Problem(HorizontalAccelerationTestGroup(num_nodes=9))
         self.prob.setup(check=True, force_alloc_complex=True)
-        self.prob['thrust'] = np.ones((9,)) * (100 + 100 * g * 0.02)
+        self.prob['thrust'] = np.ones((9,)) * (100 + 100 * GRAV_CONST * 0.02)
         self.prob['fltcond|singamma'] = np.ones((9,)) * 0.02
         self.prob.run_model()
 
@@ -184,7 +183,7 @@ class HorizontalAccelerationTestCase_SteadyClimb(unittest.TestCase):
     def setUp(self):
         self.prob = Problem(HorizontalAccelerationTestGroup(num_nodes=9))
         self.prob.setup(check=True, force_alloc_complex=True)
-        self.prob['thrust'] = np.ones((9,)) * (100 + 100 * g * 0.02)
+        self.prob['thrust'] = np.ones((9,)) * (100 + 100 * GRAV_CONST * 0.02)
         self.prob['fltcond|singamma'] = np.ones((9,)) * 0.02
         self.prob.run_model()
 
@@ -200,7 +199,7 @@ class HorizontalAccelerationTestCase_UnsteadyRunwayAccel(unittest.TestCase):
         self.prob = Problem(HorizontalAccelerationTestGroup(num_nodes=9))
         self.prob.setup(check=True, force_alloc_complex=True)
         self.prob['braking'] = np.ones((9,)) * 0.03
-        self.prob['lift'] = np.linspace(0, 150, 9) * g
+        self.prob['lift'] = np.linspace(0, 150, 9) * GRAV_CONST
         self.prob['drag'] = np.ones((9,)) * 50
         self.prob.run_model()
 
@@ -209,7 +208,7 @@ class HorizontalAccelerationTestCase_UnsteadyRunwayAccel(unittest.TestCase):
         thrust = 100.0
         lift = 0.0
         mass = 100
-        weight = mass*g
+        weight = mass*GRAV_CONST
         singamma = 0.0
         brakeforce = 0.03 * (weight-lift)
         slopeforce = weight * singamma
@@ -220,7 +219,7 @@ class HorizontalAccelerationTestCase_UnsteadyRunwayAccel(unittest.TestCase):
         drag = 50.0
         thrust = 100.0
         mass = 100
-        weight = mass*g
+        weight = mass*GRAV_CONST
         singamma = 0.0
         lift = weight*0.75
         brakeforce = 0.03 * (weight-lift)
@@ -232,7 +231,7 @@ class HorizontalAccelerationTestCase_UnsteadyRunwayAccel(unittest.TestCase):
         drag = 50.0
         thrust = 100.0
         mass = 100
-        weight = mass*g
+        weight = mass*GRAV_CONST
         singamma = 0.0
         # if lift exceeds weight (as it does here) no braking force is applied
         brakeforce = 0.0
@@ -254,7 +253,7 @@ class VerticalAccelerationTestGroup(Group):
         nn = self.options['num_nodes']
         iv = self.add_subsystem('conditions', IndepVarComp(), promotes_outputs=['*'])
         iv.add_output('weight', val=np.ones((nn,))*100, units='kg')
-        iv.add_output('lift', val=np.ones((nn,))*100*g, units='N')
+        iv.add_output('lift', val=np.ones((nn,))*100*GRAV_CONST, units='N')
         iv.add_output('thrust', val=np.ones((nn,))*100, units='N')
         iv.add_output('drag', val=np.ones((nn,))*100, units='N')
         iv.add_output('fltcond|singamma', val=np.zeros((nn,)), units=None)
@@ -280,7 +279,7 @@ class VerticalAccelerationTestCase_SteadyClimbing(unittest.TestCase):
         self.prob.setup(check=True, force_alloc_complex=True)
         self.prob['fltcond|singamma'] = np.ones((9,)) * np.sin(0.02)
         self.prob['fltcond|cosgamma'] = np.ones((9,)) * np.cos(0.02)
-        self.prob['lift'] = np.ones((9,)) * 100 * g / np.cos(0.02)
+        self.prob['lift'] = np.ones((9,)) * 100 * GRAV_CONST / np.cos(0.02)
 
         self.prob.run_model()
 
@@ -295,7 +294,7 @@ class VerticalAccelerationTestCase_UnsteadyPullUp(unittest.TestCase):
     def setUp(self):
         self.prob = Problem(VerticalAccelerationTestGroup(num_nodes=9))
         self.prob.setup(check=True, force_alloc_complex=True)
-        self.prob['lift'] = np.ones((9,)) * 100 * g + 100
+        self.prob['lift'] = np.ones((9,)) * 100 * GRAV_CONST + 100
         self.prob.run_model()
 
     def test_unsteady_pullup(self):
@@ -327,7 +326,7 @@ class SteadyFlightCLTestCase_Level(unittest.TestCase):
         self.prob.run_model()
 
     def test_steady_level_flights(self):
-        assert_near_equal(self.prob['fltcond|CL'], np.ones((9,))*100*g/1000./10./1.0, tolerance=1e-10)
+        assert_near_equal(self.prob['fltcond|CL'], np.ones((9,))*100*GRAV_CONST/1000./10./1.0, tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)
@@ -341,7 +340,7 @@ class SteadyFlightCLTestCase_Climb(unittest.TestCase):
         self.prob.run_model()
 
     def test_steady_level_flights(self):
-        assert_near_equal(self.prob['fltcond|CL'], np.ones((9,))*100*g/1000./10.*0.98, tolerance=1e-10)
+        assert_near_equal(self.prob['fltcond|CL'], np.ones((9,))*100*GRAV_CONST/1000./10.*0.98, tolerance=1e-10)
 
     def test_partials(self):
         partials = self.prob.check_partials(method='cs', out_stream=None)

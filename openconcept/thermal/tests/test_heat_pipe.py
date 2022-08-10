@@ -24,7 +24,7 @@ class HeatPipeIntegrationTestCase(unittest.TestCase):
         prob.setup(check=True, force_alloc_complex=True)
         prob.run_model()
 
-        assert_near_equal(prob['q_max'], np.ones(nn)*2807.04869547, tolerance=1e-5)
+        assert_near_equal(prob['q_max'], np.ones(nn)*2807.01928115, tolerance=1e-5)
         assert_near_equal(prob['weight'], 0.51463886, tolerance=1e-5)
         assert_near_equal(prob['T_cond'], np.ones(nn)*29.9441105, tolerance=1e-5)
 
@@ -45,7 +45,7 @@ class HeatPipeIntegrationTestCase(unittest.TestCase):
         prob.setup(check=True, force_alloc_complex=True)
         prob.run_model()
 
-        assert_near_equal(prob['q_max'], np.array([4936.75193703, 5022.29454826, 5074.04485581, 5095.29546816, 5081.04977578]), tolerance=1e-5)
+        assert_near_equal(prob['q_max'], np.array([4936.70020611, 5022.24211291, 5073.99208835, 5095.24271287, 5080.99742858]), tolerance=1e-5)
         assert_near_equal(prob['weight'], 0.51463886, tolerance=1e-5)
         assert_near_equal(prob['T_cond'], np.array([29.9441105, 37.4231564, 44.90220466, 52.38125436, 59.86030483]), tolerance=1e-5)
 
@@ -186,7 +186,7 @@ class QMaxHeatPipeTestCase(unittest.TestCase):
         p.setup(check=True, force_alloc_complex=True)
         p.run_model()
         
-        assert_near_equal(p['q_max'], np.array([4936.75193703, 5074.04485581, 5081.04977578]), tolerance=1e-5)
+        assert_near_equal(p['q_max'], np.array([4936.70020611, 5073.99208835, 5080.99742858]), tolerance=1e-5)
         assert_near_equal(p['heat_pipe_weight'], 0.51463886, tolerance=1e-5)
 
         partials = p.check_partials(method='cs',compact_print=True, step=1e-50)
@@ -203,7 +203,10 @@ class QMaxAnalyticalPartTestCase(unittest.TestCase):
         p.setup(check=True, force_alloc_complex=True)
         p.run_model()
         
-        assert_near_equal(p['q_max'], np.ones(nn)*875.86211677, tolerance=1e-5)
+        assert_near_equal(p['q_max'], np.ones(nn)*875.85211163, tolerance=1e-5)
 
         partials = p.check_partials(method='cs',compact_print=True, step=1e-50)
         assert_check_partials(partials)
+
+if __name__=="__main__":
+    unittest.main()

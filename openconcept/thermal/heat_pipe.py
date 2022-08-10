@@ -2,6 +2,7 @@ from __future__ import division
 import numpy as np
 from openmdao.api import ExplicitComponent, Group, MetaModelStructuredComp, ExecComp
 from openconcept.utilities import ElementMultiplyDivideComp
+from openconcept.utilities.constants import GRAV_CONST
 import warnings
 
 class HeatPipe(Group):
@@ -447,8 +448,6 @@ class QMaxHeatPipe(Group):
     -------
     num_nodes : int
         Number of analysis points to run, default 1 (scalar, dimensionless)
-    g : float
-        Gravitational acceleration, default 9.807 m/s^2 (scalar, m/s^2)
     theta : float
         Tilt from vertical, default 0 deg (scalar, deg)
     yield_stress : float
@@ -460,7 +459,6 @@ class QMaxHeatPipe(Group):
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of analysis points')
-        self.options.declare('g', default=9.807, desc='Gravitational acceleration m/s^2')
         self.options.declare('theta', default=0., desc='Tilt from vertical degrees')
         self.options.declare('yield_stress', default=572., desc='Wall yield stress in MPa (default 7075)')
         self.options.declare('rho_wall', default=2810., desc='Wall matl density in kg/m3 (default 7075)')
@@ -478,7 +476,7 @@ class QMaxHeatPipe(Group):
 
         # Take in the densities from the surrogate model and use analytical expressions to get Q max
         self.add_subsystem('q_max_calc',
-                           QMaxAnalyticalPart(num_nodes=nn, g=self.options['g'], theta=self.options['theta']),
+                           QMaxAnalyticalPart(num_nodes=nn, theta=self.options['theta']),
                            promotes_inputs=['inner_diam', 'temp'],
                            promotes_outputs=['q_max'])
 
@@ -520,8 +518,6 @@ class QMaxAnalyticalPart(ExplicitComponent):
     -------
     num_nodes : int
         Number of analysis points to run, default 1 (scalar, dimensionless)
-    g : float
-        Gravitational acceleration, default 9.807 m/s^2 (scalar, m/s^2)
     theta : float
         Tilt from vertical, default 0 deg (scalar, deg)
     latent_heat : float
@@ -534,7 +530,6 @@ class QMaxAnalyticalPart(ExplicitComponent):
     """
     def initialize(self):
         self.options.declare('num_nodes', default=1, desc='Number of analysis points')
-        self.options.declare('g', default=9.807, desc='Gravitational acceleration m/s^2')
         self.options.declare('theta', default=0., desc='Tilt from vertical degrees')
         self.options.declare('latent_heat', default=1371.2e3, desc='Latent heat of vaporization J/kg')
         self.options.declare('surface_tension_base', default=0.026, desc='Surface tension at 0 deg C N/m')
@@ -555,7 +550,6 @@ class QMaxAnalyticalPart(ExplicitComponent):
     def compute(self, inputs, outputs):
         rho_L = inputs['rho_liquid']
         rho_V = inputs['rho_vapor']
-        g = self.options['g']
         A_vapor = np.pi/4 * inputs['inner_diam']**2  # heat pipe cross sectional area
         latent = self.options['latent_heat']
         th_rad = self.options['theta'] * np.pi / 180  # rad
@@ -564,9 +558,9 @@ class QMaxAnalyticalPart(ExplicitComponent):
         surface_tension = self.options['surface_tension_base'] + self.options['surface_tension_incr'] * inputs['temp']
 
         # Compute Q max using equations from https://www.1-act.com/resources/heat-pipe-performance/ (accessed Aug 9 2022)
-        bond_number = inputs['inner_diam'] * np.sqrt(g/surface_tension * (rho_L - rho_V))
+        bond_number = inputs['inner_diam'] * np.sqrt(GRAV_CONST/surface_tension * (rho_L - rho_V))
         k_flooding = (rho_L/rho_V)**0.14 * np.tanh(bond_number**0.25)**2
-        q_max_numer = k_flooding * A_vapor * latent * (g * np.sin(np.pi/2 - th_rad) * surface_tension * (rho_L - rho_V))**0.25
+        q_max_numer = k_flooding * A_vapor * latent * (GRAV_CONST * np.sin(np.pi/2 - th_rad) * surface_tension * (rho_L - rho_V))**0.25
         q_max_denom = (rho_L**-0.25 + rho_V**-0.25)**2
         outputs['q_max'] = q_max_numer / q_max_denom
 

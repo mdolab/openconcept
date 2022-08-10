@@ -4,6 +4,7 @@ import openmdao.api as om
 from openconcept.atmospherics import ComputeAtmosphericProperties
 from openconcept.aerodynamics import Lift, StallSpeed
 from openconcept.utilities import Integrator
+from openconcept.utilities.constants import GRAV_CONST
 import numpy as np
 import copy
 
@@ -106,7 +107,6 @@ class HorizontalAcceleration(ExplicitComponent):
 
     def setup(self):
         nn = self.options['num_nodes']
-        g = 9.80665 #m/s^2
         self.add_input('weight', units='kg', shape=(nn,))
         self.add_input('drag', units='N',shape=(nn,))
         self.add_input('lift', units='N',shape=(nn,))
@@ -117,24 +117,22 @@ class HorizontalAcceleration(ExplicitComponent):
         self.add_output('accel_horiz', units='m/s**2', shape=(nn,))
         arange=np.arange(nn)
         self.declare_partials(['accel_horiz'], ['weight','drag','lift','thrust','braking'], rows=arange, cols=arange)
-        self.declare_partials(['accel_horiz'], ['fltcond|singamma'], rows=arange, cols=arange, val=-g*np.ones((nn,)))
+        self.declare_partials(['accel_horiz'], ['fltcond|singamma'], rows=arange, cols=arange, val=-GRAV_CONST*np.ones((nn,)))
 
 
     def compute(self, inputs, outputs):
         nn = self.options['num_nodes']
-        g = 9.80665 #m/s^2
         m = inputs['weight']
-        floor_vec = np.where(np.less((g-inputs['lift']/m),0.0),0.0,1.0)
-        accel = inputs['thrust']/m - inputs['drag']/m - floor_vec*inputs['braking']*(g-inputs['lift']/m) - g*inputs['fltcond|singamma']
+        floor_vec = np.where(np.less((GRAV_CONST-inputs['lift']/m),0.0),0.0,1.0)
+        accel = inputs['thrust']/m - inputs['drag']/m - floor_vec*inputs['braking']*(GRAV_CONST-inputs['lift']/m) - GRAV_CONST*inputs['fltcond|singamma']
         outputs['accel_horiz'] = accel
 
     def compute_partials(self, inputs, J):
-        g = 9.80665 #m/s^2
         m = inputs['weight']
-        floor_vec = np.where(np.less((g-inputs['lift']/m),0.0),0.0,1.0)
+        floor_vec = np.where(np.less((GRAV_CONST-inputs['lift']/m),0.0),0.0,1.0)
         J['accel_horiz','thrust'] = 1/m
         J['accel_horiz','drag'] = -1/m
-        J['accel_horiz','braking'] = -floor_vec*(g-inputs['lift']/m)
+        J['accel_horiz','braking'] = -floor_vec*(GRAV_CONST-inputs['lift']/m)
         J['accel_horiz','lift'] = floor_vec*inputs['braking']/m
         J['accel_horiz','weight'] = (inputs['drag']-inputs['thrust']-floor_vec*inputs['braking']*inputs['lift'])/m**2
 
@@ -172,7 +170,6 @@ class HorizontalAcceleration(ExplicitComponent):
 
     def setup(self):
         nn = self.options['num_nodes']
-        g = 9.80665 #m/s^2
         self.add_input('weight', units='kg', shape=(nn,))
         self.add_input('drag', units='N',shape=(nn,))
         self.add_input('lift', units='N',shape=(nn,))
@@ -180,22 +177,20 @@ class HorizontalAcceleration(ExplicitComponent):
         self.add_input('fltcond|singamma',shape=(nn,))
         self.add_input('fltcond|cosgamma',shape=(nn,))
 
-        self.add_output('accel_vert', units='m/s**2', shape=(nn,),upper=2.5*g,lower=-1*g)
+        self.add_output('accel_vert', units='m/s**2', shape=(nn,),upper=2.5*GRAV_CONST,lower=-1*GRAV_CONST)
         arange=np.arange(nn)
         self.declare_partials(['accel_vert'], ['weight','drag','lift','thrust','fltcond|singamma','fltcond|cosgamma'], rows=arange, cols=arange)
 
 
     def compute(self, inputs, outputs):
         nn = self.options['num_nodes']
-        g = 9.80665 #m/s^2
         cosg = inputs['fltcond|cosgamma']
         sing = inputs['fltcond|singamma']
-        accel = (inputs['lift']*cosg + (inputs['thrust']-inputs['drag'])*sing - g*inputs['weight'])/inputs['weight']
-        accel = np.clip(accel, -g, 2.5*g)
+        accel = (inputs['lift']*cosg + (inputs['thrust']-inputs['drag'])*sing - GRAV_CONST*inputs['weight'])/inputs['weight']
+        accel = np.clip(accel, -GRAV_CONST, 2.5*GRAV_CONST)
         outputs['accel_vert'] = accel
 
     def compute_partials(self, inputs, J):
-        g = 9.80665 #m/s^2
         m = inputs['weight']
         cosg = inputs['fltcond|cosgamma']
         sing = inputs['fltcond|singamma']
@@ -251,15 +246,13 @@ class SteadyFlightCL(ExplicitComponent):
         self.declare_partials(['fltcond|CL'], ['ac|geom|wing|S_ref'], rows=arange, cols=np.zeros(nn))
 
     def compute(self, inputs, outputs):
-        g = 9.80665 #m/s^2
-        outputs['fltcond|CL'] = inputs['fltcond|cosgamma']*g*inputs['weight']/inputs['fltcond|q']/inputs['ac|geom|wing|S_ref']
+        outputs['fltcond|CL'] = inputs['fltcond|cosgamma']*GRAV_CONST*inputs['weight']/inputs['fltcond|q']/inputs['ac|geom|wing|S_ref']
 
     def compute_partials(self, inputs, J):
-        g = 9.80665 #m/s^2
-        J['fltcond|CL','weight'] = inputs['fltcond|cosgamma']*g/inputs['fltcond|q']/inputs['ac|geom|wing|S_ref']
-        J['fltcond|CL','fltcond|q'] = - inputs['fltcond|cosgamma']*g*inputs['weight'] / inputs['fltcond|q']**2 / inputs['ac|geom|wing|S_ref']
-        J['fltcond|CL','ac|geom|wing|S_ref'] = - inputs['fltcond|cosgamma']*g*inputs['weight'] / inputs['fltcond|q'] / inputs['ac|geom|wing|S_ref']**2
-        J['fltcond|CL','fltcond|cosgamma'] = g*inputs['weight']/inputs['fltcond|q']/inputs['ac|geom|wing|S_ref']
+        J['fltcond|CL','weight'] = inputs['fltcond|cosgamma']*GRAV_CONST/inputs['fltcond|q']/inputs['ac|geom|wing|S_ref']
+        J['fltcond|CL','fltcond|q'] = - inputs['fltcond|cosgamma']*GRAV_CONST*inputs['weight'] / inputs['fltcond|q']**2 / inputs['ac|geom|wing|S_ref']
+        J['fltcond|CL','ac|geom|wing|S_ref'] = - inputs['fltcond|cosgamma']*GRAV_CONST*inputs['weight'] / inputs['fltcond|q'] / inputs['ac|geom|wing|S_ref']**2
+        J['fltcond|CL','fltcond|cosgamma'] = GRAV_CONST*inputs['weight']/inputs['fltcond|q']/inputs['ac|geom|wing|S_ref']
 
 class DymosSteadyFlightODE(om.Group):
     """

@@ -2,6 +2,7 @@
 from __future__ import division
 from openmdao.api import ExplicitComponent
 import numpy as np
+from openconcept.utilities.constants import GRAV_CONST
 
 
 class PolarDrag(ExplicitComponent):
@@ -151,25 +152,23 @@ class StallSpeed(ExplicitComponent):
         self.declare_partials(['Vstall_eas'], ['weight', 'ac|geom|wing|S_ref', 'CLmax'])
 
     def compute(self, inputs, outputs):
-        g = 9.80665  # m/s^2
         rho = 1.225  # kg/m3
-        outputs['Vstall_eas'] = np.sqrt(2 * inputs['weight'] * g / rho /
+        outputs['Vstall_eas'] = np.sqrt(2 * inputs['weight'] * GRAV_CONST / rho /
                                         inputs['ac|geom|wing|S_ref'] / inputs['CLmax'])
 
     def compute_partials(self, inputs, J):
-        g = 9.80665  # m/s^2
         rho = 1.225  # kg/m3
-        J['Vstall_eas', 'weight'] = (1 / np.sqrt(2 * inputs['weight'] * g / rho /
+        J['Vstall_eas', 'weight'] = (1 / np.sqrt(2 * inputs['weight'] * GRAV_CONST / rho /
                                                  inputs['ac|geom|wing|S_ref'] / inputs['CLmax']) *
-                                     g / rho / inputs['ac|geom|wing|S_ref'] / inputs['CLmax'])
-        J['Vstall_eas', 'ac|geom|wing|S_ref'] = - (1 / np.sqrt(2 * inputs['weight'] * g / rho /
+                                     GRAV_CONST / rho / inputs['ac|geom|wing|S_ref'] / inputs['CLmax'])
+        J['Vstall_eas', 'ac|geom|wing|S_ref'] = - (1 / np.sqrt(2 * inputs['weight'] * GRAV_CONST / rho /
                                                                inputs['ac|geom|wing|S_ref'] /
                                                                inputs['CLmax']) *
-                                                   inputs['weight'] * g / rho /
+                                                   inputs['weight'] * GRAV_CONST / rho /
                                                    inputs['ac|geom|wing|S_ref'] ** 2 /
                                                    inputs['CLmax'])
-        J['Vstall_eas', 'CLmax'] = - (1 / np.sqrt(2 * inputs['weight'] * g / rho /
+        J['Vstall_eas', 'CLmax'] = - (1 / np.sqrt(2 * inputs['weight'] * GRAV_CONST / rho /
                                                   inputs['ac|geom|wing|S_ref'] /
                                                   inputs['CLmax']) *
-                                      inputs['weight'] * g / rho /
+                                      inputs['weight'] * GRAV_CONST / rho /
                                       inputs['ac|geom|wing|S_ref'] / inputs['CLmax'] ** 2)
