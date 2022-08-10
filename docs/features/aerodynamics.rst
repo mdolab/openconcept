@@ -4,8 +4,7 @@
 Aerodynamics
 ************
 
-This document has some stuff in it.
-Can be used 
+OpenConcept's aerodynamics components provide an estimate of drag as a function of lift coefficient, flight conditions, and other parameters.
 
 Simple drag polar: ``PolarDrag``
 ================================
