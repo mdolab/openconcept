@@ -71,7 +71,7 @@ Propeller: ``SimplePropeller``
 ------------------------------
 
 This model uses an empirical propeller efficiency map for a constant speed turboprop propeller under the hood.
-For low speed, it uses a static thrust coefficient map from Raymer.
+For low speed, it uses a static thrust coefficient map from :cite:t:`raymer2006aircraft`.
 Propeller maps for three and four bladed propellers are included.
 
 Generator: ``SimpleGenerator``
@@ -87,3 +87,5 @@ This component enables electrical or mechanical shaft power to be split to two c
 It uses either a fractional or fixed split method where fractional splits the input power by a fraction (set by an input) and fixed sends a specified amount of power (set by an input) to one of the outputs.
 The efficiency can be changed from the default of 100%, which results in some heat being generated.
 Cost and weight are modeled as linear functions of the power rating.
+
+.. bibliography::

@@ -248,6 +248,7 @@ extensions = [
 	'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
+    'sphinxcontrib.bibtex',
     'sphinx_copybutton',
     'sphinx_mdolab_theme.ext.embed_code',
     'sphinx_mdolab_theme.ext.embed_compare',
@@ -281,6 +282,8 @@ master_doc = 'index'
 # Usually you set "language" from the command line for these cases.
 language = 'en'
 
+# This sets the bibtex bibliography file(s) to reference in the documentation
+bibtex_bibfiles = ['ref.bib']
 
 # -- Options for HTML output -------------------------------------------------
 
