@@ -1,8 +1,16 @@
 import unittest
 import numpy as np
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
-from openmdao.api import Problem, NewtonSolver, DirectSolver
-import openconcept.thermal.heat_pipe as hp
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.api import Problem
+from openconcept.thermal.heat_pipe import (
+    HeatPipe,
+    HeatPipeThermalResistance,
+    HeatPipeVaporTempDrop,
+    HeatPipeWeight,
+    AmmoniaProperties,
+    QMaxHeatPipe,
+    QMaxAnalyticalPart,
+)
 
 class HeatPipeIntegrationTestCase(unittest.TestCase):
     """
@@ -12,7 +20,7 @@ class HeatPipeIntegrationTestCase(unittest.TestCase):
         nn = 1
         theta = 84.
         prob = Problem()
-        pipe = prob.model.add_subsystem('test', hp.HeatPipe(num_nodes=nn, theta=theta), promotes=['*'])
+        pipe = prob.model.add_subsystem('test', HeatPipe(num_nodes=nn, theta=theta), promotes=['*'])
         pipe.set_input_defaults('T_evap', units='degC', val=np.linspace(30, 30, nn))
         pipe.set_input_defaults('q', units='W', val=np.linspace(400, 400, nn))
         pipe.set_input_defaults('length', units='m', val=10.22)
@@ -33,7 +41,7 @@ class HeatPipeIntegrationTestCase(unittest.TestCase):
     def test_simple_vector(self):
         nn = 5
         prob = Problem()
-        pipe = prob.model.add_subsystem('test', hp.HeatPipe(num_nodes=nn), promotes=['*'])
+        pipe = prob.model.add_subsystem('test', HeatPipe(num_nodes=nn), promotes=['*'])
         pipe.set_input_defaults('T_evap', units='degC', val=np.linspace(30, 60, nn))
         pipe.set_input_defaults('q', units='W', val=np.linspace(400, 1000, nn))
         pipe.set_input_defaults('length', units='m', val=10.22)
@@ -57,7 +65,7 @@ class HeatPipeIntegrationTestCase(unittest.TestCase):
 
         # Run one and two pipes to compare results
         one = Problem()
-        pipe = one.model.add_subsystem('test', hp.HeatPipe(num_nodes=nn), promotes=['*'])
+        pipe = one.model.add_subsystem('test', HeatPipe(num_nodes=nn), promotes=['*'])
         pipe.set_input_defaults('T_evap', units='degC', val=np.linspace(30, 30, nn))
         pipe.set_input_defaults('q', units='W', val=np.linspace(200, 200, nn))
         pipe.set_input_defaults('length', units='m', val=10.22)
@@ -73,7 +81,7 @@ class HeatPipeIntegrationTestCase(unittest.TestCase):
 
         # Twice as many pipes with twice as much heat
         two = Problem()
-        pipe = two.model.add_subsystem('test', hp.HeatPipe(num_nodes=nn), promotes=['*'])
+        pipe = two.model.add_subsystem('test', HeatPipe(num_nodes=nn), promotes=['*'])
         pipe.set_input_defaults('T_evap', units='degC', val=np.linspace(30, 30, nn))
         pipe.set_input_defaults('q', units='W', val=np.linspace(400, 400, nn))
         pipe.set_input_defaults('length', units='m', val=10.22)
@@ -98,7 +106,7 @@ class HeatPipeThermalResistanceTestCase(unittest.TestCase):
     def test_default_settings(self):
         nn = 3
         p = Problem()
-        p.model.add_subsystem('test', hp.HeatPipeThermalResistance(num_nodes=nn), promotes=['*'])
+        p.model.add_subsystem('test', HeatPipeThermalResistance(num_nodes=nn), promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
         p.run_model()
 
@@ -114,7 +122,7 @@ class HeatPipeVaporTempDropTestCase(unittest.TestCase):
     def test_default_settings(self):
         nn = 3
         p = Problem()
-        p.model.add_subsystem('test', hp.HeatPipeVaporTempDrop(num_nodes=nn), promotes=['*'])
+        p.model.add_subsystem('test', HeatPipeVaporTempDrop(num_nodes=nn), promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
         p.run_model()
         
@@ -129,7 +137,7 @@ class HeatPipeWeightTestCase(unittest.TestCase):
     """
     def test_default_settings(self):
         p = Problem()
-        p.model.add_subsystem('test', hp.HeatPipeWeight(), promotes=['*'])
+        p.model.add_subsystem('test', HeatPipeWeight(), promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
         p.run_model()
         
@@ -145,7 +153,7 @@ class AmmoniaPropertiesTestCase(unittest.TestCase):
     def test_on_data(self):
         nn = 3
         p = Problem()
-        comp = p.model.add_subsystem('test', hp.AmmoniaProperties(num_nodes=nn), promotes=['*'])
+        comp = p.model.add_subsystem('test', AmmoniaProperties(num_nodes=nn), promotes=['*'])
         comp.set_input_defaults('temp', units='degC', val=np.ones(nn)*90.)
         p.setup(check=True, force_alloc_complex=True)
         p.run_model()
@@ -159,7 +167,7 @@ class AmmoniaPropertiesTestCase(unittest.TestCase):
     def test_interpolated(self):
         nn = 6
         p = Problem()
-        comp = p.model.add_subsystem('test', hp.AmmoniaProperties(num_nodes=nn), promotes=['*'])
+        comp = p.model.add_subsystem('test', AmmoniaProperties(num_nodes=nn), promotes=['*'])
         comp.set_input_defaults('temp', units='degC', val=np.linspace(-7., 78., nn))
         p.setup(check=True, force_alloc_complex=True)
         p.run_model()
@@ -177,7 +185,7 @@ class QMaxHeatPipeTestCase(unittest.TestCase):
     def test_default_settings(self):
         nn = 3
         p = Problem()
-        comp = p.model.add_subsystem('test', hp.QMaxHeatPipe(num_nodes=nn), promotes=['*'])
+        comp = p.model.add_subsystem('test', QMaxHeatPipe(num_nodes=nn), promotes=['*'])
         comp.set_input_defaults('temp', units='degC', val=np.linspace(30, 60, nn))
         comp.set_input_defaults('length', units='m', val=10.22)
         comp.set_input_defaults('inner_diam', units='inch', val=.902)
@@ -198,7 +206,7 @@ class QMaxAnalyticalPartTestCase(unittest.TestCase):
     def test_default_settings(self):
         nn = 3
         p = Problem()
-        p.model.add_subsystem('test', hp.QMaxAnalyticalPart(num_nodes=nn), promotes=['*'])
+        p.model.add_subsystem('test', QMaxAnalyticalPart(num_nodes=nn), promotes=['*'])
         p.setup(check=True, force_alloc_complex=True)
         p.run_model()
         
