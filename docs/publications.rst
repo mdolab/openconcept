@@ -52,7 +52,7 @@ PDF is available `here <https://mdolab.engin.umich.edu/bibliography/Adler2022a>`
 Benjamin J. Brelje, John P. Jasa, Joaquim R.R.A. Martins, and Justin S. Gray,
 *Development of a Conceptual-Level Thermal Management System Design Capability in OpenConcept*,
 NATO Research Symposium on Hybrid/Electric Aero-Propulsion Systems for Military Applications (AVT-RSY-323), 2019,
-DOI: `10.14339/STO-MP-AVT-323 <https://doi.org/10.14339/STO-MP-AVT-323>`_.
+DOI: 10.14339/STO-MP-AVT-323.
 PDF is available `here <https://www.sto.nato.int/publications/STO%20Meeting%20Proceedings/STO-MP-AVT-323/MP-AVT-323-21.pdf>`__.
 
 .. code-block:: bibtex
