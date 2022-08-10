@@ -114,7 +114,7 @@ For example, in our equation we are computing
 The differential is :math:`dt` and has units of time (we'll use seconds here).
 
 The ``time_setup`` option sets what information the integrator uses to figure out the time at each integration point.
-The options are ``"dt"duration"``, or ``"bounds"``.
+The options are ``"dt"``, ``"duration"``, or ``"bounds"``.
 
 - ``"dt"`` creates an input called ``"dt"`` that specifies the time spacing between each numerical integration point
 - ``"duration"`` creates an input called ``"duration"`` that specifies the total time of the phase. The time between each integration point is computed by dividing the duration by the number of time steps (number of nodes minus one). This is the most common choice for the time setup and has the advantage that **OpenConcept automatically connects the** ``"duration"`` **input to the mission-level duration, so there is no manual time connection needed**.
