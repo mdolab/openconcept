@@ -41,7 +41,7 @@ The systems with thermal management components are also implemented in ``thermal
 Turbofan
 --------
 OpenConcept implements two turbofan engine models, CFM56 and a geared turbofan (GTF) for NASA's N+3 aircraft.
-Both are the surrogate models of `pyCycle <https://github.com/OpenMDAO/pyCycle>`_, a thermodynamic cycle modeling tool builed on the OpenMDAO framework.
+Both are surrogate models derived from `pyCycle <https://github.com/OpenMDAO/pyCycle>`__, a thermodynamic cycle modeling tool built on the OpenMDAO framework.
 The inputs to the turbofan models are the engine throttle and flight conditions (Mach number and altitude), and outputs are the thrust and fuel flow.
 In addition, the CFM56 model outputs the turbine inlet temperature, and the N+3 model outputs the surge margin.
 
