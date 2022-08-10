@@ -4,4 +4,3 @@ from .derivatives import FirstDerivative
 from .integrals import Integrator
 from .max_min_comp import MaxComp, MinComp
 from .multiply_divide_comp import ElementMultiplyDivideComp
-from .sum_comp import SumComp  # this is probably now obselete given the AddSubtractComp
