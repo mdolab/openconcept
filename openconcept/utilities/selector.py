@@ -1,4 +1,3 @@
-from __future__ import division
 import openmdao.api as om
 import numpy as np
 

@@ -1,0 +1,3 @@
+sphinx-mdolab-theme
+openmdao
+matplotlib

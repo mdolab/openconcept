@@ -1,4 +1,3 @@
-from __future__ import division
 import numpy as np
 import scipy.sparse as sp
 from openmdao.api import ExplicitComponent
@@ -205,7 +204,7 @@ def first_deriv_partials(dts, q, n_segments=1, n_simpson_intervals_per_segment=2
 
 class FirstDerivative(ExplicitComponent):
     """
-    This component integrates differentiates a vector using a second or fourth order finite difference approximation
+    This component differentiates a vector using a second or fourth order finite difference approximation
 
     Inputs
     ------

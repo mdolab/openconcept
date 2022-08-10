@@ -1,1 +1,0 @@
-"""Analysis routines for conceptual aircraft design"""

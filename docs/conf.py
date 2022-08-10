@@ -15,6 +15,7 @@
 import os
 import sys
 import openconcept
+import subprocess
 
 from sphinx_mdolab_theme.config import *
 
@@ -157,6 +158,43 @@ Source Docs
     index.close()
 
 
+def run_file_move_result(file_name, output_files, destination_files, optional_cl_args=[]):
+    """
+    Run a file (as a subprocess) that produces output file(s) of interest.
+    This function then moves the file(s) to a specified location.
+
+    For example, a file may produce a figure that is used in the docs.
+    This function can be used to automatically generate the figure in the RTD build
+    and move it to a specific location in the RTD build.
+
+    Note that the file is run from the openconcept/docs directory and all relative paths
+    are relative to this directory. If the output file name is defined in the script
+    using a relative path remember to take it into account.
+
+    Parameters
+    ----------
+    file_name : str
+        Python file to be run
+    output_files : list of str
+        Output files produced by running file_name
+    destination_files : list of str
+        Destination paths/file names to move output_file to (must be same length as output_files)
+    optional_cl_args : list of str
+        Optional command line arguments to add when file_name is run by Python
+    """
+    # Error check
+    if len(output_files) != len(destination_files):
+        raise ValueError("The number of output files must be the same as destination file paths")
+
+    # Run the file
+    subprocess.run(["python", file_name] + optional_cl_args)
+
+    # Move the files
+    for output_file, destination_file in zip(output_files, destination_files):
+        os.makedirs(os.path.dirname(destination_file), exist_ok=True)
+        os.replace(output_file, destination_file)
+
+
 # Patch the Napoleon parser to find Inputs, Outputs, and Options headings in docstrings
 
 from sphinx.ext.napoleon.docstring import NumpyDocstring
@@ -210,7 +248,11 @@ extensions = [
 	'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
-    "sphinx_copybutton",
+    'sphinxcontrib.bibtex',
+    'sphinx_copybutton',
+    'sphinx_mdolab_theme.ext.embed_code',
+    'sphinx_mdolab_theme.ext.embed_compare',
+    'sphinx_mdolab_theme.ext.embed_n2',
 ]
 autodoc_inherit_docstrings = False
 autodoc_member_order = 'bysource'
@@ -240,6 +282,8 @@ master_doc = 'index'
 # Usually you set "language" from the command line for these cases.
 language = 'en'
 
+# This sets the bibtex bibliography file(s) to reference in the documentation
+bibtex_bibfiles = ['ref.bib']
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -308,6 +352,16 @@ texinfo_documents = [
 
 # -- Extension configuration -------------------------------------------------
 
+# -- Run examples to get figures for docs ------------------------------------
+run_file_move_result("../openconcept/examples/minimal.py", ["minimal_example_results.svg"], ["tutorials/assets/minimal_example_results.svg"], optional_cl_args=["--hide_visuals"])
+run_file_move_result("../openconcept/examples/minimal_integrator.py", ["minimal_integrator_results.svg"], ["tutorials/assets/minimal_integrator_results.svg"], optional_cl_args=["--hide_visuals"])
+run_file_move_result("../openconcept/examples/TBM850.py", ["turboprop_takeoff_results.svg", "turboprop_mission_results.svg"], ["tutorials/assets/turboprop_takeoff_results.svg", "tutorials/assets/turboprop_mission_results.svg"], optional_cl_args=["--hide_visuals"])
+
+# Remove the N2 diagrams it also created
+files_remove = ["minimal_example_n2.html", "minimal_integrator_n2.html", "turboprop_n2.html"]
+for file in files_remove:
+    os.remove(file)
+
 # -- Options for intersphinx extension ---------------------------------------
 
 # Example configuration for intersphinx: refer to the Python standard library.
@@ -324,11 +378,16 @@ if generate_srcdocs:
     # subprocess.call(['sphinx-apidoc','-o','_srcdocs_native','../openconcept'])
     # os.rename('_srcdocs_native/modules.rst','_srcdocs_native/index.rst')
     # openmdao way
-    packages = ['analysis',
-                'analysis.openaerostruct',
-                'analysis.atmospherics',
-                'analysis.performance',
-                'components',
-                'utilities',
-                'utilities.math']
+    packages = [
+        'aerodynamics',
+        'aerodynamics.openaerostruct',
+        'atmospherics',
+        'energy_storage',
+        'mission',
+        'propulsion',
+        'propulsion.systems',
+        'thermal',
+        'utilities',
+        'utilities.math'
+    ]
     generate_src_docs(".", "../openconcept", packages)

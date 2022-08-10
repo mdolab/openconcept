@@ -10,9 +10,16 @@
 
 OpenConcept is a new toolkit for the conceptual design of aircraft. OpenConcept was developed in order to model and optimize aircraft with electric propulsion at low computational cost. The tools are built on top of NASA Glenn's [OpenMDAO](http://openmdao.org/) framework, which in turn is written in Python.
 
+OpenConcept is capable of modeling a wide range of propulsion systems, including detailed thermal management systems.
+The following figure (from [this paper](https://doi.org/10.3390/aerospace9050243)) shows one such system that is modeled in the `N3_HybridSingleAisle_Refrig.py` example.
+
+<h2 align="center">
+    <img src="/docs/_static/images/full_parallel_system_chiller.png" width="500" />
+</h2>
+
 The following charts show more than 250 individually optimized hybrid-electric light twin aircraft (similar to a King Air C90GT). Optimizing hundreds of configurations can be done in a couple of hours on a standard laptop computer.
 
-![Example charts](https://raw.githubusercontent.com/mdolab/openconcept/main/docs/_static/images/readme_charts.png)
+![Example charts](/docs/_static/images/readme_charts.png)
 
 The reason for OpenConcept's efficiency is the analytic derivatives built into each analysis routine and component. Accurate, efficient derivatives enable the use of Newton nonlinear equation solutions and gradient-based optimization at low computational cost.
 
@@ -35,16 +42,25 @@ To run the examples or edit the source code:
 2. Navigate to the root `openconcept` folder
 3. Run `pip install -e .` to install the package (the `-e` can be omitted if not editing the source)
 
-Get started by running the `TBM850` example:
-1. Navigate to the `examples` folder
-2. Run `python TBM850.py` to test OpenConcept on a single-engine turboprop aircraft (the TBM 850)
-3. Look at the `examples/aircraft data/TBM850.py` file to play with the assumptions / config / geometry and see the effects on the output result
-
-`examples/HybridTwin.py` is set up to do MDO in a grid of specific energies and design ranges and save the results to disk. Visualization utilities will be added soon (to produce contour plots as shown in this Readme)
+Get started by following the tutorials in the documentation to learn the most important parts of OpenConcept.
+The features section of the documentation describes most of the components and system models available in OpenConcept.
 
 ### Requirements
 
-This toolkit requires the use of [OpenMDAO](https://openmdao.org/) 3.10.0 or later. OpenMDAO requires a late NumPy and SciPy.
+<!-- Remember to change docs/index.rst too! -->
+
+This toolkit requires the use of [OpenMDAO](https://openmdao.org/) 3.10.0 or later.
+OpenMDAO requires a late NumPy and SciPy.
+
+The latest versions all tests have passed on are
+
+| Package | Version |
+| ------- | ------- |
+| Python | 3.10.4 |
+| OpenMDAO | 3.16.0 |
+| NumPy | 1.22.4 |
+| SciPy | 1.7.3 |
+| OpenAeroStruct | 2.5.1 |
 
 ## Citation
 
@@ -78,6 +94,3 @@ Eytan J. Adler and Joaquim R.R.A. Martins, "Aerostructural wing design optimizat
 	year        = {2022}
 	}
 ```
-
-## Contributing
-A contributor's guide is coming third (after completing documentation and automatic testing). I'm open to pull requests and issues in the meantime. Stay tuned.

@@ -2,8 +2,6 @@
 
 from collections.abc import Iterable
 import numpy as np
-from scipy import sparse as sp
-from six import string_types
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 
@@ -55,7 +53,7 @@ class VectorConcatenateComp(ExplicitComponent):
 
         self._add_systems = []
 
-        if isinstance(output_name, string_types):
+        if isinstance(output_name, str):
             if (not isinstance(input_names, Iterable) or
                     not isinstance(vec_sizes, Iterable)):
                 raise ValueError('User must provide list of input name(s)'
@@ -148,7 +146,7 @@ class VectorConcatenateComp(ExplicitComponent):
         """
         for (output_name, input_names, vec_sizes, length, val,
              kwargs) in self._add_systems:
-            if isinstance(input_names, string_types):
+            if isinstance(input_names, str):
                 input_names = [input_names]
 
             units = kwargs.get('units', None)
@@ -197,7 +195,7 @@ class VectorConcatenateComp(ExplicitComponent):
         """
         for (output_name, input_names, vec_sizes, length, val,
              kwargs) in self._add_systems:
-            if isinstance(input_names, string_types):
+            if isinstance(input_names, str):
                 input_names = [input_names]
 
             if self.under_complex_step:
@@ -263,7 +261,7 @@ class VectorSplitComp(ExplicitComponent):
 
         self._add_systems = []
 
-        if isinstance(input_name, string_types):
+        if isinstance(input_name, str):
             if (not isinstance(output_names, Iterable) or
                     not isinstance(vec_sizes, Iterable)):
                 raise ValueError('User must provide list of output name(s)'
@@ -356,7 +354,7 @@ class VectorSplitComp(ExplicitComponent):
         """
         for (output_names, input_name, vec_sizes, length, val,
              kwargs) in self._add_systems:
-            if isinstance(output_names, string_types):
+            if isinstance(output_names, str):
                 output_names = [output_names]
 
             units = kwargs.get('units', None)
@@ -404,7 +402,7 @@ class VectorSplitComp(ExplicitComponent):
         """
         for (output_names, input_name, vec_sizes, length, val,
              kwargs) in self._add_systems:
-            if isinstance(output_names, string_types):
+            if isinstance(output_names, str):
                 output_names = [output_names]
 
             if self.under_complex_step:

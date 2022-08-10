@@ -1,4 +1,3 @@
-from __future__ import division
 import numpy as np
 import scipy.sparse as sp
 from openmdao.api import ExplicitComponent
@@ -505,7 +504,7 @@ class Integrator(ExplicitComponent):
     diff_units : str
         The units of the integrand (none by default)
     method : str
-        Numerical method (default 'bdf3'; alternatively, 'simpson)
+        Numerical method (default 'bdf3'; alternatively, 'simpson')
     time_setup : str
         Time configuration (default 'dt')
         'dt' creates input 'dt'
@@ -562,6 +561,8 @@ class Integrator(ExplicitComponent):
             val : float
                 Default value for the integrated output (default 0.0)
                 Can be scalar or shape num_nodes
+            start_val : float
+                Default value for the initial value input (default 0.0)
             upper : float
                 Upper bound on integrated quantity
             lower : float

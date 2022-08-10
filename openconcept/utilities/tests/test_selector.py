@@ -1,9 +1,8 @@
-from __future__ import division
 import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import Problem
-from openconcept.utilities.selector import SelectorComp
+from openconcept.utilities import SelectorComp
 
 class SelectorCompTestCase(unittest.TestCase):
     """

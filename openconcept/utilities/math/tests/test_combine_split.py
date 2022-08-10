@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp
-from openconcept.utilities.math.combine_split_comp import VectorConcatenateComp, VectorSplitComp
+from openconcept.utilities import VectorConcatenateComp, VectorSplitComp
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 class TestConcatenateScalars(unittest.TestCase):
@@ -606,7 +606,7 @@ class TestForDocs(unittest.TestCase):
         import numpy as np
         from openmdao.api import Problem, Group, IndepVarComp
         from openmdao.utils.assert_utils import assert_near_equal
-        from openconcept.utilities.math.combine_split_comp import VectorConcatenateComp, VectorSplitComp
+        from openconcept.utilities import VectorConcatenateComp, VectorSplitComp
 
         n_takeoff_pts = 3
         n_cruise_pts = 5
