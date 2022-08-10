@@ -12,7 +12,7 @@ The propulsion system in ``HybridTwin_thermal.py`` uses other ones.
 Liquid-cooled components
 ========================
 
-These models group together basic thermal models to create components that model the effect heat being added to some thermal mass (or it's massless) and then dumped into a liquid coolant loop.
+These group together basic thermal models to create components that model the effect of heat being added to some thermal mass (or it's massless) and then dumped into a liquid coolant loop.
 
 Generic: ``LiquidCooledComp``
 -----------------------------
