@@ -11,7 +11,7 @@ Component positions within the aircraft are not considered; all masses are accum
 Single-engine turboprop OEW: ``SingleTurboPropEmptyWeight``
 ===========================================================
 
-This model combines estimates from Raymer, Torenbeek, Roskam, and others to compute the total operating empty weight of a small single-engine turboprop aircraft.
+This model combines estimates from :footcite:t:`raymer2006aircraft` and :footcite:t:`roskam2019airplane` to compute the total operating empty weight of a small single-engine turboprop aircraft.
 The engine and propeller weight are not computed since OpenConcept's turboshaft and propeller models compute those separately.
 Thus, those weights must be provided to this component by the user.
 
@@ -32,3 +32,5 @@ Twin-engine series hybrid OEW: ``TwinSeriesHybridEmptyWeight``
 
 This model uses all the same components as ``SingleTurboPropEmptyWeight``, except it adds weight inputs required by the user to account for the hybrid propulsion system.
 The additional weights, which are computed by other OpenConcept components, are electric motor weight and generator weight.
+
+.. footbibliography::

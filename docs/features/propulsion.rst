@@ -71,7 +71,7 @@ Propeller: ``SimplePropeller``
 ------------------------------
 
 This model uses an empirical propeller efficiency map for a constant speed turboprop propeller under the hood.
-For low speed, it uses a static thrust coefficient map from :cite:t:`raymer2006aircraft`.
+For low speed, it uses a static thrust coefficient map from :footcite:t:`raymer2006aircraft`.
 Propeller maps for three and four bladed propellers are included.
 
 Generator: ``SimpleGenerator``
@@ -88,4 +88,4 @@ It uses either a fractional or fixed split method where fractional splits the in
 The efficiency can be changed from the default of 100%, which results in some heat being generated.
 Cost and weight are modeled as linear functions of the power rating.
 
-.. bibliography::
+.. footbibliography::
