@@ -2,7 +2,20 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import IndepVarComp, Group, Problem
-from openconcept.thermal.heat_exchanger import *
+from openconcept.thermal.heat_exchanger import (
+    OffsetStripFinGeometry,
+    HydraulicDiameterReynoldsNumber,
+    OffsetStripFinData,
+    NusseltFromColburnJ,
+    ConvectiveCoefficient,
+    FinEfficiency,
+    UAOverall,
+    NTUMethod,
+    CrossFlowNTUEffectiveness,
+    NTUEffectivenessActualHeatTransfer,
+    OutletTemperatures,
+    PressureDrop
+)
 
 class OSFGeometryTestGroup(Group):
     """
