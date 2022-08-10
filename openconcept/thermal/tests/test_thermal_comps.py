@@ -2,7 +2,14 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import Problem, NewtonSolver, DirectSolver
-import openconcept.thermal as thermal
+from openconcept.thermal import (
+    PerfectHeatTransferComp,
+    ThermalComponentWithMass,
+    ConstantSurfaceTemperatureColdPlate_NTU,
+    LiquidCooledComp,
+    CoolantReservoirRate,
+    CoolantReservoir,
+)
 
 class PerfectHeatTransferCompTestCase(unittest.TestCase):
     """
@@ -11,7 +18,7 @@ class PerfectHeatTransferCompTestCase(unittest.TestCase):
     def test_comp(self):
         num_nodes = 3
         prob = Problem()
-        prob.model.add_subsystem('test', thermal.PerfectHeatTransferComp(num_nodes=num_nodes), promotes=['*'])
+        prob.model.add_subsystem('test', PerfectHeatTransferComp(num_nodes=num_nodes), promotes=['*'])
         prob.setup(check=True, force_alloc_complex=True)
 
         # Set the values
@@ -36,7 +43,7 @@ class ThermalComponentWithMassTestCase(unittest.TestCase):
     def test_comp(self):
         num_nodes = 3
         prob = Problem()
-        prob.model.add_subsystem('test', thermal.ThermalComponentWithMass(num_nodes=num_nodes), promotes=['*'])
+        prob.model.add_subsystem('test', ThermalComponentWithMass(num_nodes=num_nodes), promotes=['*'])
         prob.setup(check=True, force_alloc_complex=True)
 
         # Set the values
@@ -58,7 +65,7 @@ class ColdPlateTestCase(unittest.TestCase):
     def test_comp(self):
         num_nodes = 3
         prob = Problem()
-        prob.model.add_subsystem('test', thermal.ConstantSurfaceTemperatureColdPlate_NTU(num_nodes=num_nodes), promotes=['*'])
+        prob.model.add_subsystem('test', ConstantSurfaceTemperatureColdPlate_NTU(num_nodes=num_nodes), promotes=['*'])
         prob.setup(check=True, force_alloc_complex=True)
 
         # Set the values
@@ -85,7 +92,7 @@ class LiquidCooledCompTestCase(unittest.TestCase):
         prob.model.nonlinear_solver=NewtonSolver()
         prob.model.linear_solver = DirectSolver()
         prob.model.nonlinear_solver.options['solve_subsystems'] = True
-        prob.model.add_subsystem('test', thermal.LiquidCooledComp(num_nodes=num_nodes), promotes=['*'])
+        prob.model.add_subsystem('test', LiquidCooledComp(num_nodes=num_nodes), promotes=['*'])
         prob.setup(check=True, force_alloc_complex=True)
 
         # Set the values
@@ -115,7 +122,7 @@ class CoolantReservoirRateTestCase(unittest.TestCase):
     def test_comp(self):
         num_nodes = 3
         prob = Problem()
-        prob.model.add_subsystem('test', thermal.CoolantReservoirRate(num_nodes=num_nodes), promotes=['*'])
+        prob.model.add_subsystem('test', CoolantReservoirRate(num_nodes=num_nodes), promotes=['*'])
         prob.setup(check=True, force_alloc_complex=True)
 
         # Set the values
@@ -141,7 +148,7 @@ class ReservoirTestCase(unittest.TestCase):
         prob.model.nonlinear_solver=NewtonSolver()
         prob.model.linear_solver = DirectSolver()
         prob.model.nonlinear_solver.options['solve_subsystems'] = True
-        prob.model.add_subsystem('test', thermal.CoolantReservoir(num_nodes=num_nodes), promotes=['*'])
+        prob.model.add_subsystem('test', CoolantReservoir(num_nodes=num_nodes), promotes=['*'])
         prob.setup(check=True, force_alloc_complex=True)
 
         # Set the values
