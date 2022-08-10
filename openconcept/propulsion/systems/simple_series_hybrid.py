@@ -1,5 +1,4 @@
 
-from __future__ import division
 from openconcept.propulsion import SimpleMotor, PowerSplit, SimpleGenerator, SimpleTurboshaft, SimplePropeller
 from openconcept.energy_storage import SimpleBattery, SOCBattery
 from openconcept.utilities import DVLabel, AddSubtractComp, ElementMultiplyDivideComp

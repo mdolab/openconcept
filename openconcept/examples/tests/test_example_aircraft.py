@@ -1,5 +1,4 @@
 
-from __future__ import division
 import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal

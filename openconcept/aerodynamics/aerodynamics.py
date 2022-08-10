@@ -1,5 +1,4 @@
 """Aerodynamic analysis routines usable for multiple purposes / flight phases"""
-from __future__ import division
 from openmdao.api import ExplicitComponent
 import numpy as np
 from openconcept.utilities.constants import GRAV_CONST

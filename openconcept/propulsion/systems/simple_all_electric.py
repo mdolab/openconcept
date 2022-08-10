@@ -1,4 +1,3 @@
-from __future__ import division
 from openconcept.propulsion import SimpleMotor, SimplePropeller
 from openconcept.energy_storage import SOCBattery
 from openconcept.utilities import DVLabel

@@ -1,4 +1,3 @@
-from __future__ import division
 import numpy as np
 from openmdao.api import ExplicitComponent, Group, MetaModelStructuredComp, ExecComp
 from openconcept.utilities import ElementMultiplyDivideComp

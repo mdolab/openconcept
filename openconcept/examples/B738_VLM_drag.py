@@ -14,7 +14,6 @@ Please cite it if you use this for your own publication!
 Eytan Adler (Jan 2022)
 """
 
-from __future__ import division
 import numpy as np
 
 import openmdao.api as om

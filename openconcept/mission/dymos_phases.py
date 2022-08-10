@@ -1,4 +1,3 @@
-from __future__ import division
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, BalanceComp, ImplicitComponent
 import openmdao.api as om
 from openconcept.atmospherics import ComputeAtmosphericProperties

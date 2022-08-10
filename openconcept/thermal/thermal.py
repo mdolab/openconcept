@@ -1,4 +1,3 @@
-from __future__ import division
 from openmdao.api import Group, ExplicitComponent, ImplicitComponent
 import numpy as np
 from openconcept.utilities.math.integrals import Integrator

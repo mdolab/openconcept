@@ -1,4 +1,3 @@
-from __future__ import division
 import numpy as np
 from openmdao.api import ExplicitComponent, IndepVarComp, Group
 from openconcept.utilities import DVLabel

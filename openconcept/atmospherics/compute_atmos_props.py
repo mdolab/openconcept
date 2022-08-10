@@ -1,4 +1,3 @@
-from __future__ import division
 from openconcept.atmospherics import TemperatureComp, PressureComp, DensityComp, DynamicPressureComp, TrueAirspeedComp, EquivalentAirspeedComp, SpeedOfSoundComp, MachNumberComp
 from openmdao.api import Group
 

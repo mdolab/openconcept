@@ -1,7 +1,7 @@
 # DATA FOR TBM T80
 # Collected from various sources
 # including SOCATA pilot manual
-from __future__ import division
+
 import openmdao.api as om
 from openconcept.mission import IntegratorGroup
 from openconcept.thermal import PerfectHeatTransferComp
