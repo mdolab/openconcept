@@ -1,6 +1,5 @@
 import numpy as np
 from openmdao.api import ExplicitComponent
-from openmdao.api import Group
 
 
 class SimpleTurboshaft(ExplicitComponent):
@@ -71,11 +70,8 @@ class SimpleTurboshaft(ExplicitComponent):
         self.add_input("throttle", desc="Throttle input (Fractional)", shape=(nn,))
         self.add_input("shaft_power_rating", units="W", desc="Rated shaft power")
 
-        psfc = self.options["psfc"]
         weight_inc = self.options["weight_inc"]
-        weight_base = self.options["weight_base"]
         cost_inc = self.options["cost_inc"]
-        cost_base = self.options["cost_base"]
 
         self.add_output("shaft_power_out", units="W", desc="Output shaft power", shape=(nn,))
         self.add_output("fuel_flow", units="kg/s", desc="Fuel flow in (kg fuel / s)", shape=(nn,))
@@ -96,16 +92,12 @@ class SimpleTurboshaft(ExplicitComponent):
         )
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         psfc = self.options["psfc"]
         weight_inc = self.options["weight_inc"]
         weight_base = self.options["weight_base"]
         cost_inc = self.options["cost_inc"]
         cost_base = self.options["cost_base"]
 
-        a = inputs["throttle"]
-        b = inputs["shaft_power_rating"]
-        c = a * b
         outputs["shaft_power_out"] = inputs["throttle"] * inputs["shaft_power_rating"]
         outputs["fuel_flow"] = inputs["throttle"] * inputs["shaft_power_rating"] * psfc
         outputs["component_cost"] = inputs["shaft_power_rating"] * cost_inc + cost_base

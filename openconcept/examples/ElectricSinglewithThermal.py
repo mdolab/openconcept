@@ -105,11 +105,7 @@ class ElectricTBMAnalysisGroup(Group):
         mission_data_comp.add_output("T_motor_initial", val=15, units="degC")
         mission_data_comp.add_output("T_res_initial", val=15.1, units="degC")
 
-        connect_phases_1 = ["v0v1", "v1vr", "rotate", "climb", "cruise", "descent"]
-        connect_states_1 = ["propmodel.batt1.SOC", "propmodel.motorheatsink.T", "propmodel.reservoir.T"]
-        extra_states_tuple_1 = [(connect_state, connect_phases_1) for connect_state in connect_states_1]
-
-        analysis = self.add_subsystem(
+        self.add_subsystem(
             "analysis",
             FullMissionAnalysis(num_nodes=nn, aircraft_model=ElectricTBM850Model, transition_method="ode"),
             promotes_inputs=["*"],
@@ -169,18 +165,6 @@ def show_outputs(prob):
     print("=======================================================================")
     for i, thing in enumerate(vars_list):
         print(nice_print_names[i] + ": " + str(prob.get_val(thing, units=units[i])[0]) + " " + str(units[i]))
-
-        y_variables = [
-            "fltcond|h",
-            "fltcond|Ueas",
-            "throttle",
-            "fltcond|vs",
-            "propmodel.batt1.SOC",
-            "propmodel.motorheatsink.T",
-            "propmodel.reservoir.T_out",
-            "propmodel.duct.mdot",
-        ]
-        y_units = ["ft", "kn", None, "ft/min", None, "degC", "degC", "kg/s"]
 
     # plot some stuff
     plots = True

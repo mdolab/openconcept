@@ -4,7 +4,6 @@ costs, so mission optimization routines will tend to favor slower, longer-time r
 """
 
 from openmdao.api import ExplicitComponent
-import numpy as np
 
 
 class TurbopropOperatingCost(ExplicitComponent):

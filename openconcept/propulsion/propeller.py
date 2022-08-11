@@ -6,8 +6,6 @@ from .empirical_data.prop_maps import (
     propeller_map_highpower,
     static_propeller_map_Raymer,
     static_propeller_map_highpower,
-    propeller_map_scaled,
-    propeller_map_constant_prop_efficiency,
 )
 
 
@@ -60,8 +58,6 @@ class SimplePropeller(Group):
     def setup(self):
         nn = self.options["num_nodes"]
         n_blades = self.options["num_blades"]
-        design_J = self.options["design_J"]
-        design_cp = self.options["design_cp"]
         if n_blades == 3:
             propmap = propeller_map_Raymer(nn)
             staticpropmap = static_propeller_map_Raymer(nn)

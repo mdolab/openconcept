@@ -60,11 +60,8 @@ class SimpleMotor(ExplicitComponent):
         self.add_input("elec_power_rating", units="W", desc="Rated electrical power (load)")
 
         # outputs and partials
-        eta_m = self.options["efficiency"]
         weight_inc = self.options["weight_inc"]
-        weight_base = self.options["weight_base"]
         cost_inc = self.options["cost_inc"]
-        cost_base = self.options["cost_base"]
 
         self.add_output("shaft_power_out", units="W", desc="Output shaft power", shape=(nn,))
         self.add_output("heat_out", units="W", desc="Waste heat out", shape=(nn,))

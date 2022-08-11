@@ -7,10 +7,10 @@ import openmdao.api as om
 try:
     from openaerostruct.geometry.geometry_group import Geometry
     from openaerostruct.aerodynamics.aero_groups import AeroPoint
-    from openconcept.aerodynamics.openaerostruct.drag_polar import *
+    from openconcept.aerodynamics.openaerostruct.drag_polar import VLMDataGen, VLM, VLMDragPolar, PlanformMesh, example_usage
 
     OAS_installed = True
-except:
+except ImportError:
     OAS_installed = False
 
 
@@ -508,7 +508,7 @@ class PlanformMeshTestCase(unittest.TestCase):
         assert_check_partials(partials, atol=2e-5)
 
 
-def run_OAS(inputs, with_viscous=True, with_wave=True, t_over_c=np.array([0.12])):
+def run_OAS(inputs, with_viscous=True, with_wave=True, t_over_c=None):
     """
     Runs OpenAeroStruct with flight condition and mesh inputs.
 
@@ -546,6 +546,9 @@ def run_OAS(inputs, with_viscous=True, with_wave=True, t_over_c=np.array([0.12])
             CD : float
                 Drag coefficient
     """
+    if t_over_c is None:
+        t_over_c = np.array([0.12])
+
     # Create a dictionary with info and options about the aerodynamic
     # lifting surface
     surface = {

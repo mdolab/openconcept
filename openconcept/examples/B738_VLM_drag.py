@@ -39,7 +39,6 @@ class B738AirplaneModel(IntegratorGroup):
 
     def setup(self):
         nn = self.options["num_nodes"]
-        flight_phase = self.options["flight_phase"]
 
         # a propulsion system needs to be defined in order to provide thrust
         # information for the mission analysis code
@@ -138,7 +137,7 @@ class B738AnalysisGroup(om.Group):
         dv_comp.add_output_from_dict("ac|q_cruise")
 
         # Run a full mission analysis including takeoff, reserve_, cruise,reserve_ and descereserve_nt
-        analysis = self.add_subsystem(
+        self.add_subsystem(
             "analysis",
             MissionWithReserve(num_nodes=nn, aircraft_model=B738AirplaneModel),
             promotes_inputs=["*"],

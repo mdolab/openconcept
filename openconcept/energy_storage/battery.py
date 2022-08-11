@@ -169,9 +169,7 @@ class SimpleBattery(ExplicitComponent):
         e_b = self.options["specific_energy"]
         self.add_input("specific_energy", units="W * h / kg", val=e_b)
         eta_b = self.options["efficiency"]
-        p_b = self.options["specific_power"]
         cost_inc = self.options["cost_inc"]
-        cost_base = self.options["cost_base"]
 
         self.add_output("heat_out", units="W", desc="Waste heat out", shape=(nn,))
         self.add_output("component_cost", units="USD", desc="Battery cost")
@@ -197,7 +195,6 @@ class SimpleBattery(ExplicitComponent):
         outputs["max_energy"] = inputs["battery_weight"] * e_b
 
     def compute_partials(self, inputs, J):
-        eta_b = self.options["efficiency"]
         p_b = self.options["specific_power"]
         e_b = inputs["specific_energy"]
         J["component_sizing_margin", "elec_load"] = 1 / (p_b * inputs["battery_weight"])

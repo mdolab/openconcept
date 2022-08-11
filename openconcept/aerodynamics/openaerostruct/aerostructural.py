@@ -5,6 +5,12 @@ from copy import copy, deepcopy
 import multiprocessing as mp
 import warnings
 
+# Atmospheric calculations
+from openconcept.atmospherics import TemperatureComp, PressureComp, DensityComp, SpeedOfSoundComp
+
+# Utitilty for vector manipulation
+from openconcept.utilities import VectorConcatenateComp
+
 # Progress bar
 progress_bar = True
 try:
@@ -22,12 +28,6 @@ try:
     from openconcept.aerodynamics.openaerostruct.drag_polar import PlanformMesh
 except ImportError:
     raise ImportError("OpenAeroStruct must be installed to use the AerostructDragPolar component")
-
-# Atmospheric calculations
-from openconcept.atmospherics import TemperatureComp, PressureComp, DensityComp, SpeedOfSoundComp
-
-# Utitilty for vector manipulation
-from openconcept.utilities import VectorConcatenateComp
 
 CITATION = """
 @InProceedings{Adler2022a,
@@ -588,7 +588,7 @@ data : dict
 
 def compute_training_data(inputs, surf_dict=None):
     t_start = time()
-    print(f"Generating OpenAeroStruct aerostructural training data...")
+    print("Generating OpenAeroStruct aerostructural training data...")
 
     # Set up test points for use in parallelized map function ([Mach, alpha, altitude, inputs] for each point)
     test_points = np.array(
@@ -1560,7 +1560,7 @@ def example_usage():
 
     p.run_model()
 
-    print(f"================== SURROGATE ==================")
+    print("================== SURROGATE ==================")
     print(f"CL: {p.get_val('aero_surrogate.CL')}")
     print(f"CD: {p.get_val('aero_surrogate.CD')}")
     print(f"Alpha: {p.get_val('aero_surrogate.alpha', units='deg')} deg")
@@ -1597,7 +1597,7 @@ def example_usage():
 
     prob.run_model()
 
-    print(f"================== OpenAeroStruct ==================")
+    print("================== OpenAeroStruct ==================")
     print(f"CL: {prob.get_val('fltcond|CL')}")
     print(f"CD: {prob.get_val('fltcond|CD')}")
     print(f"Alpha: {prob.get_val('fltcond|alpha', units='deg')} deg")

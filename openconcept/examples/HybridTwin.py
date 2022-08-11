@@ -2,9 +2,7 @@ import os
 import logging
 import numpy as np
 
-from openmdao.api import Problem, Group, ScipyOptimizeDriver
-from openmdao.api import BalanceComp, ExplicitComponent, ExecComp, SqliteRecorder
-from openmdao.api import DirectSolver, IndepVarComp, NewtonSolver, BoundsEnforceLS
+from openmdao.api import Problem, Group, ScipyOptimizeDriver, ExplicitComponent, ExecComp, SqliteRecorder, DirectSolver, IndepVarComp, NewtonSolver
 
 # imports for the airplane model itself
 from openconcept.aerodynamics import PolarDrag
@@ -52,7 +50,7 @@ class SeriesHybridTwinModel(Group):
         else:
             controls.add_output("hybridization", val=1.0)
 
-        hybrid_factor = self.add_subsystem(
+        self.add_subsystem(
             "hybrid_factor",
             LinearInterpolator(num_nodes=nn),
             promotes_inputs=[("start_val", "hybridization"), ("end_val", "hybridization")],
@@ -167,14 +165,14 @@ class ElectricTwinAnalysisGroup(Group):
         mission_data_comp = self.add_subsystem("mission_data_comp", IndepVarComp(), promotes_outputs=["*"])
         mission_data_comp.add_output("batt_soc_target", val=0.1, units=None)
 
-        analysis = self.add_subsystem(
+        self.add_subsystem(
             "analysis",
             FullMissionAnalysis(num_nodes=nn, aircraft_model=SeriesHybridTwinModel),
             promotes_inputs=["*"],
             promotes_outputs=["*"],
         )
 
-        margins = self.add_subsystem(
+        self.add_subsystem(
             "margins",
             ExecComp(
                 "MTOW_margin = MTOW - OEW - total_fuel - W_battery - payload",
@@ -192,7 +190,7 @@ class ElectricTwinAnalysisGroup(Group):
         self.connect("ac|weights|MTOW", "margins.MTOW")
         self.connect("ac|weights|W_battery", "margins.W_battery")
 
-        augobj = self.add_subsystem("aug_obj", AugmentedFBObjective(), promotes_outputs=["mixed_objective"])
+        self.add_subsystem("aug_obj", AugmentedFBObjective(), promotes_outputs=["mixed_objective"])
         self.connect("ac|weights|MTOW", "aug_obj.ac|weights|MTOW")
         self.connect("descent.fuel_used_final", "aug_obj.fuel_burn")
 

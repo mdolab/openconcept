@@ -60,9 +60,7 @@ class SimpleGenerator(ExplicitComponent):
         # outputs and partials
         eta_g = self.options["efficiency"]
         weight_inc = self.options["weight_inc"]
-        weight_base = self.options["weight_base"]
         cost_inc = self.options["cost_inc"]
-        cost_base = self.options["cost_base"]
 
         self.add_output("elec_power_out", units="W", desc="Output electric power", shape=(nn,))
         self.add_output("heat_out", units="W", desc="Waste heat out", shape=(nn,))

@@ -1,6 +1,5 @@
 import numpy as np
 from openmdao.api import ExplicitComponent
-from openmdao.api import Group
 
 
 class PowerSplit(ExplicitComponent):
@@ -86,9 +85,7 @@ class PowerSplit(ExplicitComponent):
 
         eta = self.options["efficiency"]
         weight_inc = self.options["weight_inc"]
-        weight_base = self.options["weight_base"]
         cost_inc = self.options["cost_inc"]
-        cost_base = self.options["cost_base"]
 
         self.add_output("power_out_A", units="W", desc="Output power or load to A", shape=(nn,))
         self.add_output("power_out_B", units="W", desc="Output power or load to B", shape=(nn,))

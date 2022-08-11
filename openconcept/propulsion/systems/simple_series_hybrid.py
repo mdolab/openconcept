@@ -2,7 +2,7 @@ from openconcept.propulsion import SimpleMotor, PowerSplit, SimpleGenerator, Sim
 from openconcept.energy_storage import SimpleBattery, SOCBattery
 from openconcept.utilities import DVLabel, AddSubtractComp, ElementMultiplyDivideComp
 
-from openmdao.api import Problem, Group, IndepVarComp, BalanceComp
+from openmdao.api import Group, BalanceComp
 import numpy as np
 
 
@@ -336,58 +336,3 @@ class SingleSeriesHybridElectricPropulsionSystem(Group):
         self.connect("motor_rating", ["prop1.power_rating"])
         self.connect("gen_rating", "gen1.elec_power_rating")
         self.connect("batt_weight", "batt1.battery_weight")
-
-
-class VehicleSizingModel(Group):
-    def setup(self):
-        dvs = self.add_subsystem("dvs", IndepVarComp(), promotes_outputs=["*"])
-        climb = self.add_subsystem("missionanalysis", MissionAnalysis(), promotes_inputs=["dv_*"])
-        dvs.add_output("dv_prop1_diameter", 3.0, units="m")
-        dvs.add_output("dv_motor1_rating", 1.5, units="MW")
-        dvs.add_output("dv_gen1_rating", 1.55, units="MW")
-        dvs.add_output("ac|propulsion|engine|rating", 1.6, units="MW")
-        dvs.add_output("dv_batt1_weight", 2000, units="kg")
-
-
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-
-    prob = Problem()
-
-    prob.model = VehicleSizingModel()
-
-    prob.setup()
-    prob.run_model()
-
-    # print "------Prop 1-------"
-    print("Thrust: " + str(prob["missionanalysis.propmodel.prop1.thrust"]))
-    plt.plot(prob["missionanalysis.propmodel.prop1.thrust"])
-    plt.show()
-
-    print("Weight: " + str(prob["missionanalysis.propmodel.prop1.component_weight"]))
-
-    # print'Prop eff: ' + str(prob['prop1.eta_prop'])
-
-    # print "------Motor 1-------"
-    # print 'Shaft power: ' + str(prob['motor1.shaft_power_out'])
-    # print 'Elec load: ' + str(prob['motor1.elec_load'])
-    # print 'Heat: ' + str(prob['motor1.heat_out'])
-
-    # print "------Battery-------"
-    # print 'Elec load: ' + str(prob['batt1.elec_load'])
-    # print 'Heat: ' + str(prob['batt1.heat_out'])
-
-    # print "------Generator-------"
-    # print 'Shaft power: ' + str(prob['gen1.shaft_power_in'])
-    # print 'Elec load: ' + str(prob['gen1.elec_power_out'])
-    # print 'Heat: ' + str(prob['gen1.heat_out'])
-
-    # print "------Turboshaft-------"
-    # print 'Throttle: '  + str(prob['eng1.throttle'])
-    # print 'Shaft power: ' + str(prob['eng1.shaft_power_out'])
-    # print 'Fuel flow:' + str(prob['eng1.fuel_flow']*60*60)
-
-    # prob.model.list_inputs()
-    # prob.model.list_outputs()
-    # prob.check_partials(compact_print=True)
-    # prob.check_totals(compact_print=True)
