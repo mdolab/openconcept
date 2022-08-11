@@ -451,6 +451,8 @@ data : dict
         Partial derivatives of the training data flattened in the proper OpenMDAO-style
         format for use as partial derivatives in the VLMDataGen component
 """
+
+
 def compute_training_data(inputs, surf_dict=None):
     t_start = time()
     print(f"Generating OpenAeroStruct aerodynamic training data...")
@@ -708,7 +710,9 @@ class VLM(om.Group):
         # This dummy mesh must be passed to the surface dict so OpenAeroStruct
         # knows the dimensions of the mesh and whether it is a left or right wing
         dummy_mesh = np.zeros((nx, ny, 3))
-        dummy_mesh[:, :, 0], dummy_mesh[:, :, 1] = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
+        dummy_mesh[:, :, 0], dummy_mesh[:, :, 1] = np.meshgrid(
+            np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij"
+        )
 
         surf_dict = {
             "name": "wing",
@@ -887,8 +891,8 @@ class PlanformMesh(om.ExplicitComponent):
         # Compute derivatives in a way analogous to forward AD
         db_dS = AR / (4 * np.sqrt(AR * S))
         db_dAR = S / (4 * np.sqrt(AR * S))
-        dcroot_dS = 1 / (half_span * (1 + taper)) - S / (half_span ** 2 * (1 + taper)) * db_dS
-        dcroot_dAR = -S / (half_span ** 2 * (1 + taper)) * db_dAR
+        dcroot_dS = 1 / (half_span * (1 + taper)) - S / (half_span**2 * (1 + taper)) * db_dS
+        dcroot_dAR = -S / (half_span**2 * (1 + taper)) * db_dAR
         dcroot_dtaper = -S / (half_span * (1 + taper) ** 2)
 
         dy_dS = y_mesh * db_dS

@@ -518,6 +518,7 @@ class OASDataGen(om.ExplicitComponent):
             partials[key][:] = value
         partials["CD_train", "ac|aero|CD_nonwing"] = np.ones(OASDataGen.CD.shape)
 
+
 """
 Generates training data and its total derivatives by
 calling OpenAeroStruct at each training point.
@@ -583,6 +584,8 @@ data : dict
         Partial derivatives of the training data flattened in the proper OpenMDAO-style
         format for use as partial derivatives in the OASDataGen component
 """
+
+
 def compute_training_data(inputs, surf_dict=None):
     t_start = time()
     print(f"Generating OpenAeroStruct aerostructural training data...")
@@ -1115,7 +1118,9 @@ class Aerostruct(om.Group):
         # This dummy mesh must be passed to the surface dict so OpenAeroStruct
         # knows the dimensions of the mesh and whether it is a left or right wing
         dummy_mesh = np.zeros((nx, ny, 3))
-        dummy_mesh[:, :, 0], dummy_mesh[:, :, 1] = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
+        dummy_mesh[:, :, 0], dummy_mesh[:, :, 1] = np.meshgrid(
+            np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij"
+        )
 
         surf_dict = {
             # Wing definition
@@ -1438,7 +1443,11 @@ class AerostructDragPolarExact(om.Group):
                 ],
             )
             self.promotes(
-                comp_name, inputs=["fltcond|alpha", "fltcond|M", "fltcond|h"], src_indices=[node], flat_src_indices=True, src_shape=(nn,)
+                comp_name,
+                inputs=["fltcond|alpha", "fltcond|M", "fltcond|h"],
+                src_indices=[node],
+                flat_src_indices=True,
+                src_shape=(nn,),
             )
 
             # Promote wing weight from one, doesn't really matter which

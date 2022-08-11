@@ -1,10 +1,11 @@
 import openmdao.api as om
 import numpy as np
 
+
 class SimplePump(om.ExplicitComponent):
     """
     A pump that circulates coolant against pressure.
-    The default parameters are based on a survey of commercial 
+    The default parameters are based on a survey of commercial
     airplane fuel pumps of a variety of makes and models.
 
     Inputs
@@ -38,54 +39,59 @@ class SimplePump(om.ExplicitComponent):
     weight_inc : float
         Incremental weight of pump, scales linearly with power rating (default 1/450 kg/W)
     """
+
     def initialize(self):
-        self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
-        self.options.declare('efficiency', default=0.35, desc='Efficiency (dimensionless)')
-        self.options.declare('weight_base', default=0.0, desc='Pump base weight')
-        self.options.declare('weight_inc', default=1/450, desc='Incremental pump weight (kg/W)')
+        self.options.declare("num_nodes", default=1, desc="Number of flight/control conditions")
+        self.options.declare("efficiency", default=0.35, desc="Efficiency (dimensionless)")
+        self.options.declare("weight_base", default=0.0, desc="Pump base weight")
+        self.options.declare("weight_inc", default=1 / 450, desc="Incremental pump weight (kg/W)")
 
     def setup(self):
-        nn = self.options['num_nodes']
-        eta = self.options['efficiency']
-        weight_inc = self.options['weight_inc']
+        nn = self.options["num_nodes"]
+        eta = self.options["efficiency"]
+        weight_inc = self.options["weight_inc"]
 
-        self.add_input('power_rating', units='W', desc='Pump electrical power rating')
-        self.add_input('mdot_coolant', units='kg/s', desc='Coolant mass flow rate', val=np.ones((nn,)))
-        self.add_input('delta_p', units='Pa', desc='Pump pressure rise', val=np.ones((nn,)))
-        self.add_input('rho_coolant', units='kg/m**3', desc='Coolant density', val=np.ones((nn,)))
+        self.add_input("power_rating", units="W", desc="Pump electrical power rating")
+        self.add_input("mdot_coolant", units="kg/s", desc="Coolant mass flow rate", val=np.ones((nn,)))
+        self.add_input("delta_p", units="Pa", desc="Pump pressure rise", val=np.ones((nn,)))
+        self.add_input("rho_coolant", units="kg/m**3", desc="Coolant density", val=np.ones((nn,)))
 
-        self.add_output('elec_load', units='W', desc='Pump electrical load', val=np.ones((nn,)))
-        self.add_output('component_weight', units='kg', desc='Pump weight')
-        self.add_output('component_sizing_margin', units=None, val=np.ones((nn,)), desc='Comp sizing margin')
+        self.add_output("elec_load", units="W", desc="Pump electrical load", val=np.ones((nn,)))
+        self.add_output("component_weight", units="kg", desc="Pump weight")
+        self.add_output("component_sizing_margin", units=None, val=np.ones((nn,)), desc="Comp sizing margin")
 
-        self.declare_partials(['elec_load','component_sizing_margin'], ['rho_coolant', 'delta_p', 'mdot_coolant'], rows=np.arange(nn), cols=np.arange(nn))
-        self.declare_partials(['component_sizing_margin'], ['power_rating'], rows=np.arange(nn), cols=np.zeros(nn))
-        self.declare_partials(['component_weight'], ['power_rating'], val=weight_inc)
-
-
+        self.declare_partials(
+            ["elec_load", "component_sizing_margin"],
+            ["rho_coolant", "delta_p", "mdot_coolant"],
+            rows=np.arange(nn),
+            cols=np.arange(nn),
+        )
+        self.declare_partials(["component_sizing_margin"], ["power_rating"], rows=np.arange(nn), cols=np.zeros(nn))
+        self.declare_partials(["component_weight"], ["power_rating"], val=weight_inc)
 
     def compute(self, inputs, outputs):
-        nn = self.options['num_nodes']
-        eta = self.options['efficiency']
-        weight_inc = self.options['weight_inc']
-        weight_base = self.options['weight_base']
+        nn = self.options["num_nodes"]
+        eta = self.options["efficiency"]
+        weight_inc = self.options["weight_inc"]
+        weight_base = self.options["weight_base"]
 
-        outputs['component_weight'] = weight_base + weight_inc * inputs['power_rating']
-        
+        outputs["component_weight"] = weight_base + weight_inc * inputs["power_rating"]
+
         # compute the fluid power
-        vol_flow_rate = inputs['mdot_coolant'] / inputs['rho_coolant'] # m3/s
-        fluid_power = vol_flow_rate * inputs['delta_p']
-        outputs['elec_load'] = fluid_power / eta 
-        outputs['component_sizing_margin'] = outputs['elec_load'] / inputs['power_rating']
-    
+        vol_flow_rate = inputs["mdot_coolant"] / inputs["rho_coolant"]  # m3/s
+        fluid_power = vol_flow_rate * inputs["delta_p"]
+        outputs["elec_load"] = fluid_power / eta
+        outputs["component_sizing_margin"] = outputs["elec_load"] / inputs["power_rating"]
 
     def compute_partials(self, inputs, J):
-        nn = self.options['num_nodes']
-        eta = self.options['efficiency']
+        nn = self.options["num_nodes"]
+        eta = self.options["efficiency"]
 
-        J['elec_load', 'mdot_coolant'] =  inputs['delta_p'] / inputs['rho_coolant'] / eta
-        J['elec_load', 'delta_p'] = inputs['mdot_coolant'] / inputs['rho_coolant'] / eta
-        J['elec_load', 'rho_coolant'] = -inputs['mdot_coolant'] * inputs['delta_p'] / inputs['rho_coolant'] ** 2 / eta
-        for in_var in ['mdot_coolant', 'delta_p', 'rho_coolant']:
-            J['component_sizing_margin', in_var] = J['elec_load', in_var]  / inputs['power_rating']
-        J['component_sizing_margin', 'power_rating'] = - inputs['mdot_coolant'] * inputs['delta_p'] / inputs['rho_coolant'] / eta / inputs['power_rating'] ** 2
+        J["elec_load", "mdot_coolant"] = inputs["delta_p"] / inputs["rho_coolant"] / eta
+        J["elec_load", "delta_p"] = inputs["mdot_coolant"] / inputs["rho_coolant"] / eta
+        J["elec_load", "rho_coolant"] = -inputs["mdot_coolant"] * inputs["delta_p"] / inputs["rho_coolant"] ** 2 / eta
+        for in_var in ["mdot_coolant", "delta_p", "rho_coolant"]:
+            J["component_sizing_margin", in_var] = J["elec_load", in_var] / inputs["power_rating"]
+        J["component_sizing_margin", "power_rating"] = (
+            -inputs["mdot_coolant"] * inputs["delta_p"] / inputs["rho_coolant"] / eta / inputs["power_rating"] ** 2
+        )

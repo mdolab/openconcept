@@ -5,17 +5,20 @@ except:
     pass
 import numpy as np
 
-def plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases, x_label=None, y_labels=None,  marker='o', plot_title='Trajectory'):
+
+def plot_trajectory(
+    prob, x_var, x_unit, y_vars, y_units, phases, x_label=None, y_labels=None, marker="o", plot_title="Trajectory"
+):
 
     val_list = []
     for phase in phases:
-        val_list.append(prob.get_val(phase + '.' + x_var, units=x_unit))
+        val_list.append(prob.get_val(phase + "." + x_var, units=x_unit))
     x_vec = np.concatenate(val_list)
 
     for i, y_var in enumerate(y_vars):
         val_list = []
         for phase in phases:
-            val_list.append(prob.get_val(phase + '.' + y_var, units=y_units[i]))
+            val_list.append(prob.get_val(phase + "." + y_var, units=y_units[i]))
         y_vec = np.concatenate(val_list)
         plt.figure()
         plt.plot(x_vec, y_vec, marker)
@@ -31,7 +34,21 @@ def plot_trajectory(prob, x_var, x_unit, y_vars, y_units, phases, x_label=None, 
         plt.title(plot_title)
     plt.show()
 
-def plot_trajectory_grid(cases, x_var, x_unit, y_vars, y_units, phases, x_label=None, y_labels=None,  grid_layout=[5,2], marker='o', savefig=None, figsize=None):
+
+def plot_trajectory_grid(
+    cases,
+    x_var,
+    x_unit,
+    y_vars,
+    y_units,
+    phases,
+    x_label=None,
+    y_labels=None,
+    grid_layout=[5, 2],
+    marker="o",
+    savefig=None,
+    figsize=None,
+):
     """
     Plots multiple trajectories against each other
     Cases is a list of OpenMDAO CaseReader cases which act like OpenMDAO problems
@@ -40,7 +57,7 @@ def plot_trajectory_grid(cases, x_var, x_unit, y_vars, y_units, phases, x_label=
     for case in cases:
         val_list = []
         for phase in phases:
-            val_list.append(case.get_val(phase + '.' + x_var, units=x_unit))
+            val_list.append(case.get_val(phase + "." + x_var, units=x_unit))
         x_vec = np.concatenate(val_list)
         x_vecs.append(x_vec)
 
@@ -54,7 +71,7 @@ def plot_trajectory_grid(cases, x_var, x_unit, y_vars, y_units, phases, x_label=
                 # write the file
                 if savefig is not None:
                     fig.tight_layout()
-                    plt.savefig(savefig+'_'+str(file_counter)+'.pdf')
+                    plt.savefig(savefig + "_" + str(file_counter) + ".pdf")
             fig, axs = plt.subplots(grid_layout[0], grid_layout[1], sharex=True, figsize=figsize)
             file_counter += 1
             counter_within_file = 0
@@ -64,10 +81,10 @@ def plot_trajectory_grid(cases, x_var, x_unit, y_vars, y_units, phases, x_label=
         for j, case in enumerate(cases):
             val_list = []
             for phase in phases:
-                val_list.append(case.get_val(phase + '.' + y_var, units=y_units[i]))
+                val_list.append(case.get_val(phase + "." + y_var, units=y_units[i]))
             y_vec = np.concatenate(val_list)
             axs[row_no, col_no].plot(x_vecs[j], y_vec, marker)
-        if row_no + 1 == grid_layout[0]: # last row
+        if row_no + 1 == grid_layout[0]:  # last row
             if x_label is None:
                 axs[row_no, col_no].set(xlabel=x_var)
             else:
@@ -77,11 +94,9 @@ def plot_trajectory_grid(cases, x_var, x_unit, y_vars, y_units, phases, x_label=
                 axs[row_no, col_no].set(ylabel=y_labels[i])
         else:
             axs[row_no, col_no].set(y_var)
-    
-        counter_within_file += 1
 
+        counter_within_file += 1
 
     if savefig is not None:
         fig.tight_layout()
-        plt.savefig(savefig+'_'+str(file_counter)+'.pdf')
-
+        plt.savefig(savefig + "_" + str(file_counter) + ".pdf")

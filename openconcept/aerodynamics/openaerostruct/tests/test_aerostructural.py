@@ -364,17 +364,16 @@ class AerostructDragPolarExactTestCase(unittest.TestCase):
     def test_defaults(self):
         S = 427.8
         CD0 = 0.01
-        q = 0.5 * 0.55427276 * 264.20682682 ** 2
+        q = 0.5 * 0.55427276 * 264.20682682**2
         nn = 3
         p = om.Problem(
-            AerostructDragPolarExact(
-                num_nodes=nn, num_x=3, num_y=5, num_twist=2, num_toverc=2, num_skin=2, num_spar=2
-            )
+            AerostructDragPolarExact(num_nodes=nn, num_x=3, num_y=5, num_twist=2, num_toverc=2, num_skin=2, num_spar=2)
         )
         p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, atol=1e-8, rtol=1e-10)
         p.model.linear_solver = om.DirectSolver()
         p.model.set_input_defaults(
-            "fltcond|CL", np.array([0.094142402327027, 0.158902999486838, 0.223695460208479]),
+            "fltcond|CL",
+            np.array([0.094142402327027, 0.158902999486838, 0.223695460208479]),
         )
         p.model.set_input_defaults("fltcond|M", np.full(nn, 0.85))
         p.model.set_input_defaults("fltcond|h", np.full(nn, 7.5e3), units="m")

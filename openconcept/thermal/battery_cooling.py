@@ -4,7 +4,7 @@ from openconcept.utilities import Integrator
 
 
 class LiquidCooledBattery(om.Group):
-    """A battery with liquid cooling 
+    """A battery with liquid cooling
 
     Inputs
     ------
@@ -36,7 +36,7 @@ class LiquidCooledBattery(om.Group):
         Battery core temperature (vector, K)
     T_surface : float
         Battery surface temperature (vector, K)
-        
+
     Options
     -------
     num_nodes : int
@@ -66,44 +66,68 @@ class LiquidCooledBattery(om.Group):
     """
 
     def initialize(self):
-        self.options.declare('quasi_steady', default=False, desc='Treat the component as quasi-steady or with thermal mass')
-        self.options.declare('num_nodes', default=1, desc='Number of quasi-steady points to runs')
-        self.options.declare('coolant_specific_heat', default=3801, desc='Coolant specific heat in J/kg/K')
-        self.options.declare('fluid_k', default=0.405, desc='Thermal conductivity of the fluid in W / mK')
-        self.options.declare('nusselt', default=7.54, desc='Hydraulic diameter Nusselt number')
+        self.options.declare(
+            "quasi_steady", default=False, desc="Treat the component as quasi-steady or with thermal mass"
+        )
+        self.options.declare("num_nodes", default=1, desc="Number of quasi-steady points to runs")
+        self.options.declare("coolant_specific_heat", default=3801, desc="Coolant specific heat in J/kg/K")
+        self.options.declare("fluid_k", default=0.405, desc="Thermal conductivity of the fluid in W / mK")
+        self.options.declare("nusselt", default=7.54, desc="Hydraulic diameter Nusselt number")
 
-        self.options.declare('cell_kr', default=0.3) # 0.455 for an 18650 cell, knocked down a bit
-        self.options.declare('cell_diameter', default=0.021)
-        self.options.declare('cell_height', default=0.070)
-        self.options.declare('cell_mass', default=0.070)
-        self.options.declare('cell_specific_heat', default=875.)
-        self.options.declare('battery_weight_fraction', default=0.65)
+        self.options.declare("cell_kr", default=0.3)  # 0.455 for an 18650 cell, knocked down a bit
+        self.options.declare("cell_diameter", default=0.021)
+        self.options.declare("cell_height", default=0.070)
+        self.options.declare("cell_mass", default=0.070)
+        self.options.declare("cell_specific_heat", default=875.0)
+        self.options.declare("battery_weight_fraction", default=0.65)
+
     def setup(self):
-        nn = self.options['num_nodes']
-        quasi_steady = self.options['quasi_steady']
-        
-        self.add_subsystem('hex', BandolierCoolingSystem(num_nodes=nn, 
-                                                         coolant_specific_heat=self.options['coolant_specific_heat'],
-                                                         fluid_k=self.options['fluid_k'],
-                                                         nusselt=self.options['nusselt'],
-                                                         cell_kr=self.options['cell_kr'],
-                                                         cell_diameter=self.options['cell_diameter'],
-                                                         cell_height=self.options['cell_height'],
-                                                         cell_mass=self.options['cell_mass'],
-                                                         cell_specific_heat=self.options['cell_specific_heat'],
-                                                         battery_weight_fraction=self.options['battery_weight_fraction']),
-                            promotes_inputs=['q_in', 'mdot_coolant', 'T_in', ('T_battery', 'T'), 'battery_weight', 'n_cpb', 't_channel'],
-                            promotes_outputs=['T_core', 'T_surface', 'T_out', 'dTdt'])
-        
+        nn = self.options["num_nodes"]
+        quasi_steady = self.options["quasi_steady"]
+
+        self.add_subsystem(
+            "hex",
+            BandolierCoolingSystem(
+                num_nodes=nn,
+                coolant_specific_heat=self.options["coolant_specific_heat"],
+                fluid_k=self.options["fluid_k"],
+                nusselt=self.options["nusselt"],
+                cell_kr=self.options["cell_kr"],
+                cell_diameter=self.options["cell_diameter"],
+                cell_height=self.options["cell_height"],
+                cell_mass=self.options["cell_mass"],
+                cell_specific_heat=self.options["cell_specific_heat"],
+                battery_weight_fraction=self.options["battery_weight_fraction"],
+            ),
+            promotes_inputs=[
+                "q_in",
+                "mdot_coolant",
+                "T_in",
+                ("T_battery", "T"),
+                "battery_weight",
+                "n_cpb",
+                "t_channel",
+            ],
+            promotes_outputs=["T_core", "T_surface", "T_out", "dTdt"],
+        )
+
         if not quasi_steady:
-            ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
-                                           promotes_outputs=['*'], promotes_inputs=['*'])
-            ode_integ.add_integrand('T', rate_name='dTdt', units='K', lower=1e-10)
+            ode_integ = self.add_subsystem(
+                "ode_integ",
+                Integrator(num_nodes=nn, diff_units="s", method="simpson", time_setup="duration"),
+                promotes_outputs=["*"],
+                promotes_inputs=["*"],
+            )
+            ode_integ.add_integrand("T", rate_name="dTdt", units="K", lower=1e-10)
         else:
-            self.add_subsystem('thermal_bal',
-                               om.BalanceComp('T', eq_units='K/s', lhs_name='dTdt', rhs_val=0.0, units='K', lower=1.0, val=299.*np.ones((nn,))),
-                               promotes_inputs=['dTdt'],
-                               promotes_outputs=['T'])
+            self.add_subsystem(
+                "thermal_bal",
+                om.BalanceComp(
+                    "T", eq_units="K/s", lhs_name="dTdt", rhs_val=0.0, units="K", lower=1.0, val=299.0 * np.ones((nn,))
+                ),
+                promotes_inputs=["dTdt"],
+                promotes_outputs=["T"],
+            )
 
 
 class BandolierCoolingSystem(om.ExplicitComponent):
@@ -181,75 +205,84 @@ class BandolierCoolingSystem(om.ExplicitComponent):
     battery_weight_fraction : float
         Fraction of battery by weight that is cells (default 0.72 knocks down Tesla by a bit)
     """
-    def initialize(self):
-        self.options.declare('num_nodes', default=1, desc='Number of analysis points')
-        self.options.declare('coolant_specific_heat', default=3801, desc='Coolant specific heat in J/kg/K')
-        self.options.declare('fluid_k', default=0.405, desc='Thermal conductivity of the fluid in W / mK')
-        self.options.declare('nusselt', default=7.54, desc='Hydraulic diameter Nusselt number')
 
-        self.options.declare('cell_kr', default=0.3) # 0.455 for an 18650 cell, knocked down a bit
-        self.options.declare('cell_diameter', default=0.021)
-        self.options.declare('cell_height', default=0.070)
-        self.options.declare('cell_mass', default=0.070)
-        self.options.declare('cell_specific_heat', default=875.)
-        self.options.declare('battery_weight_fraction', default=0.65)
+    def initialize(self):
+        self.options.declare("num_nodes", default=1, desc="Number of analysis points")
+        self.options.declare("coolant_specific_heat", default=3801, desc="Coolant specific heat in J/kg/K")
+        self.options.declare("fluid_k", default=0.405, desc="Thermal conductivity of the fluid in W / mK")
+        self.options.declare("nusselt", default=7.54, desc="Hydraulic diameter Nusselt number")
+
+        self.options.declare("cell_kr", default=0.3)  # 0.455 for an 18650 cell, knocked down a bit
+        self.options.declare("cell_diameter", default=0.021)
+        self.options.declare("cell_height", default=0.070)
+        self.options.declare("cell_mass", default=0.070)
+        self.options.declare("cell_specific_heat", default=875.0)
+        self.options.declare("battery_weight_fraction", default=0.65)
 
     def setup(self):
-        nn = self.options['num_nodes']
-        self.add_input('q_in', shape=(nn,), units='W', val=0.0)
-        self.add_input('T_in', shape=(nn,), units='K', val=300.)
-        self.add_input('T_battery', shape=(nn,), units='K', val=300.)
-        self.add_input('mdot_coolant', shape=(nn,), units='kg/s', val=0.20)
-        self.add_input('battery_weight', units='kg', val=478.)
-        self.add_input('n_cpb', units=None, val=82.)
-        self.add_input('t_channel', units='m', val=0.0005)
+        nn = self.options["num_nodes"]
+        self.add_input("q_in", shape=(nn,), units="W", val=0.0)
+        self.add_input("T_in", shape=(nn,), units="K", val=300.0)
+        self.add_input("T_battery", shape=(nn,), units="K", val=300.0)
+        self.add_input("mdot_coolant", shape=(nn,), units="kg/s", val=0.20)
+        self.add_input("battery_weight", units="kg", val=478.0)
+        self.add_input("n_cpb", units=None, val=82.0)
+        self.add_input("t_channel", units="m", val=0.0005)
 
-        self.add_output('dTdt', shape=(nn,), units='K/s', tags=['integrate', 'state_name:T_battery', 'state_units:K', 'state_val:300.0', 'state_promotes:True'])
-        self.add_output('T_surface', shape=(nn,), units='K', lower=1e-10)
-        self.add_output('T_core', shape=(nn,), units='K', lower=1e-10)
-        self.add_output('q', shape=(nn,), units='W')
-        self.add_output('T_out', shape=(nn,), units='K', val=300, lower=1e-10)
+        self.add_output(
+            "dTdt",
+            shape=(nn,),
+            units="K/s",
+            tags=["integrate", "state_name:T_battery", "state_units:K", "state_val:300.0", "state_promotes:True"],
+        )
+        self.add_output("T_surface", shape=(nn,), units="K", lower=1e-10)
+        self.add_output("T_core", shape=(nn,), units="K", lower=1e-10)
+        self.add_output("q", shape=(nn,), units="W")
+        self.add_output("T_out", shape=(nn,), units="K", val=300, lower=1e-10)
 
-        self.declare_partials(['*'], ['*'], method='cs')
+        self.declare_partials(["*"], ["*"], method="cs")
 
     def compute(self, inputs, outputs):
-        nn = self.options['num_nodes']
-        n_cells = inputs['battery_weight'] * self.options['battery_weight_fraction'] / self.options['cell_mass']
-        n_bandoliers = n_cells / inputs['n_cpb'] / 2
+        nn = self.options["num_nodes"]
+        n_cells = inputs["battery_weight"] * self.options["battery_weight_fraction"] / self.options["cell_mass"]
+        n_bandoliers = n_cells / inputs["n_cpb"] / 2
 
-        mdot_b = inputs['mdot_coolant'] / n_bandoliers
-        q_cell = inputs['q_in'] / n_cells
-        hconv = self.options['nusselt'] * self.options['fluid_k'] / 2 / inputs['t_channel']
+        mdot_b = inputs["mdot_coolant"] / n_bandoliers
+        q_cell = inputs["q_in"] / n_cells
+        hconv = self.options["nusselt"] * self.options["fluid_k"] / 2 / inputs["t_channel"]
 
-        Hc = self.options['cell_height']
-        Dc = self.options['cell_diameter']
-        mc = self.options['cell_mass']
-        krc = self.options['cell_kr']
-        cpc = self.options['cell_specific_heat']
-        L_bandolier = inputs['n_cpb'] * Dc
+        Hc = self.options["cell_height"]
+        Dc = self.options["cell_diameter"]
+        mc = self.options["cell_mass"]
+        krc = self.options["cell_kr"]
+        cpc = self.options["cell_specific_heat"]
+        L_bandolier = inputs["n_cpb"] * Dc
 
-        cpf = self.options['coolant_specific_heat'] # of the coolant
+        cpf = self.options["coolant_specific_heat"]  # of the coolant
 
-        A_heat_trans = Hc * L_bandolier * 2 # two sides of the tape
+        A_heat_trans = Hc * L_bandolier * 2  # two sides of the tape
         NTU = hconv * A_heat_trans / mdot_b / cpf
-        Kcell = mdot_b * cpf * (1 - np.exp(-NTU)) / 2 / inputs['n_cpb'] # divide out the total bandolier convection by 2 * n_cpb cells
+        Kcell = (
+            mdot_b * cpf * (1 - np.exp(-NTU)) / 2 / inputs["n_cpb"]
+        )  # divide out the total bandolier convection by 2 * n_cpb cells
         # the convective heat transfer is (Ts - Tin) * Kcell
         PI = np.pi
-        
-        Tbar = inputs['T_battery']
+
+        Tbar = inputs["T_battery"]
         Rc = Dc / 2
 
-        K_cyl = 8*np.pi*Hc*krc
+        K_cyl = 8 * np.pi * Hc * krc
 
-        Ts = (K_cyl * Tbar + Kcell * inputs['T_in']) / (K_cyl + Kcell)
-        
-        outputs['T_surface'] = Ts
+        Ts = (K_cyl * Tbar + Kcell * inputs["T_in"]) / (K_cyl + Kcell)
 
-        q_conv = (Ts - inputs['T_in']) * Kcell * n_cells
-        outputs['dTdt'] = (q_cell - (Ts - inputs['T_in']) * Kcell) / mc / cpc  # todo check that this quantity matches convection
+        outputs["T_surface"] = Ts
 
+        q_conv = (Ts - inputs["T_in"]) * Kcell * n_cells
+        outputs["dTdt"] = (
+            (q_cell - (Ts - inputs["T_in"]) * Kcell) / mc / cpc
+        )  # todo check that this quantity matches convection
 
-        outputs['q'] = q_conv
+        outputs["q"] = q_conv
 
         qcheck = (Tbar - Ts) * K_cyl
         # UAcomb = 1/(1/hconv/A_heat_trans+1/K_cyl/2/inputs['n_cpb'])
@@ -259,5 +292,5 @@ class BandolierCoolingSystem(om.ExplicitComponent):
         #     # the heat flux across the cell is not equal to the heat flux due to convection
         #     raise ValueError('The surface temperature solution appears to be wrong')
 
-        outputs['T_out'] = inputs['T_in'] + outputs['q'] / inputs['mdot_coolant'] / cpf
-        outputs['T_core'] = (Tbar - Ts) + Tbar
+        outputs["T_out"] = inputs["T_in"] + outputs["q"] / inputs["mdot_coolant"] / cpf
+        outputs["T_core"] = (Tbar - Ts) + Tbar

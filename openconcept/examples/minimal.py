@@ -123,11 +123,14 @@ def setup_problem(model=MissionAnalysis):
 if __name__ == "__main__":
     # Process command line argument to optionally not show figures and N2 diagram
     import argparse
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hide_visuals",
-                        default=False,
-                        action="store_true",
-                        help="Do not show matplotlib figure or open N2 diagram in browser")
+    parser.add_argument(
+        "--hide_visuals",
+        default=False,
+        action="store_true",
+        help="Do not show matplotlib figure or open N2 diagram in browser",
+    )
     hide_viz = parser.parse_args().hide_visuals
 
     # Setup the problem and run the analysis
@@ -160,7 +163,7 @@ if __name__ == "__main__":
                 prob.get_val(f"mission.{phase}.{var['var']}", units=var["units"]),
                 "-o",
                 c="tab:blue",
-                markersize=2.,
+                markersize=2.0,
             )
 
     fig.savefig("minimal_example_results.svg", transparent=True)

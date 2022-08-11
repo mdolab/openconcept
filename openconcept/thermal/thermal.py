@@ -2,6 +2,7 @@ from openmdao.api import Group, ExplicitComponent, ImplicitComponent
 import numpy as np
 from openconcept.utilities.math.integrals import Integrator
 
+
 class PerfectHeatTransferComp(ExplicitComponent):
     """
     Models heat transfer to coolant loop assuming zero thermal resistance.
@@ -14,14 +15,14 @@ class PerfectHeatTransferComp(ExplicitComponent):
         Heat flow into fluid stream; positive is heat addition (vector, W)
     mdot_coolant : float
         Coolant mass flow (vector, kg/s)
-    
+
     Outputs
     -------
     T_out : float
         Outgoing coolant temperature (vector, K)
     T_average : float
         Average coolant temperature (vector K)
-    
+
     Options
     -------
     num_nodes : int
@@ -29,34 +30,45 @@ class PerfectHeatTransferComp(ExplicitComponent):
     specific_heat : float
         Specific heat of the coolant (scalar, J/kg/K, default 3801 glycol/water)
     """
+
     def initialize(self):
-        self.options.declare('num_nodes', default=1, desc='Number of analysis points')
-        self.options.declare('specific_heat', default=3801., desc='Specific heat in J/kg/K')
-    
+        self.options.declare("num_nodes", default=1, desc="Number of analysis points")
+        self.options.declare("specific_heat", default=3801.0, desc="Specific heat in J/kg/K")
+
     def setup(self):
-        nn = self.options['num_nodes']
+        nn = self.options["num_nodes"]
         arange = np.arange(0, nn)
 
-        self.add_input('T_in', desc='Incoming coolant temp', units='K', shape=(nn,))
-        self.add_input('q', desc='Heat INTO the fluid stream (positive is heat addition)', units='W', shape=(nn,))
-        self.add_input('mdot_coolant', desc='Mass flow rate of coolant', units='kg/s', shape=(nn,))
-        self.add_output('T_out', desc='Outgoing coolant temp', val=np.random.uniform(300, 330), lower=1e-10, units='K', shape=(nn,))
-        self.add_output('T_average', desc='Average temp of fluid', val=np.random.uniform(300, 330), lower=1e-10, units='K', shape=(nn,))
+        self.add_input("T_in", desc="Incoming coolant temp", units="K", shape=(nn,))
+        self.add_input("q", desc="Heat INTO the fluid stream (positive is heat addition)", units="W", shape=(nn,))
+        self.add_input("mdot_coolant", desc="Mass flow rate of coolant", units="kg/s", shape=(nn,))
+        self.add_output(
+            "T_out", desc="Outgoing coolant temp", val=np.random.uniform(300, 330), lower=1e-10, units="K", shape=(nn,)
+        )
+        self.add_output(
+            "T_average",
+            desc="Average temp of fluid",
+            val=np.random.uniform(300, 330),
+            lower=1e-10,
+            units="K",
+            shape=(nn,),
+        )
 
-        self.declare_partials(['T_out', 'T_average'], ['q', 'mdot_coolant'], rows=arange, cols=arange)
-        self.declare_partials('T_out', 'T_in', rows=arange, cols=arange, val=np.ones((nn,)))
-        self.declare_partials('T_average', 'T_in', rows=arange, cols=arange, val=np.ones((nn,)))
-    
+        self.declare_partials(["T_out", "T_average"], ["q", "mdot_coolant"], rows=arange, cols=arange)
+        self.declare_partials("T_out", "T_in", rows=arange, cols=arange, val=np.ones((nn,)))
+        self.declare_partials("T_average", "T_in", rows=arange, cols=arange, val=np.ones((nn,)))
+
     def compute(self, inputs, outputs):
-        outputs['T_out'] = inputs['T_in'] + inputs['q'] / self.options['specific_heat'] / inputs['mdot_coolant']
-        outputs['T_average'] = (inputs['T_in'] + outputs['T_out']) / 2
-    
-    def compute_partials(self, inputs, J):
-        J['T_out', 'q'] = 1 / self.options['specific_heat'] / inputs['mdot_coolant']
-        J['T_out', 'mdot_coolant'] = - inputs['q'] / self.options['specific_heat'] / inputs['mdot_coolant']**2
+        outputs["T_out"] = inputs["T_in"] + inputs["q"] / self.options["specific_heat"] / inputs["mdot_coolant"]
+        outputs["T_average"] = (inputs["T_in"] + outputs["T_out"]) / 2
 
-        J['T_average', 'q'] = J['T_out', 'q'] / 2
-        J['T_average', 'mdot_coolant'] = J['T_out', 'mdot_coolant'] / 2
+    def compute_partials(self, inputs, J):
+        J["T_out", "q"] = 1 / self.options["specific_heat"] / inputs["mdot_coolant"]
+        J["T_out", "mdot_coolant"] = -inputs["q"] / self.options["specific_heat"] / inputs["mdot_coolant"] ** 2
+
+        J["T_average", "q"] = J["T_out", "q"] / 2
+        J["T_average", "mdot_coolant"] = J["T_out", "mdot_coolant"] / 2
+
 
 class ThermalComponentWithMass(ExplicitComponent):
     """
@@ -83,34 +95,36 @@ class ThermalComponentWithMass(ExplicitComponent):
     num_nodes : int
         The number of analysis points to run
     """
+
     def initialize(self):
-        self.options.declare('num_nodes', default=1)
-        self.options.declare('specific_heat', default=921, desc='Specific heat in J/kg/K - default 921 for aluminum')
+        self.options.declare("num_nodes", default=1)
+        self.options.declare("specific_heat", default=921, desc="Specific heat in J/kg/K - default 921 for aluminum")
 
     def setup(self):
-        nn_tot = self.options['num_nodes']
+        nn_tot = self.options["num_nodes"]
         arange = np.arange(0, nn_tot)
 
-        self.add_input('q_in', units='W', shape=(nn_tot,))
-        self.add_input('q_out', units='W', shape=(nn_tot,))
-        self.add_input('mass', units='kg')
-        self.add_output('dTdt', units='K/s', shape=(nn_tot,))
+        self.add_input("q_in", units="W", shape=(nn_tot,))
+        self.add_input("q_out", units="W", shape=(nn_tot,))
+        self.add_input("mass", units="kg")
+        self.add_output("dTdt", units="K/s", shape=(nn_tot,))
 
-        self.declare_partials(['dTdt'], ['q_in'], rows=arange, cols=arange)
-        self.declare_partials(['dTdt'], ['q_out'], rows=arange, cols=arange)
-        self.declare_partials(['dTdt'], ['mass'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(["dTdt"], ["q_in"], rows=arange, cols=arange)
+        self.declare_partials(["dTdt"], ["q_out"], rows=arange, cols=arange)
+        self.declare_partials(["dTdt"], ["mass"], rows=arange, cols=np.zeros((nn_tot,)))
 
     def compute(self, inputs, outputs):
-        spec_heat = self.options['specific_heat']
-        outputs['dTdt'] = (inputs['q_in'] - inputs['q_out']) / inputs['mass'] / spec_heat
+        spec_heat = self.options["specific_heat"]
+        outputs["dTdt"] = (inputs["q_in"] - inputs["q_out"]) / inputs["mass"] / spec_heat
 
     def compute_partials(self, inputs, J):
-        nn_tot = self.options['num_nodes']
-        spec_heat = self.options['specific_heat']
+        nn_tot = self.options["num_nodes"]
+        spec_heat = self.options["specific_heat"]
 
-        J['dTdt','mass'] = - (inputs['q_in'] - inputs['q_out']) / inputs['mass']**2 / spec_heat
-        J['dTdt','q_in'] = 1 / inputs['mass'] / spec_heat
-        J['dTdt','q_out'] = - 1 / inputs['mass'] / spec_heat
+        J["dTdt", "mass"] = -(inputs["q_in"] - inputs["q_out"]) / inputs["mass"] ** 2 / spec_heat
+        J["dTdt", "q_in"] = 1 / inputs["mass"] / spec_heat
+        J["dTdt", "q_out"] = -1 / inputs["mass"] / spec_heat
+
 
 class ThermalComponentMassless(ImplicitComponent):
     """
@@ -133,22 +147,24 @@ class ThermalComponentMassless(ImplicitComponent):
     num_nodes : int
         The number of analysis points to run
     """
+
     def initialize(self):
-        self.options.declare('num_nodes',default=1)
+        self.options.declare("num_nodes", default=1)
 
     def setup(self):
-        nn_tot = self.options['num_nodes']
+        nn_tot = self.options["num_nodes"]
         arange = np.arange(0, nn_tot)
 
-        self.add_input('q_in', units='W', shape=(nn_tot,))
-        self.add_input('q_out', units='W', shape=(nn_tot,))
-        self.add_output('T_object', units='K', shape=(nn_tot,))
+        self.add_input("q_in", units="W", shape=(nn_tot,))
+        self.add_input("q_out", units="W", shape=(nn_tot,))
+        self.add_output("T_object", units="K", shape=(nn_tot,))
 
-        self.declare_partials(['T_object'], ['q_in'], rows=arange, cols=arange, val=np.ones((nn_tot,)))
-        self.declare_partials(['T_object'], ['q_out'], rows=arange, cols=arange, val=-np.ones((nn_tot,)))
+        self.declare_partials(["T_object"], ["q_in"], rows=arange, cols=arange, val=np.ones((nn_tot,)))
+        self.declare_partials(["T_object"], ["q_out"], rows=arange, cols=arange, val=-np.ones((nn_tot,)))
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        residuals['T_object'] = inputs['q_in'] - inputs['q_out']
+        residuals["T_object"] = inputs["q_in"] - inputs["q_out"]
+
 
 class ConstantSurfaceTemperatureColdPlate_NTU(ExplicitComponent):
     """
@@ -193,49 +209,61 @@ class ConstantSurfaceTemperatureColdPlate_NTU(ExplicitComponent):
     specific_heat : float
         Specific heat of the coolant (J/kg/K) (default 3801, glycol/water)
     """
+
     def initialize(self):
-        self.options.declare('num_nodes', default=1, desc='Number of analysis points')
-        self.options.declare('fluid_rho', default=997.0, desc='Fluid density in kg/m3')
-        self.options.declare('fluid_k', default=0.405, desc='Thermal conductivity of the fluid in W / mK')
-        self.options.declare('nusselt', default=7.54, desc='Hydraulic diameter Nusselt number')
-        self.options.declare('specific_heat', default=3801, desc='Specific heat in J/kg/K')
+        self.options.declare("num_nodes", default=1, desc="Number of analysis points")
+        self.options.declare("fluid_rho", default=997.0, desc="Fluid density in kg/m3")
+        self.options.declare("fluid_k", default=0.405, desc="Thermal conductivity of the fluid in W / mK")
+        self.options.declare("nusselt", default=7.54, desc="Hydraulic diameter Nusselt number")
+        self.options.declare("specific_heat", default=3801, desc="Specific heat in J/kg/K")
 
     def setup(self):
-        nn_tot = self.options['num_nodes']
+        nn_tot = self.options["num_nodes"]
         arange = np.arange(0, nn_tot)
 
-        self.add_input('T_in', units='K', shape=(nn_tot,))
-        self.add_input('T_surface', units='K', shape=(nn_tot,))
-        self.add_input('channel_width', units='m')
-        self.add_input('channel_height', units='m')
-        self.add_input('channel_length', units='m')
-        self.add_input('n_parallel')
-        self.add_input('mdot_coolant', units='kg/s', shape=(nn_tot,))
+        self.add_input("T_in", units="K", shape=(nn_tot,))
+        self.add_input("T_surface", units="K", shape=(nn_tot,))
+        self.add_input("channel_width", units="m")
+        self.add_input("channel_height", units="m")
+        self.add_input("channel_length", units="m")
+        self.add_input("n_parallel")
+        self.add_input("mdot_coolant", units="kg/s", shape=(nn_tot,))
 
-        self.add_output('q', units='W', shape=(nn_tot,))
-        self.add_output('T_out', units='K', shape=(nn_tot,))
+        self.add_output("q", units="W", shape=(nn_tot,))
+        self.add_output("T_out", units="K", shape=(nn_tot,))
 
-        self.declare_partials(['q','T_out'], ['T_in','T_surface','mdot_coolant'], method='cs')
-        self.declare_partials(['q','T_out'], ['channel_width','channel_height','channel_length','n_parallel'], method='cs')
+        self.declare_partials(["q", "T_out"], ["T_in", "T_surface", "mdot_coolant"], method="cs")
+        self.declare_partials(
+            ["q", "T_out"], ["channel_width", "channel_height", "channel_length", "n_parallel"], method="cs"
+        )
 
     def compute(self, inputs, outputs):
-        Ts = inputs['T_surface']
-        Ti = inputs['T_in']
+        Ts = inputs["T_surface"]
+        Ti = inputs["T_in"]
 
-        Cmin = inputs['mdot_coolant'] * self.options['specific_heat']
+        Cmin = inputs["mdot_coolant"] * self.options["specific_heat"]
 
-        #cross_section_area = inputs['channel_width'] * inputs['channel_height'] * inputs['n_parallel']
-        #flow_rate = inputs['mdot_coolant'] / self.options['fluid_rho'] / cross_section_area # m/s
-        surface_area = 2 * (inputs['channel_width']*inputs['channel_length'] +
-                            inputs['channel_height'] * inputs['channel_length']) * inputs['n_parallel']
-        d_h = 2 * inputs['channel_width'] * inputs['channel_height'] / (inputs['channel_width'] + inputs['channel_height'])
+        # cross_section_area = inputs['channel_width'] * inputs['channel_height'] * inputs['n_parallel']
+        # flow_rate = inputs['mdot_coolant'] / self.options['fluid_rho'] / cross_section_area # m/s
+        surface_area = (
+            2
+            * (inputs["channel_width"] * inputs["channel_length"] + inputs["channel_height"] * inputs["channel_length"])
+            * inputs["n_parallel"]
+        )
+        d_h = (
+            2
+            * inputs["channel_width"]
+            * inputs["channel_height"]
+            / (inputs["channel_width"] + inputs["channel_height"])
+        )
 
         # redh = self.options['fluid_rho'] * flow_rate * d_h / 3.39e-3
-        h = self.options['nusselt'] * self.options['fluid_k'] / d_h
+        h = self.options["nusselt"] * self.options["fluid_k"] / d_h
         ntu = surface_area * h / Cmin
         effectiveness = 1 - np.exp(-ntu)
-        outputs['q'] = effectiveness * Cmin * (Ts - Ti)
-        outputs['T_out'] = inputs['T_in'] + outputs['q'] / inputs['mdot_coolant'] / self.options['specific_heat']
+        outputs["q"] = effectiveness * Cmin * (Ts - Ti)
+        outputs["T_out"] = inputs["T_in"] + outputs["q"] / inputs["mdot_coolant"] / self.options["specific_heat"]
+
 
 class LiquidCooledComp(Group):
     """A component (heat producing) with thermal mass
@@ -284,33 +312,45 @@ class LiquidCooledComp(Group):
     """
 
     def initialize(self):
-        self.options.declare('specific_heat_object', default=921.0, desc='Specific heat in J/kg/K')
-        self.options.declare('specific_heat_coolant', default=3801, desc='Specific heat in J/kg/K')
-        self.options.declare('quasi_steady', default=False, desc='Treat the component as quasi-steady or with thermal mass')
-        self.options.declare('num_nodes', default=1, desc='Number of quasi-steady points to runs')
+        self.options.declare("specific_heat_object", default=921.0, desc="Specific heat in J/kg/K")
+        self.options.declare("specific_heat_coolant", default=3801, desc="Specific heat in J/kg/K")
+        self.options.declare(
+            "quasi_steady", default=False, desc="Treat the component as quasi-steady or with thermal mass"
+        )
+        self.options.declare("num_nodes", default=1, desc="Number of quasi-steady points to runs")
 
     def setup(self):
-        nn = self.options['num_nodes']
-        quasi_steady = self.options['quasi_steady']
+        nn = self.options["num_nodes"]
+        quasi_steady = self.options["quasi_steady"]
         if not quasi_steady:
-            self.add_subsystem('base',
-                               ThermalComponentWithMass(specific_heat=self.options['specific_heat_object'],
-                                                        num_nodes=nn),
-                                                        promotes_inputs=['q_in', 'mass'])
-            ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
-                                           promotes_outputs=['*'], promotes_inputs=['*'])
-            ode_integ.add_integrand('T', rate_name='dTdt', units='K', lower=1e-10)
-            self.connect('base.dTdt','dTdt')
+            self.add_subsystem(
+                "base",
+                ThermalComponentWithMass(specific_heat=self.options["specific_heat_object"], num_nodes=nn),
+                promotes_inputs=["q_in", "mass"],
+            )
+            ode_integ = self.add_subsystem(
+                "ode_integ",
+                Integrator(num_nodes=nn, diff_units="s", method="simpson", time_setup="duration"),
+                promotes_outputs=["*"],
+                promotes_inputs=["*"],
+            )
+            ode_integ.add_integrand("T", rate_name="dTdt", units="K", lower=1e-10)
+            self.connect("base.dTdt", "dTdt")
         else:
-            self.add_subsystem('base',
-                               ThermalComponentMassless(num_nodes=nn),
-                               promotes_inputs=['q_in'],
-                               promotes_outputs=[('T_object', 'T')])
-        self.add_subsystem('hex',
-                           ConstantSurfaceTemperatureColdPlate_NTU(num_nodes=nn, specific_heat=self.options['specific_heat_coolant']),
-                                                                   promotes_inputs=['T_in', ('T_surface','T'),'n_parallel','channel*','mdot_coolant'],
-                                                                   promotes_outputs=['T_out'])
-        self.connect('hex.q','base.q_out')
+            self.add_subsystem(
+                "base",
+                ThermalComponentMassless(num_nodes=nn),
+                promotes_inputs=["q_in"],
+                promotes_outputs=[("T_object", "T")],
+            )
+        self.add_subsystem(
+            "hex",
+            ConstantSurfaceTemperatureColdPlate_NTU(num_nodes=nn, specific_heat=self.options["specific_heat_coolant"]),
+            promotes_inputs=["T_in", ("T_surface", "T"), "n_parallel", "channel*", "mdot_coolant"],
+            promotes_outputs=["T_out"],
+        )
+        self.connect("hex.q", "base.q_out")
+
 
 class CoolantReservoir(Group):
     """A reservoir of coolant capable of buffering temperature
@@ -342,18 +382,25 @@ class CoolantReservoir(Group):
     """
 
     def initialize(self):
-        self.options.declare('num_nodes',default=5)
+        self.options.declare("num_nodes", default=5)
 
     def setup(self):
-        nn = self.options['num_nodes']
-        self.add_subsystem('rate',
-                           CoolantReservoirRate(num_nodes=nn),
-                           promotes_inputs=['T_in', 'T_out', 'mass', 'mdot_coolant'])
+        nn = self.options["num_nodes"]
+        self.add_subsystem(
+            "rate", CoolantReservoirRate(num_nodes=nn), promotes_inputs=["T_in", "T_out", "mass", "mdot_coolant"]
+        )
 
-        ode_integ = self.add_subsystem('ode_integ', Integrator(num_nodes=nn, diff_units='s', method='simpson', time_setup='duration'),
-                                           promotes_outputs=['*'], promotes_inputs=['*'])
-        ode_integ.add_integrand('T_out', rate_name='dTdt', start_name='T_initial', end_name='T_final', units='K', lower=1e-10)
-        self.connect('rate.dTdt','dTdt')
+        ode_integ = self.add_subsystem(
+            "ode_integ",
+            Integrator(num_nodes=nn, diff_units="s", method="simpson", time_setup="duration"),
+            promotes_outputs=["*"],
+            promotes_inputs=["*"],
+        )
+        ode_integ.add_integrand(
+            "T_out", rate_name="dTdt", start_name="T_initial", end_name="T_final", units="K", lower=1e-10
+        )
+        self.connect("rate.dTdt", "dTdt")
+
 
 class CoolantReservoirRate(ExplicitComponent):
     """
@@ -380,27 +427,28 @@ class CoolantReservoirRate(ExplicitComponent):
     num_nodes : int
         The number of analysis points to run
     """
+
     def initialize(self):
-        self.options.declare('num_nodes', default=1)
+        self.options.declare("num_nodes", default=1)
 
     def setup(self):
-        nn_tot = self.options['num_nodes']
+        nn_tot = self.options["num_nodes"]
         arange = np.arange(0, nn_tot)
 
-        self.add_input('T_in', units='K', shape=(nn_tot,))
-        self.add_input('T_out', units='K', shape=(nn_tot,))
-        self.add_input('mdot_coolant', units='kg/s', shape=(nn_tot,))
-        self.add_input('mass', units='kg')
-        self.add_output('dTdt', units='K/s', shape=(nn_tot,))
+        self.add_input("T_in", units="K", shape=(nn_tot,))
+        self.add_input("T_out", units="K", shape=(nn_tot,))
+        self.add_input("mdot_coolant", units="kg/s", shape=(nn_tot,))
+        self.add_input("mass", units="kg")
+        self.add_output("dTdt", units="K/s", shape=(nn_tot,))
 
-        self.declare_partials(['dTdt'], ['T_in','T_out','mdot_coolant'], rows=arange, cols=arange)
-        self.declare_partials(['dTdt'], ['mass'], rows=arange, cols=np.zeros((nn_tot,)))
+        self.declare_partials(["dTdt"], ["T_in", "T_out", "mdot_coolant"], rows=arange, cols=arange)
+        self.declare_partials(["dTdt"], ["mass"], rows=arange, cols=np.zeros((nn_tot,)))
 
     def compute(self, inputs, outputs):
-        outputs['dTdt'] = inputs['mdot_coolant'] / inputs['mass'] * (inputs['T_in'] - inputs['T_out'])
+        outputs["dTdt"] = inputs["mdot_coolant"] / inputs["mass"] * (inputs["T_in"] - inputs["T_out"])
 
     def compute_partials(self, inputs, J):
-        J['dTdt','mass'] = - inputs['mdot_coolant'] / inputs['mass']**2 * (inputs['T_in'] - inputs['T_out'])
-        J['dTdt','mdot_coolant'] = 1 / inputs['mass'] * (inputs['T_in'] - inputs['T_out'])
-        J['dTdt','T_in'] = inputs['mdot_coolant'] / inputs['mass']
-        J['dTdt','T_out'] = - inputs['mdot_coolant'] / inputs['mass']
+        J["dTdt", "mass"] = -inputs["mdot_coolant"] / inputs["mass"] ** 2 * (inputs["T_in"] - inputs["T_out"])
+        J["dTdt", "mdot_coolant"] = 1 / inputs["mass"] * (inputs["T_in"] - inputs["T_out"])
+        J["dTdt", "T_in"] = inputs["mdot_coolant"] / inputs["mass"]
+        J["dTdt", "T_out"] = -inputs["mdot_coolant"] / inputs["mass"]

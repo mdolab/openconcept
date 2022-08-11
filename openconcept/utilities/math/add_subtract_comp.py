@@ -36,8 +36,9 @@ class AddSubtractComp(ExplicitComponent):
         List of equation systems to be initialized with the system.
     """
 
-    def __init__(self, output_name=None, input_names=None, vec_size=1, length=1,
-                 val=1.0, scaling_factors=None, **kwargs):
+    def __init__(
+        self, output_name=None, input_names=None, vec_size=1, length=1, val=1.0, scaling_factors=None, **kwargs
+    ):
         """
         Allow user to create an addition/subtracton system with one-liner.
 
@@ -74,23 +75,36 @@ class AddSubtractComp(ExplicitComponent):
         self._add_systems = []
 
         if isinstance(output_name, str):
-            self._add_systems.append((output_name, input_names, vec_size, length, val,
-                                      scaling_factors, kwargs))
+            self._add_systems.append((output_name, input_names, vec_size, length, val, scaling_factors, kwargs))
         elif isinstance(output_name, Iterable):
-            raise NotImplementedError('Declaring multiple addition systems '
-                                      'on initiation is not implemented.'
-                                      'Use a string to name a single addition relationship or use '
-                                      'multiple add_output calls')
+            raise NotImplementedError(
+                "Declaring multiple addition systems "
+                "on initiation is not implemented."
+                "Use a string to name a single addition relationship or use "
+                "multiple add_output calls"
+            )
         elif output_name is None:
             pass
         else:
-            raise ValueError(
-                "first argument to adder init must be either of type "
-                "'str' or 'None'")
+            raise ValueError("first argument to adder init must be either of type " "'str' or 'None'")
 
-    def add_equation(self, output_name, input_names, vec_size=1, length=1, val=1.0,
-                     units=None, res_units=None, desc='', lower=None, upper=None, ref=1.0,
-                     ref0=0.0, res_ref=None,  scaling_factors=None):
+    def add_equation(
+        self,
+        output_name,
+        input_names,
+        vec_size=1,
+        length=1,
+        val=1.0,
+        units=None,
+        res_units=None,
+        desc="",
+        lower=None,
+        upper=None,
+        ref=1.0,
+        ref0=0.0,
+        res_ref=None,
+        scaling_factors=None,
+    ):
         """
         Add an addition/subtraction relation.
 
@@ -145,25 +159,31 @@ class AddSubtractComp(ExplicitComponent):
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
         """
-        kwargs = {'units': units, 'res_units': res_units, 'desc': desc,
-                  'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref}
-        self._add_systems.append((output_name, input_names, vec_size, length, val,
-                                  scaling_factors, kwargs))
+        kwargs = {
+            "units": units,
+            "res_units": res_units,
+            "desc": desc,
+            "lower": lower,
+            "upper": upper,
+            "ref": ref,
+            "ref0": ref0,
+            "res_ref": res_ref,
+        }
+        self._add_systems.append((output_name, input_names, vec_size, length, val, scaling_factors, kwargs))
 
     def add_output(self):
         """
         Use add_equation instead of add_output to define equation systems.
         """
-        raise NotImplementedError('Use add_equation method, not add_output method'
-                                  'to create an addition/subtraction relation')
+        raise NotImplementedError(
+            "Use add_equation method, not add_output method" "to create an addition/subtraction relation"
+        )
 
     def setup(self):
         """
         Set up the addition/subtraction system at run time.
         """
-        for (output_name, input_names, vec_size, length, val,
-             scaling_factors, kwargs) in self._add_systems:
+        for (output_name, input_names, vec_size, length, val, scaling_factors, kwargs) in self._add_systems:
             if isinstance(input_names, str):
                 input_names = [input_names]
 
@@ -171,13 +191,13 @@ class AddSubtractComp(ExplicitComponent):
                 scaling_factors = np.ones(len(input_names))
 
             if len(scaling_factors) != len(input_names):
-                raise ValueError('Scaling factors list needs to be same length as input names')
+                raise ValueError("Scaling factors list needs to be same length as input names")
 
             if isinstance(vec_size, Iterable):
                 # scalar - vector mutliplication
                 multi_vec_size = True
                 if len(vec_size) != len(input_names):
-                    raise ValueError('Inputs list needs to be same length as vec_sizes list')
+                    raise ValueError("Inputs list needs to be same length as vec_sizes list")
                 vec_out_size = max(vec_size)
             else:
                 multi_vec_size = False
@@ -189,8 +209,8 @@ class AddSubtractComp(ExplicitComponent):
                 out_shape = (vec_out_size, length)
 
             super(AddSubtractComp, self).add_output(output_name, val, shape=out_shape, **kwargs)
-            units = kwargs.pop('units', None)
-            desc = kwargs.pop('desc', '')
+            units = kwargs.pop("units", None)
+            desc = kwargs.pop("desc", "")
 
             for i, input_name in enumerate(input_names):
                 if multi_vec_size:
@@ -209,13 +229,15 @@ class AddSubtractComp(ExplicitComponent):
                 else:
                     # vector input
                     col_vals = np.arange(0, vec_out_size * length)
-                self.add_input(input_name, shape=shape, units=units,
-                               desc=desc + '_inp_' + input_name)
+                self.add_input(input_name, shape=shape, units=units, desc=desc + "_inp_" + input_name)
                 sf = scaling_factors[i]
-                self.declare_partials([output_name], [input_name],
-                                      cols=col_vals,
-                                      rows=np.arange(0, vec_out_size * length),
-                                      val=sf * np.ones((vec_out_size * length)))
+                self.declare_partials(
+                    [output_name],
+                    [input_name],
+                    cols=col_vals,
+                    rows=np.arange(0, vec_out_size * length),
+                    val=sf * np.ones((vec_out_size * length)),
+                )
 
     def compute(self, inputs, outputs):
         """
@@ -228,8 +250,7 @@ class AddSubtractComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        for (output_name, input_names, vec_size, length, val, scaling_factors,
-             kwargs) in self._add_systems:
+        for (output_name, input_names, vec_size, length, val, scaling_factors, kwargs) in self._add_systems:
             if isinstance(input_names, str):
                 input_names = [input_names]
 

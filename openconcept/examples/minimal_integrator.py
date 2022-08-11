@@ -64,7 +64,9 @@ class AircraftWithFuelBurn(om.Group):
 
         # Integrate the fuel flow rate to compute fuel burn
         # rst Integrator (beg)
-        integ = self.add_subsystem("fuel_integrator", Integrator(num_nodes=nn, diff_units="s", time_setup="duration", method="simpson"))
+        integ = self.add_subsystem(
+            "fuel_integrator", Integrator(num_nodes=nn, diff_units="s", time_setup="duration", method="simpson")
+        )
         integ.add_integrand("fuel_burned", rate_name="fuel_flow", units="kg")
 
         self.connect("fuel_flow_calc.fuel_flow", "fuel_integrator.fuel_flow")
@@ -120,11 +122,14 @@ class MissionAnalysisWithFuelBurn(om.Group):
 if __name__ == "__main__":
     # Process command line argument to optionally not show figures and N2 diagram
     import argparse
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hide_visuals",
-                        default=False,
-                        action="store_true",
-                        help="Do not show matplotlib figure or open N2 diagram in browser")
+    parser.add_argument(
+        "--hide_visuals",
+        default=False,
+        action="store_true",
+        help="Do not show matplotlib figure or open N2 diagram in browser",
+    )
     hide_viz = parser.parse_args().hide_visuals
 
     # Setup the problem and run the analysis
