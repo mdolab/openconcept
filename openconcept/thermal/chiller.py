@@ -237,9 +237,7 @@ class HeatPumpWithIntegratedCoolantLoop(om.Group):
         iv.add_output("bypass_start", val=1.0)
         iv.add_output("bypass_end", val=1.0)
 
-        self.add_subsystem(
-            "li", LinearInterpolator(num_nodes=nn, units=None), promotes_outputs=[("vec", "bypass")]
-        )
+        self.add_subsystem("li", LinearInterpolator(num_nodes=nn, units=None), promotes_outputs=[("vec", "bypass")])
         self.connect("control.bypass_start", "li.start_val")
         self.connect("control.bypass_end", "li.end_val")
         self.add_subsystem(

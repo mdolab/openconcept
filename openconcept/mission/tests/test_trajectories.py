@@ -675,9 +675,7 @@ class PhaseForTrajTestWithPromotionNamesCollide(PhaseGroup):
     def setup(self):
         nn = self.options["num_nodes"]
         self.add_subsystem("iv", om.IndepVarComp("duration", val=5.0, units="s"), promotes_outputs=["*"])
-        self.add_subsystem(
-            "a", IntegratorGroupTestBase(num_nodes=nn), promotes_inputs=["*"], promotes_outputs=["*"]
-        )
+        self.add_subsystem("a", IntegratorGroupTestBase(num_nodes=nn), promotes_inputs=["*"], promotes_outputs=["*"])
         # promote the outputs of b
         self.add_subsystem(
             "b", IntegratorTestMultipleOutputs(num_nodes=nn), promotes_outputs=["*f2*"], promotes_inputs=["*df2"]

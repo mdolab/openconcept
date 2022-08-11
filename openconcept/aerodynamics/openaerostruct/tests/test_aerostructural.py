@@ -5,7 +5,13 @@ import openmdao.api as om
 
 # Only run if OpenAeroStruct is installed
 try:
-    from openconcept.aerodynamics.openaerostruct.aerostructural import OASDataGen, Aerostruct, AerostructDragPolar, AerostructDragPolarExact, example_usage
+    from openconcept.aerodynamics.openaerostruct.aerostructural import (
+        OASDataGen,
+        Aerostruct,
+        AerostructDragPolar,
+        AerostructDragPolarExact,
+        example_usage,
+    )
 
     OAS_installed = True
 except ImportError:

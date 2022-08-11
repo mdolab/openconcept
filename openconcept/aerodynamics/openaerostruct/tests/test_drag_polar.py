@@ -7,7 +7,13 @@ import openmdao.api as om
 try:
     from openaerostruct.geometry.geometry_group import Geometry
     from openaerostruct.aerodynamics.aero_groups import AeroPoint
-    from openconcept.aerodynamics.openaerostruct.drag_polar import VLMDataGen, VLM, VLMDragPolar, PlanformMesh, example_usage
+    from openconcept.aerodynamics.openaerostruct.drag_polar import (
+        VLMDataGen,
+        VLM,
+        VLMDragPolar,
+        PlanformMesh,
+        example_usage,
+    )
 
     OAS_installed = True
 except ImportError:

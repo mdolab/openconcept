@@ -2,7 +2,17 @@ import os
 import logging
 import numpy as np
 
-from openmdao.api import Problem, Group, ScipyOptimizeDriver, ExplicitComponent, ExecComp, SqliteRecorder, DirectSolver, IndepVarComp, NewtonSolver
+from openmdao.api import (
+    Problem,
+    Group,
+    ScipyOptimizeDriver,
+    ExplicitComponent,
+    ExecComp,
+    SqliteRecorder,
+    DirectSolver,
+    IndepVarComp,
+    NewtonSolver,
+)
 
 # imports for the airplane model itself
 from openconcept.aerodynamics import PolarDrag
