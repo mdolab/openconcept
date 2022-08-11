@@ -123,11 +123,14 @@ def setup_problem(model=MissionAnalysis):
 if __name__ == "__main__":
     # Process command line argument to optionally not show figures and N2 diagram
     import argparse
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hide_visuals",
-                        default=False,
-                        action="store_true",
-                        help="Do not show matplotlib figure or open N2 diagram in browser")
+    parser.add_argument(
+        "--hide_visuals",
+        default=False,
+        action="store_true",
+        help="Do not show matplotlib figure or open N2 diagram in browser",
+    )
     hide_viz = parser.parse_args().hide_visuals
 
     # Setup the problem and run the analysis
@@ -142,14 +145,14 @@ if __name__ == "__main__":
     axs = axs.flatten()  # change 2x2 mtx of axes into 4-element vector
 
     # Define variables to plot
-    vars = [
+    plot_vars = [
         {"var": "fltcond|h", "name": "Altitude", "units": "ft"},
         {"var": "fltcond|vs", "name": "Vertical speed", "units": "ft/min"},
         {"var": "fltcond|Utrue", "name": "True airspeed", "units": "kn"},
         {"var": "throttle", "name": "Throttle", "units": None},
     ]
 
-    for idx_fig, var in enumerate(vars):
+    for idx_fig, var in enumerate(plot_vars):
         axs[idx_fig].set_xlabel("Range (nmi)")
         axs[idx_fig].set_ylabel(f"{var['name']}" if var["units"] is None else f"{var['name']} ({var['units']})")
 
@@ -160,7 +163,7 @@ if __name__ == "__main__":
                 prob.get_val(f"mission.{phase}.{var['var']}", units=var["units"]),
                 "-o",
                 c="tab:blue",
-                markersize=2.,
+                markersize=2.0,
             )
 
     fig.savefig("minimal_example_results.svg", transparent=True)

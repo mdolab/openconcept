@@ -4,6 +4,9 @@ from time import time
 from copy import copy, deepcopy
 import multiprocessing as mp
 
+# Atmospheric calculations
+from openconcept.atmospherics import TemperatureComp, PressureComp, DensityComp, SpeedOfSoundComp
+
 # Progress bar
 progress_bar = True
 try:
@@ -18,9 +21,6 @@ try:
     from openaerostruct.aerodynamics.aero_groups import AeroPoint
 except ImportError:
     raise ImportError("OpenAeroStruct must be installed to use the VLMDragPolar component")
-
-# Atmospheric calculations
-from openconcept.atmospherics import TemperatureComp, PressureComp, DensityComp, SpeedOfSoundComp
 
 CITATION = """
 @InProceedings{Adler2022a,
@@ -451,9 +451,11 @@ data : dict
         Partial derivatives of the training data flattened in the proper OpenMDAO-style
         format for use as partial derivatives in the VLMDataGen component
 """
+
+
 def compute_training_data(inputs, surf_dict=None):
     t_start = time()
-    print(f"Generating OpenAeroStruct aerodynamic training data...")
+    print("Generating OpenAeroStruct aerodynamic training data...")
 
     # Set up test points for use in parallelized map function ([Mach, alpha, altitude, inputs] for each point)
     test_points = np.array(
@@ -708,7 +710,9 @@ class VLM(om.Group):
         # This dummy mesh must be passed to the surface dict so OpenAeroStruct
         # knows the dimensions of the mesh and whether it is a left or right wing
         dummy_mesh = np.zeros((nx, ny, 3))
-        dummy_mesh[:, :, 0], dummy_mesh[:, :, 1] = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
+        dummy_mesh[:, :, 0], dummy_mesh[:, :, 1] = np.meshgrid(
+            np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij"
+        )
 
         surf_dict = {
             "name": "wing",
@@ -887,8 +891,8 @@ class PlanformMesh(om.ExplicitComponent):
         # Compute derivatives in a way analogous to forward AD
         db_dS = AR / (4 * np.sqrt(AR * S))
         db_dAR = S / (4 * np.sqrt(AR * S))
-        dcroot_dS = 1 / (half_span * (1 + taper)) - S / (half_span ** 2 * (1 + taper)) * db_dS
-        dcroot_dAR = -S / (half_span ** 2 * (1 + taper)) * db_dAR
+        dcroot_dS = 1 / (half_span * (1 + taper)) - S / (half_span**2 * (1 + taper)) * db_dS
+        dcroot_dAR = -S / (half_span**2 * (1 + taper)) * db_dAR
         dcroot_dtaper = -S / (half_span * (1 + taper) ** 2)
 
         dy_dS = y_mesh * db_dS
@@ -975,7 +979,7 @@ def example_usage():
 
     p.run_model()
 
-    print(f"================== SURROGATE ==================")
+    print("================== SURROGATE ==================")
     print(f"CL: {p.get_val('aero_surrogate.CL')}")
     print(f"CD: {p.get_val('aero_surrogate.CD')}")
     print(f"Alpha: {p.get_val('aero_surrogate.alpha', units='deg')} deg")
@@ -1001,7 +1005,7 @@ def example_usage():
 
     prob.run_model()
 
-    print(f"\n================== OpenAeroStruct ==================")
+    print("\n================== OpenAeroStruct ==================")
     print(f"CL: {prob.get_val('fltcond|CL')}")
     print(f"CD: {prob.get_val('fltcond|CD')}")
     print(f"Alpha: {prob.get_val('fltcond|alpha', units='deg')} deg")

@@ -19,14 +19,11 @@ import subprocess
 
 from sphinx_mdolab_theme.config import *
 
-sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, os.path.abspath('..'))
-sys.path.insert(0, os.path.abspath('./_exts'))
+sys.path.insert(0, os.path.abspath("."))
+sys.path.insert(0, os.path.abspath(".."))
 # sphinx build needs to be able to find the openmdao embed_code plugin
 # so we add it to the path
 this_directory = os.path.abspath(os.path.dirname(__file__))
-
-# sys.path.insert(0, os.path.abspath(openconcept.__path__[0]+r'/docs/_exts'))
 
 
 def generate_src_docs(dir, top, packages):
@@ -67,6 +64,7 @@ Source Docs
     doc_dir = os.path.join(docs_dir, "_srcdocs")
     if os.path.isdir(doc_dir):
         import shutil
+
         shutil.rmtree(doc_dir)
 
     if not os.path.isdir(doc_dir):
@@ -94,17 +92,17 @@ Source Docs
         # a package is e.g. openmdao.core, that contains source files
         # a sub_package, is a src file, e.g. openmdao.core.component
         sub_packages = []
-        package_filename = os.path.join(packages_dir,
-                                        "openconcept." + package + ".rst")
+        package_filename = os.path.join(packages_dir, "openconcept." + package + ".rst")
         package_name = "openconcept." + package
 
         # the sub_listing is going into each package dir and listing what's in it
-        for sub_listing in sorted(os.listdir(os.path.join(top, package.replace('.','/')))):
+        for sub_listing in sorted(os.listdir(os.path.join(top, package.replace(".", "/")))):
             # don't want to catalog files twice, nor use init files nor test dir
-            if (os.path.isdir(sub_listing) and sub_listing != "tests") or \
-               (sub_listing.endswith(".py") and not sub_listing.startswith('_')):
+            if (os.path.isdir(sub_listing) and sub_listing != "tests") or (
+                sub_listing.endswith(".py") and not sub_listing.startswith("_")
+            ):
                 # just want the name of e.g. dataxfer not dataxfer.py
-                sub_packages.append(sub_listing.rsplit('.')[0])
+                sub_packages.append(sub_listing.rsplit(".")[0])
 
         if len(sub_packages) > 0:
             # continue to write in the top-level index file.
@@ -126,7 +124,7 @@ Source Docs
             package_file.write(package_top)
 
             for sub_package in sub_packages:
-                SKIP_SUBPACKAGES = ['__pycache__']
+                SKIP_SUBPACKAGES = ["__pycache__"]
                 # this line writes subpackage name e.g. "core/component.py"
                 # into the corresponding package index file (e.g. "openmdao.core.rst")
                 if sub_package not in SKIP_SUBPACKAGES:
@@ -141,8 +139,7 @@ Source Docs
                     # get the meat of the ref sheet code done
                     filename = sub_package + ".py"
                     ref_sheet.write(".. index:: " + filename + "\n\n")
-                    ref_sheet.write(".. _" + package_name + "." +
-                                    filename + ":\n\n")
+                    ref_sheet.write(".. _" + package_name + "." + filename + ":\n\n")
                     ref_sheet.write(filename + "\n")
                     ref_sheet.write("-" * len(filename) + "\n\n")
                     ref_sheet.write(".. automodule:: " + package_name + "." + sub_package)
@@ -167,7 +164,7 @@ def run_file_move_result(file_name, output_files, destination_files, optional_cl
     This function can be used to automatically generate the figure in the RTD build
     and move it to a specific location in the RTD build.
 
-    Note that the file is run from the openconcept/docs directory and all relative paths
+    Note that the file is run from the openconcept/doc directory and all relative paths
     are relative to this directory. If the output file name is defined in the script
     using a relative path remember to take it into account.
 
@@ -199,104 +196,116 @@ def run_file_move_result(file_name, output_files, destination_files, optional_cl
 
 from sphinx.ext.napoleon.docstring import NumpyDocstring
 
+
 def parse_inputs_section(self, section):
-	return self._format_fields('Inputs', self._consume_fields())
+    return self._format_fields("Inputs", self._consume_fields())
+
+
 NumpyDocstring._parse_inputs_section = parse_inputs_section
 
+
 def parse_options_section(self, section):
-	return self._format_fields('Options', self._consume_fields())
+    return self._format_fields("Options", self._consume_fields())
+
+
 NumpyDocstring._parse_options_section = parse_options_section
 
+
 def parse_outputs_section(self, section):
-	return self._format_fields('Outputs', self._consume_fields())
+    return self._format_fields("Outputs", self._consume_fields())
+
+
 NumpyDocstring._parse_outputs_section = parse_outputs_section
 
+
 def patched_parse(self):
-	self._sections['inputs'] = self._parse_inputs_section
-	self._sections['outputs'] = self._parse_outputs_section
-	self._sections['options'] = self._parse_options_section
-	self._unpatched_parse()
+    self._sections["inputs"] = self._parse_inputs_section
+    self._sections["outputs"] = self._parse_outputs_section
+    self._sections["options"] = self._parse_options_section
+    self._unpatched_parse()
+
 
 NumpyDocstring._unpatched_parse = NumpyDocstring._parse
 NumpyDocstring._parse = patched_parse
 
 # -- Project information -----------------------------------------------------
 
-project = 'OpenConcept'
-author = 'Benjamin J. Brelje and Eytan J. Adler'
+project = "OpenConcept"
+author = "Benjamin J. Brelje and Eytan J. Adler"
 
 import openconcept
+
 # The short X.Y version
 version = openconcept.__version__
 # The full version, including alpha/beta/rc tags
-release = openconcept.__version__ + ' alpha'
+release = openconcept.__version__ + " alpha"
 
 
 # -- General configuration ---------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
 #
-needs_sphinx = '1.5'
+needs_sphinx = "1.5"
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 
 extensions = [
-    'sphinx.ext.autosummary',
-    'sphinx.ext.doctest',
-	'sphinx.ext.napoleon',
-    'sphinx.ext.todo',
-    'sphinx.ext.coverage',
-    'sphinxcontrib.bibtex',
-    'sphinx_copybutton',
-    'sphinx_mdolab_theme.ext.embed_code',
-    'sphinx_mdolab_theme.ext.embed_compare',
-    'sphinx_mdolab_theme.ext.embed_n2',
+    "sphinx.ext.autosummary",
+    "sphinx.ext.doctest",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.todo",
+    "sphinx.ext.coverage",
+    "sphinxcontrib.bibtex",
+    "sphinx_copybutton",
+    "sphinx_mdolab_theme.ext.embed_code",
+    "sphinx_mdolab_theme.ext.embed_compare",
+    "sphinx_mdolab_theme.ext.embed_n2",
 ]
 autodoc_inherit_docstrings = False
-autodoc_member_order = 'bysource'
+autodoc_member_order = "bysource"
 autoclass_content = "class"
 
 autosummary_generate = []
 
-# Ignore docs errors 
+# Ignore docs errors
 nitpick_ignore_regex = [("py:class", ".*")]
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
 # source_suffix = ['.rst', '.md']
-source_suffix = '.rst'
+source_suffix = ".rst"
 
 # The master toctree document.
-master_doc = 'index'
+master_doc = "index"
 
 # The language for content autogenerated by Sphinx. Refer to documentation
 # for a list of supported languages.
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = 'en'
+language = "en"
 
 # This sets the bibtex bibliography file(s) to reference in the documentation
-bibtex_bibfiles = ['ref.bib']
+bibtex_bibfiles = ["ref.bib"]
 
 # -- Options for HTML output -------------------------------------------------
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
 
 
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'openconceptdoc'
+htmlhelp_basename = "openconceptdoc"
 
 
 # -- Options for LaTeX output ------------------------------------------------
@@ -305,15 +314,12 @@ latex_elements = {
     # The paper size ('letterpaper' or 'a4paper').
     #
     # 'papersize': 'letterpaper',
-
     # The font size ('10pt', '11pt' or '12pt').
     #
     # 'pointsize': '10pt',
-
     # Additional stuff for the LaTeX preamble.
     #
     # 'preamble': '',
-
     # Latex figure (float) alignment
     #
     # 'figure_align': 'htbp',
@@ -323,8 +329,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'openconcept.tex', 'openconcept Documentation',
-     'Benjamin J. Brelje', 'manual'),
+    (master_doc, "openconcept.tex", "openconcept Documentation", "Benjamin J. Brelje", "manual"),
 ]
 
 
@@ -332,10 +337,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [
-    (master_doc, 'openconcept', 'openconcept Documentation',
-     [author], 1)
-]
+man_pages = [(master_doc, "openconcept", "openconcept Documentation", [author], 1)]
 
 
 # -- Options for Texinfo output ----------------------------------------------
@@ -344,18 +346,39 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'openconcept', 'openconcept Documentation',
-     author, 'openconcept', 'One line description of project.',
-     'Miscellaneous'),
+    (
+        master_doc,
+        "openconcept",
+        "openconcept Documentation",
+        author,
+        "openconcept",
+        "One line description of project.",
+        "Miscellaneous",
+    ),
 ]
 
 
 # -- Extension configuration -------------------------------------------------
 
 # -- Run examples to get figures for docs ------------------------------------
-run_file_move_result("../openconcept/examples/minimal.py", ["minimal_example_results.svg"], ["tutorials/assets/minimal_example_results.svg"], optional_cl_args=["--hide_visuals"])
-run_file_move_result("../openconcept/examples/minimal_integrator.py", ["minimal_integrator_results.svg"], ["tutorials/assets/minimal_integrator_results.svg"], optional_cl_args=["--hide_visuals"])
-run_file_move_result("../openconcept/examples/TBM850.py", ["turboprop_takeoff_results.svg", "turboprop_mission_results.svg"], ["tutorials/assets/turboprop_takeoff_results.svg", "tutorials/assets/turboprop_mission_results.svg"], optional_cl_args=["--hide_visuals"])
+run_file_move_result(
+    "../openconcept/examples/minimal.py",
+    ["minimal_example_results.svg"],
+    ["tutorials/assets/minimal_example_results.svg"],
+    optional_cl_args=["--hide_visuals"],
+)
+run_file_move_result(
+    "../openconcept/examples/minimal_integrator.py",
+    ["minimal_integrator_results.svg"],
+    ["tutorials/assets/minimal_integrator_results.svg"],
+    optional_cl_args=["--hide_visuals"],
+)
+run_file_move_result(
+    "../openconcept/examples/TBM850.py",
+    ["turboprop_takeoff_results.svg", "turboprop_mission_results.svg"],
+    ["tutorials/assets/turboprop_takeoff_results.svg", "tutorials/assets/turboprop_mission_results.svg"],
+    optional_cl_args=["--hide_visuals"],
+)
 
 # Remove the N2 diagrams it also created
 files_remove = ["minimal_example_n2.html", "minimal_integrator_n2.html", "turboprop_n2.html"]
@@ -365,7 +388,7 @@ for file in files_remove:
 # -- Options for intersphinx extension ---------------------------------------
 
 # Example configuration for intersphinx: refer to the Python standard library.
-#intersphinx_mapping = {'https://docs.python.org/': None}
+# intersphinx_mapping = {'https://docs.python.org/': None}
 
 # -- Options for todo extension ----------------------------------------------
 
@@ -379,15 +402,15 @@ if generate_srcdocs:
     # os.rename('_srcdocs_native/modules.rst','_srcdocs_native/index.rst')
     # openmdao way
     packages = [
-        'aerodynamics',
-        'aerodynamics.openaerostruct',
-        'atmospherics',
-        'energy_storage',
-        'mission',
-        'propulsion',
-        'propulsion.systems',
-        'thermal',
-        'utilities',
-        'utilities.math'
+        "aerodynamics",
+        "aerodynamics.openaerostruct",
+        "atmospherics",
+        "energy_storage",
+        "mission",
+        "propulsion",
+        "propulsion.systems",
+        "thermal",
+        "utilities",
+        "utilities.math",
     ]
     generate_src_docs(".", "../openconcept", packages)

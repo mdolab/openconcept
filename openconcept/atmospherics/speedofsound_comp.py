@@ -8,7 +8,7 @@ R = 287.058
 
 
 class SpeedOfSoundComp(ExplicitComponent):
-    '''
+    """
     This component computes speed of sound from temperature.
 
     Adapted from:
@@ -19,38 +19,37 @@ class SpeedOfSoundComp(ExplicitComponent):
     ------
     fltcond|T : float
         Temperature at flight condition (vector, K)
-    
+
     Outputs
     -------
     fltcond|a : float
         Speed of sound (vector, m/s)
-    
+
     Options
     -------
     num_nodes : int
         Number of analysis points to run, i.e. length of vector inputs (scalar, dimensionless)
-    '''
-
+    """
 
     def initialize(self):
-        self.options.declare('num_nodes', types=int)
+        self.options.declare("num_nodes", types=int)
 
     def setup(self):
-        num_points = self.options['num_nodes']
+        num_points = self.options["num_nodes"]
 
-        self.add_input('fltcond|T', shape=num_points, units='K')
-        self.add_output('fltcond|a', shape=num_points, units='m/s')
+        self.add_input("fltcond|T", shape=num_points, units="K")
+        self.add_output("fltcond|a", shape=num_points, units="m/s")
 
         arange = np.arange(num_points)
-        self.declare_partials('fltcond|a', 'fltcond|T', rows=arange, cols=arange)
+        self.declare_partials("fltcond|a", "fltcond|T", rows=arange, cols=arange)
 
     def compute(self, inputs, outputs):
-        T_K = inputs['fltcond|T']
+        T_K = inputs["fltcond|T"]
 
-        outputs['fltcond|a'] = np.sqrt(gamma * R * T_K)
+        outputs["fltcond|a"] = np.sqrt(gamma * R * T_K)
 
     def compute_partials(self, inputs, partials):
-        T_K = inputs['fltcond|T']
+        T_K = inputs["fltcond|T"]
 
         data = 0.5 * np.sqrt(gamma * R / T_K)
-        partials['fltcond|a', 'fltcond|T'] = data
+        partials["fltcond|a", "fltcond|T"] = data
