@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
-from openmdao.api import IndepVarComp, Group, Problem, DirectSolver, NewtonSolver, IndepVarComp
+from openmdao.api import IndepVarComp, Group, Problem, DirectSolver, NewtonSolver
 from openconcept.thermal import LiquidCooledBattery
 
 
@@ -137,7 +137,6 @@ class UnsteadyBatteryCoolingTestCase(unittest.TestCase):
         An example demonstrating unsteady battery cooling
         """
         from openconcept.mission import PhaseGroup, TrajectoryGroup
-        import openmdao.api as om
         import numpy as np
 
         class VehicleModel(Group):

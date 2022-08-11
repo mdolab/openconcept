@@ -7,7 +7,6 @@ from openconcept.utilities import Integrator, AddSubtractComp, DictIndepVarComp
 from openconcept.examples.aircraft_data.caravan import data as acdata
 from openconcept.propulsion import TurbopropPropulsionSystem
 from openconcept.weights import SingleTurboPropEmptyWeight
-from openconcept.costs import TurbopropOperatingCost
 
 from openconcept.aerodynamics import PolarDrag
 from openconcept.mission import FullMissionAnalysis
@@ -129,7 +128,7 @@ class CaravanAnalysisGroup(om.Group):
         dv_comp.add_output_from_dict("ac|num_passengers_max")
         dv_comp.add_output_from_dict("ac|q_cruise")
 
-        analysis = self.add_subsystem(
+        self.add_subsystem(
             "analysis",
             FullMissionAnalysis(num_nodes=nn, aircraft_model=CaravanAirplaneModel),
             promotes_inputs=["*"],

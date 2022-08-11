@@ -247,8 +247,6 @@ class Groundspeeds(ExplicitComponent):
         )
 
     def compute(self, inputs, outputs):
-
-        nn = self.options["num_nodes"]
         # compute the groundspeed on climb and desc
         inside = inputs["fltcond|Utrue"] ** 2 - inputs["fltcond|vs"] ** 2
         groundspeed = np.sqrt(inside)
@@ -331,7 +329,6 @@ class HorizontalAcceleration(ExplicitComponent):
         )
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         m = inputs["weight"]
         floor_vec = np.where(np.less((GRAV_CONST - inputs["lift"] / m), 0.0), 0.0, 1.0)
         accel = (
@@ -407,7 +404,6 @@ class VerticalAcceleration(ExplicitComponent):
         )
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         cosg = inputs["fltcond|cosgamma"]
         sing = inputs["fltcond|singamma"]
         accel = (
@@ -831,7 +827,7 @@ class RotationPhase(PhaseGroup):
             promotes_outputs=["*"],
         )
         self.add_subsystem("gs", Groundspeeds(num_nodes=nn), promotes_inputs=["*"], promotes_outputs=["*"])
-        clcomp = self.add_subsystem(
+        self.add_subsystem(
             "clcomp",
             ElementMultiplyDivideComp(
                 output_name="fltcond|CL", input_names=["CL_rotate_mult", "ac|aero|CLmax_TO"], vec_size=[nn, 1], length=1

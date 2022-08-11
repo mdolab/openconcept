@@ -1,8 +1,6 @@
 import numpy as np
 
-from openmdao.api import Problem, Group, ScipyOptimizeDriver
-from openmdao.api import DirectSolver, SqliteRecorder, IndepVarComp
-from openmdao.api import NewtonSolver, BoundsEnforceLS
+from openmdao.api import Problem, Group, DirectSolver, IndepVarComp, NewtonSolver
 
 # imports for the airplane model itself
 from openconcept.aerodynamics import PolarDrag
@@ -132,7 +130,7 @@ class KingAirAnalysisGroup(Group):
         dv_comp.add_output_from_dict("ac|num_engines")
 
         # Run a full mission analysis including takeoff, climb, cruise, and descent
-        analysis = self.add_subsystem(
+        self.add_subsystem(
             "analysis",
             FullMissionAnalysis(num_nodes=nn, aircraft_model=KingAirC90GTModel),
             promotes_inputs=["*"],

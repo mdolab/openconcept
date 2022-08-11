@@ -152,8 +152,8 @@ class IntegratorGroupTestBase(IntegratorGroup):
 
     def setup(self):
         nn = self.options["num_nodes"]
-        iv = self.add_subsystem("iv", om.IndepVarComp("x", val=np.linspace(0, 5, nn), units="s"))
-        ec = self.add_subsystem(
+        self.add_subsystem("iv", om.IndepVarComp("x", val=np.linspace(0, 5, nn), units="s"))
+        self.add_subsystem(
             "ec",
             om.ExecComp(
                 ["df = -10.2*x**2 + 4.2*x -10.5"],
@@ -203,7 +203,7 @@ class IntegratorTestMultipleOutputs(IntegratorGroupTestBase):
     def setup(self):
         super(IntegratorTestMultipleOutputs, self).setup()
         nn = self.options["num_nodes"]
-        ec2 = self.add_subsystem(
+        self.add_subsystem(
             "ec2",
             om.ExecComp(
                 ["df2 = 5.1*x**2 +0.5*x-7.2"],
@@ -257,7 +257,7 @@ class IntegratorTestPromotes(IntegratorGroupTestBase):
     def setup(self):
         super(IntegratorTestPromotes, self).setup()
         nn = self.options["num_nodes"]
-        ec2 = self.add_subsystem(
+        self.add_subsystem(
             "ec2",
             om.ExecComp(
                 ["df2 = 5.1*x**2 +0.5*x-7.2"],
@@ -311,7 +311,7 @@ class IntegratorTestValLimits(IntegratorGroupTestBase):
     def setup(self):
         super(IntegratorTestValLimits, self).setup()
         nn = self.options["num_nodes"]
-        ec2 = self.add_subsystem(
+        self.add_subsystem(
             "ec2",
             om.ExecComp(
                 ["df2 = 5.1*x**2 +0.5*x-7.2"],
@@ -370,7 +370,7 @@ class IntegratorTestDuplicateRateNames(IntegratorGroupTestBase):
     def setup(self):
         super(IntegratorTestDuplicateRateNames, self).setup()
         nn = self.options["num_nodes"]
-        ec2 = self.add_subsystem(
+        self.add_subsystem(
             "ec2",
             om.ExecComp(
                 ["df = 5.1*x**3 +0.5*x-7.2"],
@@ -397,7 +397,7 @@ class TestIntegratorDuplicateRateName(unittest.TestCase):
         self.p = om.Problem(model=self.TestPhase(num_nodes=self.nn))
 
     def test_asserts(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(ValueError) as _:
             self.p.setup(force_alloc_complex=True)
 
 
@@ -405,7 +405,7 @@ class IntegratorTestDuplicateStateNames(IntegratorGroupTestBase):
     def setup(self):
         super(IntegratorTestDuplicateStateNames, self).setup()
         nn = self.options["num_nodes"]
-        ec2 = self.add_subsystem(
+        self.add_subsystem(
             "ec2",
             om.ExecComp(
                 ["df2 = 5.1*x**3 +0.5*x-7.2"],
@@ -508,8 +508,8 @@ class IntegratorGroupTestPromotedRate(IntegratorGroup):
 
     def setup(self):
         nn = self.options["num_nodes"]
-        iv = self.add_subsystem("iv", om.IndepVarComp("x", val=np.linspace(0, 5, nn), units="s"))
-        ec = self.add_subsystem(
+        self.add_subsystem("iv", om.IndepVarComp("x", val=np.linspace(0, 5, nn), units="s"))
+        self.add_subsystem(
             "ec",
             om.ExecComp(
                 ["df = -10.2*x**2 + 4.2*x -10.5"],
@@ -569,7 +569,7 @@ class TestPhaseNoTime(unittest.TestCase):
         self.p = om.Problem(model=phase)
 
     def test_raises_error(self):
-        with self.assertRaises(NameError) as x:
+        with self.assertRaises(NameError) as _:
             self.p.setup()
 
 
@@ -578,8 +578,8 @@ class TestPhaseMultipleIntegrators(unittest.TestCase):
         self.nn = 5
         grp1 = IntegratorGroupTestBase(num_nodes=self.nn)
         grp2 = om.Group()
-        grp2a = grp2.add_subsystem("a", IntegratorGroupTestBase(num_nodes=self.nn))
-        grp2b = grp2.add_subsystem("b", IntegratorGroupTestBase(num_nodes=self.nn))
+        grp2.add_subsystem("a", IntegratorGroupTestBase(num_nodes=self.nn))
+        grp2.add_subsystem("b", IntegratorGroupTestBase(num_nodes=self.nn))
         phase = PhaseGroup(num_nodes=self.nn)
         phase.add_subsystem("iv", om.IndepVarComp("duration", val=5.0, units="s"), promotes_outputs=["*"])
         phase.add_subsystem("grp1", grp1)
@@ -610,8 +610,8 @@ class TestPhasePromotedDurationVariable(unittest.TestCase):
         self.nn = 5
         grp1 = IntegratorGroupTestBase(num_nodes=self.nn)
         grp2 = om.Group()
-        grp2a = grp2.add_subsystem("a", IntegratorGroupTestBase(num_nodes=self.nn))
-        grp2b = grp2.add_subsystem("b", IntegratorGroupTestBase(num_nodes=self.nn))
+        grp2.add_subsystem("a", IntegratorGroupTestBase(num_nodes=self.nn))
+        grp2.add_subsystem("b", IntegratorGroupTestBase(num_nodes=self.nn))
         phase = PhaseGroup(num_nodes=self.nn)
         phase.add_subsystem("iv", om.IndepVarComp("duration", val=5.0, units="s"), promotes_outputs=["*"])
         phase.add_subsystem("grp1", grp1)
@@ -650,8 +650,8 @@ class PhaseForTrajTest(PhaseGroup):
     def setup(self):
         nn = self.options["num_nodes"]
         self.add_subsystem("iv", om.IndepVarComp("duration", val=5.0, units="s"), promotes_outputs=["*"])
-        a = self.add_subsystem("a", IntegratorGroupTestBase(num_nodes=nn))
-        b = self.add_subsystem("b", IntegratorTestMultipleOutputs(num_nodes=nn))
+        self.add_subsystem("a", IntegratorGroupTestBase(num_nodes=nn))
+        self.add_subsystem("b", IntegratorTestMultipleOutputs(num_nodes=nn))
 
 
 class PhaseForTrajTestWithPromotion(PhaseGroup):
@@ -661,9 +661,9 @@ class PhaseForTrajTestWithPromotion(PhaseGroup):
     def setup(self):
         nn = self.options["num_nodes"]
         self.add_subsystem("iv", om.IndepVarComp("duration", val=5.0, units="s"), promotes_outputs=["*"])
-        a = self.add_subsystem("a", IntegratorGroupTestBase(num_nodes=nn))
+        self.add_subsystem("a", IntegratorGroupTestBase(num_nodes=nn))
         # promote the outputs of b
-        b = self.add_subsystem(
+        self.add_subsystem(
             "b", IntegratorTestMultipleOutputs(num_nodes=nn), promotes_outputs=["*f2*"], promotes_inputs=["*df2"]
         )
 
@@ -675,11 +675,11 @@ class PhaseForTrajTestWithPromotionNamesCollide(PhaseGroup):
     def setup(self):
         nn = self.options["num_nodes"]
         self.add_subsystem("iv", om.IndepVarComp("duration", val=5.0, units="s"), promotes_outputs=["*"])
-        a = self.add_subsystem(
+        self.add_subsystem(
             "a", IntegratorGroupTestBase(num_nodes=nn), promotes_inputs=["*"], promotes_outputs=["*"]
         )
         # promote the outputs of b
-        b = self.add_subsystem(
+        self.add_subsystem(
             "b", IntegratorTestMultipleOutputs(num_nodes=nn), promotes_outputs=["*f2*"], promotes_inputs=["*df2"]
         )
 
@@ -861,7 +861,7 @@ class TestTrajectoryTwoPhaseConnect(unittest.TestCase):
 
         phase1 = traj.add_subsystem("phase1", PhaseForTrajTest(num_nodes=5))
         phase2 = traj.add_subsystem("phase2", PhaseForTrajTest(num_nodes=5))
-        phase3 = traj.add_subsystem("phase3", PhaseForTrajTest(num_nodes=5))
+        traj.add_subsystem("phase3", PhaseForTrajTest(num_nodes=5))
 
         traj.link_phases(phase1, phase2)
 
@@ -932,9 +932,9 @@ class TestTrajectoryLinkPhaseStrings(unittest.TestCase):
         self.nn = 5
         traj = TrajectoryGroup()
 
-        phase1 = traj.add_subsystem("phase1", PhaseForTrajTest(num_nodes=5))
+        traj.add_subsystem("phase1", PhaseForTrajTest(num_nodes=5))
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ValueError) as _:
             traj.link_phases("phase1", "phase2", states_to_skip=["b.ode_integ.f"])
 
 

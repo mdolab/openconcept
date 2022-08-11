@@ -135,7 +135,6 @@ class TemperatureIsentropic(ExplicitComponent):
 
     def setup(self):
         nn = self.options["num_nodes"]
-        gam = self.options["gamma"]
         self.add_input("Tt", shape=(nn,), units="K")
         self.add_input("M", shape=(nn,))
         self.add_output("T", shape=(nn,), units="K")
@@ -143,12 +142,10 @@ class TemperatureIsentropic(ExplicitComponent):
         self.declare_partials(["T"], ["M", "Tt"], rows=arange, cols=arange)
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         gam = self.options["gamma"]
         outputs["T"] = inputs["Tt"] * (1 + (gam - 1) / 2 * inputs["M"] ** 2) ** -1
 
     def compute_partials(self, inputs, J):
-        nn = self.options["num_nodes"]
         gam = self.options["gamma"]
         J["T", "Tt"] = (1 + (gam - 1) / 2 * inputs["M"] ** 2) ** -1
         J["T", "M"] = -inputs["Tt"] * (1 + (gam - 1) / 2 * inputs["M"] ** 2) ** -2 * (gam - 1) * inputs["M"]
@@ -184,7 +181,6 @@ class TotalTemperatureIsentropic(ExplicitComponent):
 
     def setup(self):
         nn = self.options["num_nodes"]
-        gam = self.options["gamma"]
         self.add_input("T", shape=(nn,), units="K")
         self.add_input("M", shape=(nn,))
         self.add_output("Tt", shape=(nn,), units="K")
@@ -192,12 +188,10 @@ class TotalTemperatureIsentropic(ExplicitComponent):
         self.declare_partials(["Tt"], ["T", "M"], rows=arange, cols=arange)
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         gam = self.options["gamma"]
         outputs["Tt"] = inputs["T"] * (1 + (gam - 1) / 2 * inputs["M"] ** 2)
 
     def compute_partials(self, inputs, J):
-        nn = self.options["num_nodes"]
         gam = self.options["gamma"]
         J["Tt", "T"] = 1 + (gam - 1) / 2 * inputs["M"] ** 2
         J["Tt", "M"] = inputs["T"] * (gam - 1) * inputs["M"]
@@ -233,14 +227,12 @@ class PressureIsentropic(ExplicitComponent):
 
     def setup(self):
         nn = self.options["num_nodes"]
-        gam = self.options["gamma"]
         self.add_input("pt", shape=(nn,), units="Pa")
         self.add_input("M", shape=(nn,))
         self.add_output("p", shape=(nn,), units="Pa")
         self.declare_partials(["*"], ["*"], method="cs")
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         gam = self.options["gamma"]
         outputs["p"] = inputs["pt"] * (1 + (gam - 1) / 2 * inputs["M"] ** 2) ** (-gam / (gam - 1))
 
@@ -275,7 +267,6 @@ class TotalPressureIsentropic(ExplicitComponent):
 
     def setup(self):
         nn = self.options["num_nodes"]
-        gam = self.options["gamma"]
         self.add_input("p", shape=(nn,), units="Pa")
         self.add_input("M", shape=(nn,))
         self.add_output("pt", shape=(nn,), units="Pa")
@@ -283,12 +274,10 @@ class TotalPressureIsentropic(ExplicitComponent):
         self.declare_partials(["pt"], ["p", "M"], rows=arange, cols=arange)
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         gam = self.options["gamma"]
         outputs["pt"] = inputs["p"] * (1 + (gam - 1) / 2 * inputs["M"] ** 2) ** (gam / (gam - 1))
 
     def compute_partials(self, inputs, J):
-        nn = self.options["num_nodes"]
         gam = self.options["gamma"]
         J["pt", "p"] = (1 + (gam - 1) / 2 * inputs["M"] ** 2) ** (gam / (gam - 1))
         J["pt", "M"] = (
@@ -331,14 +320,12 @@ class DensityIdealGas(ExplicitComponent):
 
     def setup(self):
         nn = self.options["num_nodes"]
-        R = self.options["R"]
         self.add_input("p", shape=(nn,), units="Pa")
         self.add_input("T", shape=(nn,), units="K")
         self.add_output("rho", shape=(nn,), units="kg/m**3")
         self.declare_partials(["*"], ["*"], method="cs")
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         R = self.options["R"]
         outputs["rho"] = inputs["p"] / R / inputs["T"]
 
@@ -380,7 +367,6 @@ class SpeedOfSound(ExplicitComponent):
         self.declare_partials(["a"], ["T"], rows=arange, cols=arange)
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         R = self.options["R"]
         gam = self.options["gamma"]
         T = inputs["T"].copy()
@@ -428,7 +414,6 @@ class MachNumberfromSpeed(ExplicitComponent):
         self.declare_partials(["*"], ["*"], method="cs")
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         outputs["M"] = inputs["Utrue"] / inputs["a"]
 
 
@@ -495,7 +480,6 @@ class HeatAdditionPressureLoss(ExplicitComponent):
         self.declare_partials(["pt_out"], ["area", "dynamic_pressure_loss_factor"], rows=arange, cols=np.zeros((nn,)))
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         dynamic_pressure = 0.5 * inputs["mdot"] ** 2 / inputs["rho"] / inputs["area"] ** 2
 
         if np.min(inputs["mdot"]) <= 0.0:
@@ -515,16 +499,8 @@ class HeatAdditionPressureLoss(ExplicitComponent):
         outputs["Tt_out"] = tt_out
 
     def compute_partials(self, inputs, J):
-        dynamic_pressure = 0.5 * inputs["mdot"] ** 2 / inputs["rho"] / inputs["area"] ** 2
-        tt_out = inputs["Tt_in"] + inputs["heat_in"] / inputs["cp"] / inputs["mdot"]
-        # bool_array_tt = np.where(tt_out <= 0.0, np.zeros(inputs['Tt_in'].shape), np.ones(inputs['Tt_in'].shape))
-        pt_out = (
-            inputs["pt_in"] * inputs["pressure_recovery"]
-            - dynamic_pressure * inputs["dynamic_pressure_loss_factor"]
-            + inputs["delta_p"]
-        )
-        # bool_array_pt = np.where(pt_out <= 0.0, np.zeros(inputs['pt_in'].shape), np.ones(inputs['pt_in'].shape))
         nn = self.options["num_nodes"]
+
         J["Tt_out", "Tt_in"] = np.ones((nn,))
         J["Tt_out", "heat_in"] = 1 / inputs["cp"] / inputs["mdot"]
         J["Tt_out", "cp"] = -inputs["heat_in"] / inputs["cp"] ** 2 / inputs["mdot"]
@@ -698,7 +674,6 @@ class DuctExitMachNumber(ExplicitComponent):
 
     def setup(self):
         nn = self.options["num_nodes"]
-        gam = self.options["gamma"]
         self.add_input("nozzle_pressure_ratio", shape=(nn,))
         self.add_output("M", shape=(nn,))
         self.declare_partials(["*"], ["*"], method="cs")
@@ -763,7 +738,6 @@ class NetForce(ExplicitComponent):
         self.declare_partials(["*"], ["*"], method="cs")
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         cfg = self.options["cfg"]
         outputs["F_net"] = inputs["mdot"] * (
             inputs["mdot"] / inputs["area_nozzle"] / inputs["rho_nozzle"] * cfg - inputs["Utrue_inf"]
@@ -915,7 +889,6 @@ class NozzlePressureLoss(ExplicitComponent):
         self.declare_partials(["pt"], ["dynamic_pressure_loss_factor"], rows=arange, cols=np.zeros((nn,)))
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         dynamic_pressure = 0.5 * inputs["mdot"] ** 2 / inputs["rho"] / inputs["area"] ** 2
 
         pt_out = inputs["pt_in"] - dynamic_pressure * inputs["dynamic_pressure_loss_factor"]

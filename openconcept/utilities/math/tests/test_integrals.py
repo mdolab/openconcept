@@ -337,11 +337,6 @@ class IntegratorCommonTestCases(object):
         assert_check_partials(partials, atol=1e-8, rtol=1e0)
 
     def test_quadratic_both_units_correct(self):
-        num_nodes = self.num_nodes
-        nn_tot = num_nodes
-        x = np.linspace(0, nn_tot - 1, nn_tot)
-        fprime = 4 * x**2 - 8 * x + 5
-        f = 4 * x**3 / 3 - 8 * x**2 / 2 + 5 * x
         prob = Problem(
             IntegratorTestGroup(
                 num_nodes=self.num_nodes,
@@ -511,10 +506,6 @@ class BDFIntegrator3PtTestCases(unittest.TestCase, IntegratorCommonTestCases):
 class EdgeCaseTestCases(unittest.TestCase):
     def test_quadratic_even_num_nodes(self):
         num_nodes = 10
-        nn_tot = num_nodes
-        x = np.linspace(0, nn_tot - 1, nn_tot)
-        fprime = 4 * x**2 - 8 * x + 5
-        f = 4 * x**3 / 3 - 8 * x**2 / 2 + 5 * x
         with self.assertRaises(ValueError) as cm:
             prob = Problem(
                 IntegratorTestGroup(num_nodes=num_nodes, integrator="simpson", rate_units="kg/s", diff_units="s")
@@ -529,7 +520,6 @@ class EdgeCaseTestCases(unittest.TestCase):
         nn_tot = num_nodes
         x = np.linspace(0, nn_tot - 1, nn_tot)
         fprime = 4 * x**2 - 8 * x + 5
-        f = 4 * x**3 / 3 - 8 * x**2 / 2 + 5 * x
 
         prob = Problem(
             IntegratorTestGroup(
@@ -554,7 +544,6 @@ class EdgeCaseTestCases(unittest.TestCase):
         nn_tot = num_nodes
         x = np.linspace(0, nn_tot - 1, nn_tot)
         fprime = 4 * x**2 - 8 * x + 5
-        f = 4 * x**3 / 3 - 8 * x**2 / 2 + 5 * x
 
         prob = Problem(
             IntegratorTestGroup(

@@ -211,7 +211,7 @@ class ElementMultiplyDivideComp(ExplicitComponent):
             vec_size,
             length,
             val,
-            scaling_factor,
+            _,
             divide,
             input_units,
             kwargs,
@@ -305,17 +305,17 @@ class ElementMultiplyDivideComp(ExplicitComponent):
             input_names,
             vec_size,
             length,
-            val,
+            _,
             scaling_factor,
             divide,
-            input_units,
-            kwargs,
+            _,
+            _,
         ) in self._add_systems:
             if isinstance(input_names, str):
                 input_names = [input_names]
 
             if divide is None:
-                divide = [False for k in range(len(input_names))]
+                divide = [False for _ in range(len(input_names))]
 
             if isinstance(vec_size, Iterable):
                 # scalar - vector mutliplication
@@ -347,11 +347,11 @@ class ElementMultiplyDivideComp(ExplicitComponent):
             input_names,
             vec_size,
             length,
-            val,
+            _,
             scaling_factor,
             divide,
-            input_units,
-            kwargs,
+            _,
+            _,
         ) in self._add_systems:
             if isinstance(input_names, str):
                 input_names = [input_names]
@@ -369,7 +369,7 @@ class ElementMultiplyDivideComp(ExplicitComponent):
             else:
                 shape = (vec_out_size, length)
 
-            for j, input_name in enumerate(input_names):
+            for input_name in input_names:
                 temp = np.ones(shape)
                 for i, input_name_partial in enumerate(input_names):
                     if input_name_partial != input_name:

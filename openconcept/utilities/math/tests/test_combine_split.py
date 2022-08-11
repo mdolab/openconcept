@@ -134,7 +134,7 @@ class TestConcatenateInitMethod(unittest.TestCase):
 
         self.p.model.add_subsystem(name="ivc", subsys=ivc, promotes_outputs=["a", "b"])
 
-        combiner = self.p.model.add_subsystem(
+        self.p.model.add_subsystem(
             name="vector_concat_comp",
             subsys=VectorConcatenateComp(
                 "concat_output", ["input_a", "input_b"], vec_sizes=[self.nn, self.nn], length=self.length
@@ -473,7 +473,7 @@ class TestSplitInitMethod(unittest.TestCase):
 
         self.p.model.add_subsystem(name="ivc", subsys=ivc, promotes_outputs=["input_to_split"])
 
-        splitter = self.p.model.add_subsystem(
+        self.p.model.add_subsystem(
             name="vector_split_comp",
             subsys=VectorSplitComp(["output_a", "output_b"], "input_to_split", vec_sizes=[self.nn, self.nn], length=3),
         )

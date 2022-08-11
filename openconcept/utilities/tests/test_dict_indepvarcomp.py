@@ -51,8 +51,6 @@ class TestOne(unittest.TestCase):
         self.p.run_model()
 
     def test_results(self):
-        a = self.p["a"]
-        b = self.p["b"]
         out = self.p["geom|S_ref"]
         expected = 20
         assert_near_equal(out, expected, 1e-16)

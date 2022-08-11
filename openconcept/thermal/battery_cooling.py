@@ -243,7 +243,6 @@ class BandolierCoolingSystem(om.ExplicitComponent):
         self.declare_partials(["*"], ["*"], method="cs")
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         n_cells = inputs["battery_weight"] * self.options["battery_weight_fraction"] / self.options["cell_mass"]
         n_bandoliers = n_cells / inputs["n_cpb"] / 2
 
@@ -266,10 +265,8 @@ class BandolierCoolingSystem(om.ExplicitComponent):
             mdot_b * cpf * (1 - np.exp(-NTU)) / 2 / inputs["n_cpb"]
         )  # divide out the total bandolier convection by 2 * n_cpb cells
         # the convective heat transfer is (Ts - Tin) * Kcell
-        PI = np.pi
 
         Tbar = inputs["T_battery"]
-        Rc = Dc / 2
 
         K_cyl = 8 * np.pi * Hc * krc
 
@@ -284,7 +281,7 @@ class BandolierCoolingSystem(om.ExplicitComponent):
 
         outputs["q"] = q_conv
 
-        qcheck = (Tbar - Ts) * K_cyl
+        # qcheck = (Tbar - Ts) * K_cyl
         # UAcomb = 1/(1/hconv/A_heat_trans+1/K_cyl/2/inputs['n_cpb'])
         # qcheck2 = (Tbar - inputs['T_in']) * mdot_b * cpf * (1 - np.exp(-UAcomb/mdot_b/cpf)) / 2 / inputs['n_cpb']
 

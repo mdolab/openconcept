@@ -4,7 +4,6 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openconcept.examples.B738 import run_738_analysis
 from openconcept.examples.TBM850 import run_tbm_analysis
 from openconcept.examples.HybridTwin_thermal import run_hybrid_twin_thermal_analysis
-from openconcept.examples.HybridTwin_active_thermal import run_hybrid_twin_active_thermal_analysis
 from openconcept.examples.HybridTwin import run_hybrid_twin_analysis
 from openconcept.examples.Caravan import run_caravan_analysis
 from openconcept.examples.KingAirC90GT import run_kingair_analysis
@@ -19,7 +18,7 @@ try:
     from openconcept.examples.B738_aerostructural import run_738_analysis as run_738Aerostruct_analysis
 
     OAS_installed = True
-except:
+except ImportError:
     OAS_installed = False
 
 

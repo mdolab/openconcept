@@ -75,7 +75,6 @@ class SimpleHose(om.ExplicitComponent):
         return dp
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         sigma = self.options["hose_operating_stress"]
         rho_hose = self.options["hose_density"]
 
@@ -88,7 +87,6 @@ class SimpleHose(om.ExplicitComponent):
         outputs["component_weight"] = w_hose + w_coolant
 
     def compute_partials(self, inputs, J):
-        nn = self.options["num_nodes"]
         sigma = self.options["hose_operating_stress"]
         rho_hose = self.options["hose_density"]
         thickness = inputs["hose_diameter"] * inputs["hose_design_pressure"] / 2 / sigma
@@ -113,7 +111,6 @@ class SimpleHose(om.ExplicitComponent):
 
         # use a colored complex step approach
         cs_step = 1e-30
-        dp_base = self._compute_pressure_drop(inputs)
 
         cs_inp_list = ["rho_coolant", "mdot_coolant", "hose_diameter", "hose_length", "mu_coolant"]
         fake_inputs = dict()

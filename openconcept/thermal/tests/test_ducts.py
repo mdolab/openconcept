@@ -1,6 +1,5 @@
 import unittest
-import numpy as np
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal
 from openconcept.thermal import ImplicitCompressibleDuct_ExternalHX
 import openmdao.api as om
 import warnings
@@ -29,7 +28,6 @@ try:
                 else:
                     self.options["thermo_method"] = "CEA"
                     self.options["thermo_data"] = pyc.species_data.janaf
-                    FUEL_TYPE = "JP-7"
 
                 self.add_subsystem("fc", pyc.FlightConditions())
                 # ram_recovery | ram_recovery
@@ -120,7 +118,7 @@ try:
                 self.options["thermo_method"] = "CEA"
                 self.options["thermo_data"] = pyc.species_data.janaf
 
-                design = self.pyc_add_pnt("design", PyCycleDuct(design=True, thermo_method="CEA"))
+                self.pyc_add_pnt("design", PyCycleDuct(design=True, thermo_method="CEA"))
 
                 # define the off-design conditions we want to run
                 self.od_pts = []
@@ -190,7 +188,7 @@ try:
         HAS_PYCYCLE = False
 
 
-except:
+except ImportError:
     HAS_PYCYCLE = False
 
 

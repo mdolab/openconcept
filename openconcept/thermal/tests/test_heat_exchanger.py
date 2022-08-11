@@ -318,12 +318,12 @@ class TestHXByHand(unittest.TestCase):
         hot_one_cell_width = t_f + w_h
         n_hot_wide = cold_length / hot_one_cell_width
 
-        #######____
+        # ######____
         # |    |    |
         # |    |    |
         # |    |    |
         # |____|    |___
-        ##########
+        # #########
 
         height_overall = n_cold_tall * (cold_one_layer_height + hot_one_layer_height)
         # note does not include case

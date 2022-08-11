@@ -9,7 +9,6 @@ from openconcept.mission import (
     VerticalAcceleration,
     SteadyFlightCL,
     FlipVectorComp,
-    TakeoffTransition,
 )
 from openconcept.utilities.constants import GRAV_CONST
 
@@ -177,22 +176,6 @@ class HorizontalAccelerationTestCase_SteadyLevel(unittest.TestCase):
         self.prob.run_model()
 
     def test_steady_level_flights(self):
-        assert_near_equal(self.prob["accel_horiz"], np.zeros((9,)), tolerance=1e-10)
-
-    def test_partials(self):
-        partials = self.prob.check_partials(method="cs", out_stream=None)
-        assert_check_partials(partials)
-
-
-class HorizontalAccelerationTestCase_SteadyClimb(unittest.TestCase):
-    def setUp(self):
-        self.prob = Problem(HorizontalAccelerationTestGroup(num_nodes=9))
-        self.prob.setup(check=True, force_alloc_complex=True)
-        self.prob["thrust"] = np.ones((9,)) * (100 + 100 * GRAV_CONST * 0.02)
-        self.prob["fltcond|singamma"] = np.ones((9,)) * 0.02
-        self.prob.run_model()
-
-    def test_steady_climb_flights(self):
         assert_near_equal(self.prob["accel_horiz"], np.zeros((9,)), tolerance=1e-10)
 
     def test_partials(self):

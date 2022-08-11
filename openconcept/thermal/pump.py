@@ -48,7 +48,6 @@ class SimplePump(om.ExplicitComponent):
 
     def setup(self):
         nn = self.options["num_nodes"]
-        eta = self.options["efficiency"]
         weight_inc = self.options["weight_inc"]
 
         self.add_input("power_rating", units="W", desc="Pump electrical power rating")
@@ -70,7 +69,6 @@ class SimplePump(om.ExplicitComponent):
         self.declare_partials(["component_weight"], ["power_rating"], val=weight_inc)
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         eta = self.options["efficiency"]
         weight_inc = self.options["weight_inc"]
         weight_base = self.options["weight_base"]
@@ -84,7 +82,6 @@ class SimplePump(om.ExplicitComponent):
         outputs["component_sizing_margin"] = outputs["elec_load"] / inputs["power_rating"]
 
     def compute_partials(self, inputs, J):
-        nn = self.options["num_nodes"]
         eta = self.options["efficiency"]
 
         J["elec_load", "mdot_coolant"] = inputs["delta_p"] / inputs["rho_coolant"] / eta

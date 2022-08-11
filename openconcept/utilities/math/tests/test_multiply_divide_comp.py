@@ -1,7 +1,6 @@
 from __future__ import print_function, division, absolute_import
 
 import unittest
-import pytest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp

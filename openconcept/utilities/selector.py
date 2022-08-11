@@ -82,8 +82,6 @@ class SelectorComp(om.ExplicitComponent):
 
     def compute_partials(self, inputs, J):
         input_names = list(self.options["input_names"])
-        num_inputs = len(input_names)
-        nn = self.options["num_nodes"]
 
         selector = np.around(inputs["selector"])
 

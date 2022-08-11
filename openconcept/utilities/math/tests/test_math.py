@@ -164,7 +164,6 @@ class FirstDerivCommonTestCases(object):
         prob.setup(check=True, force_alloc_complex=True)
         n_int_per_seg = 5
         nn_seg = n_int_per_seg * 2 + 1
-        nn_tot = (n_int_per_seg * 2 + 1) * 3
         x = np.concatenate([np.linspace(0, 2, nn_seg), np.linspace(2, 3, nn_seg), np.linspace(3, 6, nn_seg)])
         f_test = 5 * x**2 + 7 * x - 3
         fp_exact = 10 * x + 7
@@ -190,7 +189,6 @@ class FirstDerivCommonTestCases(object):
         prob.setup(check=True, force_alloc_complex=True)
         n_int_per_seg = 7
         nn_seg = n_int_per_seg * 2 + 1
-        nn_tot = (n_int_per_seg * 2 + 1) * 3
         x = np.concatenate([np.linspace(0, 2, nn_seg), np.linspace(2, 3, nn_seg), np.linspace(3, 6, nn_seg)])
         f_test = 5 * x**2 + 7 * x - 3
         fp_exact = 10 * x + 7

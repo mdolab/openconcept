@@ -423,7 +423,7 @@ class HybridSingleAisleAnalysisGroup(om.Group):
         dv_comp.add_output_from_dict("ac|design_mission|TOW")
 
         # Run a full mission analysis including takeoff, reserve_, cruise,reserve_ and descereserve_nt
-        analysis = self.add_subsystem(
+        self.add_subsystem(
             "analysis",
             BasicMission(num_nodes=nn, aircraft_model=HybridSingleAisleModel, include_ground_roll=True),
             promotes_inputs=["*"],
@@ -455,9 +455,8 @@ def set_values(prob, num_nodes):
     prob.set_val("cruise|h0", 35000.0, units="ft")
     prob.set_val("mission_range", 800, units="NM")
     prob.set_val("takeoff|v2", 160.0, units="kn")
-    nozzleprs = [0.85, 0.85, 0.71, 0.88]
     phases_list = ["groundroll", "climb", "cruise", "descent"]
-    for i, phase in enumerate(phases_list):
+    for phase in phases_list:
         prob.set_val(phase + ".hybrid_throttle_start", 0.00)
         prob.set_val(phase + ".hybrid_throttle_end", 0.00)
         prob.set_val(phase + ".fltcond|TempIncrement", 20, units="degC")

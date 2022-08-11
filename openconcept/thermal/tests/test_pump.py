@@ -43,7 +43,7 @@ class TestPump(unittest.TestCase):
         partials = prob.check_partials(method="cs", compact_print=True)
         assert_check_partials(partials)
 
-    def test_scalar(self):
+    def test_vector(self):
         prob, elec_load, weight, margin = self.generate_model(nn=11)
         prob.run_model()
         assert_near_equal(prob.get_val("pump.elec_load", units="W"), elec_load, tolerance=1e-10)

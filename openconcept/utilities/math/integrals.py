@@ -754,7 +754,7 @@ class Integrator(ExplicitComponent):
             delta_t = inputs["t_final"] - inputs["t_initial"]
             dts = [delta_t[0] / (num_nodes - 1)]
 
-        for name, options in self._state_vars.items():
+        for _, options in self._state_vars.items():
             if options["zero_start"]:
                 q0 = np.array([0.0])
             else:
@@ -795,7 +795,7 @@ class Integrator(ExplicitComponent):
                 delta_t = inputs["t_final"] - inputs["t_initial"]
                 dts = [delta_t[0] / (num_nodes - 1)]
 
-            for name, options in self._state_vars.items():
+            for _, options in self._state_vars.items():
                 start_name = options["start_name"]
                 end_name = options["end_name"]
                 qty_name = options["name"]
@@ -1077,7 +1077,6 @@ class OldIntegrator(ExplicitComponent):
             single_point = False
 
         if segment_names is None:
-            n_segments = 1
             if time_setup == "dt":
                 dts = [inputs["dt"][0]]
             elif time_setup == "duration":
@@ -1089,9 +1088,8 @@ class OldIntegrator(ExplicitComponent):
                 delta_t = inputs["t_final"] - inputs["t_initial"]
                 dts = [delta_t[0] / (num_nodes - 1)]
         else:
-            n_segments = len(segment_names)
             dts = []
-            for i_seg, segment_name in enumerate(segment_names):
+            for segment_name in segment_names:
                 input_name = segment_name + "|dt"
                 dts.append(inputs[input_name][0])
         if zero_start:
@@ -1119,8 +1117,6 @@ class OldIntegrator(ExplicitComponent):
 
     def compute_partials(self, inputs, J):
         segment_names = self.options["segment_names"]
-        quantity_units = self.options["quantity_units"]
-        diff_units = self.options["diff_units"]
         num_nodes = self.options["num_nodes"]
         segments_to_count = self.options["segments_to_count"]
         zero_start = self.options["zero_start"]
@@ -1133,13 +1129,6 @@ class OldIntegrator(ExplicitComponent):
             single_point = False
         if not single_point:
             if segment_names is None:
-                n_segments = 1
-            else:
-                n_segments = len(segment_names)
-            nn_tot = num_nodes * n_segments
-
-            if segment_names is None:
-                n_segments = 1
                 if time_setup == "dt":
                     dts = [inputs["dt"][0]]
                 elif time_setup == "duration":
@@ -1148,9 +1137,8 @@ class OldIntegrator(ExplicitComponent):
                     delta_t = inputs["t_final"] - inputs["t_initial"]
                     dts = [delta_t[0] / (num_nodes - 1)]
             else:
-                n_segments = len(segment_names)
                 dts = []
-                for i_seg, segment_name in enumerate(segment_names):
+                for segment_name in segment_names:
                     input_name = segment_name + "|dt"
                     dts.append(inputs[input_name][0])
 

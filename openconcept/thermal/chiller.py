@@ -129,7 +129,6 @@ class COPHeatPump(om.ExplicitComponent):
         self.declare_partials(["q_in_1", "q_in_2"], "power_rating", rows=np.arange(nn), cols=np.zeros(nn))
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         outputs["q_in_1"] = -inputs["COP"] * inputs["power_rating"]
         outputs["q_in_2"] = (inputs["COP"] + 1) * inputs["power_rating"]
 
@@ -238,7 +237,7 @@ class HeatPumpWithIntegratedCoolantLoop(om.Group):
         iv.add_output("bypass_start", val=1.0)
         iv.add_output("bypass_end", val=1.0)
 
-        li = self.add_subsystem(
+        self.add_subsystem(
             "li", LinearInterpolator(num_nodes=nn, units=None), promotes_outputs=[("vec", "bypass")]
         )
         self.connect("control.bypass_start", "li.start_val")
@@ -323,7 +322,6 @@ class COPExplicit(om.ExplicitComponent):
         self.declare_partials(["COP"], ["T_c", "T_h", "eff_factor"], method="cs")
 
     def compute(self, inputs, outputs):
-        epsilon = 0.05
         delta_T = inputs["T_h"] - inputs["T_c"]
         COP_raw = inputs["T_c"] / (delta_T)
         alpha = -1.5

@@ -1088,13 +1088,11 @@ class CrossFlowNTUEffectiveness(ExplicitComponent):
         self.declare_partials(["effectiveness"], ["NTU", "C_ratio"], rows=arange, cols=arange)
 
     def compute(self, inputs, outputs):
-        nn = self.options["num_nodes"]
         Cr = inputs["C_ratio"]
         ntu = inputs["NTU"]
         outputs["effectiveness"] = 1 - np.exp(ntu**0.22 / Cr * (np.exp(-Cr * ntu**0.78) - 1))
 
     def compute_partials(self, inputs, J):
-        nn = self.options["num_nodes"]
         Cr = inputs["C_ratio"]
         ntu = inputs["NTU"]
         J["effectiveness", "C_ratio"] = -np.exp((ntu**0.22 * (np.exp(-Cr * ntu**0.78) - 1)) / Cr) * (
@@ -1324,8 +1322,6 @@ class PressureDrop(ExplicitComponent):
         dyn_press_hot = (1 / 2) * (inputs["mdot_hot"] / inputs["xs_area_hot"]) ** 2 / inputs["rho_hot"]
         Kec = self.options["Ke_cold"]
         Kcc = self.options["Kc_cold"]
-        Keh = self.options["Ke_hot"]
-        Kch = self.options["Kc_hot"]
         outputs["delta_p_cold"] = dyn_press_cold * (
             -Kec - Kcc - 4 * inputs["length_overall"] * inputs["f_cold"] / inputs["dh_cold"]
         )
@@ -1338,8 +1334,6 @@ class PressureDrop(ExplicitComponent):
         dyn_press_hot = (1 / 2) * (inputs["mdot_hot"] / inputs["xs_area_hot"]) ** 2 / inputs["rho_hot"]
         Kec = self.options["Ke_cold"]
         Kcc = self.options["Kc_cold"]
-        Keh = self.options["Ke_hot"]
-        Kch = self.options["Kc_hot"]
         losses_cold = -Kec - Kcc - 4 * inputs["length_overall"] * inputs["f_cold"] / inputs["dh_cold"]
         losses_hot = -Kec - Kcc - 4 * inputs["width_overall"] * inputs["f_hot"] / inputs["dh_hot"]
 

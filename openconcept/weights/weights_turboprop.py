@@ -4,7 +4,7 @@ from openmdao.api import Group
 from openconcept.utilities import AddSubtractComp, ElementMultiplyDivideComp
 import math
 
-##TODO: add fuel system weight back in (depends on Wf, which depends on MTOW and We, and We depends on fuel system weight)
+# TODO: add fuel system weight back in (depends on Wf, which depends on MTOW and We, and We depends on fuel system weight)
 
 
 class WingWeight_SmallTurboprop(ExplicitComponent):
@@ -396,13 +396,11 @@ class NacelleWeight_SmallSingleTurboprop(ExplicitComponent):
         self.declare_partials(["W_nacelle"], ["*"])
 
     def compute(self, inputs, outputs):
-        n_ult = self.options["n_ult"]
         # Torenbeek method, Roskam PVC5pg78eq5.30
         W_nacelle = 2.5 * inputs["P_TO"] ** 0.5
         outputs["W_nacelle"] = W_nacelle
 
     def compute_partials(self, inputs, J):
-        n_ult = self.options["n_ult"]
         # Torenbeek method, Roskam PVC5pg78eq5.30
         J["W_nacelle", "P_TO"] = 0.5 * 2.5 * inputs["P_TO"] ** (0.5 - 1)
 
@@ -428,13 +426,11 @@ class NacelleWeight_MultiTurboprop(ExplicitComponent):
         self.declare_partials(["W_nacelle"], ["*"])
 
     def compute(self, inputs, outputs):
-        n_ult = self.options["n_ult"]
         # Torenbeek method, Roskam PVC5pg78eq5.33
         W_nacelle = 0.14 * inputs["P_TO"]
         outputs["W_nacelle"] = W_nacelle
 
     def compute_partials(self, inputs, J):
-        n_ult = self.options["n_ult"]
         # Torenbeek method, Roskam PVC5pg78eq5.30
         J["W_nacelle", "P_TO"] = 0.14
 
@@ -693,7 +689,7 @@ class SingleTurboPropEmptyWeight(Group):
 
 
 if __name__ == "__main__":
-    from openmdao.api import IndepVarComp, Problem
+    from openmdao.api import Problem
 
     prob = Problem()
     prob.model = Group()

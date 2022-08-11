@@ -12,6 +12,7 @@ from openmdao.api import (
     DirectSolver,
     IndepVarComp,
     NewtonSolver,
+    CaseReader,
 )
 
 # imports for the airplane model itself
@@ -68,7 +69,7 @@ class SeriesHybridTwinModel(Group):
         else:
             controls.add_output("hybridization", val=1.0)
 
-        hybrid_factor = self.add_subsystem(
+        self.add_subsystem(
             "hybrid_factor",
             LinearInterpolator(num_nodes=nn),
             promotes_inputs=[("start_val", "hybridization"), ("end_val", "hybridization")],
@@ -212,14 +213,14 @@ class ElectricTwinAnalysisGroup(Group):
         mission_data_comp.add_output("T_batt_initial", val=10.1, units="degC")
 
         # Ensure that any state variables are connected across the mission as intended
-        analysis = self.add_subsystem(
+        self.add_subsystem(
             "analysis",
             FullMissionAnalysis(num_nodes=nn, aircraft_model=SeriesHybridTwinModel),
             promotes_inputs=["*"],
             promotes_outputs=["*"],
         )
 
-        margins = self.add_subsystem(
+        self.add_subsystem(
             "margins",
             ExecComp(
                 "MTOW_margin = MTOW - OEW - total_fuel - W_battery - payload",
@@ -237,7 +238,7 @@ class ElectricTwinAnalysisGroup(Group):
         self.connect("ac|weights|MTOW", "margins.MTOW")
         self.connect("ac|weights|W_battery", "margins.W_battery")
 
-        augobj = self.add_subsystem("aug_obj", AugmentedFBObjective(), promotes_outputs=["mixed_objective"])
+        self.add_subsystem("aug_obj", AugmentedFBObjective(), promotes_outputs=["mixed_objective"])
         self.connect("ac|weights|MTOW", "aug_obj.ac|weights|MTOW")
         self.connect("descent.fuel_used_final", "aug_obj.fuel_burn")
 

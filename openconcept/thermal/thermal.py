@@ -118,7 +118,6 @@ class ThermalComponentWithMass(ExplicitComponent):
         outputs["dTdt"] = (inputs["q_in"] - inputs["q_out"]) / inputs["mass"] / spec_heat
 
     def compute_partials(self, inputs, J):
-        nn_tot = self.options["num_nodes"]
         spec_heat = self.options["specific_heat"]
 
         J["dTdt", "mass"] = -(inputs["q_in"] - inputs["q_out"]) / inputs["mass"] ** 2 / spec_heat
@@ -219,7 +218,6 @@ class ConstantSurfaceTemperatureColdPlate_NTU(ExplicitComponent):
 
     def setup(self):
         nn_tot = self.options["num_nodes"]
-        arange = np.arange(0, nn_tot)
 
         self.add_input("T_in", units="K", shape=(nn_tot,))
         self.add_input("T_surface", units="K", shape=(nn_tot,))

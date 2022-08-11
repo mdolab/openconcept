@@ -89,7 +89,6 @@ def first_deriv(dts, q, n_segments=1, n_simpson_intervals_per_segment=2, order=4
     """
 
     n_int_seg = n_simpson_intervals_per_segment
-    n_int_tot = n_segments * n_int_seg
     nn_seg = n_simpson_intervals_per_segment * 2 + 1
     nn_tot = n_segments * nn_seg
     if order == 4 and n_int_seg < 2:
@@ -155,7 +154,6 @@ def first_deriv_partials(dts, q, n_segments=1, n_simpson_intervals_per_segment=2
         returned in CSR format as rowidxs[i], colidxs[i], data[i]
     """
     n_int_seg = n_simpson_intervals_per_segment
-    n_int_tot = n_segments * n_int_seg
     nn_seg = n_simpson_intervals_per_segment * 2 + 1
     nn_tot = n_segments * nn_seg
     if order == 4 and n_int_seg < 2:
@@ -167,7 +165,6 @@ def first_deriv_partials(dts, q, n_segments=1, n_simpson_intervals_per_segment=2
     if len(dts) != n_segments:
         raise ValueError("must provide same number of dts as segments")
 
-    dqdt = np.zeros(q.shape)
     if order == 4:
         stencil_vec, rowidx, colidx = first_deriv_fourth_order_accurate_stencil(nn_seg)
     elif order == 2:
@@ -197,10 +194,6 @@ def first_deriv_partials(dts, q, n_segments=1, n_simpson_intervals_per_segment=2
 
         # next compute the indices and values of dq' / d(dt[i]) in CSR format
         # the dimension of the matrix for all segments is nn_tot x 1
-        if order == 2:
-            n_to_tile = 3
-        else:
-            n_to_tile = 5
         rowidxs_wrt_dt.append(np.arange(0, nn_seg) + i * nn_seg)
         colidxs_wrt_dt.append(np.zeros((nn_seg,), dtype=np.int32))
         local_partials = -np.dot(stencil_mat, q[i * nn_seg : (i + 1) * nn_seg]) * dt_seg**-2
@@ -309,21 +302,17 @@ class FirstDerivative(ExplicitComponent):
 
     def compute(self, inputs, outputs):
         segment_names = self.options["segment_names"]
-        quantity_units = self.options["quantity_units"]
-        diff_units = self.options["diff_units"]
         order = self.options["order"]
         n_int_per_seg = self.options["num_intervals"]
-        nn_seg = n_int_per_seg * 2 + 1
         if segment_names is None:
             n_segments = 1
             dts = [inputs["dt"][0]]
         else:
             n_segments = len(segment_names)
             dts = []
-            for i_seg, segment_name in enumerate(segment_names):
+            for segment_name in segment_names:
                 input_name = segment_name + "|dt"
                 dts.append(inputs[input_name][0])
-        nn_tot = nn_seg * n_segments
         dqdt = first_deriv(
             dts, inputs["q"], n_segments=n_segments, n_simpson_intervals_per_segment=n_int_per_seg, order=order
         )
@@ -331,22 +320,18 @@ class FirstDerivative(ExplicitComponent):
 
     def compute_partials(self, inputs, J):
         segment_names = self.options["segment_names"]
-        quantity_units = self.options["quantity_units"]
-        diff_units = self.options["diff_units"]
         order = self.options["order"]
 
         n_int_per_seg = self.options["num_intervals"]
-        nn_seg = n_int_per_seg * 2 + 1
         if segment_names is None:
             n_segments = 1
             dts = [inputs["dt"][0]]
         else:
             n_segments = len(segment_names)
             dts = []
-            for i_seg, segment_name in enumerate(segment_names):
+            for segment_name in segment_names:
                 input_name = segment_name + "|dt"
                 dts.append(inputs[input_name][0])
-        nn_tot = nn_seg * n_segments
         wrt_q, wrt_dt = first_deriv_partials(
             dts, inputs["q"], n_segments=n_segments, n_simpson_intervals_per_segment=n_int_per_seg, order=order
         )

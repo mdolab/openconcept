@@ -249,7 +249,6 @@ class HeatPipeThermalResistance(ExplicitComponent):
 
     def setup(self):
         nn = self.options["num_nodes"]
-        arange = np.arange(0, nn)
 
         self.add_input("inner_diam", units="m", val=0.02)
         self.add_input("wall_thickness", val=1.25e-3, units="m")

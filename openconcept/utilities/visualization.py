@@ -1,6 +1,6 @@
 try:
     from matplotlib import pyplot as plt
-except:
+except ImportError:
     # don't want a matplotlib dependency on Travis/Appveyor
     pass
 import numpy as np
@@ -70,7 +70,6 @@ def plot_trajectory_grid(
             if file_counter >= 0:
                 # write the file
                 if savefig is not None:
-                    fig.tight_layout()
                     plt.savefig(savefig + "_" + str(file_counter) + ".pdf")
             fig, axs = plt.subplots(grid_layout[0], grid_layout[1], sharex=True, figsize=figsize)
             file_counter += 1

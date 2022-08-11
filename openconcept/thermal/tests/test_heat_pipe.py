@@ -69,7 +69,6 @@ class HeatPipeIntegrationTestCase(unittest.TestCase):
 
     def test_two_pipes(self):
         nn = 3
-        prob = Problem()
 
         # Run one and two pipes to compare results
         one = Problem()

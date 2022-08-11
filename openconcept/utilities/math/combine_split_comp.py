@@ -205,7 +205,7 @@ class VectorConcatenateComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        for (output_name, input_names, vec_sizes, length, val, kwargs) in self._add_systems:
+        for (output_name, input_names, _, length, _, _) in self._add_systems:
             if isinstance(input_names, str):
                 input_names = [input_names]
 
@@ -218,7 +218,7 @@ class VectorConcatenateComp(ExplicitComponent):
             else:
                 temp = np.empty([0, length], dtype=np.dtype)
 
-            for i, input_name in enumerate(input_names):
+            for input_name in input_names:
                 temp = np.concatenate((temp, inputs[input_name]))
             outputs[output_name] = temp
 
@@ -423,14 +423,9 @@ class VectorSplitComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        for (output_names, input_name, vec_sizes, length, val, kwargs) in self._add_systems:
+        for (output_names, input_name, vec_sizes, length, _, _) in self._add_systems:
             if isinstance(output_names, str):
                 output_names = [output_names]
-
-            if self.under_complex_step:
-                dtype = np.complex_
-            else:
-                dtype = np.float64
 
             for i, output_name in enumerate(output_names):
                 if i == 0:

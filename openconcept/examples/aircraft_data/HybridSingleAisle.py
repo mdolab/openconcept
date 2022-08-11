@@ -2,7 +2,6 @@
 # Collected from various sources
 # including SOCATA pilot manual
 
-import openmdao.api as om
 from openconcept.mission import IntegratorGroup
 from openconcept.thermal import PerfectHeatTransferComp
 from openconcept.utilities import ElementMultiplyDivideComp, AddSubtractComp

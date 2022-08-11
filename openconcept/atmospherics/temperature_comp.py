@@ -46,8 +46,6 @@ class TemperatureComp(ExplicitComponent):
         self.declare_partials("fltcond|T", "fltcond|TempIncrement", rows=arange, cols=arange, val=1.0)
 
     def compute(self, inputs, outputs):
-        num_points = self.options["num_nodes"]
-
         h_m = inputs["fltcond|h"]
 
         self.tropos_mask, self.strato_mask, self.smooth_mask = get_mask_arrays(h_m)
@@ -56,8 +54,6 @@ class TemperatureComp(ExplicitComponent):
         outputs["fltcond|T"] = temp_K + inputs["fltcond|TempIncrement"]
 
     def compute_partials(self, inputs, partials):
-        num_points = self.options["num_nodes"]
-
         h_m = inputs["fltcond|h"]
 
         derivs = compute_temp_derivs(h_m, self.tropos_mask, self.strato_mask, self.smooth_mask)
