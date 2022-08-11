@@ -14,12 +14,12 @@ OpenConcept is capable of modeling a wide range of propulsion systems, including
 The following figure (from [this paper](https://doi.org/10.3390/aerospace9050243)) shows one such system that is modeled in the `N3_HybridSingleAisle_Refrig.py` example.
 
 <h2 align="center">
-    <img src="/docs/_static/images/full_parallel_system_chiller.png" width="500" />
+    <img src="/doc/_static/images/full_parallel_system_chiller.png" width="500" />
 </h2>
 
 The following charts show more than 250 individually optimized hybrid-electric light twin aircraft (similar to a King Air C90GT). Optimizing hundreds of configurations can be done in a couple of hours on a standard laptop computer.
 
-![Example charts](/docs/_static/images/readme_charts.png)
+![Example charts](/doc/_static/images/readme_charts.png)
 
 The reason for OpenConcept's efficiency is the analytic derivatives built into each analysis routine and component. Accurate, efficient derivatives enable the use of Newton nonlinear equation solutions and gradient-based optimization at low computational cost.
 
@@ -27,7 +27,7 @@ The reason for OpenConcept's efficiency is the analytic derivatives built into e
 
 Automatically-generated documentation is available at (https://mdolab-openconcept.readthedocs-hosted.com/en/latest/).
 
-To build the docs locally, install the `sphinx_mdolab_theme` via `pip`. Then enter the `docs` folder in the root directory and run `make html`. The built documentation can be viewed by opening `_build/html/index.html`. OpenAeroStruct is required (also installable via `pip`) to build the OpenAeroStruct portion of the source docs.
+To build the docs locally, install the `sphinx_mdolab_theme` via `pip`. Then enter the `doc` folder in the root directory and run `make html`. The built documentation can be viewed by opening `_build/html/index.html`. OpenAeroStruct is required (also installable via `pip`) to build the OpenAeroStruct portion of the source docs.
 
 ## Getting Started
 
@@ -47,7 +47,7 @@ The features section of the documentation describes most of the components and s
 
 ### Requirements
 
-<!-- Remember to change docs/index.rst too! -->
+<!-- Remember to change doc/index.rst too! -->
 
 This toolkit requires the use of [OpenMDAO](https://openmdao.org/) 3.10.0 or later.
 OpenMDAO requires a late NumPy and SciPy.

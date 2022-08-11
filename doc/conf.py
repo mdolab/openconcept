@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.abspath("./_exts"))
 # so we add it to the path
 this_directory = os.path.abspath(os.path.dirname(__file__))
 
-# sys.path.insert(0, os.path.abspath(openconcept.__path__[0]+r'/docs/_exts'))
+# sys.path.insert(0, os.path.abspath(openconcept.__path__[0]+r'/doc/_exts'))
 
 
 def generate_src_docs(dir, top, packages):
@@ -167,7 +167,7 @@ def run_file_move_result(file_name, output_files, destination_files, optional_cl
     This function can be used to automatically generate the figure in the RTD build
     and move it to a specific location in the RTD build.
 
-    Note that the file is run from the openconcept/docs directory and all relative paths
+    Note that the file is run from the openconcept/doc directory and all relative paths
     are relative to this directory. If the output file name is defined in the script
     using a relative path remember to take it into account.
 

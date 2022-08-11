@@ -6,8 +6,8 @@
 .cache/
 build/
 *pycache*
-docs/_build
-docs/_srcdocs
+doc/_build
+doc/_srcdocs
 *_old.py
 *hide*
 coloring.json

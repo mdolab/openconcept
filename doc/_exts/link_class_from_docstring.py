@@ -19,7 +19,7 @@ def build_dict():
         path=package.__path__, prefix=package.__name__ + ".", onerror=lambda x: None
     ):
         if not ispkg:
-            if "docs" not in modname:
+            if "doc" not in modname:
                 if any(ignore in modname for ignore in IGNORE_LIST):
                     continue
                 module = importer.find_module(modname).load_module(modname)
