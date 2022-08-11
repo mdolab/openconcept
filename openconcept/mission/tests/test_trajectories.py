@@ -397,7 +397,7 @@ class TestIntegratorDuplicateRateName(unittest.TestCase):
         self.p = om.Problem(model=self.TestPhase(num_nodes=self.nn))
 
     def test_asserts(self):
-        with self.assertRaises(ValueError) as _:
+        with self.assertRaises(ValueError):
             self.p.setup(force_alloc_complex=True)
 
 
@@ -569,7 +569,7 @@ class TestPhaseNoTime(unittest.TestCase):
         self.p = om.Problem(model=phase)
 
     def test_raises_error(self):
-        with self.assertRaises(NameError) as _:
+        with self.assertRaises(NameError):
             self.p.setup()
 
 
@@ -932,7 +932,7 @@ class TestTrajectoryLinkPhaseStrings(unittest.TestCase):
 
         traj.add_subsystem("phase1", PhaseForTrajTest(num_nodes=5))
 
-        with self.assertRaises(ValueError) as _:
+        with self.assertRaises(ValueError):
             traj.link_phases("phase1", "phase2", states_to_skip=["b.ode_integ.f"])
 
 
