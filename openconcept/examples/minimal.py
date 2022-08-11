@@ -145,14 +145,14 @@ if __name__ == "__main__":
     axs = axs.flatten()  # change 2x2 mtx of axes into 4-element vector
 
     # Define variables to plot
-    vars = [
+    plot_vars = [
         {"var": "fltcond|h", "name": "Altitude", "units": "ft"},
         {"var": "fltcond|vs", "name": "Vertical speed", "units": "ft/min"},
         {"var": "fltcond|Utrue", "name": "True airspeed", "units": "kn"},
         {"var": "throttle", "name": "Throttle", "units": None},
     ]
 
-    for idx_fig, var in enumerate(vars):
+    for idx_fig, var in enumerate(plot_vars):
         axs[idx_fig].set_xlabel("Range (nmi)")
         axs[idx_fig].set_ylabel(f"{var['name']}" if var["units"] is None else f"{var['name']} ({var['units']})")
 

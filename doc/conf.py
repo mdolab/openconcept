@@ -21,12 +21,9 @@ from sphinx_mdolab_theme.config import *
 
 sys.path.insert(0, os.path.abspath("."))
 sys.path.insert(0, os.path.abspath(".."))
-sys.path.insert(0, os.path.abspath("./_exts"))
 # sphinx build needs to be able to find the openmdao embed_code plugin
 # so we add it to the path
 this_directory = os.path.abspath(os.path.dirname(__file__))
-
-# sys.path.insert(0, os.path.abspath(openconcept.__path__[0]+r'/doc/_exts'))
 
 
 def generate_src_docs(dir, top, packages):

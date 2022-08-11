@@ -354,11 +354,11 @@ def configure_problem(num_nodes):
     return prob
 
 
-def set_values(prob, num_nodes, range=2050):
+def set_values(prob, num_nodes, mission_range=2050):
     # set some (required) mission parameters. Each phase needs a vertical and air-speed
-    # the entire mission needs a cruise altitude and range
+    # the entire mission needs a cruise altitude and mission range
     prob.set_val("cruise|h0", 35000.0, units="ft")
-    prob.set_val("mission_range", range, units="NM")
+    prob.set_val("mission_range", mission_range, units="NM")
     prob.set_val("climb.fltcond|vs", np.linspace(2000.0, 400.0, num_nodes), units="ft/min")
     prob.set_val("climb.fltcond|Ueas", np.linspace(220, 200, num_nodes), units="kn")
     prob.set_val("cruise.fltcond|vs", np.zeros((num_nodes,)), units="ft/min")

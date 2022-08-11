@@ -46,7 +46,7 @@ class ElementMultiplyDivideComp(ExplicitComponent):
         scaling_factor=1,
         divide=None,
         input_units=None,
-        **kwargs
+        **kwargs,
     ):
         """
         Allow user to create an multiplication system with one-liner.
