@@ -14,12 +14,12 @@ OpenConcept is capable of modeling a wide range of propulsion systems, including
 The following figure (from [this paper](https://doi.org/10.3390/aerospace9050243)) shows one such system that is modeled in the `N3_HybridSingleAisle_Refrig.py` example.
 
 <h2 align="center">
-    <img src="/doc/_static/images/full_parallel_system_chiller.png" width="500" />
+    <img src="https://raw.githubusercontent.com/mdolab/openconcept/main/doc/_static/images/full_parallel_system_chiller.png" width="500" />
 </h2>
 
 The following charts show more than 250 individually optimized hybrid-electric light twin aircraft (similar to a King Air C90GT). Optimizing hundreds of configurations can be done in a couple of hours on a standard laptop computer.
 
-![Example charts](/doc/_static/images/readme_charts.png)
+![Example charts](https://raw.githubusercontent.com/mdolab/openconcept/main/doc/_static/images/readme_charts.png)
 
 The reason for OpenConcept's efficiency is the analytic derivatives built into each analysis routine and component. Accurate, efficient derivatives enable the use of Newton nonlinear equation solutions and gradient-based optimization at low computational cost.
 
