@@ -1,2 +1,5 @@
 from .aerodynamics import PolarDrag, StallSpeed, Lift
-from .openaerostruct import VLMDragPolar, AerostructDragPolar
+try:
+    from .openaerostruct import VLMDragPolar, AerostructDragPolar
+except ImportError:
+    pass
