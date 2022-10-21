@@ -170,9 +170,9 @@ class B738VLMTestCase(unittest.TestCase):
     def test_values_B738(self):
         prob = self.prob
         # block fuel
-        assert_near_equal(prob.get_val("descent.fuel_used_final", units="lbm"), 28443.39604559, tolerance=1e-5)
+        assert_near_equal(prob.get_val("descent.fuel_used_final", units="lbm"), 27841.06640683, tolerance=1e-5)
         # total fuel
-        assert_near_equal(prob.get_val("loiter.fuel_used_final", units="lbm"), 34075.30721371, tolerance=1e-5)
+        assert_near_equal(prob.get_val("loiter.fuel_used_final", units="lbm"), 33412.41922187, tolerance=1e-5)
 
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
@@ -192,7 +192,7 @@ class B738AerostructTestCase(unittest.TestCase):
     def test_values_B738(self):
         prob = self.prob
         # block fuel
-        assert_near_equal(prob.get_val("descent.fuel_used_final", units="lbm"), 34310.44045734, tolerance=1e-5)
+        assert_near_equal(prob.get_val("descent.fuel_used_final", units="lbm"), 33611.18277099, tolerance=1e-5)
 
 
 class N3HSATestCase(unittest.TestCase):
