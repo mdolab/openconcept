@@ -1277,9 +1277,9 @@ class PressureDrop(ExplicitComponent):
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of flight/control conditions")
         self.options.declare("Kc_cold", default=0.3, desc="Irreversible contraction loss coefficient")
-        self.options.declare("Ke_cold", default=-0.1, desc="Irreversible contraction loss coefficient")
+        self.options.declare("Ke_cold", default=-0.1, desc="Irreversible expansion loss coefficient")
         self.options.declare("Kc_hot", default=0.3, desc="Irreversible contraction loss coefficient")
-        self.options.declare("Ke_hot", default=-0.1, desc="Irreversible contraction loss coefficient")
+        self.options.declare("Ke_hot", default=-0.1, desc="Irreversible expansion loss coefficient")
 
     def setup(self):
         nn = self.options["num_nodes"]
