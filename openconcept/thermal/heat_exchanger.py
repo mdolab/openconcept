@@ -1277,9 +1277,9 @@ class PressureDrop(ExplicitComponent):
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of flight/control conditions")
         self.options.declare("Kc_cold", default=0.3, desc="Irreversible contraction loss coefficient")
-        self.options.declare("Ke_cold", default=-0.1, desc="Irreversible contraction loss coefficient")
+        self.options.declare("Ke_cold", default=-0.1, desc="Irreversible expansion loss coefficient")
         self.options.declare("Kc_hot", default=0.3, desc="Irreversible contraction loss coefficient")
-        self.options.declare("Ke_hot", default=-0.1, desc="Irreversible contraction loss coefficient")
+        self.options.declare("Ke_hot", default=-0.1, desc="Irreversible expansion loss coefficient")
 
     def setup(self):
         nn = self.options["num_nodes"]
@@ -1322,11 +1322,13 @@ class PressureDrop(ExplicitComponent):
         dyn_press_hot = (1 / 2) * (inputs["mdot_hot"] / inputs["xs_area_hot"]) ** 2 / inputs["rho_hot"]
         Kec = self.options["Ke_cold"]
         Kcc = self.options["Kc_cold"]
+        Keh = self.options["Ke_hot"]
+        Kch = self.options["Kc_hot"]
         outputs["delta_p_cold"] = dyn_press_cold * (
             -Kec - Kcc - 4 * inputs["length_overall"] * inputs["f_cold"] / inputs["dh_cold"]
         )
         outputs["delta_p_hot"] = dyn_press_hot * (
-            -Kec - Kcc - 4 * inputs["width_overall"] * inputs["f_hot"] / inputs["dh_hot"]
+            -Keh - Kch - 4 * inputs["width_overall"] * inputs["f_hot"] / inputs["dh_hot"]
         )
 
     def compute_partials(self, inputs, J):
@@ -1334,8 +1336,10 @@ class PressureDrop(ExplicitComponent):
         dyn_press_hot = (1 / 2) * (inputs["mdot_hot"] / inputs["xs_area_hot"]) ** 2 / inputs["rho_hot"]
         Kec = self.options["Ke_cold"]
         Kcc = self.options["Kc_cold"]
+        Keh = self.options["Ke_hot"]
+        Kch = self.options["Kc_hot"]
         losses_cold = -Kec - Kcc - 4 * inputs["length_overall"] * inputs["f_cold"] / inputs["dh_cold"]
-        losses_hot = -Kec - Kcc - 4 * inputs["width_overall"] * inputs["f_hot"] / inputs["dh_hot"]
+        losses_hot = -Keh - Kch - 4 * inputs["width_overall"] * inputs["f_hot"] / inputs["dh_hot"]
 
         J["delta_p_cold", "mdot_cold"] = (
             (inputs["mdot_cold"] / inputs["xs_area_cold"] ** 2) / inputs["rho_cold"] * losses_cold
