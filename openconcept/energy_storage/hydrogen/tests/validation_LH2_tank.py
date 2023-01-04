@@ -6,65 +6,101 @@ from openconcept.energy_storage.hydrogen.LH2_tank import LH2Tank
 def aydelott_validation(case):
     nn = 31
     p = om.Problem()
-    p.model.add_subsystem('tank', LH2Tank(num_nodes=nn, init_fill_level=case['fill_init'],
-                          ullage_T_init=case['T_init'], ullage_P_init=1e3*case['P_init']),
-                          promotes=['*'])
-    p.model.add_subsystem('Q_dot_bal', om.BalanceComp('T_inf', units='K', eq_units='W', lhs_name='Q_model',
-                                                      rhs_name='Q_exp', rhs_val=case['Q_dot']*np.ones(nn),
-                                                      val=300*np.ones(nn)),
-                          promotes_outputs=['T_inf'])
-    p.model.connect('heat.Q_wall.heat_into_walls', 'Q_dot_bal.Q_model')
+    p.model.add_subsystem(
+        "tank",
+        LH2Tank(
+            num_nodes=nn,
+            init_fill_level=case["fill_init"],
+            ullage_T_init=case["T_init"],
+            ullage_P_init=1e3 * case["P_init"],
+        ),
+        promotes=["*"],
+    )
+    p.model.add_subsystem(
+        "Q_dot_bal",
+        om.BalanceComp(
+            "T_inf",
+            units="K",
+            eq_units="W",
+            lhs_name="Q_model",
+            rhs_name="Q_exp",
+            rhs_val=case["Q_dot"] * np.ones(nn),
+            val=300 * np.ones(nn),
+        ),
+        promotes_outputs=["T_inf"],
+    )
+    p.model.connect("heat.Q_wall.heat_into_walls", "Q_dot_bal.Q_model")
     p.model.linear_solver = om.DirectSolver()
     p.model.nonlinear_solver = om.NewtonSolver()
-    p.model.nonlinear_solver.options['solve_subsystems'] = True
-    p.model.nonlinear_solver.options['maxiter'] = 100
-    p.model.nonlinear_solver.options['iprint'] = 0
+    p.model.nonlinear_solver.options["solve_subsystems"] = True
+    p.model.nonlinear_solver.options["maxiter"] = 100
+    p.model.nonlinear_solver.options["iprint"] = 0
 
     p.setup()
 
-    p.set_val('design_pressure', 3., units='bar')
-    p.set_val('m_dot_gas', np.zeros(nn), units='kg/s')
-    p.set_val('radius', 23/2, units='cm')
-    p.set_val('length', 0., units='m')
-    p.set_val('insulation_thickness', .5, units='inch')
-    p.set_val('duration', case['duration'], units='s')
+    p.set_val("design_pressure", 3.0, units="bar")
+    p.set_val("m_dot_gas", np.zeros(nn), units="kg/s")
+    p.set_val("radius", 23 / 2, units="cm")
+    p.set_val("length", 0.0, units="m")
+    p.set_val("insulation_thickness", 0.5, units="inch")
+    p.set_val("duration", case["duration"], units="s")
 
     p.run_model()
 
     print("\n                         | Experiment | Model   | Error (%)")
     print(f"Initial pressure (kPa)   | {case['P_init']}    | {p.get_val('ullage.P', units='kPa')[0]:.2f}")
-    print(f"Final pressure (kPa)     | {case['P_final']}    | {p.get_val('ullage.P', units='kPa')[-1]:.2f}  | {(p.get_val('ullage.P', units='kPa')[-1] - case['P_final'])/case['P_final']*100}")
-    if case['T_final'] != 0:
+    print(
+        f"Final pressure (kPa)     | {case['P_final']}    | {p.get_val('ullage.P', units='kPa')[-1]:.2f}  | {(p.get_val('ullage.P', units='kPa')[-1] - case['P_final'])/case['P_final']*100}"
+    )
+    if case["T_final"] != 0:
         print(f"Initial temperature (K)  | {case['T_init']}      | {p.get_val('ullage.T', units='K')[0]:.2f}")
-        print(f"Final temperature (K)    | {case['T_final']}      | {p.get_val('ullage.T', units='K')[-1]:.2f}   | {(p.get_val('ullage.T', units='K')[-1] - case['T_final'])/case['T_final']*100}")
+        print(
+            f"Final temperature (K)    | {case['T_final']}      | {p.get_val('ullage.T', units='K')[-1]:.2f}   | {(p.get_val('ullage.T', units='K')[-1] - case['T_final'])/case['T_final']*100}"
+        )
 
 
 # A validation case for the Aydelott experiments (described below)
 def MHTB_validation(case):
     nn = 31
     p = om.Problem()
-    p.model.add_subsystem('tank', LH2Tank(num_nodes=nn, init_fill_level=case['fill_init'],
-                          ullage_T_init=case['T_init'], ullage_P_init=1e3*case['P_init']),
-                          promotes=['*'])
-    p.model.add_subsystem('Q_dot_bal', om.BalanceComp('T_inf', units='K', eq_units='W', lhs_name='Q_model',
-                                                      rhs_name='Q_exp', rhs_val=case['Q_dot']*np.ones(nn),
-                                                      val=200*np.ones(nn)),
-                          promotes_outputs=['T_inf'])
-    p.model.connect('heat.Q_wall.heat_into_walls', 'Q_dot_bal.Q_model')
+    p.model.add_subsystem(
+        "tank",
+        LH2Tank(
+            num_nodes=nn,
+            init_fill_level=case["fill_init"],
+            ullage_T_init=case["T_init"],
+            ullage_P_init=1e3 * case["P_init"],
+        ),
+        promotes=["*"],
+    )
+    p.model.add_subsystem(
+        "Q_dot_bal",
+        om.BalanceComp(
+            "T_inf",
+            units="K",
+            eq_units="W",
+            lhs_name="Q_model",
+            rhs_name="Q_exp",
+            rhs_val=case["Q_dot"] * np.ones(nn),
+            val=200 * np.ones(nn),
+        ),
+        promotes_outputs=["T_inf"],
+    )
+    p.model.connect("heat.Q_wall.heat_into_walls", "Q_dot_bal.Q_model")
     p.model.linear_solver = om.DirectSolver()
     p.model.nonlinear_solver = om.NewtonSolver()
-    p.model.nonlinear_solver.options['solve_subsystems'] = True
-    p.model.nonlinear_solver.options['maxiter'] = 100
-    p.model.nonlinear_solver.options['iprint'] = 0
+    p.model.nonlinear_solver.options["solve_subsystems"] = True
+    p.model.nonlinear_solver.options["maxiter"] = 100
+    p.model.nonlinear_solver.options["iprint"] = 0
 
     p.setup()
 
-    p.set_val('design_pressure', 3., units='bar')
-    p.set_val('m_dot_gas', np.zeros(nn), units='kg/s')
-    p.set_val('radius', 3.05/2, units='m')
-    p.set_val('length', 3.05, units='m')
-    p.set_val('insulation_thickness', 1000., units='inch')
-    p.set_val('duration', case['duration'], units='s')
+    p.set_val("design_pressure", 3.0, units="bar")
+    p.set_val("m_dot_gas", np.zeros(nn), units="kg/s")
+    p.set_val("radius", 3.05 / 2, units="m")
+    p.set_val("length", 3.05, units="m")
+    p.set_val("insulation_thickness", 1000.0, units="inch")
+    p.set_val("duration", case["duration"], units="s")
 
     p.run_model()
 
@@ -72,9 +108,13 @@ def MHTB_validation(case):
     # print(f"Environment temp: {p.get_val('T_inf', units='K')} K")
     print("\n                         | Experiment | Model   | Error (%)")
     print(f"Initial pressure (kPa)   | {case['P_init']}      | {p.get_val('ullage.P', units='kPa')[0]:.2f}")
-    print(f"Final pressure (kPa)     | {case['P_final']}    | {p.get_val('ullage.P', units='kPa')[-1]:.2f}  | {(p.get_val('ullage.P', units='kPa')[-1] - case['P_final'])/case['P_final']*100}")
+    print(
+        f"Final pressure (kPa)     | {case['P_final']}    | {p.get_val('ullage.P', units='kPa')[-1]:.2f}  | {(p.get_val('ullage.P', units='kPa')[-1] - case['P_final'])/case['P_final']*100}"
+    )
     print(f"Initial temperature (K)  | {case['T_init']}      | {p.get_val('ullage.T', units='K')[0]:.2f}")
-    print(f"Final temperature (K)    | {case['T_final']}      | {p.get_val('ullage.T', units='K')[-1]:.2f}   | {(p.get_val('ullage.T', units='K')[-1] - case['T_final'])/case['T_final']*100}")
+    print(
+        f"Final temperature (K)    | {case['T_final']}      | {p.get_val('ullage.T', units='K')[-1]:.2f}   | {(p.get_val('ullage.T', units='K')[-1] - case['T_final'])/case['T_final']*100}"
+    )
 
 
 # A validation case of the Ball tank designed for Boeing's Phantom Eye
@@ -84,36 +124,40 @@ def MHTB_validation(case):
 def Ball_HALE_validation(T_inf, Q_dot, boil_off):
     nn = 31
     p = om.Problem()
-    p.model.add_subsystem('tank', LH2Tank(num_nodes=nn, init_fill_level=0.95,
-                          ullage_T_init=21., ullage_P_init=85*6895.),  # 85 PSIG
-                          promotes=['*'])
+    p.model.add_subsystem(
+        "tank",
+        LH2Tank(num_nodes=nn, init_fill_level=0.95, ullage_T_init=21.0, ullage_P_init=85 * 6895.0),  # 85 PSIG
+        promotes=["*"],
+    )
     p.model.linear_solver = om.DirectSolver()
     p.model.nonlinear_solver = om.NewtonSolver()
-    p.model.nonlinear_solver.options['solve_subsystems'] = True
-    p.model.nonlinear_solver.options['maxiter'] = 100
-    p.model.nonlinear_solver.options['iprint'] = 0
+    p.model.nonlinear_solver.options["solve_subsystems"] = True
+    p.model.nonlinear_solver.options["maxiter"] = 100
+    p.model.nonlinear_solver.options["iprint"] = 0
 
     p.setup()
 
-    p.set_val('design_pressure', 95*6895., units='Pa')
-    p.set_val('T_inf', T_inf*np.ones(nn), units='K')
-    p.set_val('m_dot_gas', np.zeros(nn), units='kg/s')
-    p.set_val('radius', 4, units='ft')
-    p.set_val('length', 0., units='m')
-    p.set_val('insulation_thickness', 4.6, units='inch')
-    p.set_val('duration', 10, units='min')
+    p.set_val("design_pressure", 95 * 6895.0, units="Pa")
+    p.set_val("T_inf", T_inf * np.ones(nn), units="K")
+    p.set_val("m_dot_gas", np.zeros(nn), units="kg/s")
+    p.set_val("radius", 4, units="ft")
+    p.set_val("length", 0.0, units="m")
+    p.set_val("insulation_thickness", 4.6, units="inch")
+    p.set_val("duration", 10, units="min")
 
     p.run_model()
 
     print("\n                     | Experiment       | Model")
-    print(f"Heat leak (W)        | {Q_dot}          | {np.mean(p.get_val('heat.Q_wall.heat_into_walls', units='W')):.2f}")
+    print(
+        f"Heat leak (W)        | {Q_dot}          | {np.mean(p.get_val('heat.Q_wall.heat_into_walls', units='W')):.2f}"
+    )
     print(f"Environment temp (K) |                  | {T_inf:.2f}")
     print(f"Boil off (lb/hr)     | {boil_off}     | {np.mean(p.get_val('boil_off.m_boil_off', units='lb/h')):.2f}")
-    W_tank = (p.get_val('weight', units='lb') - p.get_val('W_LH2', units='lb') - p.get_val('W_GH2', units='lb'))[0]
+    W_tank = (p.get_val("weight", units="lb") - p.get_val("W_LH2", units="lb") - p.get_val("W_GH2", units="lb"))[0]
     print(f"Tank weight (lb)     | 615              | {W_tank:.2f}")
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     # This validation is based on experimental data from the MHTB tank, reported in section 5.1 of
     # Eugina Mendez Ramos' dissertation, available here: http://hdl.handle.net/1853/64797
     # The data is from a cylindrical tank with elliptical end caps (more details in the dissertation),
@@ -129,15 +173,49 @@ if __name__=="__main__":
     # the simpler solution of venting any boil off gas immediately.
     #
     #                                      W               kPa                 kPa                K                 K                  sec
-    cases = [{'fill_init': 0.9, 'Q_dot': 54.1, 'P_init': 111.5, 'P_final': 138.012, 'T_init': 20.71, 'T_final': 23.65, 'duration': 19591},
-             {'fill_init': 0.9, 'Q_dot': 20.2, 'P_init': 111.5, 'P_final': 136.202, 'T_init': 20.71, 'T_final': 23.08, 'duration': 51138},
-             {'fill_init': 0.25, 'Q_dot': 18.8, 'P_init': 122., 'P_final': 137.993, 'T_init': 21.01, 'T_final': 26.32, 'duration': 66446},
-             {'fill_init': 0.5, 'Q_dot': 51.0, 'P_init': 111.5, 'P_final': 138.013, 'T_init': 20.71, 'T_final': 27.78, 'duration': 49869}]
+    cases = [
+        {
+            "fill_init": 0.9,
+            "Q_dot": 54.1,
+            "P_init": 111.5,
+            "P_final": 138.012,
+            "T_init": 20.71,
+            "T_final": 23.65,
+            "duration": 19591,
+        },
+        {
+            "fill_init": 0.9,
+            "Q_dot": 20.2,
+            "P_init": 111.5,
+            "P_final": 136.202,
+            "T_init": 20.71,
+            "T_final": 23.08,
+            "duration": 51138,
+        },
+        {
+            "fill_init": 0.25,
+            "Q_dot": 18.8,
+            "P_init": 122.0,
+            "P_final": 137.993,
+            "T_init": 21.01,
+            "T_final": 26.32,
+            "duration": 66446,
+        },
+        {
+            "fill_init": 0.5,
+            "Q_dot": 51.0,
+            "P_init": 111.5,
+            "P_final": 138.013,
+            "T_init": 20.71,
+            "T_final": 27.78,
+            "duration": 49869,
+        },
+    ]
     print("            MHTB TESTS             ")
     print("----------------------------------")
     for case in cases:
         MHTB_validation(case)
-    
+
     # This test case validates the heat transfer model and boil off rate
     # for a tank that has flown on an aircraft. The experiment was imperfect
     # in many ways, most notably because they lost the vacuum in the MLI on their
@@ -156,8 +234,8 @@ if __name__=="__main__":
     # model. This may explain the low tank weight estimate of our model.
     print("\n\n      BALL PHANTOM EYE TEST       ")
     print("----------------------------------")
-    Ball_HALE_validation(425, '740-765', '18.2 +/- 0.2')
-    Ball_HALE_validation(295, '571-677', 'Unknown     ')
+    Ball_HALE_validation(425, "740-765", "18.2 +/- 0.2")
+    Ball_HALE_validation(295, "571-677", "Unknown     ")
 
     # These Aydelott tests (also reported in section 5.1 of Eugina Ramos' dissertation) are
     # from a spherical tank with a 0.23 m diameter. They tend to give results that are quite far
