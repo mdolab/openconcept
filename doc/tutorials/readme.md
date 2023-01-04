@@ -1,0 +1,1 @@
+When Read the Docs builds the documentation, the assets directory will be created and figures from the examples will be moved there. See the calls to `run_file_move_result` in `conf.py`.

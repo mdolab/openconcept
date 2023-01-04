@@ -1,4 +1,3 @@
-from __future__ import division
 from openmdao.api import ExplicitComponent
 import numpy as np
 
@@ -52,8 +51,7 @@ class DVLabel(ExplicitComponent):
                 self.add_output(o_var, val, units=units)
             # partial derivs setup
             row_col = np.arange(size)
-            self.declare_partials(of=o_var, wrt=i_var,
-                                  val=np.ones(size), rows=row_col, cols=row_col)
+            self.declare_partials(of=o_var, wrt=i_var, val=np.ones(size), rows=row_col, cols=row_col)
 
     def compute(self, inputs, outputs):
         for var_list in self.vars_list:

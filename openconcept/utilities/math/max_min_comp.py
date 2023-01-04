@@ -1,6 +1,6 @@
-from __future__ import division
 import openmdao.api as om
 import numpy as np
+
 
 class MaxComp(om.ExplicitComponent):
     """
@@ -15,7 +15,7 @@ class MaxComp(om.ExplicitComponent):
     -------
     max : same as data type of input array
         The maximum value of the input array (scalar)
-    
+
     Options
     -------
     num_nodes : int
@@ -23,24 +23,25 @@ class MaxComp(om.ExplicitComponent):
     units : string
         OpenMDAO-style units of input and output
     """
+
     def initialize(self):
-        self.options.declare('num_nodes', default=1, desc='Length of all input and output arrays')
-        self.options.declare('units', default=None, desc='Units of input array')
-    
+        self.options.declare("num_nodes", default=1, desc="Length of all input and output arrays")
+        self.options.declare("units", default=None, desc="Units of input array")
+
     def setup(self):
-        nn = self.options['num_nodes']
-        unit = self.options['units']
+        nn = self.options["num_nodes"]
+        unit = self.options["units"]
 
-        self.add_input('array', shape=(nn,), units=unit)
-        self.add_output('max', units=unit)
+        self.add_input("array", shape=(nn,), units=unit)
+        self.add_output("max", units=unit)
 
-        self.declare_partials('max', 'array', rows=np.zeros(nn), cols=np.arange(0, nn))
-    
+        self.declare_partials("max", "array", rows=np.zeros(nn), cols=np.arange(0, nn))
+
     def compute(self, inputs, outputs):
-        outputs['max'] = np.amax(inputs['array'])
-    
+        outputs["max"] = np.amax(inputs["array"])
+
     def compute_partials(self, inputs, J):
-        J['max', 'array'] = np.where(inputs['array'] == np.amax(inputs['array']), 1, 0)
+        J["max", "array"] = np.where(inputs["array"] == np.amax(inputs["array"]), 1, 0)
 
 
 class MinComp(om.ExplicitComponent):
@@ -56,7 +57,7 @@ class MinComp(om.ExplicitComponent):
     -------
     min : same as data type of input array
         The minimum value of the input array (scalar)
-    
+
     Options
     -------
     num_nodes : int
@@ -64,23 +65,24 @@ class MinComp(om.ExplicitComponent):
     units : string
         OpenMDAO-style units of input and output
     """
+
     def initialize(self):
-        self.options.declare('num_nodes', default=1, desc='Length of all input and output arrays')
-        self.options.declare('units', default=None, desc='Units of input array')
-    
+        self.options.declare("num_nodes", default=1, desc="Length of all input and output arrays")
+        self.options.declare("units", default=None, desc="Units of input array")
+
     def setup(self):
-        nn = self.options['num_nodes']
-        unit = self.options['units']
+        nn = self.options["num_nodes"]
+        unit = self.options["units"]
 
-        self.add_input('array', shape=(nn,), units=unit)
-        self.add_output('min', units=unit)
+        self.add_input("array", shape=(nn,), units=unit)
+        self.add_output("min", units=unit)
 
-        self.declare_partials('min', 'array', rows=np.zeros(nn), cols=np.arange(0, nn))
-    
+        self.declare_partials("min", "array", rows=np.zeros(nn), cols=np.arange(0, nn))
+
     def compute(self, inputs, outputs):
-        print(inputs['array'])
-        outputs['min'] = np.amin(inputs['array'])
-        print(outputs['min'])
-    
+        print(inputs["array"])
+        outputs["min"] = np.amin(inputs["array"])
+        print(outputs["min"])
+
     def compute_partials(self, inputs, J):
-        J['min', 'array'] = np.where(inputs['array'] == np.amin(inputs['array']), 1, 0)
+        J["min", "array"] = np.where(inputs["array"] == np.amin(inputs["array"]), 1, 0)

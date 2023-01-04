@@ -1,4 +1,3 @@
-from __future__ import division
 from openmdao.api import IndepVarComp
 import numpy as np
 import numbers
@@ -39,7 +38,7 @@ class DictIndepVarComp(IndepVarComp):
         super(DictIndepVarComp, self).__init__(**kwargs)
         self._data_dict = data_dict
 
-    def add_output_from_dict(self, structured_name, separator='|', **kwargs):
+    def add_output_from_dict(self, structured_name, separator="|", **kwargs):
         """
         Create a new output based on data from the data dictionary
 
@@ -62,18 +61,18 @@ class DictIndepVarComp(IndepVarComp):
             except KeyError:
                 raise KeyError('"%s" does not exist in the data dictionary' % structured_name)
         try:
-            val = data_dict_tmp['value']
+            val = data_dict_tmp["value"]
         except KeyError:
             raise KeyError('Data dict entry "%s" must have a "value" key' % structured_name)
-        units = data_dict_tmp.get('units', None)
+        units = data_dict_tmp.get("units", None)
 
         if isinstance(val, numbers.Number):
             val = np.array([val])
 
-        super(DictIndepVarComp, self).add_output(name=structured_name,
-                                                 val=val, units=units, shape=val.shape)
+        super(DictIndepVarComp, self).add_output(name=structured_name, val=val, units=units, shape=val.shape)
 
-class DymosDesignParamsFromDict():
+
+class DymosDesignParamsFromDict:
     r"""
     Create Dymos parameters from an external file with a Python dictionary.
 
@@ -98,7 +97,7 @@ class DymosDesignParamsFromDict():
         self._data_dict = data_dict
         self._dymos_traj = dymos_traj
 
-    def add_output_from_dict(self, structured_name, separator='|', opt=False, dynamic=False, **kwargs):
+    def add_output_from_dict(self, structured_name, separator="|", opt=False, dynamic=False, **kwargs):
         """
         Create a new output based on data from the data dictionary
 
@@ -121,14 +120,16 @@ class DymosDesignParamsFromDict():
             except KeyError:
                 raise KeyError('"%s" does not exist in the data dictionary' % structured_name)
         try:
-            val = data_dict_tmp['value']
+            val = data_dict_tmp["value"]
         except KeyError:
             raise KeyError('Data dict entry "%s" must have a "value" key' % structured_name)
-        units = data_dict_tmp.get('units', None)
+        units = data_dict_tmp.get("units", None)
 
         if isinstance(val, numbers.Number):
             val = np.array([val])
 
-        targets = {phase : [structured_name] for phase in self._dymos_traj._phases.keys()}
+        targets = {phase: [structured_name] for phase in self._dymos_traj._phases.keys()}
 
-        self._dymos_traj.add_design_parameter(structured_name, units=units, val=val, opt=opt, targets=targets, dynamic=dynamic)
+        self._dymos_traj.add_design_parameter(
+            structured_name, units=units, val=val, opt=opt, targets=targets, dynamic=dynamic
+        )

@@ -1,8 +1,8 @@
-from __future__ import division
 import numpy as np
 import scipy.sparse as sp
 from openmdao.api import ExplicitComponent
 import warnings
+
 
 def first_deriv_second_order_accurate_stencil(nn_seg):
     # thought: eventually, create this matrix upon initializing the component to save time
@@ -10,43 +10,44 @@ def first_deriv_second_order_accurate_stencil(nn_seg):
     # assemble a sparse matrix which includes the finite difference stencil for ONE segment
     # CSR format: mat[rowidx[i], colidx[i]] = matvec[i]
     # TODO: middle CD coefficient is 0, could remove from sparsity pattern for big improvement
-    rowidx = np.repeat(np.arange(1, nn_seg-1), 2) # [1, 1, 2, 2, .... ]
-    rowidx = np.concatenate([np.tile(0, 3), rowidx, np.tile(nn_seg-1, 3)]) # adds one-sided [0,0,0,1,1,2,2...]
+    rowidx = np.repeat(np.arange(1, nn_seg - 1), 2)  # [1, 1, 2, 2, .... ]
+    rowidx = np.concatenate([np.tile(0, 3), rowidx, np.tile(nn_seg - 1, 3)])  # adds one-sided [0,0,0,1,1,2,2...]
     # the columns have an interesting sparsity pattern due to the one sided stencils at the edges:
     # [0, 1, 2,    0, 2,      1, 3,     2, 4, ...]
-    offset = np.repeat(np.arange(0, nn_seg-2), 2)
-    colidx = np.tile(np.array([0, 2]), nn_seg-2) + offset
-    colidx = np.concatenate([np.arange(0,3), colidx, np.arange(nn_seg-3,nn_seg)])
+    offset = np.repeat(np.arange(0, nn_seg - 2), 2)
+    colidx = np.tile(np.array([0, 2]), nn_seg - 2) + offset
+    colidx = np.concatenate([np.arange(0, 3), colidx, np.arange(nn_seg - 3, nn_seg)])
 
     # the central difference stencil is:
-    cd_stencil = np.array([-1/2, 1/2])
+    cd_stencil = np.array([-1 / 2, 1 / 2])
     # the biased stencils for the first, second, second-to-last, and last entries are:
-    fwd_0_stencil = np.array([-3/2, 2, -1/2])
-    bwd_0_stencil = np.array([1/2, -2, 3/2])
+    fwd_0_stencil = np.array([-3 / 2, 2, -1 / 2])
+    bwd_0_stencil = np.array([1 / 2, -2, 3 / 2])
     stencil_vec = np.tile(cd_stencil, nn_seg - 2)
     stencil_vec = np.concatenate([fwd_0_stencil, stencil_vec, bwd_0_stencil])
     return stencil_vec, rowidx, colidx
+
 
 def first_deriv_fourth_order_accurate_stencil(nn_seg):
     # thought: eventually, create this matrix upon initializing the component to save time
 
     # assemble a sparse matrix which includes the finite difference stencil for ONE segment
     # CSR format: mat[rowidx[i], colidx[i]] = matvec[i]
-    rowidx = np.repeat(np.arange(0, nn_seg), 5) # [0, 0, 0, 0, 0, 1, 1, 1, 1, 1 .... ]
+    rowidx = np.repeat(np.arange(0, nn_seg), 5)  # [0, 0, 0, 0, 0, 1, 1, 1, 1, 1 .... ]
     # the columns have an interesting sparsity pattern due to the one sided stencils at the edges:
     # [0, 1, 2, 3, 4,    0, 1, 2, 3, 4,    0, 1, 2, 3, 4,   1, 2, 3, 4, 5,      2, 3, 4, 5, 6, ...]
-    offset = np.repeat(np.arange(-2, nn_seg-2), 5)
-    colidx = np.tile(np.arange(0,5), nn_seg) + offset
-    colidx[:10] = np.tile(np.arange(0,5), 2)
-    colidx[-10:] = np.tile(np.arange(nn_seg-5, nn_seg), 2)
+    offset = np.repeat(np.arange(-2, nn_seg - 2), 5)
+    colidx = np.tile(np.arange(0, 5), nn_seg) + offset
+    colidx[:10] = np.tile(np.arange(0, 5), 2)
+    colidx[-10:] = np.tile(np.arange(nn_seg - 5, nn_seg), 2)
 
     # the central difference stencil is:
-    cd_stencil = np.array([1/12, -2/3, 0, 2/3, -1/12])
+    cd_stencil = np.array([1 / 12, -2 / 3, 0, 2 / 3, -1 / 12])
     # the biased stencils for the first, second, second-to-last, and last entries are:
-    fwd_0_stencil = np.array([-25/12, 4, -3, 4/3, -1/4])
-    fwd_1_stencil = np.array([-1/4, -5/6, 3/2, -1/2, 1/12])
-    bwd_1_stencil = np.array([-1/12, 1/2, -3/2, 5/6, 1/4])
-    bwd_0_stencil = np.array([1/4, -4/3, 3, -4, 25/12])
+    fwd_0_stencil = np.array([-25 / 12, 4, -3, 4 / 3, -1 / 4])
+    fwd_1_stencil = np.array([-1 / 4, -5 / 6, 3 / 2, -1 / 2, 1 / 12])
+    bwd_1_stencil = np.array([-1 / 12, 1 / 2, -3 / 2, 5 / 6, 1 / 4])
+    bwd_0_stencil = np.array([1 / 4, -4 / 3, 3, -4, 25 / 12])
     stencil_vec = np.tile(cd_stencil, nn_seg)
     stencil_vec[:5] = fwd_0_stencil
     stencil_vec[5:10] = fwd_1_stencil
@@ -54,6 +55,7 @@ def first_deriv_fourth_order_accurate_stencil(nn_seg):
     stencil_vec[-5:] = bwd_0_stencil
 
     return stencil_vec, rowidx, colidx
+
 
 def first_deriv(dts, q, n_segments=1, n_simpson_intervals_per_segment=2, order=4):
     """
@@ -87,15 +89,16 @@ def first_deriv(dts, q, n_segments=1, n_simpson_intervals_per_segment=2, order=4
     """
 
     n_int_seg = n_simpson_intervals_per_segment
-    n_int_tot = n_segments * n_int_seg
-    nn_seg = (n_simpson_intervals_per_segment * 2 + 1)
+    nn_seg = n_simpson_intervals_per_segment * 2 + 1
     nn_tot = n_segments * nn_seg
     if order == 4 and n_int_seg < 2:
-        raise ValueError('Must use a minimum of 2 Simpson intervals or 5 points per segment due to fourth-order FD stencil')
+        raise ValueError(
+            "Must use a minimum of 2 Simpson intervals or 5 points per segment due to fourth-order FD stencil"
+        )
     if len(q) != nn_tot:
-        raise ValueError('q must be of the correct length')
+        raise ValueError("q must be of the correct length")
     if len(dts) != n_segments:
-        raise ValueError('must provide same number of dts as segments')
+        raise ValueError("must provide same number of dts as segments")
 
     dqdt = np.zeros(q.shape)
     if order == 4:
@@ -103,7 +106,7 @@ def first_deriv(dts, q, n_segments=1, n_simpson_intervals_per_segment=2, order=4
     elif order == 2:
         stencil_vec, rowidx, colidx = first_deriv_second_order_accurate_stencil(nn_seg)
     else:
-        raise ValueError('Must choose second or fourth order accuracy')
+        raise ValueError("Must choose second or fourth order accuracy")
 
     stencil_mat = sp.csr_matrix((stencil_vec, (rowidx, colidx)))
     # now we have a generic stencil for each segment
@@ -116,6 +119,7 @@ def first_deriv(dts, q, n_segments=1, n_simpson_intervals_per_segment=2, order=4
     overall_stencil = sp.block_diag(block_mat_list).toarray()
     dqdt = overall_stencil.dot(q)
     return dqdt
+
 
 def first_deriv_partials(dts, q, n_segments=1, n_simpson_intervals_per_segment=2, order=4):
     """
@@ -150,23 +154,23 @@ def first_deriv_partials(dts, q, n_segments=1, n_simpson_intervals_per_segment=2
         returned in CSR format as rowidxs[i], colidxs[i], data[i]
     """
     n_int_seg = n_simpson_intervals_per_segment
-    n_int_tot = n_segments * n_int_seg
-    nn_seg = (n_simpson_intervals_per_segment * 2 + 1)
+    nn_seg = n_simpson_intervals_per_segment * 2 + 1
     nn_tot = n_segments * nn_seg
     if order == 4 and n_int_seg < 2:
-        raise ValueError('Must use a minimum of 2 Simpson intervals or 5 points per segment due to fourth-order FD stencil')
+        raise ValueError(
+            "Must use a minimum of 2 Simpson intervals or 5 points per segment due to fourth-order FD stencil"
+        )
     if len(q) != nn_tot:
-        raise ValueError('q must be of the correct length')
+        raise ValueError("q must be of the correct length")
     if len(dts) != n_segments:
-        raise ValueError('must provide same number of dts as segments')
+        raise ValueError("must provide same number of dts as segments")
 
-    dqdt = np.zeros(q.shape)
     if order == 4:
         stencil_vec, rowidx, colidx = first_deriv_fourth_order_accurate_stencil(nn_seg)
     elif order == 2:
         stencil_vec, rowidx, colidx = first_deriv_second_order_accurate_stencil(nn_seg)
     else:
-        raise ValueError('Must choose second or fourth order accuracy')
+        raise ValueError("Must choose second or fourth order accuracy")
 
     # now we have a generic stencil for each segment
 
@@ -190,22 +194,19 @@ def first_deriv_partials(dts, q, n_segments=1, n_simpson_intervals_per_segment=2
 
         # next compute the indices and values of dq' / d(dt[i]) in CSR format
         # the dimension of the matrix for all segments is nn_tot x 1
-        if order == 2:
-            n_to_tile = 3
-        else:
-            n_to_tile = 5
         rowidxs_wrt_dt.append(np.arange(0, nn_seg) + i * nn_seg)
         colidxs_wrt_dt.append(np.zeros((nn_seg,), dtype=np.int32))
-        local_partials = - np.dot(stencil_mat, q[i * nn_seg: (i + 1) * nn_seg]) * dt_seg ** -2
+        local_partials = -np.dot(stencil_mat, q[i * nn_seg : (i + 1) * nn_seg]) * dt_seg**-2
         partials_wrt_dt.append(local_partials)
 
     wrt_q = [rowidx_wrt_q.astype(np.int32), colidx_wrt_q.astype(np.int32), partials_wrt_q]
     wrt_dt = [rowidxs_wrt_dt, colidxs_wrt_dt, partials_wrt_dt]
     return wrt_q, wrt_dt
 
+
 class FirstDerivative(ExplicitComponent):
     """
-    This component integrates differentiates a vector using a second or fourth order finite difference approximation
+    This component differentiates a vector using a second or fourth order finite difference approximation
 
     Inputs
     ------
@@ -216,6 +217,7 @@ class FirstDerivative(ExplicitComponent):
         q is of length nn_tot where nn_tot = n_segments  x(2 x num_intervals + 1)
         Each segment of q is of length nn_seg = (2 x num_intervals + 1)
     """
+
     """
         For example, a two-interval vector q has indices |0 1 2 3 4 | 5 6 7 8 9 |
         Elements 4 and 5 correspond to exactly the same time point
@@ -249,20 +251,20 @@ class FirstDerivative(ExplicitComponent):
     """
 
     def initialize(self):
-        self.options.declare('segment_names', default=None, desc="Names of differentiation segments")
-        self.options.declare('quantity_units',default=None, desc="Units of the quantity being differentiated")
-        self.options.declare('diff_units',default=None, desc="Units of the differential")
-        self.options.declare('num_intervals',default=5, desc="Number of Simpsons rule intervals per segment")
-        self.options.declare('order',default=4, desc="Order of accuracy")
+        self.options.declare("segment_names", default=None, desc="Names of differentiation segments")
+        self.options.declare("quantity_units", default=None, desc="Units of the quantity being differentiated")
+        self.options.declare("diff_units", default=None, desc="Units of the differential")
+        self.options.declare("num_intervals", default=5, desc="Number of Simpsons rule intervals per segment")
+        self.options.declare("order", default=4, desc="Order of accuracy")
 
     def setup(self):
-        segment_names = self.options['segment_names']
-        quantity_units = self.options['quantity_units']
-        diff_units = self.options['diff_units']
-        order = self.options['order']
+        segment_names = self.options["segment_names"]
+        quantity_units = self.options["quantity_units"]
+        diff_units = self.options["diff_units"]
+        order = self.options["order"]
 
-        n_int_per_seg = self.options['num_intervals']
-        nn_seg = (n_int_per_seg*2 + 1)
+        n_int_per_seg = self.options["num_intervals"]
+        nn_seg = n_int_per_seg * 2 + 1
         if segment_names is None:
             n_segments = 1
         else:
@@ -272,70 +274,71 @@ class FirstDerivative(ExplicitComponent):
         if quantity_units is None and diff_units is None:
             deriv_units = None
         elif quantity_units is None:
-            deriv_units = '(' + diff_units +')** -1'
+            deriv_units = "(" + diff_units + ")** -1"
         elif diff_units is None:
             deriv_units = quantity_units
-            warnings.warn('You have specified a derivative with respect to a unitless differential. Be aware of this.')
+            warnings.warn("You have specified a derivative with respect to a unitless differential. Be aware of this.")
         else:
-            deriv_units = '('+quantity_units+') / (' + diff_units +')'
-        wrt_q, wrt_dt = first_deriv_partials(np.ones((n_segments, )), np.ones((nn_tot,)), n_segments=n_segments, n_simpson_intervals_per_segment=n_int_per_seg, order=order)
+            deriv_units = "(" + quantity_units + ") / (" + diff_units + ")"
+        wrt_q, wrt_dt = first_deriv_partials(
+            np.ones((n_segments,)),
+            np.ones((nn_tot,)),
+            n_segments=n_segments,
+            n_simpson_intervals_per_segment=n_int_per_seg,
+            order=order,
+        )
 
-        self.add_input('q', val=0, units=quantity_units, desc='Quantity to differentiate',shape=(nn_tot,))
-        self.add_output('dqdt', units=deriv_units, desc='First derivative of q', shape=(nn_tot,))
-        self.declare_partials(['dqdt'], ['q'], rows=wrt_q[0], cols=wrt_q[1])
-
+        self.add_input("q", val=0, units=quantity_units, desc="Quantity to differentiate", shape=(nn_tot,))
+        self.add_output("dqdt", units=deriv_units, desc="First derivative of q", shape=(nn_tot,))
+        self.declare_partials(["dqdt"], ["q"], rows=wrt_q[0], cols=wrt_q[1])
 
         if segment_names is None:
-            self.add_input('dt', units=diff_units, desc='Time step')
-            self.declare_partials(['dqdt'], ['dt'], rows=wrt_dt[0][0], cols=wrt_dt[1][0])
+            self.add_input("dt", units=diff_units, desc="Time step")
+            self.declare_partials(["dqdt"], ["dt"], rows=wrt_dt[0][0], cols=wrt_dt[1][0])
         else:
             for i_seg, segment_name in enumerate(segment_names):
-                self.add_input(segment_name +'|dt', units=diff_units, desc='Time step')
-                self.declare_partials(['dqdt'], [segment_name +'|dt'], rows=wrt_dt[0][i_seg], cols=wrt_dt[1][i_seg])
+                self.add_input(segment_name + "|dt", units=diff_units, desc="Time step")
+                self.declare_partials(["dqdt"], [segment_name + "|dt"], rows=wrt_dt[0][i_seg], cols=wrt_dt[1][i_seg])
 
     def compute(self, inputs, outputs):
-        segment_names = self.options['segment_names']
-        quantity_units = self.options['quantity_units']
-        diff_units = self.options['diff_units']
-        order = self.options['order']
-        n_int_per_seg = self.options['num_intervals']
-        nn_seg = (n_int_per_seg*2 + 1)
+        segment_names = self.options["segment_names"]
+        order = self.options["order"]
+        n_int_per_seg = self.options["num_intervals"]
         if segment_names is None:
             n_segments = 1
-            dts = [inputs['dt'][0]]
+            dts = [inputs["dt"][0]]
         else:
             n_segments = len(segment_names)
             dts = []
-            for i_seg, segment_name in enumerate(segment_names):
-                input_name = segment_name+'|dt'
+            for segment_name in segment_names:
+                input_name = segment_name + "|dt"
                 dts.append(inputs[input_name][0])
-        nn_tot = nn_seg * n_segments
-        dqdt = first_deriv(dts, inputs['q'], n_segments=n_segments, n_simpson_intervals_per_segment=n_int_per_seg, order=order)
-        outputs['dqdt'] = dqdt
+        dqdt = first_deriv(
+            dts, inputs["q"], n_segments=n_segments, n_simpson_intervals_per_segment=n_int_per_seg, order=order
+        )
+        outputs["dqdt"] = dqdt
 
     def compute_partials(self, inputs, J):
-        segment_names = self.options['segment_names']
-        quantity_units = self.options['quantity_units']
-        diff_units = self.options['diff_units']
-        order = self.options['order']
+        segment_names = self.options["segment_names"]
+        order = self.options["order"]
 
-        n_int_per_seg = self.options['num_intervals']
-        nn_seg = (n_int_per_seg*2 + 1)
+        n_int_per_seg = self.options["num_intervals"]
         if segment_names is None:
             n_segments = 1
-            dts = [inputs['dt'][0]]
+            dts = [inputs["dt"][0]]
         else:
             n_segments = len(segment_names)
             dts = []
-            for i_seg, segment_name in enumerate(segment_names):
-                input_name = segment_name+'|dt'
+            for segment_name in segment_names:
+                input_name = segment_name + "|dt"
                 dts.append(inputs[input_name][0])
-        nn_tot = nn_seg * n_segments
-        wrt_q, wrt_dt = first_deriv_partials(dts, inputs['q'], n_segments=n_segments, n_simpson_intervals_per_segment=n_int_per_seg, order=order)
+        wrt_q, wrt_dt = first_deriv_partials(
+            dts, inputs["q"], n_segments=n_segments, n_simpson_intervals_per_segment=n_int_per_seg, order=order
+        )
 
-        J['dqdt','q'] = wrt_q[2]
+        J["dqdt", "q"] = wrt_q[2]
         if segment_names is None:
-            J['dqdt','dt'] = wrt_dt[2][0]
+            J["dqdt", "dt"] = wrt_dt[2][0]
         else:
             for i_seg, segment_name in enumerate(segment_names):
-                J['dqdt',segment_name+'|dt'] = wrt_dt[2][i_seg]
+                J["dqdt", segment_name + "|dt"] = wrt_dt[2][i_seg]
