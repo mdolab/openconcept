@@ -23,8 +23,7 @@ class HeatTransfer(om.Group):
     insulation_thickness : float
         Thickness of tank insulation (scalar, m)
     fill_level : float
-        Fraction of tank (in range 0-1) filled with liquid propellant; assumes
-        tank is oriented horizontally as shown above (vector, dimensionless)
+        Volume fraction of tank (in range 0-1) filled with liquid propellant (vector, dimensionless)
 
     Outputs
     -------
@@ -113,8 +112,7 @@ class FillLevelCalc(om.ExplicitComponent):
     Outputs
     -------
     fill_level : float
-        Fraction of tank (in range 0-1) filled with liquid propellant; assumes
-        tank is oriented horizontally as shown above (vector, dimensionless)
+        Volume fraction of tank (in range 0-1) filled with liquid propellant (vector, dimensionless)
 
     Options
     -------
@@ -611,8 +609,7 @@ class COPVHeatFromWallsIntoPropellant(om.ExplicitComponent):
     T_liquid : float
         Temperature of the liquid propellant in the tank (vector, K)
     fill_level : float
-        Fraction of tank (in range 0-1) filled with liquid propellant; assumes
-        tank is oriented horizontally as shown above (vector, dimensionless)
+        Volume fraction of tank (in range 0-1) filled with liquid propellant (vector, dimensionless)
     thermal_resistance : float
         Thermal resistance of the tank walls (scalar, K/W)
 
@@ -672,11 +669,13 @@ class COPVHeatFromWallsIntoPropellant(om.ExplicitComponent):
         Q_liquid = Q_if_all_liquid * fill_level
         outputs["heat_into_liquid"] = Q_liquid
 
-        heat_liquid_frac = -(fill_level**2) + 2 * fill_level  # rough curve fit that follows trend for
+        # rough curve fit that follows trend for
         # fraction of total heating going to liquid in
         # https://arc.aiaa.org/doi/10.2514/6.1992-818
+        heat_liquid_frac = -(fill_level**2) + 2 * fill_level
         heat_vapor_frac = 1 - heat_liquid_frac
         Q_total = Q_liquid / heat_liquid_frac
+
         outputs["heat_total"] = Q_total
         outputs["heat_into_vapor"] = Q_total * heat_vapor_frac
 
@@ -689,9 +688,10 @@ class COPVHeatFromWallsIntoPropellant(om.ExplicitComponent):
         Q_if_all_liquid = (T_surf - T_liq) / R
         Q_liquid = Q_if_all_liquid * fill_level
 
-        heat_liquid_frac = -(fill_level**2) + 2 * fill_level  # rough curve fit that follows trend for
+        # rough curve fit that follows trend for
         # fraction of total heating going to liquid in
         # https://arc.aiaa.org/doi/10.2514/6.1992-818
+        heat_liquid_frac = -(fill_level**2) + 2 * fill_level
         heat_vapor_frac = 1 - heat_liquid_frac
         Q_total = Q_liquid / heat_liquid_frac
 

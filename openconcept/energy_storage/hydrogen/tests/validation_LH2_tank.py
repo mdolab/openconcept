@@ -59,7 +59,7 @@ def aydelott_validation(case):
         )
 
 
-# A validation case for the Aydelott experiments (described below)
+# A validation case for the MHTB experiments (described below)
 def MHTB_validation(case):
     nn = 31
     p = om.Problem()
@@ -171,17 +171,15 @@ if __name__ == "__main__":
     # and from the ullage to the liquid is not well modelled, which may explain the discrepancy.
     # Despite this difference, having some reasonable model of the ullage that can hold GH2 is better than
     # the simpler solution of venting any boil off gas immediately.
-    #
-    #                                      W               kPa                 kPa                K                 K                  sec
     cases = [
         {
             "fill_init": 0.9,
-            "Q_dot": 54.1,
-            "P_init": 111.5,
-            "P_final": 138.012,
-            "T_init": 20.71,
-            "T_final": 23.65,
-            "duration": 19591,
+            "Q_dot": 54.1,  # W
+            "P_init": 111.5,  # kPa
+            "P_final": 138.012,  # kPa
+            "T_init": 20.71,  # K
+            "T_final": 23.65,  # K
+            "duration": 19591,  # sec
         },
         {
             "fill_init": 0.9,
@@ -244,12 +242,12 @@ if __name__ == "__main__":
     # this test case is commented out. The other validation cases give good results.
     #
     #                                      W               kPa                 kPa                K                 K                  sec
-    # cases = [{'fill_init': 0.514, 'Q_dot': 9.50, 'P_init': 105.462, 'P_final': 705.396, 'T_init': 20.28, 'T_final': 0.000, 'duration': 1441},
-    #          {'fill_init': 0.349, 'Q_dot': 31.4, 'P_init': 122.161, 'P_final': 671.488, 'T_init': 20.12, 'T_final': 35.44, 'duration': 433},
-    #          {'fill_init': 0.489, 'Q_dot': 34.1, 'P_init': 110.633, 'P_final': 741.566, 'T_init': 20.19, 'T_final': 31.17, 'duration': 400},
-    #          {'fill_init': 0.765, 'Q_dot': 38.1, 'P_init': 127.036, 'P_final': 658.015, 'T_init': 20.51, 'T_final': 63.85, 'duration': 272},
-    #          {'fill_init': 0.507, 'Q_dot': 58.5, 'P_init': 105.462, 'P_final': 717.103, 'T_init': 20.28, 'T_final': 0.000, 'duration': 222}]
-    # print("          AYDELOTT TESTS          ")
-    # print("----------------------------------")
-    # for case in cases:
-    #     aydelott_validation(case)
+    cases = [{'fill_init': 0.514, 'Q_dot': 9.50, 'P_init': 105.462, 'P_final': 705.396, 'T_init': 20.28, 'T_final': 0.000, 'duration': 1441},
+             {'fill_init': 0.349, 'Q_dot': 31.4, 'P_init': 122.161, 'P_final': 671.488, 'T_init': 20.12, 'T_final': 35.44, 'duration': 433},
+             {'fill_init': 0.489, 'Q_dot': 34.1, 'P_init': 110.633, 'P_final': 741.566, 'T_init': 20.19, 'T_final': 31.17, 'duration': 400},
+             {'fill_init': 0.765, 'Q_dot': 38.1, 'P_init': 127.036, 'P_final': 658.015, 'T_init': 20.51, 'T_final': 63.85, 'duration': 272},
+             {'fill_init': 0.507, 'Q_dot': 58.5, 'P_init': 105.462, 'P_final': 717.103, 'T_init': 20.28, 'T_final': 0.000, 'duration': 222}]
+    print("\n\n          AYDELOTT TESTS          ")
+    print("----------------------------------")
+    for case in cases:
+        aydelott_validation(case)

@@ -5,10 +5,10 @@ import openmdao.api as om
 from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
 from openconcept.utilities.math.integrals import Integrator
 from openconcept.utilities.linearinterp import LinearInterpolator
-from .structural import CompositeOverwrap, COPVInsulationWeight, COPVLinerWeight
-from .thermal import HeatTransfer, FillLevelCalc
-from .boil_off import SimpleBoilOff
-from .GH2_reservoir import GH2Reservoir
+from openconcept.energy_storage.hydrogen.structural import CompositeOverwrap, InsulationWeight, LinerWeight
+from openconcept.energy_storage.hydrogen.thermal import HeatTransfer, FillLevelCalc
+from openconcept.energy_storage.hydrogen.boil_off import SimpleBoilOff
+from openconcept.energy_storage.hydrogen.GH2_reservoir import GH2Reservoir
 
 
 class LH2Tank(om.Group):
@@ -50,7 +50,8 @@ class LH2Tank(om.Group):
     design_pressure : float
         Maximum expected operating pressure (MEOP) (scalar, Pa)
     radius : float
-        Inner radius of the cylinder and hemispherical end caps (scalar, m)
+        Inner radius of the cylinder and hemispherical end caps. This value
+        does not include the insulation (scalar, m).
     length : float
         Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
     insulation_thickness : float
@@ -122,7 +123,7 @@ class LH2Tank(om.Group):
         self.options.declare("init_fill_level", default=0.97, desc="Initial fill level")
         self.options.declare("T_surf_guess", default=150.0, desc="Guess for tank surface temperature (K)")
         self.options.declare("rho_LH2", default=70.85, desc="Liquid hydrogen density (kg/m^3)")
-        self.options.declare("ullage_T_init", default=90, desc="Initial ullage temp (K)")
+        self.options.declare("ullage_T_init", default=21, desc="Initial ullage temp (K)")
         self.options.declare("ullage_P_init", default=101325 * 1.2, desc="Initial ullage pressure (Pa)")
 
     def setup(self):
@@ -136,10 +137,10 @@ class LH2Tank(om.Group):
         )
         self.add_subsystem(
             "insulation",
-            COPVInsulationWeight(),
+            InsulationWeight(),
             promotes_inputs=["radius", "length", ("thickness", "insulation_thickness")],
         )
-        self.add_subsystem("liner", COPVLinerWeight(), promotes_inputs=["radius", "length"])
+        self.add_subsystem("liner", LinerWeight(), promotes_inputs=["radius", "length"])
 
         # Compute the LH2 weight and how much of the tank it fills up (fill level)
         self.add_subsystem(

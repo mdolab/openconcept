@@ -121,7 +121,7 @@ class CompositeOverwrap(om.ExplicitComponent):
         J["weight", "length"] = density * (np.pi * (r + thickness) ** 2 - np.pi * r**2)
 
 
-class COPVLinerWeight(om.ExplicitComponent):
+class LinerWeight(om.ExplicitComponent):
     """
     Computes the weight of the metallic pressure vessel liner used
     to prevent leakage through the pressure vessel. This model assumes
@@ -186,7 +186,7 @@ class COPVLinerWeight(om.ExplicitComponent):
         J["weight", "length"] = 2 * np.pi * r * self.options["density"] * self.options["thickness"]
 
 
-class COPVInsulationWeight(om.ExplicitComponent):
+class InsulationWeight(om.ExplicitComponent):
     """
     Computes the weight of the insulation outside the composite overwrap.
     Unlike the liner weight this calculation does not assume the
@@ -267,7 +267,7 @@ class COPVInsulationWeight(om.ExplicitComponent):
 if __name__ == "__main__":
     # Validation from Argonne National Lab 149 L, 700 bar hydrogen tank
     # https://www1.eere.energy.gov/hydrogenandfuelcells/pdfs/compressedtank_storage.pdf
-    from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
+    from openconcept.utilities import AddSubtractComp
 
     p = om.Problem()
     p.model.add_subsystem(
@@ -278,13 +278,13 @@ if __name__ == "__main__":
     )
     p.model.add_subsystem(
         "liner",
-        COPVLinerWeight(density=970, thickness=0.005),  # 5 mm HDPE liner
+        LinerWeight(density=970, thickness=0.005),  # 5 mm HDPE liner
         promotes_inputs=["radius", "length"],
         promotes_outputs=[("weight", "w_liner")],
     )
     p.model.add_subsystem(
         "insulation",
-        COPVInsulationWeight(fairing_areal_density=0),
+        InsulationWeight(fairing_areal_density=0),
         promotes_inputs=["radius", "length"],
         promotes_outputs=[("weight", "w_insulation")],
     )

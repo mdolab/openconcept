@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.api import Problem, NewtonSolver, DirectSolver
-from openconcept.energy_storage.hydrogen.structural import CompositeOverwrap, COPVLinerWeight, COPVInsulationWeight
+from openconcept.energy_storage.hydrogen.structural import CompositeOverwrap, LinerWeight, InsulationWeight
 
 
 class CompositeOverwrapTestCase(unittest.TestCase):
@@ -80,11 +80,11 @@ class CompositeOverwrapTestCase(unittest.TestCase):
         assert_check_partials(partials)
 
 
-class COPVLinerWeightTestCase(unittest.TestCase):
+class LinerWeightTestCase(unittest.TestCase):
     def test_defaults(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = COPVLinerWeight()
+        p.model = LinerWeight()
         p.setup(force_alloc_complex=True)
 
         p.set_val("radius", 0.5, units="m")
@@ -103,7 +103,7 @@ class COPVLinerWeightTestCase(unittest.TestCase):
 
         rho = 42.0
         thickness = 0.7e-3
-        p.model = COPVLinerWeight(density=rho, thickness=thickness)
+        p.model = LinerWeight(density=rho, thickness=thickness)
 
         p.setup(force_alloc_complex=True)
 
@@ -118,11 +118,11 @@ class COPVLinerWeightTestCase(unittest.TestCase):
         assert_check_partials(partials)
 
 
-class COPVInsulationWeightTestCase(unittest.TestCase):
+class InsulationWeightTestCase(unittest.TestCase):
     def test_defaults(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = COPVInsulationWeight()
+        p.model = InsulationWeight()
         p.setup(force_alloc_complex=True)
 
         p.set_val("radius", 0.5, units="m")
@@ -139,7 +139,7 @@ class COPVInsulationWeightTestCase(unittest.TestCase):
     def test_radius(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = COPVInsulationWeight()
+        p.model = InsulationWeight()
         p.setup(force_alloc_complex=True)
 
         p.set_val("radius", 0.8, units="m")
@@ -156,7 +156,7 @@ class COPVInsulationWeightTestCase(unittest.TestCase):
     def test_length(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = COPVInsulationWeight()
+        p.model = InsulationWeight()
         p.setup(force_alloc_complex=True)
 
         p.set_val("radius", 0.5, units="m")
@@ -173,7 +173,7 @@ class COPVInsulationWeightTestCase(unittest.TestCase):
     def test_thickness(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = COPVInsulationWeight()
+        p.model = InsulationWeight()
         p.setup(force_alloc_complex=True)
 
         p.set_val("radius", 0.5, units="m")
@@ -190,7 +190,7 @@ class COPVInsulationWeightTestCase(unittest.TestCase):
     def test_density(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = COPVInsulationWeight(density=42.0)
+        p.model = InsulationWeight(density=42.0)
         p.setup(force_alloc_complex=True)
 
         p.set_val("radius", 0.5, units="m")
