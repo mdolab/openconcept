@@ -331,6 +331,9 @@ class COPVThermalResistance(om.ExplicitComponent):
 
 class COPVHeatFromEnvironmentIntoTankWalls(om.ExplicitComponent):
     """
+    TODO: I don't think this method is valid for non-stationary tanks!
+          Need to reformulate it (Verstraete's method is more applicable).
+
     Computes the amount of heat that enters the tank walls from
     natural convection around the surface of the tank. Since
     this component takes in the surface temperature of the tank,
