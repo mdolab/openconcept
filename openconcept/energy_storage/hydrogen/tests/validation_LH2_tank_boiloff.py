@@ -13,7 +13,77 @@ import numpy as np
 import matplotlib.pyplot as plt
 import openmdao.api as om
 from openconcept.energy_storage.hydrogen import LH2Tank
+from openconcept.energy_storage.hydrogen.boil_off import BoilOff
+import openconcept.energy_storage.hydrogen.H2_properties as H2_prop
+from openconcept.utilities.constants import UNIVERSAL_GAS_CONST, MOLEC_WEIGHT_H2
 from validation_data.validation_data_boiloff import MHTB_results
+
+
+# A validation case for the MHTB experiments (described below) using the new boil off model
+def new_MHTB_validation_model(fill_init, T_init, P_init, Q_dot, duration):
+    """
+    Return a setup and run OpenMDAO model for the MHTB tank. Data for the tank dimensions
+    is given in Table 5.1a of the Mendez Ramos thesis. In reality it is a cylinder
+    with equal height and diameter and 2:1 elliptical end caps. Here, we approximate
+    that as a sphere because the current OpenConcept model supports only hemispherical
+    end caps. Because the heat into the tank is given, this model sets the environment
+    temperature to achieve the desired heat.
+
+    Parameters
+    ----------
+    fill_init : float
+        Fraction of tank filled with liquid hydrogen at the start of the simulation.
+    T_init : float
+       Ullage temperature in K at the start of the simulation.
+    P_init : float
+        Ullage pressure in Pa at the start of the simulation.
+    Q_dot : float
+        Total heat in W entering the tank throughout the simulation.
+    duration : float
+        Duration of the simulation in seconds.
+    """
+    nn = 101
+    r = 3.05 / 2
+    L = 0.0
+    p = om.Problem()
+    p.model.add_subsystem("tank", BoilOff(num_nodes=nn), promotes=["*"])
+
+    p.setup()
+
+    T_liq_init = 20
+    p.set_val("integ.T_liq_initial", T_liq_init, units="K")
+    p.set_val("integ.T_gas_initial", T_init, units="K")
+
+    # Compute the initial gas mass from the given initial pressure
+    V_tank = 4 / 3 * np.pi * r**3 + np.pi * r**2 * L
+    V_gas_init = V_tank * (1 - fill_init)
+    p.set_val("integ.V_gas_initial", V_gas_init, units="m**3")
+
+    m_gas_init = P_init / T_init / UNIVERSAL_GAS_CONST * V_gas_init * MOLEC_WEIGHT_H2
+    p.set_val("integ.m_gas_initial", m_gas_init, units="kg")
+
+    m_liq_init = (V_tank - V_gas_init) * H2_prop.lh2_rho(T_liq_init)
+    p.set_val("integ.m_liq_initial", m_liq_init, units="kg")
+
+    # Set initial values for ODE states
+    p.set_val("integ.V_gas", V_gas_init, units="m**3")
+    p.set_val("m_gas", m_gas_init, units="kg")
+    p.set_val("m_liq", m_liq_init, units="kg")
+
+    # Heat flow into tank
+    p.set_val("Q_dot", Q_dot, units="W")
+
+    p.set_val("m_dot_gas_out", np.zeros(nn), units="kg/s")
+    p.set_val("radius", r, units="m")
+    p.set_val("length", L, units="m")
+
+    p.set_val("integ.duration", duration, units="s")
+
+    p.run_model()
+
+    om.n2(p, show_browser=False)
+
+    return p
 
 
 # A validation case for the MHTB experiments (described below)
@@ -89,7 +159,7 @@ def MHTB_validation_model(fill_init, T_init, P_init, Q_dot, duration):
     return p
 
 
-def run_MHTB_validation(fname=None):
+def run_MHTB_validation(fname=None, new_model=True):
     """
     Run a validation case based on the MHTB tank.
 
@@ -131,13 +201,20 @@ def run_MHTB_validation(fname=None):
     }
 
     fig, axs = plt.subplots(len(MHTB_cases), 2, figsize=(9, 3 * len(MHTB_cases)), tight_layout=True)
+    axs = np.atleast_2d(axs)
 
     for i, case in enumerate(MHTB_cases.keys()):
         # Simulate the result
-        p = MHTB_validation_model(**MHTB_cases[case])
-        pressure = p.get_val("ullage.P", units="Pa")
-        temp_ullage = p.get_val("ullage.T", units="K")
-        t = np.linspace(0, p.get_val("duration", units="s"), pressure.size)
+        if new_model:
+            p = new_MHTB_validation_model(**MHTB_cases[case])
+            pressure = p.get_val("P_gas", units="Pa")
+            temp_ullage = p.get_val("T_gas", units="K")
+            t = np.linspace(0, p.get_val("integ.duration", units="s"), pressure.size)
+        else:
+            p = MHTB_validation_model(**MHTB_cases[case])
+            pressure = p.get_val("ullage.P", units="Pa")
+            temp_ullage = p.get_val("ullage.T", units="K")
+            t = np.linspace(0, p.get_val("duration", units="s"), pressure.size)
 
         # Plot the result from the test
         for j, param in enumerate(["P", "Tg"]):
