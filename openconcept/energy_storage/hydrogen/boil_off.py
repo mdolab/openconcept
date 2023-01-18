@@ -195,8 +195,9 @@ class BoilOff(om.Group):
         self.linear_solver = om.DirectSolver()
         self.nonlinear_solver = om.NewtonSolver()
         self.nonlinear_solver.options["solve_subsystems"] = False
-        self.nonlinear_solver.options["maxiter"] = 100
+        self.nonlinear_solver.options["maxiter"] = 50
         self.nonlinear_solver.options["iprint"] = 2
+        self.nonlinear_solver.options["rtol"] = 1e-9
         self.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(alpha=1.0, iprint=2, print_bound_enforce=False)
 
     def guess_nonlinear(self, inputs, outputs, _):
@@ -696,7 +697,7 @@ class BoilOffFillLevelCalc(om.ExplicitComponent):
         self.add_input("radius", val=2.0, units="m")
         self.add_input("length", val=0.5, units="m")
         self.add_input("V_gas", units="m**3", shape=(nn,))
-        self.add_output("fill_level", val=0.5, shape=(nn,), lower=0.005, upper=0.995)
+        self.add_output("fill_level", val=0.5, shape=(nn,), lower=0.001, upper=0.999)
 
         arng = np.arange(nn)
         self.declare_partials("fill_level", ["V_gas"], rows=arng, cols=arng)
@@ -714,6 +715,6 @@ class BoilOffFillLevelCalc(om.ExplicitComponent):
         L = inputs["length"]
 
         V_tank = 4 / 3 * np.pi * r**3 + np.pi * r**2 * L
-        J["fill_level", "V_gas"] = 1 - 1 / V_tank
-        J["fill_level", "radius"] = 1 + inputs["V_gas"] / V_tank**2 * (4 * np.pi * r**2 + 2 * np.pi * r * L)
-        J["fill_level", "length"] = 1 + inputs["V_gas"] / V_tank**2 * (np.pi * r**2)
+        J["fill_level", "V_gas"] = -1 / V_tank
+        J["fill_level", "radius"] = inputs["V_gas"] / V_tank**2 * (4 * np.pi * r**2 + 2 * np.pi * r * L)
+        J["fill_level", "length"] = inputs["V_gas"] / V_tank**2 * (np.pi * r**2)

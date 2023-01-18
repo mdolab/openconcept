@@ -189,5 +189,46 @@ class BoilOffGeometryTestCase(unittest.TestCase):
         assert_check_partials(partials)
 
 
+class BoilOffFillLevelCalcTestCase(unittest.TestCase):
+    def setup_model(self, nn=1):
+        self.p = p = om.Problem()
+        p.model.add_subsystem("model", BoilOffFillLevelCalc(num_nodes=nn), promotes=["*"])
+        p.setup(force_alloc_complex=True)
+
+        self.r = 0.5
+        self.L = 0.3
+
+        self.p.set_val("radius", self.r, units="m")
+        self.p.set_val("length", self.L, units="m")
+
+    def test_fill_level(self):
+        nn = 7
+        self.setup_model(nn)
+
+        r = self.r
+        L = self.L
+        V_tank = 4 / 3 * np.pi * r**3 + np.pi * r**2 * L
+        fill = np.linspace(0.01, 0.99, nn)
+        V_gas = (1 - fill) * V_tank
+        self.p.set_val("V_gas", V_gas, units="m**3")
+
+        self.p.run_model()
+
+        assert_near_equal(self.p.get_val("fill_level"), fill, tolerance=1e-10)
+
+    def test_derivatives(self):
+        nn = 7
+        self.setup_model(nn)
+
+        r = self.r
+        L = self.L
+        V_tank = 4 / 3 * np.pi * r**3 + np.pi * r**2 * L
+        V_gas = np.linspace(0.005, 0.995, nn) * V_tank
+        self.p.set_val("V_gas", V_gas, units="m**3")
+
+        partials = self.p.check_partials(method="cs", compact_print=True)
+        assert_check_partials(partials)
+
+
 if __name__ == "__main__":
     unittest.main()
