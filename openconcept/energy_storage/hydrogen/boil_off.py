@@ -88,9 +88,6 @@ class BoilOff(om.Group):
         is bookkept, assuming it is removed from the tank as a liquid (vector, kg/s)
     Q_dot : float
         Total heat flow rate into tank (vector, W)
-    Q_dot_add_liq : float
-        Additional heat flow rate into the bulk liquid; could be used for heating to increase
-        ullage pressure or for cooling to reduce liquid temperature (vector, W)
 
     Outputs
     -------
@@ -111,10 +108,24 @@ class BoilOff(om.Group):
     -------
     num_nodes : int
         Number of analysis points to run (scalar, dimensionless)
+    init_fill_level : float
+        Initial fill level (in range 0-1) of the tank, default 0.97
+        to leave space for boil off gas; 3% adopted from Cryoplane study (scalar, dimensionless)
+    ullage_T_init : float
+        Initial temperature of gas in ullage, default 21 K (scalar, K)
+    ullage_P_init : float
+        Initial pressure of gas in ullage, default 120,000 Pa; ullage pressure must be higher than ambient
+        to prevent air leaking in and creating a combustible mixture (scalar, Pa)
+    liquid_T_init : float
+        Initial temperature of bulk liquid hydrogen, default 20 K (scalar, K)
     """
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of design points to run")
+        self.options.declare("init_fill_level", default=0.97, desc="Initial fill level")
+        self.options.declare("ullage_T_init", default=21.0, desc="Initial ullage temp (K)")
+        self.options.declare("ullage_P_init", default=1.2e5, desc="Initial ullage pressure (Pa)")
+        self.options.declare("liquid_T_init", default=20.0, desc="Initial bulk liquid temp (K)")
 
     def setup(self):
         nn = self.options["num_nodes"]
@@ -143,7 +154,6 @@ class BoilOff(om.Group):
                 "m_dot_liq_in",
                 "m_dot_liq_out",
                 "Q_dot",
-                "Q_dot_add_liq",
             ],
             promotes_outputs=["P_gas"],
         )
@@ -158,11 +168,11 @@ class BoilOff(om.Group):
             Integrator(num_nodes=nn, diff_units="s", time_setup="duration", method="simpson"),
             promotes_outputs=["m_gas", "m_liq", "T_gas", "T_liq"],
         )
-        integ.add_integrand("m_gas", rate_name="m_dot_gas", units="kg", val=1.0, lower=1e-3)
-        integ.add_integrand("m_liq", rate_name="m_dot_liq", units="kg", val=1e3, lower=1e-3)
-        integ.add_integrand("T_gas", rate_name="T_dot_gas", units="K", val=21.0, lower=10, upper=1e3)
-        integ.add_integrand("T_liq", rate_name="T_dot_liq", units="K", val=20.0, lower=1e-3, upper=30)
-        integ.add_integrand("V_gas", rate_name="V_dot_gas", units="m**3", val=1.0, lower=1e-3)
+        integ.add_integrand("m_gas", rate_name="m_dot_gas", units="kg", lower=1e-4)
+        integ.add_integrand("m_liq", rate_name="m_dot_liq", units="kg", lower=1e-3)
+        integ.add_integrand("T_gas", rate_name="T_dot_gas", units="K", lower=15, upper=1e3)
+        integ.add_integrand("T_liq", rate_name="T_dot_liq", units="K", lower=1e-3, upper=30)
+        integ.add_integrand("V_gas", rate_name="V_dot_gas", units="m**3", lower=1e-3)
 
         # Connect the ODE to the integrator
         self.connect("boil_off_ode.m_dot_gas", "integ.m_dot_gas")
@@ -187,9 +197,44 @@ class BoilOff(om.Group):
         self.nonlinear_solver.options["solve_subsystems"] = False
         self.nonlinear_solver.options["maxiter"] = 100
         self.nonlinear_solver.options["iprint"] = 2
-        self.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(alpha=1.0, iprint=2)
+        self.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(alpha=1.0, iprint=2, print_bound_enforce=False)
 
-        # TODO: figure out a good way to set the initial state in the tank
+    def guess_nonlinear(self, inputs, outputs, _):
+        """
+        Set both the guesses and the initial values at the beginning of the phase
+        for the integrated states. The initial state values should get overwritten
+        if this component lives in an intermediate phase and OpenConcept has linked
+        the states from a previous phase to this one.
+        """
+        r = inputs["level_calc.radius"]
+        L = inputs["level_calc.length"]
+        fill_init = self.options["init_fill_level"]
+        T_gas_init = self.options["ullage_T_init"]
+        P_gas_init = self.options["ullage_P_init"]
+        T_liq_init = self.options["liquid_T_init"]
+
+        # Compute the initial gas mass from the given initial pressure
+        V_tank = 4 / 3 * np.pi * r**3 + np.pi * r**2 * L
+        V_gas = V_tank * (1 - fill_init)
+        m_gas = P_gas_init / T_gas_init / UNIVERSAL_GAS_CONST * V_gas * MOLEC_WEIGHT_H2
+        m_liq = (V_tank - V_gas) * H2_prop.lh2_rho(T_liq_init)
+
+        # Initialize the states for the solver
+        outputs["m_gas"] = m_gas
+        outputs["m_liq"] = m_liq
+        outputs["T_gas"] = T_gas_init
+        outputs["T_liq"] = T_liq_init
+        outputs["integ.V_gas"] = V_gas
+
+        # Set the initial values of the states for integration. Doing this here allows the values
+        # to be set properly while enabling them to be overwritten if this component lives within
+        # an intermediate phase and OpenConcept has connected the final states from the previous
+        # phase the the initial state of this one.
+        inputs["integ.m_gas_initial"] = m_gas
+        inputs["integ.m_liq_initial"] = m_liq
+        inputs["integ.T_gas_initial"] = T_gas_init
+        inputs["integ.T_liq_initial"] = T_liq_init
+        inputs["integ.V_gas_initial"] = V_gas
 
 
 class LiquidHeight(om.ImplicitComponent):
@@ -440,9 +485,6 @@ class LH2BoilOffODE(om.ExplicitComponent):
         is bookkept, assuming it is removed from the tank as a liquid (vector, kg/s)
     Q_dot : float
         Total heat flow rate into tank (vector, W)
-    Q_dot_add_liq : float
-        Additional heat flow rate into the bulk liquid; could be used for heating to increase
-        ullage pressure or for cooling to reduce liquid temperature (vector, W)
     A_interface : float
         Area of the surface of the liquid in the tank. This is the area of
         the interface between the ullage and bulk liquid portions, hence
@@ -494,7 +536,6 @@ class LH2BoilOffODE(om.ExplicitComponent):
         self.add_input("m_dot_liq_in", units="kg/s", shape=(nn,), val=0.0)
         self.add_input("m_dot_liq_out", units="kg/s", shape=(nn,), val=0.0)
         self.add_input("Q_dot", units="W", shape=(nn,), val=0.0)
-        self.add_input("Q_dot_add_liq", units="W", shape=(nn,), val=0.0)
         self.add_input("A_interface", units="m**2", shape=(nn,))
         self.add_input("L_interface", units="m", shape=(nn,))
         self.add_input("A_wet", units="m**2", shape=(nn,))
@@ -583,17 +624,14 @@ class LH2BoilOffODE(om.ExplicitComponent):
         # Heat from the environment that goes to heating the walls is likely be small (only a few percent),
         # so we'll ignore it (see Van Dresar paper).
         Q_dot = inputs["Q_dot"]
-        Q_dot_add_liq = inputs["Q_dot_add_liq"]
         Q_dot_gas_int = heat_transfer_coeff_gas_int * A_int * (T_gas - T_int)
 
         # Determine heat flows into bulk liquid and ullage
         Q_dot_gas = Q_dot * A_dry / (A_wet + A_dry)
-        Q_dot_liq = Q_dot_add_liq + Q_dot * A_wet / (A_wet + A_dry)
+        Q_dot_liq = Q_dot * A_wet / (A_wet + A_dry)
 
         # ============================================ ODEs ============================================
         # Compute the boil off mass flow rate
-        # TODO: these two should be the same I think? Check.
-        m_dot_boil_off = Q_dot_gas_int / (h_gas - h_liq)
         m_dot_boil_off = Q_dot_gas_int / (cp_liq * (T_int - T_liq) + (h_gas - h_int) + (h_gas - h_sat_gas))
 
         # Mass flows
@@ -603,7 +641,6 @@ class LH2BoilOffODE(om.ExplicitComponent):
         V_dot_liq = m_dot_liq / rho_liq
         V_dot_gas = -V_dot_liq
 
-        # TODO: is there a reason she differentiates between mdot_v and mdot_l/g in these equations? (See eqns 4.17 and 4.25 in the thesis)
         T_dot_gas = (Q_dot_gas - Q_dot_gas_int - P_gas * V_dot_gas + m_dot_gas * (h_gas - u_gas)) / (m_gas * cv_gas)
         T_dot_liq = (Q_dot_liq + P_liq * V_dot_liq - m_dot_liq * (h_liq + u_liq)) / (m_liq * cp_liq)
         m_dot_liq = -m_dot_gas
@@ -661,10 +698,9 @@ class BoilOffFillLevelCalc(om.ExplicitComponent):
         self.add_input("V_gas", units="m**3", shape=(nn,))
         self.add_output("fill_level", val=0.5, shape=(nn,), lower=0.005, upper=0.995)
 
-        # TODO: analytic partials
         arng = np.arange(nn)
-        self.declare_partials("fill_level", ["V_gas"], rows=arng, cols=arng, method="cs")
-        self.declare_partials("fill_level", ["radius", "length"], rows=arng, cols=np.zeros(nn), method="cs")
+        self.declare_partials("fill_level", ["V_gas"], rows=arng, cols=arng)
+        self.declare_partials("fill_level", ["radius", "length"], rows=arng, cols=np.zeros(nn))
 
     def compute(self, inputs, outputs):
         r = inputs["radius"]
@@ -672,3 +708,12 @@ class BoilOffFillLevelCalc(om.ExplicitComponent):
 
         V_tank = 4 / 3 * np.pi * r**3 + np.pi * r**2 * L
         outputs["fill_level"] = 1 - inputs["V_gas"] / V_tank
+
+    def compute_partials(self, inputs, J):
+        r = inputs["radius"]
+        L = inputs["length"]
+
+        V_tank = 4 / 3 * np.pi * r**3 + np.pi * r**2 * L
+        J["fill_level", "V_gas"] = 1 - 1 / V_tank
+        J["fill_level", "radius"] = 1 + inputs["V_gas"] / V_tank**2 * (4 * np.pi * r**2 + 2 * np.pi * r * L)
+        J["fill_level", "length"] = 1 + inputs["V_gas"] / V_tank**2 * (np.pi * r**2)

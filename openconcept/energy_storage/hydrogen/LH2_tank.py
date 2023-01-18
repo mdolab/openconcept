@@ -111,7 +111,7 @@ class LH2Tank(om.Group):
     rho_LH2 : float
         Density of liquid hydrogen, default 70.85 kg/m^3 at boiling point and 1 atm (scalar, kg/m^3)
     ullage_T_init : float
-        Initial temperature of gas in ullage, default 90 K (scalar, K)
+        Initial temperature of gas in ullage, default 21 K (scalar, K)
     ullage_P_init : float
         Initial pressure of gas in ullage, default 1.2 atm; ullage pressure must be higher than ambient
         to prevent air leaking in and creating a combustible mixture (scalar, Pa)
