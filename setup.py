@@ -43,7 +43,7 @@ setup(
         "openmdao>=3.10.0",
     ],
     extras_require={
-        "testing": ["pytest", "pytest-cov", "coverage", "openaerostruct"],
+        "testing": ["pytest", "pytest-cov", "coverage", "openaerostruct", "parameterized"],
         "docs": ["sphinx_mdolab_theme", "openaerostruct"],
         "plot": ["matplotlib"],
     },
