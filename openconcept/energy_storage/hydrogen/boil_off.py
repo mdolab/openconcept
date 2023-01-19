@@ -555,14 +555,8 @@ class LH2BoilOffODE(om.ExplicitComponent):
 
         arng = np.arange(nn)
         self.declare_partials(
-            "m_dot_gas",
+            ["m_dot_gas", "m_dot_liq", "V_dot_gas"],
             ["A_interface", "L_interface", "T_gas", "T_liq", "V_gas", "m_dot_gas_in", "m_dot_gas_out", "m_gas"],
-            rows=arng,
-            cols=arng,
-        )
-        self.declare_partials(
-            "m_dot_gas",
-            ["A_interface", "L_interface", "T_gas", "T_liq", "V_gas", "m_dot_liq_in", "m_dot_liq_out", "m_gas"],
             rows=arng,
             cols=arng,
         )
@@ -603,13 +597,13 @@ class LH2BoilOffODE(om.ExplicitComponent):
         # Ullage gas properties
         self.h_gas = H2_prop.gh2_h(P_gas, T_gas)  # enthalpy
         u_gas = H2_prop.gh2_u(P_gas, T_gas)  # internal energy
-        cv_gas = H2_prop.gh2_cv(P_gas, T_gas)  # specific heat at constant volume
+        self.cv_gas = H2_prop.gh2_cv(P_gas, T_gas)  # specific heat at constant volume
 
         # Bulk liquid properties
         self.h_liq = H2_prop.lh2_h(T_liq)  # enthalpy
         u_liq = H2_prop.lh2_u(T_liq)  # internal energy
         self.cp_liq = H2_prop.lh2_cp(T_liq)  # specific heat at constant pressure
-        rho_liq = H2_prop.lh2_rho(T_liq)  # density
+        self.rho_liq = H2_prop.lh2_rho(T_liq)  # density
         P_liq = H2_prop.lh2_P(T_liq)  # pressure
 
         # Temperature of the interface assumes saturated hydrogen with same pressure as the ullage
@@ -665,27 +659,27 @@ class LH2BoilOffODE(om.ExplicitComponent):
         )
 
         # Mass flows
-        m_dot_gas = self.m_dot_boil_off + m_dot_gas_in - m_dot_gas_out
-        m_dot_liq = m_dot_liq_in - self.m_dot_boil_off - m_dot_liq_out
+        self.m_dot_gas = self.m_dot_boil_off + m_dot_gas_in - m_dot_gas_out
+        self.m_dot_liq = m_dot_liq_in - self.m_dot_boil_off - m_dot_liq_out
 
-        V_dot_liq = m_dot_liq / rho_liq
-        V_dot_gas = -V_dot_liq
+        self.V_dot_liq = self.m_dot_liq / self.rho_liq
+        self.V_dot_gas = -self.V_dot_liq
 
-        T_dot_gas = (Q_dot_gas - Q_dot_gas_int - P_gas * V_dot_gas + m_dot_gas * (self.h_gas - u_gas)) / (
-            m_gas * cv_gas
+        self.T_dot_gas = (Q_dot_gas - Q_dot_gas_int - P_gas * self.V_dot_gas + self.m_dot_gas * (self.h_gas - u_gas)) / (
+            m_gas * self.cv_gas
         )
-        T_dot_liq = (Q_dot_liq - P_liq * V_dot_liq + m_dot_liq * (self.h_liq - u_liq)) / (m_liq * self.cp_liq)
+        self.T_dot_liq = (Q_dot_liq - P_liq * self.V_dot_liq + self.m_dot_liq * (self.h_liq - u_liq)) / (m_liq * self.cp_liq)
 
         # The maximum allowable temperature of the liquid is the saturation temperature
         # at the minimum pressure. If it is at this temperature, don't let it increase further.
-        T_dot_liq[T_liq >= self.T_liq_max] *= 0.0
+        self.T_dot_liq[T_liq >= self.T_liq_max] *= 0.0
 
         # We got em!
-        outputs["m_dot_gas"] = m_dot_gas
-        outputs["m_dot_liq"] = m_dot_liq
-        outputs["T_dot_gas"] = T_dot_gas
-        outputs["T_dot_liq"] = T_dot_liq
-        outputs["V_dot_gas"] = V_dot_gas
+        outputs["m_dot_gas"] = self.m_dot_gas
+        outputs["m_dot_liq"] = self.m_dot_liq
+        outputs["T_dot_gas"] = self.T_dot_gas
+        outputs["T_dot_liq"] = self.T_dot_liq
+        outputs["V_dot_gas"] = self.V_dot_gas
 
         # Ullage pressure (useful for other stuff)
         outputs["P_gas"] = P_gas
@@ -826,6 +820,26 @@ class LH2BoilOffODE(om.ExplicitComponent):
         J["m_dot_liq", "m_dot_liq_in"] = 1.0
         J["m_dot_liq", "m_dot_liq_out"] = -1.0
         J["m_dot_liq", "m_gas"] = -d_m_gas
+
+        # ------------------------------ V_dot_liq ------------------------------
+        J["V_dot_gas", "A_interface"]   = -J["m_dot_liq", "A_interface"] / self.rho_liq
+        J["V_dot_gas", "L_interface"]   = -J["m_dot_liq", "L_interface"] / self.rho_liq
+        J["V_dot_gas", "T_gas"]         = -J["m_dot_liq", "T_gas"] / self.rho_liq
+        J["V_dot_gas", "T_liq"]         = -J["m_dot_liq", "T_liq"] / self.rho_liq - self.m_dot_liq / self.rho_liq**2 * H2_prop.lh2_rho(T_liq, deriv=True)
+        J["V_dot_gas", "V_gas"]         = -J["m_dot_liq", "V_gas"] / self.rho_liq
+        J["V_dot_gas", "m_dot_liq_in"]  = -J["m_dot_liq", "m_dot_liq_in"] / self.rho_liq
+        J["V_dot_gas", "m_dot_liq_out"] = -J["m_dot_liq", "m_dot_liq_out"] / self.rho_liq
+        J["V_dot_gas", "m_gas"]         = -J["m_dot_liq", "m_gas"] / self.rho_liq
+
+        # # ------------------------------ T_dot_gas ------------------------------
+        # # Initial seed with desired output
+        # d_T_dot_gas = 1.0
+
+        # # Influence of terms in T_dot_gas
+        # d_Q_dot_gas = 1 / (m_gas * self.cv_gas) * d_T_dot_gas
+        # d_Q_dot_gas_int = -d_Q_dot_gas
+        # d_P_gas = -self.V_dot_gas / (m_gas * self.cv_gas) * d_T_dot_gas
+        # d_V_dot_gas = -self.V_dot_gas / (m_gas * self.cv_gas) * d_T_dot_gas
 
         # ------------------- P_gas is easy to do analytically -------------------
         J["P_gas", "m_gas"] = T_gas * UNIVERSAL_GAS_CONST / (V_gas * MOLEC_WEIGHT_H2)
