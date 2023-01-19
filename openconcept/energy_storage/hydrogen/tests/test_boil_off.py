@@ -230,5 +230,156 @@ class BoilOffFillLevelCalcTestCase(unittest.TestCase):
         assert_check_partials(partials)
 
 
+class LH2BoilOffODETestCase(unittest.TestCase):
+    def test_mostly_empty(self):
+        """
+        Compare to values of the EBM model implementation from Eugina Mendez Ramos's thesis.
+        """
+        p = om.Problem()
+        p.model.add_subsystem("model", LH2BoilOffODE(), promotes=["*"])
+
+        p.setup()
+
+        p.set_val("m_gas", 2.0, units="kg")
+        p.set_val("m_liq", 4.5161831120531115, units="kg")
+        p.set_val("T_gas", 21, units="K")
+        p.set_val("T_liq", 20, units="K")
+        p.set_val("V_gas", 1.5, units="m**3")
+        p.set_val("m_dot_gas_in", 0.0, units="kg/s")
+        p.set_val("m_dot_gas_out", 0.0, units="kg/s")
+        p.set_val("m_dot_liq_in", 0.0, units="kg/s")
+        p.set_val("m_dot_liq_out", 0.0, units="kg/s")
+        p.set_val("Q_dot", 50, units="W")
+        p.set_val("A_interface", 0.3840421278000321, units="m**2")
+        p.set_val("L_interface", 0.17481733751963005, units="m")
+        p.set_val("A_wet", 0.6203054996729682, units="m**2")
+        p.set_val("A_dry", 5.8941010268108265, units="m**2")
+
+        p.run_model()
+
+        assert_near_equal(p.get_val("m_dot_gas", units="kg/s"), 6.296280265373945e-07, tolerance=1e-12)
+        assert_near_equal(p.get_val("m_dot_gas", units="kg/s"), -p.get_val("m_dot_liq", units="kg/s"), tolerance=1e-12)
+        assert_near_equal(p.get_val("T_dot_gas", units="K/s"), 0.003488134556611412, tolerance=1e-12)
+        assert_near_equal(p.get_val("T_dot_liq", units="K/s"), 0.00010642261101789976, tolerance=1e-12)
+        assert_near_equal(p.get_val("V_dot_gas", units="m**3/s"), 8.846997848034505e-09, tolerance=1e-12)
+        assert_near_equal(p.get_val("P_gas", units="Pa"), 115486.04083576404, tolerance=1e-12)
+
+    def test_MHTB_mostly_full(self):
+        """
+        Compare to values of the EBM model implementation from Eugina Mendez Ramos's thesis.
+        """
+        p = om.Problem()
+        p.model.add_subsystem("model", LH2BoilOffODE(), promotes=["*"])
+
+        p.setup()
+
+        p.set_val("m_gas", 1.9411308219846288, units="kg")
+        p.set_val("m_liq", 942.0670752834986, units="kg")
+        p.set_val("T_gas", 21.239503179127798, units="K")
+        p.set_val("T_liq", 20.708930544834377, units="K")
+        p.set_val("V_gas", 1.4856099323616818, units="m**3")
+        p.set_val("m_dot_gas_in", 0.0, units="kg/s")
+        p.set_val("m_dot_gas_out", 0.0, units="kg/s")
+        p.set_val("m_dot_liq_in", 0.0, units="kg/s")
+        p.set_val("m_dot_liq_out", 0.0, units="kg/s")
+        p.set_val("Q_dot", 51.4, units="W")
+        p.set_val("A_interface", 4.601815537828035, units="m**2")
+        p.set_val("L_interface", 0.6051453090136371, units="m")
+        p.set_val("A_wet", 23.502425642397316, units="m**2")
+        p.set_val("A_dry", 5.722240017621729, units="m**2")
+
+        p.run_model()
+
+        assert_near_equal(p.get_val("m_dot_gas", units="kg/s"), 1.8147216231146884e-05, tolerance=1e-12)
+        assert_near_equal(p.get_val("m_dot_gas", units="kg/s"), -p.get_val("m_dot_liq", units="kg/s"), tolerance=1e-12)
+        assert_near_equal(p.get_val("T_dot_gas", units="K/s"), 0.0002533535735070904, tolerance=1e-12)
+        assert_near_equal(p.get_val("T_dot_liq", units="K/s"), 4.309889239802682e-06, tolerance=1e-12)
+        assert_near_equal(p.get_val("V_dot_gas", units="m**3/s"), 2.575538811629458e-07, tolerance=1e-12)
+        assert_near_equal(p.get_val("P_gas", units="Pa"), 114463.18507907697, tolerance=1e-12)
+
+    def test_T_cutoff(self):
+        # Minimum pressure of 100,000 Pa puts the saturation temperature below 21 K, so
+        # the rate of change of the liquid temperature should be zeroed out
+        p = om.Problem()
+        p.model.add_subsystem("model", LH2BoilOffODE(P_min=1e5), promotes=["*"])
+        p.setup()
+        p.set_val("T_liq", 21.0, units="K")
+        p.run_model()
+        assert_near_equal(p.get_val("T_dot_liq", units="K/s"), 0.0)  # cut off by the T max limiter
+
+    def test_derivatives(self):
+        p = om.Problem()
+        p.model.add_subsystem("model", LH2BoilOffODE(), promotes=["*"])
+
+        p.setup(force_alloc_complex=True)
+
+        p.set_val("m_gas", 1.9411308219846288, units="kg")
+        p.set_val("m_liq", 942.0670752834986, units="kg")
+        p.set_val("T_gas", 21.239503179127798, units="K")
+        p.set_val("T_liq", 20.708930544834377, units="K")
+        p.set_val("V_gas", 1.4856099323616818, units="m**3")
+        p.set_val("m_dot_gas_in", 0.0, units="kg/s")
+        p.set_val("m_dot_gas_out", 0.0, units="kg/s")
+        p.set_val("m_dot_liq_in", 0.0, units="kg/s")
+        p.set_val("m_dot_liq_out", 0.0, units="kg/s")
+        p.set_val("Q_dot", 51.4, units="W")
+        p.set_val("A_interface", 4.601815537828035, units="m**2")
+        p.set_val("L_interface", 0.6051453090136371, units="m")
+        p.set_val("A_wet", 23.502425642397316, units="m**2")
+        p.set_val("A_dry", 5.722240017621729, units="m**2")
+
+        p.run_model()
+
+        partials = p.check_partials(method="cs", compact_print=True)
+        assert_check_partials(partials)
+
 if __name__ == "__main__":
     unittest.main()
+
+    # p = om.Problem()
+    # p.model.add_subsystem("model", LH2BoilOffODE(), promotes=["*"])
+
+    # p.setup(force_alloc_complex=True)
+
+    # p.set_val("m_gas", 2.0, units="kg")
+    # p.set_val("m_liq", 4.5161831120531115, units="kg")
+    # p.set_val("T_gas", 21, units="K")
+    # p.set_val("T_liq", 20, units="K")
+    # p.set_val("V_gas", 1.5, units="m**3")
+    # p.set_val("m_dot_gas_in", 0.0, units="kg/s")
+    # p.set_val("m_dot_gas_out", 0.0, units="kg/s")
+    # p.set_val("m_dot_liq_in", 0.0, units="kg/s")
+    # p.set_val("m_dot_liq_out", 0.0, units="kg/s")
+    # p.set_val("Q_dot", 50, units="W")
+    # p.set_val("A_interface", 0.3840421278000321, units="m**2")
+    # p.set_val("L_interface", 0.17481733751963005, units="m")
+    # p.set_val("A_wet", 0.6203054996729682, units="m**2")
+    # p.set_val("A_dry", 5.8941010268108265, units="m**2")
+
+    # p.run_model()
+
+    # p.model.list_outputs()
+
+    # from EBM_model.self_pressurization import f
+
+    # t = None  # doesn't matter, unused by function
+    # y = [
+    #     2.0,  # mass in ullage space (kg)
+    #     1.5,  # ullage volume (m^3)
+    #     21,  # ullage temp (K)
+    #     20,  # bulk liquid temp (K)
+    # ]
+    # diam = 0.72
+    # tank_data = [
+    #     "sphere",  # tank_shape
+    #     diam,  # diameter (m)
+    #     4/3 * np.pi * diam**3,  # volume (m^3)
+    #     4 * np.pi * diam**2,  # surface area (m^2)
+    #     0.0,  # barrel height (not used when shape is sphere)
+    #     0.0,  # dome height (not used when shape is sphere)
+    # ]
+    # Q_dot = 50.0  # W
+    # heat_flux = Q_dot / tank_data[3]  # W/m^2
+    # T_max = 30  # as long as the bulk liquid temp passed in is less than this value it will have no effect (K)
+
+    # print(f(t, y, tank_data, heat_flux, T_max))

@@ -518,12 +518,12 @@ class LH2BoilOffODE(om.ExplicitComponent):
     num_nodes : int
         Number of analysis points to run (scalar, dimensionless)
     P_min : float
-        Minimum operating pressure of the tank, by default 110,000 Pa; slightly above atmospheric (scalar, Pa)
+        Minimum operating pressure of the tank, by default 120,000 Pa; slightly above atmospheric (scalar, Pa)
     """
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of design points to run")
-        self.options.declare("P_min", default=110e3, desc="Minimum operating pressure of the tank")
+        self.options.declare("P_min", default=120e3, desc="Minimum operating pressure of the tank")
 
     def setup(self):
         nn = self.options["num_nodes"]
@@ -603,7 +603,7 @@ class LH2BoilOffODE(om.ExplicitComponent):
         k_sat_gas = H2_prop.sat_gh2_k(T_mean_film)  # thermal conductivity
         beta_sat_gas = H2_prop.sat_gh2_beta(T_mean_film)  # coefficient of thermal expansion
         rho_sat_gas = H2_prop.sat_gh2_rho(T_mean_film)  # density
-        h_sat_gas = H2_prop.sat_gh2_h(T_mean_film)  # enthalpy
+        h_sat_gas = H2_prop.sat_gh2_h(H2_prop.sat_gh2_T(P_gas))  # enthalpy
 
         # ==================== Compute heat transfer between ullage and interface ====================
         # Compute the heat transfer coefficient for the heat transfer from the ullage to the interface.
@@ -643,7 +643,7 @@ class LH2BoilOffODE(om.ExplicitComponent):
         V_dot_gas = -V_dot_liq
 
         T_dot_gas = (Q_dot_gas - Q_dot_gas_int - P_gas * V_dot_gas + m_dot_gas * (h_gas - u_gas)) / (m_gas * cv_gas)
-        T_dot_liq = (Q_dot_liq + P_liq * V_dot_liq - m_dot_liq * (h_liq + u_liq)) / (m_liq * cp_liq)
+        T_dot_liq = (Q_dot_liq - P_liq * V_dot_liq + m_dot_liq * (h_liq - u_liq)) / (m_liq * cp_liq)
         m_dot_liq = -m_dot_gas
 
         # The maximum allowable temperature of the liquid is the saturation temperature
