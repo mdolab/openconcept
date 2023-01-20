@@ -677,12 +677,12 @@ class LH2BoilOffODE(om.ExplicitComponent):
             GRAV_CONST
             * self.beta_sat_gas
             * self.rho_sat_gas**2
-            * np.abs(T_gas - T_int)
+            * np.sqrt((T_gas - T_int) ** 2)  # use sqrt of square as absolute value shorthand so complex-safe
             * L_int**3
             / self.visc_sat_gas**2
         )
-        self.prandtl[self.prandtl < 0] = 0.0
-        self.grashof[self.grashof < 0] = 0.0
+        self.prandtl[np.real(self.prandtl) < 0] = 0.0
+        self.grashof[np.real(self.grashof) < 0] = 0.0
         self.nusselt = self.C_const * (self.prandtl * self.grashof) ** self.n_const
         self.heat_transfer_coeff_gas_int = self.k_sat_gas / L_int * self.nusselt
 
@@ -717,7 +717,7 @@ class LH2BoilOffODE(om.ExplicitComponent):
 
         # The maximum allowable temperature of the liquid is the saturation temperature
         # at the minimum pressure. If it is at this temperature, don't let it increase further.
-        self.T_dot_liq[T_liq >= self.T_liq_max] *= 0.0
+        self.T_dot_liq[np.real(T_liq) >= self.T_liq_max] *= 0.0
 
         # We got em!
         outputs["m_dot_gas"] = self.m_dot_gas
@@ -823,7 +823,7 @@ class LH2BoilOffODE(om.ExplicitComponent):
             mask = np.ones(self.options["num_nodes"])
             mask[self.grashof < 0] = 0.0
             abs_val_mult = np.ones(self.options["num_nodes"])
-            abs_val_mult[T_gas - self.T_int < 0] = -1.0
+            abs_val_mult[(T_gas - self.T_int) < 0] = -1.0
             d_beta_sat_gas = self.grashof / self.beta_sat_gas * mask * d_grashof
             d_rho_sat_gas = 2 * self.grashof / self.rho_sat_gas * mask * d_grashof
             d_T_gas += self.grashof / np.abs(T_gas - self.T_int) * abs_val_mult * mask * d_grashof
@@ -1084,29 +1084,3 @@ class BoilOffFillLevelCalc(om.ExplicitComponent):
         J["fill_level", "V_gas"] = -1 / V_tank
         J["fill_level", "radius"] = inputs["V_gas"] / V_tank**2 * (4 * np.pi * r**2 + 2 * np.pi * r * L)
         J["fill_level", "length"] = inputs["V_gas"] / V_tank**2 * (np.pi * r**2)
-
-
-if __name__ == "__main__":
-    p = om.Problem()
-    p.model.add_subsystem("model", LH2BoilOffODE(), promotes=["*"])
-
-    p.setup(force_alloc_complex=True)
-
-    p.set_val("m_gas", 1.9411308219846288, units="kg")
-    p.set_val("m_liq", 942.0670752834986, units="kg")
-    p.set_val("T_gas", 21.239503179127798, units="K")
-    p.set_val("T_liq", 20.708930544834377, units="K")
-    p.set_val("V_gas", 1.4856099323616818, units="m**3")
-    p.set_val("m_dot_gas_in", 0.0, units="kg/s")
-    p.set_val("m_dot_gas_out", 0.0, units="kg/s")
-    p.set_val("m_dot_liq_in", 0.0, units="kg/s")
-    p.set_val("m_dot_liq_out", 0.0, units="kg/s")
-    p.set_val("Q_dot", 51.4, units="W")
-    p.set_val("A_interface", 4.601815537828035, units="m**2")
-    p.set_val("L_interface", 0.6051453090136371, units="m")
-    p.set_val("A_wet", 23.502425642397316, units="m**2")
-    p.set_val("A_dry", 5.722240017621729, units="m**2")
-
-    p.run_model()
-
-    partials = p.check_partials(method="cs", compact_print=True)

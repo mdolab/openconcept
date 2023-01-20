@@ -333,53 +333,32 @@ class LH2BoilOffODETestCase(unittest.TestCase):
         partials = p.check_partials(method="cs", compact_print=True)
         assert_check_partials(partials)
 
+    def test_derivatives_with_mass_flows(self):
+        p = om.Problem()
+        p.model.add_subsystem("model", LH2BoilOffODE(), promotes=["*"])
+
+        p.setup(force_alloc_complex=True)
+
+        p.set_val("m_gas", 1.9411308219846288, units="kg")
+        p.set_val("m_liq", 942.0670752834986, units="kg")
+        p.set_val("T_gas", 21.239503179127798, units="K")
+        p.set_val("T_liq", 20.708930544834377, units="K")
+        p.set_val("V_gas", 1.4856099323616818, units="m**3")
+        p.set_val("m_dot_gas_in", 0.1, units="kg/s")
+        p.set_val("m_dot_gas_out", 0.2, units="kg/s")
+        p.set_val("m_dot_liq_in", 0.05, units="kg/s")
+        p.set_val("m_dot_liq_out", 0.5, units="kg/s")
+        p.set_val("Q_dot", 51.4, units="W")
+        p.set_val("A_interface", 4.601815537828035, units="m**2")
+        p.set_val("L_interface", 0.6051453090136371, units="m")
+        p.set_val("A_wet", 23.502425642397316, units="m**2")
+        p.set_val("A_dry", 5.722240017621729, units="m**2")
+
+        p.run_model()
+
+        partials = p.check_partials(method="cs", compact_print=True)
+        assert_check_partials(partials)
+
+
 if __name__ == "__main__":
     unittest.main()
-
-    # p = om.Problem()
-    # p.model.add_subsystem("model", LH2BoilOffODE(), promotes=["*"])
-
-    # p.setup(force_alloc_complex=True)
-
-    # p.set_val("m_gas", 2.0, units="kg")
-    # p.set_val("m_liq", 4.5161831120531115, units="kg")
-    # p.set_val("T_gas", 21, units="K")
-    # p.set_val("T_liq", 20, units="K")
-    # p.set_val("V_gas", 1.5, units="m**3")
-    # p.set_val("m_dot_gas_in", 0.0, units="kg/s")
-    # p.set_val("m_dot_gas_out", 0.0, units="kg/s")
-    # p.set_val("m_dot_liq_in", 0.0, units="kg/s")
-    # p.set_val("m_dot_liq_out", 0.0, units="kg/s")
-    # p.set_val("Q_dot", 50, units="W")
-    # p.set_val("A_interface", 0.3840421278000321, units="m**2")
-    # p.set_val("L_interface", 0.17481733751963005, units="m")
-    # p.set_val("A_wet", 0.6203054996729682, units="m**2")
-    # p.set_val("A_dry", 5.8941010268108265, units="m**2")
-
-    # p.run_model()
-
-    # p.model.list_outputs()
-
-    # from EBM_model.self_pressurization import f
-
-    # t = None  # doesn't matter, unused by function
-    # y = [
-    #     2.0,  # mass in ullage space (kg)
-    #     1.5,  # ullage volume (m^3)
-    #     21,  # ullage temp (K)
-    #     20,  # bulk liquid temp (K)
-    # ]
-    # diam = 0.72
-    # tank_data = [
-    #     "sphere",  # tank_shape
-    #     diam,  # diameter (m)
-    #     4/3 * np.pi * diam**3,  # volume (m^3)
-    #     4 * np.pi * diam**2,  # surface area (m^2)
-    #     0.0,  # barrel height (not used when shape is sphere)
-    #     0.0,  # dome height (not used when shape is sphere)
-    # ]
-    # Q_dot = 50.0  # W
-    # heat_flux = Q_dot / tank_data[3]  # W/m^2
-    # T_max = 30  # as long as the bulk liquid temp passed in is less than this value it will have no effect (K)
-
-    # print(f(t, y, tank_data, heat_flux, T_max))
