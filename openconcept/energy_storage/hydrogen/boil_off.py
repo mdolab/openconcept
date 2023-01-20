@@ -550,9 +550,6 @@ class LH2BoilOffODE(om.ExplicitComponent):
         self.add_output("V_dot_gas", units="m**3/s", shape=(nn,), val=0.0)
         self.add_output("P_gas", units="Pa", shape=(nn,), val=1e5, lower=1e3)
 
-        # TODO: analytic partials
-        self.declare_partials(["*"], ["*"], method="cs")
-
         arng = np.arange(nn)
         self.declare_partials(
             "m_dot_gas",
@@ -577,6 +574,27 @@ class LH2BoilOffODE(om.ExplicitComponent):
                 "T_gas",
                 "T_liq",
                 "V_gas",
+                "m_dot_liq_in",
+                "m_dot_liq_out",
+                "m_gas",
+                "m_liq",
+            ],
+            rows=arng,
+            cols=arng,
+        )
+        self.declare_partials(
+            "T_dot_gas",
+            [
+                "Q_dot",
+                "A_wet",
+                "A_dry",
+                "A_interface",
+                "L_interface",
+                "T_gas",
+                "T_liq",
+                "V_gas",
+                "m_dot_gas_in",
+                "m_dot_gas_out",
                 "m_dot_liq_in",
                 "m_dot_liq_out",
                 "m_gas",
@@ -621,7 +639,7 @@ class LH2BoilOffODE(om.ExplicitComponent):
 
         # Ullage gas properties
         self.h_gas = H2_prop.gh2_h(P_gas, T_gas)  # enthalpy
-        u_gas = H2_prop.gh2_u(P_gas, T_gas)  # internal energy
+        self.u_gas = H2_prop.gh2_u(P_gas, T_gas)  # internal energy
         self.cv_gas = H2_prop.gh2_cv(P_gas, T_gas)  # specific heat at constant volume
 
         # Bulk liquid properties
@@ -691,7 +709,7 @@ class LH2BoilOffODE(om.ExplicitComponent):
         self.V_dot_gas = -self.V_dot_liq
 
         self.T_dot_gas = (
-            Q_dot_gas - Q_dot_gas_int - P_gas * self.V_dot_gas + self.m_dot_gas * (self.h_gas - u_gas)
+            Q_dot_gas - Q_dot_gas_int - P_gas * self.V_dot_gas + self.m_dot_gas * (self.h_gas - self.u_gas)
         ) / (m_gas * self.cv_gas)
         self.T_dot_liq = (Q_dot_liq - self.P_liq * self.V_dot_liq + self.m_dot_liq * (self.h_liq - self.u_liq)) / (
             m_liq * self.cp_liq
@@ -755,93 +773,107 @@ class LH2BoilOffODE(om.ExplicitComponent):
             / (self.cp_liq * (self.T_int - T_liq) + 2 * self.h_gas - self.h_int - self.h_sat_gas) ** 2
         )  # derivative of terms in denomenator without associated chain rule
         d_cp_liq = deriv_m_dot_boil_off_denom * (self.T_int - T_liq) * d_m_dot_boil_off
-        d_T_int = deriv_m_dot_boil_off_denom * self.cp_liq * d_m_dot_boil_off
+        # do d_T_int in the for loop since it'll get overwritten otherwise, save the variable temporarily
+        d_T_int_temp = deriv_m_dot_boil_off_denom * self.cp_liq * d_m_dot_boil_off
         d_T_liq = deriv_m_dot_boil_off_denom * (-self.cp_liq) * d_m_dot_boil_off
         d_h_gas = deriv_m_dot_boil_off_denom * 2 * d_m_dot_boil_off
         d_h_int = deriv_m_dot_boil_off_denom * (-1) * d_m_dot_boil_off
         d_h_sat_gas = deriv_m_dot_boil_off_denom * (-1) * d_m_dot_boil_off
 
-        # Influence of terms in Q_dot_gas_int
-        d_heat_transfer_coeff_gas_int = self.Q_dot_gas_int / self.heat_transfer_coeff_gas_int * d_Q_dot_gas_int
-        d_A_interface = self.Q_dot_gas_int / A_int * d_Q_dot_gas_int
-        d_T_gas = self.Q_dot_gas_int / (T_gas - self.T_int) * d_Q_dot_gas_int
-        d_T_int -= d_T_gas
+        # Since this portion of the code is almost identical to the reverse AD code
+        # necessary for T_dos_gas derivatives, use a loop here to do both
+        for Q_dot_gas_int_seed, output_name in zip([-1 / (m_gas * self.cv_gas), d_Q_dot_gas_int], ["T_dot_gas", "m_dot_gas"]):
+            is_m_dot = output_name == "m_dot_gas"
 
-        # Influence of terms in heat_transfer_coeff_gas_int
-        d_k_sat_gas = self.nusselt / L_int * d_heat_transfer_coeff_gas_int
-        d_L_interface = -self.heat_transfer_coeff_gas_int / L_int * d_heat_transfer_coeff_gas_int
-        d_nusselt = self.k_sat_gas / L_int * d_heat_transfer_coeff_gas_int
+            # Influence of terms in Q_dot_gas_int
+            d_heat_transfer_coeff_gas_int = self.Q_dot_gas_int / self.heat_transfer_coeff_gas_int * Q_dot_gas_int_seed
+            d_A_interface = self.Q_dot_gas_int / A_int * Q_dot_gas_int_seed
+            d_T_gas = self.Q_dot_gas_int / (T_gas - self.T_int) * Q_dot_gas_int_seed
+            if is_m_dot:
+                d_T_int = d_T_int_temp
+                d_T_int -= d_T_gas
+            else:
+                d_T_int = -d_T_gas
 
-        # Influence of terms in nusselt
-        d_grashof = (
-            self.n_const * self.C_const * (self.prandtl * self.grashof) ** (self.n_const - 1) * self.prandtl * d_nusselt
-        )
-        d_prandtl = (
-            self.n_const * self.C_const * (self.prandtl * self.grashof) ** (self.n_const - 1) * self.grashof * d_nusselt
-        )
+            # Influence of terms in heat_transfer_coeff_gas_int
+            d_k_sat_gas = self.nusselt / L_int * d_heat_transfer_coeff_gas_int
+            d_L_interface = -self.heat_transfer_coeff_gas_int / L_int * d_heat_transfer_coeff_gas_int
+            d_nusselt = self.k_sat_gas / L_int * d_heat_transfer_coeff_gas_int
 
-        # Influence of terms in grashof
-        # These derivatives are zero anywhere the grashof number was zeroed out
-        mask = np.ones(self.options["num_nodes"])
-        mask[self.grashof < 0] = 0.0
-        abs_val_mult = np.ones(self.options["num_nodes"])
-        abs_val_mult[T_gas - self.T_int < 0] = -1.0
-        d_beta_sat_gas = self.grashof / self.beta_sat_gas * mask * d_grashof
-        d_rho_sat_gas = 2 * self.grashof / self.rho_sat_gas * mask * d_grashof
-        d_T_gas += self.grashof / np.abs(T_gas - self.T_int) * abs_val_mult * mask * d_grashof
-        d_T_int += self.grashof / np.abs(T_gas - self.T_int) * (-abs_val_mult) * mask * d_grashof
-        d_L_interface += 3 * self.grashof / L_int * mask * d_grashof
-        d_visc_sat_gas = -2 * self.grashof / self.visc_sat_gas * mask * d_grashof
+            # Influence of terms in nusselt
+            d_grashof = (
+                self.n_const * self.C_const * (self.prandtl * self.grashof) ** (self.n_const - 1) * self.prandtl * d_nusselt
+            )
+            d_prandtl = (
+                self.n_const * self.C_const * (self.prandtl * self.grashof) ** (self.n_const - 1) * self.grashof * d_nusselt
+            )
 
-        # Influence of terms in prandtl
-        # These derivatives are zero anywhere the grashof number was zeroed out
-        mask = np.ones(self.options["num_nodes"])
-        mask[self.prandtl < 0] = 0.0
-        d_cp_sat_gas = self.prandtl / self.cp_sat_gas * mask * d_prandtl
-        d_visc_sat_gas += self.prandtl / self.visc_sat_gas * mask * d_prandtl
-        d_k_sat_gas += -self.prandtl / self.k_sat_gas * mask * d_prandtl
+            # Influence of terms in grashof
+            # These derivatives are zero anywhere the grashof number was zeroed out
+            mask = np.ones(self.options["num_nodes"])
+            mask[self.grashof < 0] = 0.0
+            abs_val_mult = np.ones(self.options["num_nodes"])
+            abs_val_mult[T_gas - self.T_int < 0] = -1.0
+            d_beta_sat_gas = self.grashof / self.beta_sat_gas * mask * d_grashof
+            d_rho_sat_gas = 2 * self.grashof / self.rho_sat_gas * mask * d_grashof
+            d_T_gas += self.grashof / np.abs(T_gas - self.T_int) * abs_val_mult * mask * d_grashof
+            d_T_int += self.grashof / np.abs(T_gas - self.T_int) * (-abs_val_mult) * mask * d_grashof
+            d_L_interface += 3 * self.grashof / L_int * mask * d_grashof
+            d_visc_sat_gas = -2 * self.grashof / self.visc_sat_gas * mask * d_grashof
 
-        # T_mean_film (and P_gas on h_sat_gas) influence on saturated gas properties
-        d_T_int += H2_prop.sat_gh2_h(self.T_int, deriv=True) * d_h_sat_gas
-        d_T_mean_film = (
-            H2_prop.sat_gh2_cp(self.T_mean_film, deriv=True) * d_cp_sat_gas
-            + H2_prop.sat_gh2_viscosity(self.T_mean_film, deriv=True) * d_visc_sat_gas
-            + H2_prop.sat_gh2_k(self.T_mean_film, deriv=True) * d_k_sat_gas
-            + H2_prop.sat_gh2_beta(self.T_mean_film, deriv=True) * d_beta_sat_gas
-            + H2_prop.sat_gh2_rho(self.T_mean_film, deriv=True) * d_rho_sat_gas
-        )
+            # Influence of terms in prandtl
+            # These derivatives are zero anywhere the grashof number was zeroed out
+            mask = np.ones(self.options["num_nodes"])
+            mask[self.prandtl < 0] = 0.0
+            d_cp_sat_gas = self.prandtl / self.cp_sat_gas * mask * d_prandtl
+            d_visc_sat_gas += self.prandtl / self.visc_sat_gas * mask * d_prandtl
+            d_k_sat_gas += -self.prandtl / self.k_sat_gas * mask * d_prandtl
 
-        # Influence of terms in T_mean_film
-        d_T_gas += 0.5 * d_T_mean_film
-        d_T_int += 0.5 * d_T_mean_film
+            # T_mean_film (and P_gas on h_sat_gas) influence on saturated gas properties
+            if is_m_dot:
+                d_T_int += H2_prop.sat_gh2_h(self.T_int, deriv=True) * d_h_sat_gas
+            d_T_mean_film = (
+                H2_prop.sat_gh2_cp(self.T_mean_film, deriv=True) * d_cp_sat_gas
+                + H2_prop.sat_gh2_viscosity(self.T_mean_film, deriv=True) * d_visc_sat_gas
+                + H2_prop.sat_gh2_k(self.T_mean_film, deriv=True) * d_k_sat_gas
+                + H2_prop.sat_gh2_beta(self.T_mean_film, deriv=True) * d_beta_sat_gas
+                + H2_prop.sat_gh2_rho(self.T_mean_film, deriv=True) * d_rho_sat_gas
+            )
 
-        # T_int influence on h_int
-        d_T_int += H2_prop.lh2_h(self.T_int, deriv=True) * d_h_int
+            # Influence of terms in T_mean_film
+            d_T_gas += 0.5 * d_T_mean_film
+            d_T_int += 0.5 * d_T_mean_film
 
-        # Influence of P_gas on T_int
-        d_P_gas = H2_prop.sat_gh2_T(self.P_gas, deriv=True) * d_T_int
+            # T_int influence on h_int
+            if is_m_dot:
+                d_T_int += H2_prop.lh2_h(self.T_int, deriv=True) * d_h_int
 
-        # Influence of T_liq on cp_liq
-        d_T_liq += H2_prop.lh2_cp(T_liq, deriv=True) * d_cp_liq
+            # Influence of P_gas on T_int
+            d_P_gas = H2_prop.sat_gh2_T(self.P_gas, deriv=True) * d_T_int
 
-        # Influence of P_gas and T_gas on h_gas
-        phpP, phpT = H2_prop.gh2_h(self.P_gas, T_gas, deriv=True)
-        d_P_gas += phpP * d_h_gas
-        d_T_gas += phpT * d_h_gas
+            if is_m_dot:
+                # Influence of T_liq on cp_liq
+                d_T_liq += H2_prop.lh2_cp(T_liq, deriv=True) * d_cp_liq
 
-        # Influence of terms in P_gas
-        d_m_gas = self.P_gas / m_gas * d_P_gas
-        d_T_gas += self.P_gas / T_gas * d_P_gas
-        d_V_gas = -self.P_gas / V_gas * d_P_gas
+                # Influence of P_gas and T_gas on h_gas
+                phpP, phpT = H2_prop.gh2_h(self.P_gas, T_gas, deriv=True)
+                d_P_gas += phpP * d_h_gas
+                d_T_gas += phpT * d_h_gas
 
-        J["m_dot_gas", "A_interface"] = d_A_interface
-        J["m_dot_gas", "L_interface"] = d_L_interface
-        J["m_dot_gas", "T_gas"] = d_T_gas
+            # Influence of terms in P_gas
+            d_m_gas = self.P_gas / m_gas * d_P_gas
+            d_T_gas += self.P_gas / T_gas * d_P_gas
+            d_V_gas = -self.P_gas / V_gas * d_P_gas
+
+            J[output_name, "A_interface"] = d_A_interface.copy()
+            J[output_name, "L_interface"] = d_L_interface.copy()
+            J[output_name, "T_gas"] = d_T_gas.copy()
+            J[output_name, "V_gas"] = d_V_gas.copy()
+            J[output_name, "m_gas"] = d_m_gas.copy()
+
         J["m_dot_gas", "T_liq"] = d_T_liq
-        J["m_dot_gas", "V_gas"] = d_V_gas
         J["m_dot_gas", "m_dot_gas_in"] = 1.0
         J["m_dot_gas", "m_dot_gas_out"] = -1.0
-        J["m_dot_gas", "m_gas"] = d_m_gas
 
         # ------------ m_dot_liq is mostly just negative of m_dot_gas ------------
         J["m_dot_liq", "A_interface"] = -d_A_interface
@@ -859,11 +891,79 @@ class LH2BoilOffODE(om.ExplicitComponent):
         J["V_dot_gas", "T_gas"] = -J["m_dot_liq", "T_gas"] / self.rho_liq
         J["V_dot_gas", "T_liq"] = -J[
             "m_dot_liq", "T_liq"
-        ] / self.rho_liq - self.m_dot_liq / self.rho_liq**2 * H2_prop.lh2_rho(T_liq, deriv=True)
+        ] / self.rho_liq + self.m_dot_liq / self.rho_liq**2 * H2_prop.lh2_rho(T_liq, deriv=True)
         J["V_dot_gas", "V_gas"] = -J["m_dot_liq", "V_gas"] / self.rho_liq
         J["V_dot_gas", "m_dot_liq_in"] = -J["m_dot_liq", "m_dot_liq_in"] / self.rho_liq
         J["V_dot_gas", "m_dot_liq_out"] = -J["m_dot_liq", "m_dot_liq_out"] / self.rho_liq
         J["V_dot_gas", "m_gas"] = -J["m_dot_liq", "m_gas"] / self.rho_liq
+
+        # -------------------------------- P_gas --------------------------------
+        J["P_gas", "m_gas"] = T_gas * UNIVERSAL_GAS_CONST / (V_gas * MOLEC_WEIGHT_H2)
+        J["P_gas", "T_gas"] = m_gas * UNIVERSAL_GAS_CONST / (V_gas * MOLEC_WEIGHT_H2)
+        J["P_gas", "V_gas"] = -m_gas * T_gas * UNIVERSAL_GAS_CONST * MOLEC_WEIGHT_H2 / (V_gas * MOLEC_WEIGHT_H2) ** 2
+
+        # ------------------------------ T_dot_gas ------------------------------
+        # Some of the T_dot_gas partials are already set in the m_dot_gas section
+        # Q_dot_gas portion
+        partial_Q_dot_gas = 1 / (m_gas * self.cv_gas)
+        J["T_dot_gas", "Q_dot"] = partial_Q_dot_gas * A_dry / (A_wet + A_dry)
+        J["T_dot_gas", "A_wet"] = partial_Q_dot_gas * Q_dot * (-A_dry) / (A_wet + A_dry) ** 2
+        J["T_dot_gas", "A_dry"] = partial_Q_dot_gas * Q_dot * A_wet / (A_wet + A_dry) ** 2
+
+        # P_gas portion
+        partial_P_gas = -self.V_dot_gas / (m_gas * self.cv_gas)
+        J["T_dot_gas", "m_gas"] += partial_P_gas * J["P_gas", "m_gas"]
+        J["T_dot_gas", "T_gas"] += partial_P_gas * J["P_gas", "T_gas"]
+        J["T_dot_gas", "V_gas"] += partial_P_gas * J["P_gas", "V_gas"]
+
+        # V_dot_gas portion
+        partial_V_dot_gas = -self.P_gas / (m_gas * self.cv_gas)
+        J["T_dot_gas", "A_interface"] += partial_V_dot_gas * J["V_dot_gas", "A_interface"]
+        J["T_dot_gas", "L_interface"] += partial_V_dot_gas * J["V_dot_gas", "L_interface"]
+        J["T_dot_gas", "T_gas"] += partial_V_dot_gas * J["V_dot_gas", "T_gas"]
+        J["T_dot_gas", "T_liq"] = partial_V_dot_gas * J["V_dot_gas", "T_liq"]
+        J["T_dot_gas", "V_gas"] += partial_V_dot_gas * J["V_dot_gas", "V_gas"]
+        J["T_dot_gas", "m_dot_liq_in"] = partial_V_dot_gas * J["V_dot_gas", "m_dot_liq_in"]
+        J["T_dot_gas", "m_dot_liq_out"] = partial_V_dot_gas * J["V_dot_gas", "m_dot_liq_out"]
+        J["T_dot_gas", "m_gas"] += partial_V_dot_gas * J["V_dot_gas", "m_gas"]
+
+        # m_dot_gas portion
+        partial_m_dot_gas = (self.h_gas - self.u_gas) / (m_gas * self.cv_gas)
+        J["T_dot_gas", "A_interface"] += partial_m_dot_gas * J["m_dot_gas", "A_interface"]
+        J["T_dot_gas", "L_interface"] += partial_m_dot_gas * J["m_dot_gas", "L_interface"]
+        J["T_dot_gas", "T_gas"] += partial_m_dot_gas * J["m_dot_gas", "T_gas"]
+        J["T_dot_gas", "T_liq"] += partial_m_dot_gas * J["m_dot_gas", "T_liq"]
+        J["T_dot_gas", "V_gas"] += partial_m_dot_gas * J["m_dot_gas", "V_gas"]
+        J["T_dot_gas", "m_dot_gas_in"] = partial_m_dot_gas * J["m_dot_gas", "m_dot_gas_in"]
+        J["T_dot_gas", "m_dot_gas_out"] = partial_m_dot_gas * J["m_dot_gas", "m_dot_gas_out"]
+        J["T_dot_gas", "m_gas"] += partial_m_dot_gas * J["m_dot_gas", "m_gas"]
+
+        # h_gas and u_gas portions
+        partial_h_gas = self.m_dot_gas / (m_gas * self.cv_gas)
+        partial_u_gas = -partial_h_gas
+        pupP, pupT = H2_prop.gh2_u(self.P_gas, T_gas, deriv=True)
+        J["T_dot_gas", "m_gas"] += (
+            partial_h_gas * phpP * J["P_gas", "m_gas"] + partial_u_gas * pupP * J["P_gas", "m_gas"]
+        )
+        J["T_dot_gas", "T_gas"] += (
+            partial_h_gas * phpP * J["P_gas", "T_gas"]
+            + partial_u_gas * pupP * J["P_gas", "T_gas"]
+            + partial_h_gas * phpT
+            + partial_u_gas * pupT
+        )
+        J["T_dot_gas", "V_gas"] += (
+            partial_h_gas * phpP * J["P_gas", "V_gas"] + partial_u_gas * pupP * J["P_gas", "V_gas"]
+        )
+
+        # m_gas portion
+        J["T_dot_gas", "m_gas"] += -self.T_dot_gas / m_gas
+
+        # cv_gas portion
+        partial_cv_gas = -self.T_dot_gas / self.cv_gas
+        pcvpP, pcvpT = H2_prop.gh2_cv(self.P_gas, T_gas, deriv=True)
+        J["T_dot_gas", "m_gas"] += partial_cv_gas * pcvpP * J["P_gas", "m_gas"]
+        J["T_dot_gas", "T_gas"] += partial_cv_gas * (pcvpP * J["P_gas", "T_gas"] + pcvpT)
+        J["T_dot_gas", "V_gas"] += partial_cv_gas * pcvpP * J["P_gas", "V_gas"]
 
         # ------------------------------ T_dot_liq ------------------------------
         J["T_dot_liq", "Q_dot"] = 1 / (m_liq * self.cp_liq) * A_wet / (A_wet + A_dry)
@@ -899,11 +999,6 @@ class LH2BoilOffODE(om.ExplicitComponent):
             self.P_liq * J["V_dot_gas", "m_gas"] + (self.h_liq - self.u_liq) * J["m_dot_liq", "m_gas"]
         ) / (m_liq * self.cp_liq)
         J["T_dot_liq", "m_liq"] = -self.T_dot_liq / m_liq
-
-        # ------------------- P_gas is easy to do analytically -------------------
-        J["P_gas", "m_gas"] = T_gas * UNIVERSAL_GAS_CONST / (V_gas * MOLEC_WEIGHT_H2)
-        J["P_gas", "T_gas"] = m_gas * UNIVERSAL_GAS_CONST / (V_gas * MOLEC_WEIGHT_H2)
-        J["P_gas", "V_gas"] = -m_gas * T_gas * UNIVERSAL_GAS_CONST * MOLEC_WEIGHT_H2 / (V_gas * MOLEC_WEIGHT_H2) ** 2
 
 
 class BoilOffFillLevelCalc(om.ExplicitComponent):
