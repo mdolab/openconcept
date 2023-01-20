@@ -782,7 +782,9 @@ class LH2BoilOffODE(om.ExplicitComponent):
 
         # Since this portion of the code is almost identical to the reverse AD code
         # necessary for T_dos_gas derivatives, use a loop here to do both
-        for Q_dot_gas_int_seed, output_name in zip([-1 / (m_gas * self.cv_gas), d_Q_dot_gas_int], ["T_dot_gas", "m_dot_gas"]):
+        for Q_dot_gas_int_seed, output_name in zip(
+            [-1 / (m_gas * self.cv_gas), d_Q_dot_gas_int], ["T_dot_gas", "m_dot_gas"]
+        ):
             is_m_dot = output_name == "m_dot_gas"
 
             # Influence of terms in Q_dot_gas_int
@@ -802,10 +804,18 @@ class LH2BoilOffODE(om.ExplicitComponent):
 
             # Influence of terms in nusselt
             d_grashof = (
-                self.n_const * self.C_const * (self.prandtl * self.grashof) ** (self.n_const - 1) * self.prandtl * d_nusselt
+                self.n_const
+                * self.C_const
+                * (self.prandtl * self.grashof) ** (self.n_const - 1)
+                * self.prandtl
+                * d_nusselt
             )
             d_prandtl = (
-                self.n_const * self.C_const * (self.prandtl * self.grashof) ** (self.n_const - 1) * self.grashof * d_nusselt
+                self.n_const
+                * self.C_const
+                * (self.prandtl * self.grashof) ** (self.n_const - 1)
+                * self.grashof
+                * d_nusselt
             )
 
             # Influence of terms in grashof
@@ -1000,6 +1010,22 @@ class LH2BoilOffODE(om.ExplicitComponent):
         ) / (m_liq * self.cp_liq)
         J["T_dot_liq", "m_liq"] = -self.T_dot_liq / m_liq
 
+        for wrt in [
+            "Q_dot",
+            "A_wet",
+            "A_dry",
+            "A_interface",
+            "L_interface",
+            "T_gas",
+            "T_liq",
+            "V_gas",
+            "m_dot_liq_in",
+            "m_dot_liq_out",
+            "m_gas",
+            "m_liq",
+        ]:
+            J["T_dot_liq", wrt][T_liq >= self.T_liq_max] *= 0.0
+
 
 class BoilOffFillLevelCalc(om.ExplicitComponent):
     """
@@ -1083,4 +1109,4 @@ if __name__ == "__main__":
 
     p.run_model()
 
-    partials = p.check_partials(method="fd", compact_print=True)
+    partials = p.check_partials(method="cs", compact_print=True)
