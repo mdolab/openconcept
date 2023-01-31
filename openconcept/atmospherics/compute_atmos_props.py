@@ -7,6 +7,7 @@ from openconcept.atmospherics import (
     EquivalentAirspeedComp,
     SpeedOfSoundComp,
     MachNumberComp,
+    ConductivityComp,
 )
 from openmdao.api import Group
 
@@ -84,3 +85,6 @@ class ComputeAtmosphericProperties(Group):
             "dynamicpressure", DynamicPressureComp(num_nodes=nn), promotes_inputs=["*"], promotes_outputs=["*"]
         )
         self.add_subsystem("machnumber", MachNumberComp(num_nodes=nn), promotes_inputs=["*"], promotes_outputs=["*"])
+        self.add_subsystem(
+            "conductivity", ConductivityComp(num_nodes=nn), promotes_inputs=["*"], promotes_outputs=["*"]
+        )

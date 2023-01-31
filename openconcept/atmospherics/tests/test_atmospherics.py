@@ -36,6 +36,7 @@ class VectorAtmosTestCase(unittest.TestCase):
         assert_near_equal(self.prob["fltcond|q"][0], 2334.2398, tolerance=1e-3)
         assert_near_equal(self.prob["fltcond|M"][0], 0.1814, tolerance=1e-3)
         assert_near_equal(self.prob["fltcond|a"][0], 340.294, tolerance=1e-3)
+        assert_near_equal(self.prob["fltcond|k"][0], 0.02534, tolerance=1e-3)
 
         # check conditions at 30kft (1976 standard atmosphere verified at https://www.digitaldutch.com/atmoscalc/)
         assert_near_equal(self.prob["fltcond|rho"][-1], 0.458312, tolerance=1e-4)
@@ -45,6 +46,7 @@ class VectorAtmosTestCase(unittest.TestCase):
         assert_near_equal(self.prob["fltcond|q"][-1], 2334.2398, tolerance=1e-3)
         assert_near_equal(self.prob["fltcond|M"][-1], 0.3326, tolerance=1e-3)
         assert_near_equal(self.prob["fltcond|a"][-1], 303.2301, tolerance=1e-3)
+        assert_near_equal(self.prob["fltcond|k"][-1], 0.02053, tolerance=3e-3)
 
     def test_ISA_temp_offset(self):
         self.prob.set_val("atmos.fltcond|TempIncrement", np.linspace(30, 15, 5), units="degC")
@@ -57,6 +59,7 @@ class VectorAtmosTestCase(unittest.TestCase):
         assert_near_equal(self.prob["fltcond|q"][0], 2334.2398, tolerance=1e-3)
         assert_near_equal(self.prob["fltcond|M"][0], 0.1814, tolerance=1e-3)
         assert_near_equal(self.prob["fltcond|a"][0], 357.5698, tolerance=1e-3)
+        assert_near_equal(self.prob["fltcond|k"][0], 0.02534, tolerance=1e-3)
 
         # #check conditions at 30kft (1976 standard atmosphere verified at https://www.digitaldutch.com/atmoscalc/)
         assert_near_equal(self.prob["fltcond|rho"][-1], 0.430104, tolerance=1e-4)
@@ -66,6 +69,7 @@ class VectorAtmosTestCase(unittest.TestCase):
         assert_near_equal(self.prob["fltcond|q"][-1], 2334.2398, tolerance=1e-3)
         assert_near_equal(self.prob["fltcond|M"][-1], 61.7333 * np.sqrt(1.225 / 0.430104) / 312.957, tolerance=1e-3)
         assert_near_equal(self.prob["fltcond|a"][-1], 312.957, tolerance=1e-3)
+        assert_near_equal(self.prob["fltcond|k"][-1], 0.02053, tolerance=3e-3)
 
     def test_partials(self):
         partials = self.prob.check_partials(method="cs", out_stream=None)
@@ -86,7 +90,12 @@ class ScalarAtmosTestCase(unittest.TestCase):
         assert_near_equal(self.prob["fltcond|q"][0], 2334.2398, tolerance=1e-3)
         assert_near_equal(self.prob["fltcond|M"][0], 0.1814, tolerance=1e-3)
         assert_near_equal(self.prob["fltcond|a"][0], 340.294, tolerance=1e-3)
+        assert_near_equal(self.prob["fltcond|k"][0], 0.02534, tolerance=1e-3)
 
     def test_partials(self):
         partials = self.prob.check_partials(method="cs", out_stream=None)
         assert_check_partials(partials)
+
+
+if __name__=="__main__":
+    unittest.main()
