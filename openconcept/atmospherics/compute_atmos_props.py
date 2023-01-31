@@ -8,6 +8,7 @@ from openconcept.atmospherics import (
     SpeedOfSoundComp,
     MachNumberComp,
     ConductivityComp,
+    ViscosityComp,
 )
 from openmdao.api import Group
 
@@ -37,6 +38,12 @@ class ComputeAtmosphericProperties(Group):
         True airspeed (vector, m/s)
     fltcond|q : float
         Dynamic pressure (vector, Pa)
+    fltcond|k : float
+        Thermal conductivity at flight condition (vector, W/(m-K))
+    fltcond|mu : float
+        Dynamic viscosity at flight condition (vector, N-s/m^2)
+    fltcond|visc_kin : float
+        Kinematic viscosity at flight condition (vector, m^2/s)
 
     Options
     -------
@@ -88,3 +95,4 @@ class ComputeAtmosphericProperties(Group):
         self.add_subsystem(
             "conductivity", ConductivityComp(num_nodes=nn), promotes_inputs=["*"], promotes_outputs=["*"]
         )
+        self.add_subsystem("viscosity", ViscosityComp(num_nodes=nn), promotes_inputs=["*"], promotes_outputs=["*"])
