@@ -2,12 +2,20 @@ import numpy as np
 import openmdao.api as om
 from openconcept.utilities.constants import STEFAN_BOLTZMANN_CONST, GRAV_CONST
 from openconcept.energy_storage.hydrogen.H2_properties import lh2_cp, lh2_rho, sat_gh2_k
+from openconcept.utilities import AddSubtractComp, ElementMultiplyDivideComp
 
 
 class HeatTransferVacuumTank(om.Group):
     """
     Computes the heat transfered from the environment to the propellant. This model
     assumes the tank is a vacuum-insulated tank with MLI insulation.
+
+    This model assumes that the outer wall temperature is equal to the external
+    environment temperature and the inner tank wall temperature is equal to the
+    gaseous or liquid hydrogen temperature. This is a reasonably good assumption
+    because the thermal resistance of the convective heat transfer to the outer
+    wall and from the inner wall is much lower than the thermal resistance of the
+    vacuum and MLI insulation.
 
     Inputs
     ------
@@ -24,13 +32,6 @@ class HeatTransferVacuumTank(om.Group):
         The area of the tank's surface touching the bulk liquid (vector, m^2)
     A_dry : float
         The area of the tank's surface touching the ullage (vector, m^2)
-    h_liq : float
-        Height of the liquid in the tank (vector, m)
-    radius : float
-        Inner radius of the cylinder and hemispherical end caps. This value
-        does not include the insulation (scalar, m)
-    length : float
-        Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
 
     Outputs
     -------
@@ -41,163 +42,60 @@ class HeatTransferVacuumTank(om.Group):
     -------
     num_nodes : int
         Number of analysis points to run (scalar, dimensionless)
+    heat_multiplier : float
+        Multiplier on the output heat to account for heat through supports
+        and other connections, by default 1.3 (scalar, dimensionless)
     """
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of design points to run")
+        self.options.declare("heat_multiplier", default=1.3, desc="Multiplier on heat leak")
 
     def setup(self):
         nn = self.options["num_nodes"]
 
-        # Compute the heat flux through the MLI and from the inner wall to the propellant
-        self.add_subsystem("mli_heat", MLIHeatFlux(num_nodes=nn), promotes_inputs=[("T_hot", "T_env"), "N_layers"])
+        # Compute the heat flux through the MLI to the propellant
         self.add_subsystem(
-            "propellant_heat",
-            InnerWallToHydrogenHeatFlux(num_nodes=nn),
-            promotes_inputs=["T_liq", "T_gas", "A_wet", "A_dry", "h_liq", "radius"],
+            "mli_heat_liq",
+            MLIHeatFlux(num_nodes=nn),
+            promotes_inputs=[("T_hot", "T_env"), ("T_cold", "T_liq"), "N_layers"],
+        )
+        self.add_subsystem(
+            "mli_heat_gas",
+            MLIHeatFlux(num_nodes=nn),
+            promotes_inputs=[("T_hot", "T_env"), ("T_cold", "T_gas"), "N_layers"],
         )
 
-        # Determine the inner wall temperature such that the heat flux through the MLI and
-        # to the propellant are the same (assume steady state heat transfer)
+        # Scale each flux by the associated area
+        mult = self.add_subsystem(
+            "scale_by_area", ElementMultiplyDivideComp(vec_size=nn), promotes_inputs=["A_wet", "A_dry"]
+        )
+        mult.add_equation(
+            output_name="heat_liq", input_names=["flux_liq", "A_wet"], vec_size=nn, input_units=["W/m**2", "m**2"]
+        )
+        mult.add_equation(
+            output_name="heat_gas", input_names=["flux_gas", "A_dry"], vec_size=nn, input_units=["W/m**2", "m**2"]
+        )
+        self.connect("mli_heat_liq.heat_flux", "scale_by_area.flux_liq")
+        self.connect("mli_heat_gas.heat_flux", "scale_by_area.flux_gas")
+
+        # Sum the heat into the liquid and gas to get total heat leak and scale by heat_multiplier
         self.add_subsystem(
-            "wall_temp_balance",
-            om.BalanceComp(
-                name="T_wall",
-                eq_units="W/m**2",
-                units="K",
-                lower=10,
-                val=30,
-                lhs_name="q_mli",
-                rhs_name="q_prop",
-                shape=(nn,),
+            "sum_heats",
+            AddSubtractComp(
+                output_name="Q",
+                input_names=["Q_liq", "Q_gas"],
+                vec_size=nn,
+                scaling_factors=[
+                    self.options["heat_multiplier"],
+                    self.options["heat_multiplier"],
+                ],
+                units="W",
             ),
-        )
-        self.connect("mli_heat.heat_flux", "wall_temp_balance.q_mli")
-        self.connect("propellant_heat.heat_flux", "wall_temp_balance.q_prop")
-        self.connect("wall_temp_balance.T_wall", ["mli_heat.T_cold", "propellant_heat.T_wall"])
-
-        # Given the heat flux, compute the total heat by multiplying by area
-        self.add_subsystem(
-            "total_heat",
-            TotalHeatGivenHeatFlux(num_nodes=nn),
-            promotes_inputs=["radius", "length"],
             promotes_outputs=["Q"],
         )
-        self.connect("propellant_heat.heat_flux", "total_heat.heat_flux")
-
-
-class ExternalThermalResistance(om.ExplicitComponent):
-    """
-    This component computes the effective thermal resistance of the external forced convection
-    and radiation around the surface of the tank. This somewhat implicitly assumes that the surface
-    of the tank is exposed to the freestream air. This may not be the case in all configurations.
-
-    See section 3.4.3.1 of Dries Verstraete's thesis (http://hdl.handle.net/1826/4089) for more details.
-
-          |--- length ---|
-         . -------------- .         ---
-      ,'                    `.       | radius
-     /                        \      |
-    |                          |    ---
-     \                        /
-      `.                    ,'
-         ` -------------- '
-
-    Inputs
-    ------
-    outer_radius : float
-        Radius of the outer surface of the tank's cylindrical portion and hemispherical end caps (scalar, m)
-    length : float
-        Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
-    T_surface : float
-        Temperature of the outer skin of the tank (vector, K)
-    fltcond|Utrue : float
-        True airspeed (vector, m/s)
-    fltcond|rho : float
-        Density at flight condition (vector, kg/m^3)
-    fltcond|T : float
-        Temperature (vector, K)
-    fltcond|k : float
-        Thermal conductivity at flight condition (vector, W/(m-K))
-    fltcond|mu : float
-        Dynamic viscosity at flight condition (vector, N-s/m^2)
-
-    Outputs
-    -------
-    resistance : float
-        Thermal resistance for the external heat transfer (float, K/W)
-
-    Options
-    -------
-    num_nodes : int
-        Number of analysis points to run (scalar, dimensionless)
-    skin_emissivity : float
-        Radiative emissivity of the skin of the tank/aircraft. Verstraete assume an integral
-        tank and take emissivity to be 0.95 when the aircraft skin is painted white and 0.09
-        if the aircraft is unpainted, by default 0.9 (scalar, dimensionless)
-    """
-
-    def initialize(self):
-        self.options.declare("num_nodes", default=1, desc="Number of design points to run")
-        self.options.declare("skin_emissivity", default=0.9, desc="Tank skin emissivity")
-
-    def setup(self):
-        nn = self.options["num_nodes"]
-
-        self.add_input("outer_radius", units="m")
-        self.add_input("length", units="m")
-        self.add_input("T_surface", shape=(nn,), units="K")
-        self.add_input("fltcond|Utrue", shape=(nn,), units="m/s")
-        self.add_input("fltcond|rho", shape=(nn,), units="kg / m**3")
-        self.add_input("fltcond|T", shape=(nn,), units="K")
-        self.add_input("fltcond|k", shape=(nn,), units="W / (m * K)")
-        self.add_input("fltcond|mu", shape=(nn,), units="N * s / m**2")
-
-        self.add_output("resistance", shape=(nn,), units="K/W")
-
-        # TODO: analytic partials
-        arng = np.arange(nn)
-        self.declare_partials("resistance", ["outer_radius", "length"], rows=arng, cols=np.zeros(nn), method="cs")
-        self.declare_partials(
-            "resistance",
-            ["T_surface", "fltcond|Utrue", "fltcond|rho", "fltcond|T", "fltcond|k", "fltcond|mu"],
-            rows=arng,
-            cols=arng,
-            method="cs",
-        )
-
-    def compute(self, inputs, outputs):
-        r = inputs["outer_radius"]
-        L = inputs["length"]
-        T_surface = inputs["T_surface"]
-        v_air = inputs["fltcond|Utrue"]
-        rho_air = inputs["fltcond|rho"]
-        T_air = inputs["fltcond|T"]
-        k_air = inputs["fltcond|k"]
-        mu_air = inputs["fltcond|mu"]
-        cp_air = 1.005e3  # J/(kg-K), specific heat at constant pressure of air
-        emissivity = self.options["skin_emissivity"]
-
-        # We take characteristic length to include half the length of each hemispherical end cap
-        L_char = r + L
-
-        # =================================== Convective heat transfer portion ===================================
-        # Prandtl and Reynolds numbers
-        Pr = mu_air * cp_air / k_air
-        Re_L = rho_air * v_air * L_char / mu_air
-
-        # Nusselt number uses the same relation as Verstraete (see Equation 3.12 in thesis for more details)
-        Nu_L = 0.03625 * Pr**0.43 * Re_L**0.8
-
-        # Convective heat transfer coefficient
-        h_conv = Nu_L * k_air / L_char
-
-        # =================================== Radiative heat transfer portion ===================================
-        h_rad = STEFAN_BOLTZMANN_CONST * emissivity * (T_surface**2 + T_air**2) * (T_surface + T_air)
-
-        # ====================================== Total thermal resistance ======================================
-        h_tot = h_conv + h_rad
-        outputs["resistance"] = 1 / (2 * np.pi * r * L_char * h_tot)
+        self.connect("scale_by_area.heat_liq", "sum_heats.Q_liq")
+        self.connect("scale_by_area.heat_gas", "sum_heats.Q_gas")
 
 
 class MLIHeatFlux(om.ExplicitComponent):
@@ -260,7 +158,7 @@ class MLIHeatFlux(om.ExplicitComponent):
         self.add_input("T_hot", shape=(nn,), val=300, units="K")
         self.add_input("T_cold", shape=(nn,), val=20, units="K")
         self.add_input("N_layers", val=20, units=None)
-        self.add_output("heat_flux", shape=(nn,), units="W/m**2")
+        self.add_output("heat_flux", shape=(nn,), val=1.0, units="W/m**2")
 
         arng = np.arange(nn)
         self.declare_partials("heat_flux", ["T_hot", "T_cold"], rows=arng, cols=arng)
@@ -320,167 +218,25 @@ class MLIHeatFlux(om.ExplicitComponent):
         )
 
 
-class InnerWallToHydrogenHeatFlux(om.ExplicitComponent):
-    """
-    Compute the heat flux from the tank inner wall into the gaseous and liquid hydrogen propellant.
-    See section 3.4.3.3 of Dries Verstraete's thesis (http://hdl.handle.net/1826/4089) for more details.
-
-    Inputs
-    ------
-    T_wall : float
-        Temperature of the inner tank wall (vector, K)
-    T_liq : float
-        Temperature of the liquid hydrogen (vector, K)
-    T_gas : float
-        Temperature of the gaseous hydrogen (vector, K)
-    A_wet : float
-        The area of the tank's surface touching the bulk liquid (vector, m^2)
-    A_dry : float
-        The area of the tank's surface touching the ullage (vector, m^2)
-    h_liq : float
-        Height of the liquid in the tank (vector, m)
-    radius : float
-        Inner radius of the cylinder and hemispherical end caps. This value
-        does not include the insulation (scalar, m)
-
-    Outputs
-    -------
-    heat_flux : float
-        Heat flux into the propellant (vector, W/m^2)
-
-    Options
-    -------
-    num_nodes : int
-        Number of analysis points to run (scalar, dimensionless)
-        Pressure of gas in vacuum region in torr, by default 1e-6
-    lh2_conductivity : float
-        Conductivity of the liquid hydrogen, by default 0.104 esimated from NIST WebBook
-        around 1-2 bar and 20 K (scalar, W/(m-K))
-    lh2_expand_coeff : float
-        Thermal expansion coefficient of liquid hydrogen, by default 18e-3 roughly
-        extrapolated from Shwalbe and Grilly 1977 (https://pubmed.ncbi.nlm.nih.gov/34566132/)
-        (scalar, 1/K)
-    """
-
-    def initialize(self):
-        self.options.declare("num_nodes", default=1, desc="Number of design points to run")
-        self.options.declare("lh2_conductivity", default=0.104, desc="LH2 thermal conductivity in W/(m-K)")
-        self.options.declare("lh2_expand_coeff", default=18e-3, desc="LH2 thermal expansion coefficient in 1/K")
-
-    def setup(self):
-        nn = self.options["num_nodes"]
-
-        self.add_input("T_wall", shape=(nn,), val=30, units="K")
-        self.add_input("T_liq", shape=(nn,), val=20, units="K")
-        self.add_input("T_gas", shape=(nn,), val=25, units="K")
-        self.add_input("A_wet", shape=(nn,), val=5.0, units="m**2")
-        self.add_input("A_dry", shape=(nn,), val=5.0, units="m**2")
-        self.add_input("h_liq", shape=(nn,), units="m")
-        self.add_input("radius", units="m")
-
-        self.add_output("heat_flux", shape=(nn,), units="W/m**2")
-
-        # TODO: add analytic partials
-        self.declare_partials(["*"], ["*"], method="cs")
-
-    def compute(self, inputs, outputs):
-        T_w = inputs["T_wall"]
-        T_l = inputs["T_liq"]
-        T_g = inputs["T_gas"]
-        A_l = inputs["A_wet"]
-        A_g = inputs["A_dry"]
-        h_l = inputs["h_liq"]
-        r = inputs["radius"]
-        k = self.options["lh2_conductivity"]
-        beta = self.options["lh2_expand_coeff"]
-
-        # Heat transfer coefficient for liquid phase natural convection
-        Ra = GRAV_CONST * beta * (T_w - T_l) * h_l**3 * lh2_rho(T_l) * lh2_cp(T_l) / k
-        Nu_liq = 0.0605 * Ra ** (1 / 3)
-        h_coeff_liq = k * Nu_liq / h_l
-
-        # Heat transfer coefficient for gaseous phase convection (use saturated gas thermal conductivity)
-        Nu_gas = 17.0
-        h_coeff_gas = sat_gh2_k(T_g) * Nu_gas / (2 * r - h_l)
-
-        # Scale the heat transfer to liquid and gas by the area touching liquid and gas inside the tank
-        outputs["heat_flux"] = (h_coeff_liq * A_l * (T_w - T_l) + h_coeff_gas * A_g * (T_w - T_g)) / (A_l + A_g)
-
-
-class TotalHeatGivenHeatFlux(om.ExplicitComponent):
-    """
-    Compute the total heat from the heat flux by multiplying the heat flux by the tank surface area.
-
-    Inputs
-    -----
-    radius : float
-        Inner radius of the cylinder and hemispherical end caps. This value
-        does not include the insulation (scalar, m)
-    length : float
-        Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
-    heat_flux : float
-        Heat flux through the insulation and into the propellant (vector, W/m^2)
-
-    Outputs
-    -------
-    Q : float
-        Heat entering the propellant from the external environment (vector, W)
-
-    Options
-    -------
-    num_nodes : int
-        Number of analysis points to run (scalar, dimensionless)
-    """
-
-    def initialize(self):
-        self.options.declare("num_nodes", default=1, desc="Number of design points to run")
-
-    def setup(self):
-        nn = self.options["num_nodes"]
-
-        self.add_input("radius", units="m")
-        self.add_input("length", units="m")
-        self.add_input("heat_flux", shape=(nn,), units="W/m**2")
-
-        self.add_output("Q", shape=(nn,), units="W")
-
-        arng = np.arange(nn)
-        self.declare_partials("Q", ["radius", "length"], rows=arng, cols=np.zeros(nn))
-        self.declare_partials("Q", "heat_flux", rows=arng, cols=arng)
-
-    def compute(self, inputs, outputs):
-        r = inputs["radius"]
-        L = inputs["length"]
-        q = inputs["heat_flux"]
-
-        # Compute the surface area
-        A = 4 * np.pi * r**2 + 2 * np.pi * r * L
-
-        # Heat is surface area times heat flux
-        outputs["Q"] = q * A
-
-    def compute_partials(self, inputs, J):
-        r = inputs["radius"]
-        L = inputs["length"]
-        q = inputs["heat_flux"]
-
-        # Compute the surface area
-        A = 4 * np.pi * r**2 + 2 * np.pi * r * L
-
-        J["Q", "radius"] = q * (8 * np.pi * r + 2 * np.pi * L)
-        J["Q", "length"] = q * 2 * np.pi * r
-        J["Q", "heat_flux"] = A
-
-
 if __name__ == "__main__":
     p = om.Problem()
-    p.model.add_subsystem("model", HeatTransferVacuumTank(num_nodes=5), promotes=["*"])
-    p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, iprint=2)
-    p.model.linear_solver = om.DirectSolver()
+    p.model.add_subsystem("model", HeatTransferVacuumTank(num_nodes=1), promotes=["*"])
 
-    p.setup()
+    p.setup(force_alloc_complex=True)
+
+    r = 2.0
+    L = 2.0
+    SA = 4 * np.pi * r**2 + 2 * np.pi * r * L
+    wet_frac = 0.9
+    p.set_val("A_wet", SA * wet_frac, units="m**2")
+    p.set_val("A_dry", SA * (1 - wet_frac), units="m**2")
+    p.set_val("T_env", 300, units="K")
+    p.set_val("T_liq", 21, units="K")
+    p.set_val("T_gas", 25, units="K")
 
     p.run_model()
 
-    p.model.list_inputs(units=True)
-    p.model.list_outputs(units=True)
+    om.n2(p)
+
+    p.model.list_inputs(units=True, print_arrays=True)
+    p.model.list_outputs(units=True, print_arrays=True)

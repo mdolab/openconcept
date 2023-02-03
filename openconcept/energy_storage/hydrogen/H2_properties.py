@@ -739,7 +739,7 @@ def lh2_cp(T, deriv=False):
     Returns
     -------
     float or numpy array
-       Specific heat at constant pressure of saturated liquid hydrogen (J/kg) or the
+       Specific heat at constant pressure of saturated liquid hydrogen (J/(kg-K)) or the
        derivative with respect to T if deriv is set to True
     """
     if deriv:
