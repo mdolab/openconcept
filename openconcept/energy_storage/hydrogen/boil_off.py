@@ -117,13 +117,13 @@ class BoilOff(om.Group):
         # Integrate the ODE
         integ = self.add_subsystem(
             "integ",
-            Integrator(num_nodes=nn, diff_units="s", time_setup="duration", method="simpson"),
+            Integrator(num_nodes=nn, diff_units="s", time_setup="duration", method="bdf3"),
             promotes_outputs=["m_gas", "m_liq", "T_gas", "T_liq"],
         )
         integ.add_integrand("m_gas", rate_name="m_dot_gas", units="kg", lower=1e-4)
-        integ.add_integrand("m_liq", rate_name="m_dot_liq", units="kg", lower=1e-3)
-        integ.add_integrand("T_gas", rate_name="T_dot_gas", units="K", lower=15, upper=1e3)
-        integ.add_integrand("T_liq", rate_name="T_dot_liq", units="K", lower=1e-3, upper=30)
+        integ.add_integrand("m_liq", rate_name="m_dot_liq", units="kg", lower=1e-2)
+        integ.add_integrand("T_gas", rate_name="T_dot_gas", units="K", lower=15, upper=50)
+        integ.add_integrand("T_liq", rate_name="T_dot_liq", units="K", lower=1e-3, upper=25)
         integ.add_integrand("V_gas", rate_name="V_dot_gas", units="m**3", lower=1e-3)
 
         # Connect the ODE to the integrator
@@ -225,7 +225,7 @@ class LiquidHeight(om.ImplicitComponent):
         self.add_input("radius", units="m")
         self.add_input("length", units="m")
 
-        self.add_output("h_liq", val=1e-3, units="m", shape=(nn,))
+        self.add_output("h_liq", val=1e-2, units="m", shape=(nn,), lower=1e-3)
 
         arng = np.arange(nn)
         self.declare_partials("h_liq", ["radius", "length"], rows=arng, cols=np.zeros(nn))
@@ -341,10 +341,10 @@ class BoilOffGeometry(om.ExplicitComponent):
         self.add_input("radius", units="m")
         self.add_input("length", units="m")
 
-        self.add_output("A_interface", units="m**2", shape=(nn,), lower=0.0, val=3.0)
-        self.add_output("L_interface", units="m", shape=(nn,), lower=0.0, val=1.0)
-        self.add_output("A_wet", units="m**2", shape=(nn,), lower=0.0, val=5.0)
-        self.add_output("A_dry", units="m**2", shape=(nn,), lower=0.0, val=5.0)
+        self.add_output("A_interface", units="m**2", shape=(nn,), lower=1e-5, val=3.0)
+        self.add_output("L_interface", units="m", shape=(nn,), lower=1e-5, val=1.0)
+        self.add_output("A_wet", units="m**2", shape=(nn,), lower=1e-5, val=5.0)
+        self.add_output("A_dry", units="m**2", shape=(nn,), lower=1e-5, val=5.0)
 
         arng = np.arange(nn)
         self.declare_partials(["*"], "h_liq", rows=arng, cols=arng)

@@ -1,6 +1,7 @@
 import openmdao.api as om
+import numpy as np
 
-from openconcept.energy_storage.hydrogen.structural import VacuumTankStructure
+from openconcept.energy_storage.hydrogen.structural import VacuumTankWeight
 from openconcept.energy_storage.hydrogen.thermal import HeatTransferVacuumTank
 from openconcept.energy_storage.hydrogen.boil_off import BoilOff
 from openconcept.utilities.math.add_subtract_comp import AddSubtractComp
@@ -30,6 +31,9 @@ class LH2Tank(om.Group):
         does not include the insulation (scalar, m).
     length : float
         Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
+    Q_add : float
+        Additional heat added to the tank other than the natural environment
+        heat leak, make negative to remove heat (vector, W)
     m_dot_gas_in : float
         Mass flow rate of gaseous hydrogen into the ullage EXCLUDING any boil off (this is
         handled internally in this component); unlikely to ever be nonzero but left here
@@ -53,7 +57,9 @@ class LH2Tank(om.Group):
     max_expected_operating_pressure : float
         Maximum expected operating pressure of tank (scalar, Pa)
     vacuum_gap : float
-        Thickness of vacuum gap, used to compute radius of outer vacuum wall (scalar, m)
+        Thickness of vacuum gap, used to compute radius of outer vacuum wall, by default
+        5 cm, which seems standard. This parameter only affects the radius of the outer
+        shell, so it's probably ok to leave at 5 cm (scalar, m)
 
     Outputs
     -------
@@ -103,7 +109,13 @@ class LH2Tank(om.Group):
         # Boil-off model
         self.add_subsystem(
             "boil_off",
-            BoilOff(num_nodes=nn),
+            BoilOff(
+                num_nodes=nn,
+                init_fill_level=self.options["init_fill_level"],
+                ullage_T_init=self.options["ullage_T_init"],
+                ullage_P_init=self.options["ullage_P_init"],
+                liquid_T_init=self.options["liquid_T_init"],
+            ),
             promotes_inputs=["radius", "length", "m_dot_gas_in", "m_dot_gas_out", "m_dot_liq_in", "m_dot_liq_out"],
             promotes_outputs=["m_gas", "m_liq", "T_gas", "T_liq", ("P_gas", "P"), "fill_level"],
         )
@@ -112,25 +124,31 @@ class LH2Tank(om.Group):
         self.add_subsystem(
             "heat_leak", HeatTransferVacuumTank(num_nodes=nn), promotes_inputs=["T_env", "N_layers", "T_liq", "T_gas"]
         )
-        self.connect("heat_leak.Q", "boil_off.Q_dot")
+        self.add_subsystem(
+            "total_heat",
+            AddSubtractComp(output_name="Q", input_names=["heat_leak", "Q_add"], vec_size=[nn, nn], units="W"),
+            promotes_inputs=["Q_add"],
+        )
+        self.connect("heat_leak.Q", "total_heat.heat_leak")
+        self.connect("total_heat.Q", "boil_off.Q_dot")
         self.connect("boil_off.interface_params.A_wet", "heat_leak.A_wet")
         self.connect("boil_off.interface_params.A_dry", "heat_leak.A_dry")
 
         # Structural weight model
         self.add_subsystem(
             "structure",
-            VacuumTankStructure(),
+            VacuumTankWeight(),
             promotes_inputs=[
                 "environment_design_pressure",
                 "max_expected_operating_pressure",
                 "vacuum_gap",
                 "radius",
                 "length",
+                "N_layers",
             ],
             promotes_outputs=[("weight", "tank_weight")],
         )
 
-        # TODO: add MLI weight and find a way to determine the vacuum gap thickness by the MLI design parameters
         # Add all the weights
         self.add_subsystem(
             "sum_weight",
@@ -144,8 +162,11 @@ class LH2Tank(om.Group):
             promotes_outputs=["total_weight"],
         )
 
-        # Set default for inputs promoted from multiple sources
+        # Set default for some inputs
         self.set_input_defaults("radius", 1.0, units="m")
+        self.set_input_defaults("N_layers", 20)
+        self.set_input_defaults("Q_add", np.zeros(nn), units="W")
+        self.set_input_defaults("vacuum_gap", 5, units="cm")
 
         # Use block Gauss-Seidel solver for this component
         self.nonlinear_solver = om.NonlinearBlockGS(iprint=2)
@@ -153,23 +174,24 @@ class LH2Tank(om.Group):
 
 
 if __name__ == "__main__":
-    duration = 10.0  # hr
-    nn = 31
+    duration = 15.0  # hr
+    nn = 51
 
     p = om.Problem()
-    p.model.add_subsystem("tank", LH2Tank(num_nodes=nn), promotes=["*"])
+    p.model.add_subsystem("tank", LH2Tank(num_nodes=nn, init_fill_level=0.95), promotes=["*"])
 
     p.setup()
 
     p.set_val("boil_off.integ.duration", duration, units="h")
-    p.set_val("radius", 1.0, units="m")
-    p.set_val("length", 1.0, units="m")
-    p.set_val("m_dot_gas_out", 0.02, units="kg/h")
-    p.set_val("m_dot_liq_out", 0.0, units="kg/h")
+    p.set_val("radius", 2.75, units="m")
+    p.set_val("length", 2.0, units="m")
+    p.set_val("Q_add", 1000.0, units="W")
+    p.set_val("m_dot_gas_out", 0.0, units="kg/h")
+    p.set_val("m_dot_liq_out", 100.0, units="kg/h")
     p.set_val("m_dot_gas_in", 0.0, units="kg/h")
     p.set_val("m_dot_liq_in", 0.0, units="kg/h")
     p.set_val("T_env", 300, units="K")
-    p.set_val("N_layers", 20)
+    p.set_val("N_layers", 10)
     p.set_val("environment_design_pressure", 1, units="atm")
     p.set_val("max_expected_operating_pressure", 3, units="bar")
     p.set_val("vacuum_gap", 0.1, units="m")
@@ -181,26 +203,50 @@ if __name__ == "__main__":
     import numpy as np
     import matplotlib.pyplot as plt
 
-    fig, axs = plt.subplots(2, 2)
+    fig, axs = plt.subplots(2, 3, figsize=(9, 5))
     axs = axs.flatten()
 
     t = np.linspace(0, duration, nn)
 
     axs[0].plot(t, p.get_val("P", units="bar"))
     axs[0].set_xlabel("Time (hrs)")
-    axs[0].set_ylabel("Pressure (bar)")
+    axs[0].set_ylabel("Ullage pressure (bar)")
 
-    axs[1].plot(t, p.get_val("T_liq", units="K"))
+    axs[1].plot(t, p.get_val("T_gas", units="K"))
     axs[1].set_xlabel("Time (hrs)")
-    axs[1].set_ylabel("Liquid temperature (K)")
+    axs[1].set_ylabel("Ullage temperature (K)")
 
-    axs[3].plot(t, 100 * p.get_val("fill_level"))
-    axs[3].set_xlabel("Time (hrs)")
-    axs[3].set_ylabel("Fill level (%)")
-
-    axs[2].plot(t, p.get_val("heat_leak.Q", units="W"))
+    axs[2].plot(t, p.get_val("T_liq", units="K"))
     axs[2].set_xlabel("Time (hrs)")
-    axs[2].set_ylabel("Heat leak (W)")
+    axs[2].set_ylabel("Liquid temperature (K)")
+
+    heat_leak = p.get_val("heat_leak.Q", units="W")
+    Q_add = p.get_val("Q_add", units="W")
+    axs[3].fill_between(t, heat_leak, label="Heat leak")
+    axs[3].fill_between(t, heat_leak, heat_leak + Q_add, label="Additional heat")
+    axs[3].set_xlabel("Time (hrs)")
+    axs[3].set_ylabel("Heat leak (W)")
+    # axs[3].legend()
+
+    axs[4].plot(t, 100 * p.get_val("fill_level"))
+    axs[4].set_xlabel("Time (hrs)")
+    axs[4].set_ylabel("Fill level (%)")
+
+    m_liq_init = p.get_val("m_liq", units="kg")[0]
+    m_dot_boil_off = (
+        p.get_val("boil_off.boil_off_ode.m_dot_gas", units="kg/d")
+        - p.get_val("m_dot_gas_in", units="kg/d")
+        + p.get_val("m_dot_gas_out", units="kg/d")
+    )
+    m_dot_boil_off *= 100 / m_liq_init
+    axs[5].plot(t, m_dot_boil_off)
+    axs[5].set_xlabel("Time (hrs)")
+    axs[5].set_ylabel("Boil off rate (% initial\nfuel weight per day)")
+
+    for ax in axs:
+        ax.spines[["top", "right"]].set_visible(False)
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig("LH2_tank_plot.pdf")
+
+    print(f"\n\nGravimetric efficiency: {m_liq_init / p.get_val('total_weight', units='kg')[0] * 100 :.1f}%")

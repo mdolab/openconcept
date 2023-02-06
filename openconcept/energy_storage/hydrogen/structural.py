@@ -3,10 +3,10 @@ import openmdao.api as om
 from openconcept.utilities import AddSubtractComp
 
 
-class VacuumTankStructure(om.Group):
+class VacuumTankWeight(om.Group):
     """
-    Sizes the structure and computes the weight of the tank's vacuum walls. This
-    does not include the weight of MLI or any other insulation.
+    Sizes the structure and computes the weight of the tank's vacuum walls.
+    This includes the weight of MLI.
 
           |--- length ---|
          . -------------- .         ---
@@ -29,6 +29,9 @@ class VacuumTankStructure(om.Group):
         Tank inner radius of the cylinder and hemispherical end caps (scalar, m)
     length : float
         Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
+    N_layers : float
+        Number of reflective sheild layers in the MLI, should be at least ~10 for model
+        to retain reasonable accuracy (scalar, dimensionless)
 
     Outputs
     -------
@@ -112,14 +115,17 @@ class VacuumTankStructure(om.Group):
         )
         self.connect("outer_radius.outer_radius", "outer_wall.radius")
 
+        # Compute the weight of the MLI
+        self.add_subsystem("MLI", MLIWeight(), promotes_inputs=["radius", "length", "N_layers"])
+
         # Compute total weight multiplied by fudge factor
         W_mult = self.options["weight_fudge_factor"]
         self.add_subsystem(
             "total_weight",
             AddSubtractComp(
                 output_name="weight",
-                input_names=["W_outer", "W_inner"],
-                scaling_factors=[W_mult, W_mult],
+                input_names=["W_outer", "W_inner", "W_MLI"],
+                scaling_factors=[W_mult, W_mult, W_mult],
                 lower=0.0,
                 units="kg",
             ),
@@ -127,6 +133,7 @@ class VacuumTankStructure(om.Group):
         )
         self.connect("inner_wall.weight", "total_weight.W_inner")
         self.connect("outer_wall.weight", "total_weight.W_outer")
+        self.connect("MLI.weight", "total_weight.W_MLI")
 
         # Set defaults for inputs promoted from multiple sources
         self.set_input_defaults("radius", 0.5, units="m")
@@ -316,7 +323,7 @@ class VacuumWallThickness(om.ExplicitComponent):
         stiff_mult = self.options["stiffening_multiplier"]
 
         # Compute the thickness necessary for the cylindrical portion
-        t_cyl = (p * SF * L * r**1.5 / (0.92 * E))**(1 / 2.5)
+        t_cyl = (p * SF * L * r**1.5 / (0.92 * E)) ** (1 / 2.5)
 
         # Compute the thickness necessary for the spherical portion
         t_sph = r * np.sqrt(p * SF / (0.365 * E))
@@ -339,20 +346,20 @@ class VacuumWallThickness(om.ExplicitComponent):
         stiff_mult = self.options["stiffening_multiplier"]
 
         # Compute the thickness necessary for the cylindrical portion
-        t_cyl = (p * SF * L * r**1.5 / (0.92 * E))**(1 / 2.5)
+        t_cyl = (p * SF * L * r**1.5 / (0.92 * E)) ** (1 / 2.5)
         if L < 1e-6:
             dtcyl_dp = 0.0
             dtcyl_dr = 0.0
             dtcyl_dL = 0.0
         else:
-            first_term = (p * SF * L * r**1.5 / (0.92 * E))**(1 / 2.5 - 1) / 2.5
+            first_term = (p * SF * L * r**1.5 / (0.92 * E)) ** (1 / 2.5 - 1) / 2.5
             dtcyl_dp = first_term * SF * L * r**1.5 / (0.92 * E)
             dtcyl_dr = first_term * p * SF * L * r**0.5 / (0.92 * E) * 1.5
             dtcyl_dL = first_term * p * SF * r**1.5 / (0.92 * E)
 
         # Compute the thickness necessary for the spherical portion
         t_sph = r * np.sqrt(p * SF / (0.365 * E))
-        dtsph_dp = 0.5 * r * (p * SF / (0.365 * E))**(-0.5) * SF / (0.365 * E)
+        dtsph_dp = 0.5 * r * (p * SF / (0.365 * E)) ** (-0.5) * SF / (0.365 * E)
         dtsph_dr = t_sph / r
         dtsph_dL = 0.0
 
@@ -371,9 +378,79 @@ class VacuumWallThickness(om.ExplicitComponent):
         J["weight", "length"] = (dAdL * t + A * J["thickness", "length"]) * density
 
 
+class MLIWeight(om.ExplicitComponent):
+    """
+    Compute the weight of the MLI given the tank geometry and number of MLI layers.
+    Foil and spacer areal density per layer estimated from here:
+    https://frakoterm.com/cryogenics/multi-layer-insulation-mli/
+
+    Inputs
+    ------
+    radius : float
+        Inner radius of the cylinder and hemispherical end caps. This value
+        does not include the insulation (scalar, m).
+    length : float
+        Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
+    N_layers : float
+        Number of reflective sheild layers in the MLI, should be at least ~10 for model
+        to retain reasonable accuracy (scalar, dimensionless)
+
+    Outputs
+    -------
+    weight : float
+        Total weight of the MLI insulation (scalar, kg)
+
+    Options
+    -------
+    foil_layer_areal_weight : float
+        Areal weight of a single foil layer, by default 18e-3 (scalar, kg/m^2)
+    spacer_layer_areal_weight : float
+        Areal weight of a single spacer layer, by default 12e-3 (scalar, kg/m^2)
+    """
+
+    def initialize(self):
+        self.options.declare("foil_layer_areal_weight", default=18e-3, desc="Areal weight of foil layer in kg/m^2")
+        self.options.declare("spacer_layer_areal_weight", default=12e-3, desc="Areal weight of spacer layer in kg/m^2")
+
+    def setup(self):
+        self.add_input("radius", units="m")
+        self.add_input("length", units="m")
+        self.add_input("N_layers")
+
+        self.add_output("weight", units="kg")
+
+        self.declare_partials("weight", ["radius", "length", "N_layers"])
+
+    def compute(self, inputs, outputs):
+        r = inputs["radius"]
+        L = inputs["length"]
+        N = inputs["N_layers"]
+        W_foil = self.options["foil_layer_areal_weight"]
+        W_spacer = self.options["spacer_layer_areal_weight"]
+
+        # Compute surface area
+        A = 4 * np.pi * r**2 + 2 * np.pi * r * L
+
+        outputs["weight"] = (W_foil + W_spacer) * N * A
+
+    def compute_partials(self, inputs, J):
+        r = inputs["radius"]
+        L = inputs["length"]
+        N = inputs["N_layers"]
+        W_foil = self.options["foil_layer_areal_weight"]
+        W_spacer = self.options["spacer_layer_areal_weight"]
+
+        # Compute surface area
+        A = 4 * np.pi * r**2 + 2 * np.pi * r * L
+
+        J["weight", "N_layers"] = (W_foil + W_spacer) * A
+        J["weight", "radius"] = (W_foil + W_spacer) * N * (8 * np.pi * r + 2 * np.pi * L)
+        J["weight", "length"] = (W_foil + W_spacer) * N * (2 * np.pi * r)
+
+
 if __name__ == "__main__":
     p = om.Problem()
-    p.model.add_subsystem("model", VacuumTankStructure(), promotes=["*"])
+    p.model.add_subsystem("model", VacuumTankWeight(), promotes=["*"])
     p.setup(force_alloc_complex=True)
 
     p.set_val("environment_design_pressure", 1.0, units="atm")
