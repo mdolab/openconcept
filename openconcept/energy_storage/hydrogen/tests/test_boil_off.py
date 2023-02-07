@@ -6,55 +6,6 @@ import openmdao.api as om
 from openconcept.energy_storage.hydrogen.boil_off import *
 
 
-class SimpleBoilOffTestCase(unittest.TestCase):
-    def test_defaults(self):
-        p = om.Problem()
-        p.model.linear_solver = om.DirectSolver()
-        p.model = SimpleBoilOff()
-        p.setup(force_alloc_complex=True)
-
-        p.run_model()
-
-        assert_near_equal(p.get_val("m_boil_off", units="kg/s"), 2.239180280883e-04, tolerance=1e-9)
-
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
-
-    def test_vectorized(self):
-        nn = 5
-        p = om.Problem()
-        p.model.linear_solver = om.DirectSolver()
-        p.model = SimpleBoilOff(num_nodes=nn)
-        p.setup(force_alloc_complex=True)
-
-        p.run_model()
-
-        assert_near_equal(p.get_val("m_boil_off", units="kg/s"), 2.239180280883e-04 * np.ones(nn), tolerance=1e-9)
-
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
-
-    def test_adding_heat(self):
-        nn = 5
-        p = om.Problem()
-        p.model.linear_solver = om.DirectSolver()
-        p.model = SimpleBoilOff(num_nodes=nn)
-        p.setup(force_alloc_complex=True)
-
-        p.set_val("LH2_heat_added", np.linspace(1.0, 10.0, nn), units="W")
-
-        p.run_model()
-
-        assert_near_equal(
-            p.get_val("m_boil_off", units="kg/s"),
-            np.array([0.0002261572084, 0.000231195364, 0.0002362335196, 0.0002412716753, 0.0002463098309]),
-            tolerance=1e-9,
-        )
-
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
-
-
 class LiquidHeightTestCase(unittest.TestCase):
     def setUp(self):
         self.nn = nn = 7
@@ -72,7 +23,7 @@ class LiquidHeightTestCase(unittest.TestCase):
 
         # Define height and work backwards to fill level so we
         # can recompute it and check against the original height
-        off = 1e-3
+        off = 1.0  # deg
         theta = np.linspace(off, 2 * np.pi - off, self.nn)
         h = r * (1 - np.cos(theta / 2))
         V_fill = r**2 / 2 * (theta - np.sin(theta)) * L + np.pi * h**2 / 3 * (3 * r - h)

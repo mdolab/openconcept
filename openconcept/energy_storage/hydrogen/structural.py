@@ -49,7 +49,7 @@ class VacuumTankWeight(om.Group):
         would be if it were purely empirically determined from Sullivan et al. 2006
         (https://ntrs.nasa.gov/citations/20060021606), but has been made much more
         conservative to fall more in line with ~60% gravimetric efficiency tanks
-    inner_wall_safety_factor : float
+    inner_safety_factor : float
         Safety factor for sizing inner wall, by default 1.5
     inner_yield_stress : float
         Yield stress of inner wall material (Pa), by default Al 2014-T6 taken from Table IV of
@@ -57,7 +57,7 @@ class VacuumTankWeight(om.Group):
     inner_density : float
         Density of inner wall material (kg/m^3), by default Al 2014-T6 taken from Table IV of
         Sullivan et al. 2006 (https://ntrs.nasa.gov/citations/20060021606)
-    outer_wall_safety_factor : float
+    outer_safety_factor : float
         Safety factor for sizing outer wall, by default 2
     outer_youngs_modulus : float
         Young's modulus of outer wall material (Pa), by default LiAl 2090 taken from Table XIII of
@@ -137,6 +137,7 @@ class VacuumTankWeight(om.Group):
 
         # Set defaults for inputs promoted from multiple sources
         self.set_input_defaults("radius", 0.5, units="m")
+        self.set_input_defaults("length", 0.5, units="m")
 
 
 class PressureVesselWallThickness(om.ExplicitComponent):

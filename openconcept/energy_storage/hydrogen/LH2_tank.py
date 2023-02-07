@@ -88,9 +88,9 @@ class LH2Tank(om.Group):
         Initial fill level (in range 0-1) of the tank, default 0.97
         to leave space for boil off gas; 3% adopted from Cryoplane study (scalar, dimensionless)
     ullage_T_init : float
-        Initial temperature of gas in ullage, default 21 K (scalar, K)
+        Initial temperature of gas in ullage, default 20 K (scalar, K)
     ullage_P_init : float
-        Initial pressure of gas in ullage, default 120,000 Pa; ullage pressure must be higher than ambient
+        Initial pressure of gas in ullage, default 150,000 Pa; ullage pressure must be higher than ambient
         to prevent air leaking in and creating a combustible mixture (scalar, Pa)
     liquid_T_init : float
         Initial temperature of bulk liquid hydrogen, default 20 K (scalar, K)
@@ -100,7 +100,7 @@ class LH2Tank(om.Group):
         self.options.declare("num_nodes", default=1, desc="Number of design points to run")
         self.options.declare("init_fill_level", default=0.97, desc="Initial fill level")
         self.options.declare("ullage_T_init", default=21.0, desc="Initial ullage temp (K)")
-        self.options.declare("ullage_P_init", default=1.2e5, desc="Initial ullage pressure (Pa)")
+        self.options.declare("ullage_P_init", default=1.5e5, desc="Initial ullage pressure (Pa)")
         self.options.declare("liquid_T_init", default=20.0, desc="Initial bulk liquid temp (K)")
 
     def setup(self):
@@ -222,11 +222,11 @@ if __name__ == "__main__":
 
     heat_leak = p.get_val("heat_leak.Q", units="W")
     Q_add = p.get_val("Q_add", units="W")
-    axs[3].fill_between(t, heat_leak, label="Heat leak")
-    axs[3].fill_between(t, heat_leak, heat_leak + Q_add, label="Additional heat")
+    axs[3].plot(t, heat_leak, label="Heat leak")
+    axs[3].plot(t, Q_add, label="Additional heat")
     axs[3].set_xlabel("Time (hrs)")
     axs[3].set_ylabel("Heat leak (W)")
-    # axs[3].legend()
+    axs[3].legend()
 
     axs[4].plot(t, 100 * p.get_val("fill_level"))
     axs[4].set_xlabel("Time (hrs)")

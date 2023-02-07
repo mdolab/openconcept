@@ -1,19 +1,15 @@
-from __future__ import division
 import unittest
-from matplotlib import pyplot
-import numpy as np
-from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
-from openmdao.api import Problem, NewtonSolver, DirectSolver, ScipyOptimizeDriver
+import openmdao.api as om
 from openconcept.energy_storage.hydrogen.LH2_tank import *
 
 
 class LH2TankTestCase(unittest.TestCase):
     def test_simple(self):
-        p = Problem()
-        p.model = LH2Tank(ullage_P_init=101325.0, init_fill_level=0.95, ullage_T_init=90)
-        p.model.linear_solver = DirectSolver()
-        p.model.nonlinear_solver = NewtonSolver()
+        p = om.Problem()
+        p.model = LH2Tank(ullage_P_init=101325.0, init_fill_level=0.95, ullage_T_init=25)
+        p.model.linear_solver = om.DirectSolver()
+        p.model.nonlinear_solver = om.NewtonSolver()
         p.model.nonlinear_solver.options["err_on_non_converge"] = True
         p.model.nonlinear_solver.options["solve_subsystems"] = True
         p.model.nonlinear_solver.options["maxiter"] = 20
@@ -21,298 +17,182 @@ class LH2TankTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val("W_LH2", units="kg"), 2678.40146873, tolerance=1e-9)
-        assert_near_equal(p.get_val("W_GH2", units="kg"), 0.5431713185, tolerance=1e-9)
-        assert_near_equal(p.get_val("weight", units="kg"), 3188.48956232, tolerance=1e-9)
-        assert_near_equal(p.get_val("ullage_P_residual", units="Pa"), 198675.0, tolerance=1e-9)
+        assert_near_equal(p.get_val("m_gas", units="kg"), 0.28298698, tolerance=1e-7)
+        assert_near_equal(p.get_val("m_liq", units="kg"), 389.40636198, tolerance=1e-9)
+        assert_near_equal(p.get_val("T_gas", units="K"), 25, tolerance=1e-9)
+        assert_near_equal(p.get_val("T_liq", units="K"), 20, tolerance=1e-9)
+        assert_near_equal(p.get_val("P", units="Pa"), 101325, tolerance=1e-9)
+        assert_near_equal(p.get_val("fill_level"), 0.95, tolerance=1e-9)
+        assert_near_equal(p.get_val("tank_weight", units="kg"), 252.70942027, tolerance=1e-9)
+        assert_near_equal(p.get_val("total_weight", units="kg"), 642.39876923, tolerance=1e-9)
+        assert_near_equal(
+            p.get_val("total_weight", units="kg"),
+            p.get_val("tank_weight", units="kg") + p.get_val("m_gas", units="kg") + p.get_val("m_liq", units="kg"),
+            tolerance=1e-9,
+        )
 
         partials = p.check_partials(method="cs", compact_print=True)
         assert_check_partials(partials)
 
-    def test_vectorized(self):
-        nn = 5
-        p = Problem()
-        p.model = LH2Tank(num_nodes=nn, ullage_P_init=101325.0, init_fill_level=0.95, ullage_T_init=90)
-        p.model.linear_solver = DirectSolver()
-        p.model.nonlinear_solver = NewtonSolver()
-        p.model.nonlinear_solver.options["err_on_non_converge"] = True
-        p.model.nonlinear_solver.options["solve_subsystems"] = True
-        p.model.nonlinear_solver.options["maxiter"] = 20
-        p.setup(force_alloc_complex=True)
+    def test_time_history(self):
+        duration = 15.0  # hr
+        nn = 11
 
-        p.set_val("design_pressure", 2.0, units="bar")
-        p.set_val("m_dot_gas", 0.0 * np.ones(nn), units="kg/s")
-        p.set_val("radius", 1.0, units="m")
-        p.set_val("length", 0.2, units="m")
-        p.set_val("T_inf", np.linspace(100.0, 100.0, nn), units="K")
-        p.set_val("insulation_thickness", 0.1, units="inch")
-        p.set_val("duration", 5, units="h")
+        p = om.Problem()
+        p.model.add_subsystem("tank", LH2Tank(num_nodes=nn, init_fill_level=0.95), promotes=["*"])
+
+        p.setup()
+
+        p.set_val("boil_off.integ.duration", duration, units="h")
+        p.set_val("radius", 2.75, units="m")
+        p.set_val("length", 2.0, units="m")
+        p.set_val("Q_add", np.linspace(1e3, 0.0, nn), units="W")
+        p.set_val("m_dot_gas_out", -1.0, units="kg/h")
+        p.set_val("m_dot_liq_out", 100.0, units="kg/h")
+        p.set_val("m_dot_gas_in", 1.0, units="kg/h")
+        p.set_val("m_dot_liq_in", 1.0, units="kg/h")
+        p.set_val("T_env", 300, units="K")
+        p.set_val("N_layers", 10)
+        p.set_val("environment_design_pressure", 1, units="atm")
+        p.set_val("max_expected_operating_pressure", 3, units="bar")
+        p.set_val("vacuum_gap", 0.1, units="m")
 
         p.run_model()
 
         assert_near_equal(
-            p.get_val("W_LH2", units="kg"),
-            np.array([324.22754621, 292.74492385, 263.83377006, 237.39924829, 213.32789699]),
-            tolerance=1e-9,
-        )
-        assert_near_equal(
-            p.get_val("W_GH2", units="kg"),
-            np.array([6.57523175e-02, 3.15483740e01, 6.04595248e01, 8.68940375e01, 1.10965371e02]),
-            tolerance=1e-8,
-        )
-        assert_near_equal(
-            p.get_val("weight", units="kg"),
-            np.array([370.80974416, 370.80974346, 370.80974044, 370.80973145, 370.8097133]),
-            tolerance=1e-9,
-        )
-        assert_near_equal(
-            p.get_val("ullage.P", units="bar"),
-            np.array([1.01325, 157.64154789, 182.03687431, 192.48001122, 199.57467472]),
-            tolerance=1e-9,
-        )
-
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
-
-    def test_vent_and_heat_add(self):
-        nn = 5
-        p = Problem()
-        p.model = LH2Tank(num_nodes=nn, ullage_P_init=101325.0, init_fill_level=0.95, ullage_T_init=90)
-        p.model.linear_solver = DirectSolver()
-        p.model.nonlinear_solver = NewtonSolver()
-        p.model.nonlinear_solver.options["err_on_non_converge"] = True
-        p.model.nonlinear_solver.options["solve_subsystems"] = True
-        p.model.nonlinear_solver.options["maxiter"] = 20
-        p.setup(force_alloc_complex=True)
-
-        p.set_val("design_pressure", 2.0, units="bar")
-        p.set_val("m_dot_gas", 0.005 * np.ones(nn), units="kg/s")
-        p.set_val("m_dot_liq", 0.006 * np.ones(nn), units="kg/s")
-        p.set_val("radius", 1.0, units="m")
-        p.set_val("length", 0.2, units="m")
-        p.set_val("T_inf", np.linspace(300.0, 300.0, nn), units="K")
-        p.set_val("insulation_thickness", 0.1, units="inch")
-        p.set_val("m_dot_vent_start", 0.01, units="kg/s")
-        p.set_val("m_dot_vent_end", 0.0085, units="kg/s")
-        p.set_val("LH2_heat_added_start", 1000.0, units="W")
-        p.set_val("LH2_heat_added_end", 5000.0, units="W")
-        p.set_val("duration", 3, units="h")
-
-        p.run_model()
-
-        assert_near_equal(
-            p.get_val("W_LH2", units="kg"),
-            np.array([324.22754621, 248.11209355, 176.71720854, 110.79433692, 50.6849193]),
-            tolerance=1e-9,
-        )
-        assert_near_equal(
-            p.get_val("W_GH2", units="kg"),
-            np.array([0.06575232, 19.98745498, 36.20108999, 47.95521161, 54.90837923]),
-            tolerance=1e-9,
-        )
-        assert_near_equal(
-            p.get_val("weight", units="kg"),
-            np.array([370.80974416, 314.61599416, 259.43474416, 205.26599416, 152.10974416]),
-            tolerance=1e-9,
-        )
-        assert_near_equal(
-            p.get_val("ullage.P", units="bar"),
-            np.array([1.01325, 27.99677337, 25.91405023, 28.25625532, 28.72683992]),
-            tolerance=1e-9,
-        )
-
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
-
-    def test_options(self):
-        nn = 5
-        p = Problem()
-        p.model = LH2Tank(
-            num_nodes=nn, safety_factor=1.5, init_fill_level=0.85, ullage_T_init=60.0, ullage_P_init=1.5 * 101325
-        )
-        p.model.linear_solver = DirectSolver()
-        p.model.nonlinear_solver = NewtonSolver()
-        p.model.nonlinear_solver.options["err_on_non_converge"] = True
-        p.model.nonlinear_solver.options["solve_subsystems"] = True
-        p.model.nonlinear_solver.options["maxiter"] = 20
-        p.setup(force_alloc_complex=True)
-
-        p.set_val("design_pressure", 2.0, units="bar")
-        p.set_val("m_dot_gas", 0.009 * np.ones(nn), units="kg/s")
-        p.set_val("m_dot_liq", 0.003 * np.ones(nn), units="kg/s")
-        p.set_val("radius", 1.0, units="m")
-        p.set_val("length", 0.2, units="m")
-        p.set_val("T_inf", np.linspace(300.0, 300.0, nn), units="K")
-        p.set_val("insulation_thickness", 0.1, units="inch")
-        p.set_val("m_dot_vent_start", 0.01, units="kg/s")
-        p.set_val("m_dot_vent_end", 0.0085, units="kg/s")
-        p.set_val("LH2_heat_added_start", 1000.0, units="W")
-        p.set_val("LH2_heat_added_end", 5000.0, units="W")
-        p.set_val("duration", 3, units="h")
-
-        p.run_model()
-
-        assert_near_equal(
-            p.get_val("W_LH2", units="kg"),
-            np.array([290.09833082, 225.83086207, 165.1636196, 108.55825113, 56.2251017]),
-            tolerance=1e-9,
-        )
-        assert_near_equal(
-            p.get_val("W_GH2", units="kg"),
-            np.array([0.44382814, 5.8175469, 8.60353936, 8.34015783, 4.81705727]),
-            tolerance=1e-9,
-        )
-        assert_near_equal(
-            p.get_val("weight", units="kg"),
-            np.array([332.7513486, 273.8575986, 215.9763486, 159.1075986, 103.2513486]),
-            tolerance=1e-9,
-        )
-        assert_near_equal(
-            p.get_val("ullage.P", units="bar"),
-            np.array([1.519875, 4.46311316, 4.50352318, 3.82109948, 2.02291237]),
-            tolerance=1e-8,
-        )
-
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
-
-    def test_optimization(self):
-        nn = 9
-        p = Problem()
-        p.model = LH2Tank(
-            num_nodes=nn, safety_factor=2.25, init_fill_level=0.9, ullage_T_init=50, ullage_P_init=101325.0
-        )
-        p.model.linear_solver = DirectSolver()
-        p.model.nonlinear_solver = NewtonSolver()
-        p.model.nonlinear_solver.options["solve_subsystems"] = True
-        # p.model.nonlinear_solver.options['err_on_non_converge'] = True
-        p.model.nonlinear_solver.options["maxiter"] = 20
-
-        p.model.add_objective("mass_integ.GH2_vent_final")
-        p.model.add_design_var("m_dot_vent_start", lower=0.0)
-        p.model.add_design_var("m_dot_vent_end", lower=0.0)
-        p.model.add_design_var("LH2_heat_added_start", lower=0.0)
-        p.model.add_design_var("LH2_heat_added_end", lower=0.0)
-        p.model.add_constraint("ullage_P_residual", lower=0.0, scaler=1e-7)
-        p.model.add_constraint("W_GH2", lower=0.0)
-
-        p.setup(force_alloc_complex=True)
-
-        p.set_val("design_pressure", 2.0, units="bar")
-        p.set_val("m_dot_gas", 0.01 * np.ones(nn), units="kg/s")
-        p.set_val("m_dot_liq", np.zeros(nn), units="kg/s")
-        p.set_val("radius", 1.0, units="m")
-        p.set_val("length", 0.2, units="m")
-        p.set_val("T_inf", np.linspace(300.0, 300.0, nn), units="K")
-        p.set_val("insulation_thickness", 0.1, units="inch")
-        p.set_val("duration", 3, units="h")
-
-        # If the SNOPT optimizer is installed use it for this test,
-        # otherwise skip the test (SciPy's SLSQP is inconsistent)
-        try:
-            p.driver = om.pyOptSparseDriver()
-            p.driver.options["optimizer"] = "SNOPT"
-            p.run_driver()
-        except:
-            self.skipTest("SNOPT optimizer and pyOptSparseDriver not installed")
-
-        assert_near_equal(
-            p.get_val("W_LH2", units="kg"),
+            p.get_val("m_gas", units="kg"),
             np.array(
                 [
-                    307.16293852,
-                    281.37457711,
-                    257.15538659,
-                    234.52996554,
-                    213.50290057,
-                    194.05103704,
-                    176.12650805,
-                    159.66356383,
-                    144.5850991,
+                    11.657715010524457,
+                    16.43953842688591,
+                    22.08870949789011,
+                    27.838243320482125,
+                    33.479934932744925,
+                    39.059925412833124,
+                    44.5866737236875,
+                    50.00668659847522,
+                    55.263120440875454,
+                    60.31815864032765,
+                    65.14495106349747,
+                ]
+            ),
+            tolerance=1e-7,
+        )
+        assert_near_equal(
+            p.get_val("m_liq", units="kg"),
+            np.array(
+                [
+                    9102.373711349434,
+                    8952.091887933071,
+                    8800.942716862068,
+                    8649.693183039475,
+                    8498.551491427213,
+                    8347.471500947126,
+                    8196.444752636271,
+                    8045.524739761482,
+                    7894.768305919082,
+                    7744.2132677196305,
+                    7593.886475296461,
                 ]
             ),
             tolerance=1e-9,
         )
         assert_near_equal(
-            p.get_val("W_GH2", units="kg"),
+            p.get_val("T_gas", units="K"),
             np.array(
                 [
-                    0.23670834,
-                    1.23375388,
-                    2.04429119,
-                    2.64372168,
-                    3.02745875,
-                    3.21865703,
-                    3.26518344,
-                    3.23278773,
-                    3.19857519,
-                ]
-            ),
-            tolerance=1e-8,
-        )
-        assert_near_equal(
-            p.get_val("weight", units="kg"),
-            np.array(
-                [
-                    351.76226195,
-                    326.97094608,
-                    303.56229287,
-                    281.53630231,
-                    260.89297441,
-                    241.63230917,
-                    223.75430658,
-                    207.25896665,
-                    192.14628938,
+                    21.0,
+                    24.72365745623197,
+                    25.23429373994755,
+                    25.153574187569333,
+                    25.195784410313603,
+                    25.255375020792766,
+                    25.235602063894643,
+                    25.15035581935711,
+                    25.030510035316535,
+                    24.886151901225222,
+                    24.714875081968668,
                 ]
             ),
             tolerance=1e-9,
         )
         assert_near_equal(
-            p.get_val("ullage_P_residual", units="bar"),
+            p.get_val("T_liq", units="K"),
             np.array(
                 [
-                    9.86750000e-01,
-                    5.11545668e-01,
-                    2.09918905e-01,
-                    1.66351753e-02,
-                    7.41632940e-11,
-                    1.83171164e-02,
-                    3.73230905e-02,
-                    4.25445171e-02,
-                    -3.44565304e-09,
+                    20.0,
+                    20.072619663709517,
+                    20.139655872466925,
+                    20.201308117540623,
+                    20.257741092749292,
+                    20.309078797774912,
+                    20.355411941321876,
+                    20.396805710201278,
+                    20.433305225258078,
+                    20.464939176068956,
+                    20.491722195096845,
                 ]
             ),
-            tolerance=1e-8,
+            tolerance=1e-9,
         )
         assert_near_equal(
-            p.get_val("ullage.P", units="bar"),
-            np.array([1.01325, 1.48845433, 1.7900811, 1.98336482, 2.0, 1.98168288, 1.96267691, 1.95745548, 2.0]),
-            tolerance=1e-8,
-        )
-        assert_near_equal(
-            p.get_val("ullage.T", units="K"),
+            p.get_val("P", units="Pa"),
             np.array(
                 [
-                    50.0,
-                    24.74012426,
-                    25.21485205,
-                    27.41226958,
-                    28.89260806,
-                    31.0262446,
-                    33.97829641,
-                    37.63912943,
-                    42.09533993,
+                    150000.0,
+                    189548.4653410521,
+                    209554.00473580387,
+                    220455.37047851048,
+                    228436.27880909137,
+                    234353.7579511462,
+                    238075.70480708423,
+                    239886.40052419002,
+                    240179.17802175425,
+                    239204.54631162607,
+                    237092.96600641473,
                 ]
             ),
-            tolerance=1e-8,
+            tolerance=1e-9,
         )
-        assert_near_equal(p.get_val("m_dot_vent_start", units="kg/s"), 0.008876034963, tolerance=1e-8)
-        assert_near_equal(p.get_val("m_dot_vent_end", units="kg/s"), 0.000682478477, tolerance=1e-8)
-        assert_near_equal(p.get_val("LH2_heat_added_start", units="W"), 0.0, tolerance=1e-8)
-        assert_near_equal(p.get_val("LH2_heat_added_end", units="W"), 0.0, tolerance=1e-8)
-
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
+        assert_near_equal(
+            p.get_val("fill_level"),
+            np.array(
+                [
+                    0.95,
+                    0.9343082850873371,
+                    0.9185119233636299,
+                    0.9026918126596172,
+                    0.886870479483351,
+                    0.8710439137808385,
+                    0.8552121229337393,
+                    0.8393816649464999,
+                    0.823559498622189,
+                    0.8077506289187172,
+                    0.7919589453560123,
+                ]
+            ),
+            tolerance=1e-9,
+        )
+        assert_near_equal(
+            p.get_val("total_weight", units="kg"),
+            np.array(
+                [
+                    15184.82556927447,
+                    15039.32556927447,
+                    14893.82556927447,
+                    14748.32556927447,
+                    14602.82556927447,
+                    14457.325569274471,
+                    14311.825569274471,
+                    14166.32556927447,
+                    14020.82556927447,
+                    13875.325569274471,
+                    13729.825569274471,
+                ]
+            ),
+            tolerance=1e-9,
+        )
+        assert_near_equal(p.get_val("tank_weight", units="kg"), 6070.794142914512, tolerance=1e-9)
 
 
 if __name__ == "__main__":
