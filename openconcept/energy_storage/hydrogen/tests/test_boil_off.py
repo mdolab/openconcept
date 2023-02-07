@@ -6,6 +6,144 @@ import openmdao.api as om
 from openconcept.energy_storage.hydrogen.boil_off import *
 
 
+class BoilOffTestCase(unittest.TestCase):
+    def test_integrated(self):
+        """
+        A regression test for the fully integrated boil-off model.
+        """
+        nn = 11
+        p = om.Problem()
+        p.model.add_subsystem("model", BoilOff(num_nodes=nn, init_fill_level=0.9), promotes=["*"])
+
+        p.setup(force_alloc_complex=True)
+
+        p.set_val("integ.duration", 3, units="h")
+        p.set_val("radius", 0.7, units="m")
+        p.set_val("length", 0.3, units="m")
+        p.set_val("m_dot_gas_in", 0.7, shape=(nn,), units="kg/h")
+        p.set_val("m_dot_liq_in", 2.0, shape=(nn,), units="kg/h")
+        p.set_val("m_dot_gas_out", 0.2, shape=(nn,), units="kg/h")
+        p.set_val("m_dot_liq_out", 30.0, shape=(nn,), units="kg/h")
+        p.set_val("Q_dot", 50, units="W")
+
+        p.run_model()
+
+        assert_near_equal(
+            p.get_val("m_gas", units="kg"),
+            np.array(
+                [
+                    0.26303704192536154,
+                    0.42824983628333974,
+                    0.6063360966425474,
+                    0.7908946454675435,
+                    0.979294083766866,
+                    1.1715455673363493,
+                    1.368037081543731,
+                    1.5686835254461788,
+                    1.773120630979943,
+                    1.9809979081536,
+                    2.192022628679719,
+                ]
+            ),
+            tolerance=1e-9,
+        )
+        assert_near_equal(
+            p.get_val("m_liq", units="kg"),
+            np.array(
+                [
+                    121.60657623874415,
+                    113.19136344438617,
+                    104.76327718402698,
+                    96.32871863520197,
+                    87.89031919690265,
+                    79.44806771333316,
+                    71.00157619912578,
+                    62.55092975522333,
+                    54.096492649689566,
+                    45.63861537251589,
+                    37.17759065198979,
+                ]
+            ),
+            tolerance=1e-9,
+        )
+        assert_near_equal(
+            p.get_val("T_gas", units="K"),
+            np.array(
+                [
+                    21.0,
+                    22.53189850495305,
+                    22.94735860229283,
+                    23.068666630450227,
+                    23.216090257538593,
+                    23.403700047089767,
+                    23.591580229207803,
+                    23.769746854896383,
+                    23.94896718089159,
+                    24.14219628817064,
+                    24.360037880890946,
+                ]
+            ),
+            tolerance=1e-9,
+        )
+        assert_near_equal(
+            p.get_val("T_liq", units="K"),
+            np.array(
+                [
+                    20.0,
+                    20.027969060527173,
+                    20.05567182732004,
+                    20.08334541703263,
+                    20.11120025717257,
+                    20.13942293108154,
+                    20.168193926313638,
+                    20.197706787043465,
+                    20.228186606494212,
+                    20.25991173996442,
+                    20.293244426674327,
+                ]
+            ),
+            tolerance=1e-9,
+        )
+        assert_near_equal(
+            p.get_val("P_gas", units="Pa"),
+            np.array(
+                [
+                    119999.99999999999,
+                    129165.17596077801,
+                    134521.05033238672,
+                    138018.54598992236,
+                    141236.2208481784,
+                    144474.95369406184,
+                    147632.35781236002,
+                    150674.66783696116,
+                    153661.93549340914,
+                    156674.53736317036,
+                    159785.71493562404,
+                ]
+            ),
+            tolerance=1e-9,
+        )
+        assert_near_equal(
+            p.get_val("fill_level"),
+            np.array(
+                [
+                    0.9,
+                    0.8377089420319701,
+                    0.7753011157497871,
+                    0.7128236179012597,
+                    0.6502955446437099,
+                    0.5877162818761296,
+                    0.5250822680760078,
+                    0.4623932798529712,
+                    0.39965097156234897,
+                    0.3368566604342073,
+                    0.2740109310097058,
+                ]
+            ),
+            tolerance=1e-9,
+        )
+
+
 class LiquidHeightTestCase(unittest.TestCase):
     def setUp(self):
         self.nn = nn = 7
@@ -124,7 +262,9 @@ class BoilOffGeometryTestCase(unittest.TestCase):
             tolerance=1e-8,
         )
         assert_near_equal(
-            self.p.get_val("L_interface", units="m"), np.array([0.0, 1.212435565298214, 1.4, 1.2124355652982144, 0.0]), tolerance=1e-8
+            self.p.get_val("L_interface", units="m"),
+            np.array([0.0, 1.212435565298214, 1.4, 1.2124355652982144, 0.0]),
+            tolerance=1e-8,
         )
         assert_near_equal(self.p.get_val("A_wet", units="m**2"), A_wet, tolerance=1e-8)
         assert_near_equal(self.p.get_val("A_dry", units="m**2"), A_tank - A_wet, tolerance=1e-8)
