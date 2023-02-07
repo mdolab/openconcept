@@ -94,7 +94,7 @@ class BoilOff(om.Group):
         self.add_subsystem("liq_height_calc", LiquidHeight(num_nodes=nn), promotes_inputs=["radius", "length"])
         self.add_subsystem("interface_params", BoilOffGeometry(num_nodes=nn), promotes_inputs=["radius", "length"])
         self.connect("fill_level", "liq_height_calc.fill_level")
-        self.connect("liq_height_calc.h_liq", "interface_params.h_liq")
+        self.connect("liq_height_calc.h_liq_frac", "interface_params.h_liq_frac")
 
         # Compute the ODE equations to be integrated
         self.add_subsystem(
@@ -123,7 +123,7 @@ class BoilOff(om.Group):
         integ.add_integrand("m_gas", rate_name="m_dot_gas", units="kg", lower=1e-4)
         integ.add_integrand("m_liq", rate_name="m_dot_liq", units="kg", lower=1e-2)
         integ.add_integrand("T_gas", rate_name="T_dot_gas", units="K", lower=15, upper=50)
-        integ.add_integrand("T_liq", rate_name="T_dot_liq", units="K", lower=1e-3, upper=25)
+        integ.add_integrand("T_liq", rate_name="T_dot_liq", units="K", lower=10, upper=25)
         integ.add_integrand("V_gas", rate_name="V_dot_gas", units="m**3", lower=1e-3)
 
         # Connect the ODE to the integrator
@@ -194,6 +194,15 @@ class LiquidHeight(om.ImplicitComponent):
     """
     Implicitly compute the height of liquid in the tank.
 
+          |--- length ---|
+         . -------------- .         ---
+      ,'                    `.       | radius
+     /                        \      |
+    |                          |    ---
+     \                        /
+      `. ~~~~~~~~~~~~~~~~~~ ,'      -.- h  -->  h_liq_frac = h / (2 * radius)
+         ` -------------- '         -'-
+
     Inputs
     ------
     fill_level : float
@@ -206,8 +215,10 @@ class LiquidHeight(om.ImplicitComponent):
 
     Outputs
     -------
-    h_liq : float
-        Height of the liquid in the tank (vector, m)
+    h_liq_frac : float
+        Height of the liquid in the tank nondimensionalized by the height of
+        the tank; 1.0 indicates the height is two radii (at the top of the tank)
+        and 0.0 indicates the height is zero (vector, dimensionless)
 
     Options
     -------
@@ -225,17 +236,17 @@ class LiquidHeight(om.ImplicitComponent):
         self.add_input("radius", units="m")
         self.add_input("length", units="m")
 
-        self.add_output("h_liq", val=1e-2, units="m", shape=(nn,), lower=1e-3)
+        self.add_output("h_liq_frac", val=0.5, shape=(nn,), lower=1e-3, upper=1.0 - 1e-3)
 
         arng = np.arange(nn)
-        self.declare_partials("h_liq", ["radius", "length"], rows=arng, cols=np.zeros(nn))
-        self.declare_partials("h_liq", ["h_liq", "fill_level"], rows=arng, cols=arng)
+        self.declare_partials("h_liq_frac", ["radius", "length"], rows=arng, cols=np.zeros(nn))
+        self.declare_partials("h_liq_frac", ["h_liq_frac", "fill_level"], rows=arng, cols=arng)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         fill = inputs["fill_level"]
         r = inputs["radius"]
         L = inputs["length"]
-        h = outputs["h_liq"]
+        h = outputs["h_liq_frac"] * 2 * r
 
         # For the current guess of the liquid height, compute the
         # volume of fluid in the hemispherical and cylindrical
@@ -250,13 +261,13 @@ class LiquidHeight(om.ImplicitComponent):
 
         # Residual is difference between liquid volume given current
         # height guess and actual liquid volume computed with fill level
-        residuals["h_liq"] = V_sph + V_cyl - V_tank * fill
+        residuals["h_liq_frac"] = V_sph + V_cyl - V_tank * fill
 
     def linearize(self, inputs, outputs, J):
         fill = inputs["fill_level"]
         r = inputs["radius"]
         L = inputs["length"]
-        h = outputs["h_liq"]
+        h = outputs["h_liq_frac"] * 2 * r
 
         # Compute partials of spherical volume w.r.t. inputs and height
         Vsph_r = np.pi * h**2
@@ -279,14 +290,14 @@ class LiquidHeight(om.ImplicitComponent):
         Vtank_r = 4 * np.pi * r**2 + 2 * np.pi * r * L
         Vtank_L = np.pi * r**2
 
-        J["h_liq", "radius"] = Vsph_r + Vcyl_r - Vtank_r * fill
-        J["h_liq", "length"] = Vcyl_L - Vtank_L * fill
-        J["h_liq", "fill_level"] = -V_tank
-        J["h_liq", "h_liq"] = Vsph_h + Vcyl_h
+        J["h_liq_frac", "radius"] = Vsph_r + Vcyl_r - Vtank_r * fill + (Vsph_h + Vcyl_h) * 2 * outputs["h_liq_frac"]
+        J["h_liq_frac", "length"] = Vcyl_L - Vtank_L * fill
+        J["h_liq_frac", "fill_level"] = -V_tank
+        J["h_liq_frac", "h_liq_frac"] = (Vsph_h + Vcyl_h) * 2 * r
 
     def guess_nonlinear(self, inputs, outputs, residuals):
         # Guess the height initially using a linear approximation of height w.r.t. fill level
-        outputs["h_liq"] = 2 * inputs["fill_level"] * inputs["radius"]
+        outputs["h_liq_frac"] = inputs["fill_level"]
 
 
 class BoilOffGeometry(om.ExplicitComponent):
@@ -299,13 +310,15 @@ class BoilOffGeometry(om.ExplicitComponent):
      /                        \      |
     |                          |    ---
      \                        /
-      `. ~~~~~~~~~~~~~~~~~~ ,'      -.- h_liq
+      `. ~~~~~~~~~~~~~~~~~~ ,'      -.- h  -->  h_liq_frac = h / (2 * radius)
          ` -------------- '         -'-
 
     Inputs
     ------
-    h_liq : float
-        Height of the liquid in the tank (vector, m)
+    h_liq_frac : float
+        Height of the liquid in the tank nondimensionalized by the height of
+        the tank; 1.0 indicates the height is two radii (at the top of the tank)
+        and 0.0 indicates the height is zero (vector, dimensionless)
     radius : float
         Inner radius of the cylinder and hemispherical end caps. This value
         does not include the insulation (scalar, m).
@@ -337,7 +350,7 @@ class BoilOffGeometry(om.ExplicitComponent):
 
     def setup(self):
         nn = self.options["num_nodes"]
-        self.add_input("h_liq", units="m", shape=(nn,))
+        self.add_input("h_liq_frac", shape=(nn,))
         self.add_input("radius", units="m")
         self.add_input("length", units="m")
 
@@ -347,13 +360,13 @@ class BoilOffGeometry(om.ExplicitComponent):
         self.add_output("A_dry", units="m**2", shape=(nn,), lower=1e-5, val=5.0)
 
         arng = np.arange(nn)
-        self.declare_partials(["*"], "h_liq", rows=arng, cols=arng)
+        self.declare_partials(["*"], "h_liq_frac", rows=arng, cols=arng)
         self.declare_partials(["*"], ["radius", "length"], rows=arng, cols=np.zeros(nn))
 
     def compute(self, inputs, outputs):
-        h = inputs["h_liq"]
         r = inputs["radius"]
         L = inputs["length"]
+        h = inputs["h_liq_frac"] * 2 * r
 
         # Total area of the tank
         A_tank = 4 * np.pi * r**2 + 2 * np.pi * r * L
@@ -371,9 +384,9 @@ class BoilOffGeometry(om.ExplicitComponent):
         outputs["A_dry"] = A_tank - outputs["A_wet"]
 
     def compute_partials(self, inputs, J):
-        h = inputs["h_liq"]
         r = inputs["radius"]
         L = inputs["length"]
+        h = inputs["h_liq_frac"] * 2 * r
 
         # Derivatives of chord and central angle of segment w.r.t. height and radius
         c = 2 * np.sqrt(2 * r * h - h**2)  # chord length of circular segment
@@ -384,19 +397,19 @@ class BoilOffGeometry(om.ExplicitComponent):
         th_r = -2 / np.sqrt(1 - (1 - h / r) ** 2) * h / r**2
         th_h = 2 / np.sqrt(1 - (1 - h / r) ** 2) / r
 
-        J["A_interface", "h_liq"] = c_h * (np.pi * c / 2 + L)
-        J["A_interface", "radius"] = c_r * (np.pi * c / 2 + L)
+        J["A_interface", "h_liq_frac"] = c_h * (np.pi * c / 2 + L) * 2 * r
+        J["A_interface", "radius"] = c_r * (np.pi * c / 2 + L) + J["A_interface", "h_liq_frac"] / r * inputs["h_liq_frac"]
         J["A_interface", "length"] = c
 
-        J["L_interface", "h_liq"] = c_h
-        J["L_interface", "radius"] = c_r
+        J["L_interface", "h_liq_frac"] = c_h * 2 * r
+        J["L_interface", "radius"] = c_r + J["L_interface", "h_liq_frac"] / r * inputs["h_liq_frac"]
         J["L_interface", "length"] *= 0.0
 
-        J["A_wet", "h_liq"] = 2 * np.pi * r + th_h * r * L
-        J["A_wet", "radius"] = 2 * np.pi * h + th * L + th_r * r * L
+        J["A_wet", "h_liq_frac"] = (2 * np.pi * r + th_h * r * L) * 2 * r
+        J["A_wet", "radius"] = 2 * np.pi * h + th * L + th_r * r * L + J["A_wet", "h_liq_frac"] / r * inputs["h_liq_frac"]
         J["A_wet", "length"] = th * r
 
-        J["A_dry", "h_liq"] = -J["A_wet", "h_liq"]
+        J["A_dry", "h_liq_frac"] = -J["A_wet", "h_liq_frac"]
         J["A_dry", "radius"] = 8 * np.pi * r + 2 * np.pi * L - J["A_wet", "radius"]
         J["A_dry", "length"] = 2 * np.pi * r - J["A_wet", "length"]
 
@@ -718,7 +731,9 @@ class LH2BoilOffODE(om.ExplicitComponent):
         d_m_dot_boil_off = 1.0 * d_m_dot_gas
 
         # Influence of terms in m_dot_boil_off
-        d_Q_dot_gas_int = self.m_dot_boil_off / self.Q_dot_gas_int * d_m_dot_boil_off
+        d_Q_dot_gas_int = d_m_dot_boil_off / (
+            self.cp_liq * (self.T_int - T_liq) + (self.h_gas - self.h_int) + (self.h_gas - self.h_sat_gas)
+        )
         deriv_m_dot_boil_off_denom = (
             -self.Q_dot_gas_int
             / (self.cp_liq * (self.T_int - T_liq) + 2 * self.h_gas - self.h_int - self.h_sat_gas) ** 2
@@ -739,7 +754,7 @@ class LH2BoilOffODE(om.ExplicitComponent):
             is_m_dot = output_name == "m_dot_gas"
 
             # Influence of terms in Q_dot_gas_int
-            d_heat_transfer_coeff_gas_int = self.Q_dot_gas_int / self.heat_transfer_coeff_gas_int * Q_dot_gas_int_seed
+            d_heat_transfer_coeff_gas_int = A_int * (T_gas - self.T_int) * Q_dot_gas_int_seed
             d_A_interface = self.Q_dot_gas_int / A_int * Q_dot_gas_int_seed
             d_T_gas = self.Q_dot_gas_int / (T_gas - self.T_int) * Q_dot_gas_int_seed
             if is_m_dot:
@@ -754,19 +769,22 @@ class LH2BoilOffODE(om.ExplicitComponent):
             d_nusselt = self.k_sat_gas / L_int * d_heat_transfer_coeff_gas_int
 
             # Influence of terms in nusselt
-            d_grashof = (
+            NaN_mask = np.logical_and(self.prandtl != 0.0, self.grashof != 0.0)
+            d_grashof = np.zeros_like(self.grashof)
+            d_prandtl = np.zeros_like(self.prandtl)
+            d_grashof[NaN_mask] = (
                 self.n_const
                 * self.C_const
-                * (self.prandtl * self.grashof) ** (self.n_const - 1)
-                * self.prandtl
-                * d_nusselt
+                * (self.prandtl[NaN_mask] * self.grashof[NaN_mask]) ** (self.n_const - 1)
+                * self.prandtl[NaN_mask]
+                * d_nusselt[NaN_mask]
             )
-            d_prandtl = (
+            d_prandtl[NaN_mask] = (
                 self.n_const
                 * self.C_const
-                * (self.prandtl * self.grashof) ** (self.n_const - 1)
-                * self.grashof
-                * d_nusselt
+                * (self.prandtl[NaN_mask] * self.grashof[NaN_mask]) ** (self.n_const - 1)
+                * self.grashof[NaN_mask]
+                * d_nusselt[NaN_mask]
             )
 
             # Influence of terms in grashof
@@ -786,8 +804,8 @@ class LH2BoilOffODE(om.ExplicitComponent):
             # These derivatives are zero anywhere the grashof number was zeroed out
             mask = np.ones(self.options["num_nodes"])
             mask[self.prandtl < 0] = 0.0
-            d_cp_sat_gas = self.prandtl / self.cp_sat_gas * mask * d_prandtl
-            d_visc_sat_gas += self.prandtl / self.visc_sat_gas * mask * d_prandtl
+            d_cp_sat_gas = self.visc_sat_gas / self.k_sat_gas * mask * d_prandtl
+            d_visc_sat_gas += self.cp_sat_gas / self.k_sat_gas * mask * d_prandtl
             d_k_sat_gas += -self.prandtl / self.k_sat_gas * mask * d_prandtl
 
             # T_mean_film (and P_gas on h_sat_gas) influence on saturated gas properties

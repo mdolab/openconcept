@@ -12,18 +12,18 @@ class LiquidHeightTestCase(unittest.TestCase):
         self.p = p = om.Problem()
         p.model.add_subsystem("model", LiquidHeight(num_nodes=nn), promotes=["*"])
         p.model.nonlinear_solver = om.NewtonSolver(
-            atol=1e-14, rtol=1e-14, solve_subsystems=True, iprint=2, err_on_non_converge=True
+            atol=1e-14, rtol=1e-14, solve_subsystems=True, iprint=2, err_on_non_converge=True, maxiter=20
         )
         p.model.linear_solver = om.DirectSolver()
         p.setup(force_alloc_complex=True)
 
     def test_simple(self):
-        r = 0.5
+        r = 0.6
         L = 0.3
 
         # Define height and work backwards to fill level so we
         # can recompute it and check against the original height
-        off = 1.0  # deg
+        off = 5.0  # deg
         theta = np.linspace(off, 2 * np.pi - off, self.nn)
         h = r * (1 - np.cos(theta / 2))
         V_fill = r**2 / 2 * (theta - np.sin(theta)) * L + np.pi * h**2 / 3 * (3 * r - h)
@@ -36,11 +36,11 @@ class LiquidHeightTestCase(unittest.TestCase):
 
         self.p.run_model()
 
-        assert_near_equal(self.p.get_val("h_liq", units="m"), h, tolerance=1e-8)
+        assert_near_equal(self.p.get_val("h_liq_frac"), h / (2 * r), tolerance=1e-8)
 
     def test_derivatives(self):
         self.p.set_val("fill_level", np.linspace(0.1, 0.9, self.nn))
-        self.p.set_val("radius", 0.5, units="m")
+        self.p.set_val("radius", 0.6, units="m")
         self.p.set_val("length", 1.2, units="m")
 
         self.p.run_model()
@@ -55,7 +55,7 @@ class BoilOffGeometryTestCase(unittest.TestCase):
         p.model.add_subsystem("model", BoilOffGeometry(num_nodes=nn), promotes=["*"])
         p.setup(force_alloc_complex=True)
 
-        self.r = 0.5
+        self.r = 0.7
         self.L = 0.3
 
         self.p.set_val("radius", self.r, units="m")
@@ -64,7 +64,7 @@ class BoilOffGeometryTestCase(unittest.TestCase):
     def test_empty(self):
         self.setup_model(1)
 
-        self.p.set_val("h_liq", 0, units="m")
+        self.p.set_val("h_liq_frac", 0)
 
         self.p.run_model()
 
@@ -78,7 +78,7 @@ class BoilOffGeometryTestCase(unittest.TestCase):
     def test_full(self):
         self.setup_model(1)
 
-        self.p.set_val("h_liq", 2 * self.r, units="m")
+        self.p.set_val("h_liq_frac", 1.0)
 
         self.p.run_model()
 
@@ -92,7 +92,7 @@ class BoilOffGeometryTestCase(unittest.TestCase):
     def test_half(self):
         self.setup_model(1)
 
-        self.p.set_val("h_liq", self.r, units="m")
+        self.p.set_val("h_liq_frac", 0.5)
 
         self.p.run_model()
 
@@ -111,20 +111,20 @@ class BoilOffGeometryTestCase(unittest.TestCase):
         nn = 5
         self.setup_model(nn)
 
-        self.p.set_val("h_liq", np.linspace(0, 2 * self.r, nn), units="m")
+        self.p.set_val("h_liq_frac", np.linspace(0, 1.0, nn))
 
         self.p.run_model()
 
-        A_wet = np.array([0.0, 1.09955743, 2.04203522, 2.98451302, 4.08407045])
+        A_wet = np.array([0.0, 1.97920337, 3.73849526, 5.49778714, 7.47699052])
         A_tank = 4 * np.pi * self.r**2 + 2 * np.pi * self.r * self.L
 
         assert_near_equal(
             self.p.get_val("A_interface", units="m**2"),
-            np.array([0.0, 0.84885624, 1.08539816, 0.84885624, 0.0]),
+            np.array([0.0, 1.5182659697837129, 1.9593804002589983, 1.5182659697837138, 0.0]),
             tolerance=1e-8,
         )
         assert_near_equal(
-            self.p.get_val("L_interface", units="m"), np.array([0.0, 0.8660254, 1.0, 0.8660254, 0.0]), tolerance=1e-8
+            self.p.get_val("L_interface", units="m"), np.array([0.0, 1.212435565298214, 1.4, 1.2124355652982144, 0.0]), tolerance=1e-8
         )
         assert_near_equal(self.p.get_val("A_wet", units="m**2"), A_wet, tolerance=1e-8)
         assert_near_equal(self.p.get_val("A_dry", units="m**2"), A_tank - A_wet, tolerance=1e-8)
@@ -134,7 +134,7 @@ class BoilOffGeometryTestCase(unittest.TestCase):
         self.setup_model(nn)
 
         off = 1e-6
-        self.p.set_val("h_liq", np.linspace(off, 2 * self.r - off, nn), units="m")
+        self.p.set_val("h_liq_frac", np.linspace(off, 1.0 - off, nn))
 
         partials = self.p.check_partials(method="cs", compact_print=True)
         assert_check_partials(partials)
@@ -146,7 +146,7 @@ class BoilOffFillLevelCalcTestCase(unittest.TestCase):
         p.model.add_subsystem("model", BoilOffFillLevelCalc(num_nodes=nn), promotes=["*"])
         p.setup(force_alloc_complex=True)
 
-        self.r = 0.5
+        self.r = 0.7
         self.L = 0.3
 
         self.p.set_val("radius", self.r, units="m")
