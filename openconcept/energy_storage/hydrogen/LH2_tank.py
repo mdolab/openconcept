@@ -94,6 +94,34 @@ class LH2Tank(om.Group):
         to prevent air leaking in and creating a combustible mixture (scalar, Pa)
     liquid_T_init : float
         Initial temperature of bulk liquid hydrogen, default 20 K (scalar, K)
+    heat_multiplier : float
+        Multiplier on the output heat to account for heat through supports
+        and other connections, by default 1.3 (scalar, dimensionless)
+    weight_fudge_factor : float
+        Multiplier on tank weight to account for supports, valves, etc., by default 1.1
+    stiffening_multiplier : float
+        Machining stiffeners into the inner side of the vacuum shell enhances its buckling
+        performance, enabling weight reductions. The value provided in this option is a
+        multiplier on the outer wall thickness. The default value of 0.8 is higher than it
+        would be if it were purely empirically determined from Sullivan et al. 2006
+        (https://ntrs.nasa.gov/citations/20060021606), but has been made much more
+        conservative to fall more in line with ~60% gravimetric efficiency tanks
+    inner_safety_factor : float
+        Safety factor for sizing inner wall, by default 1.5
+    inner_yield_stress : float
+        Yield stress of inner wall material (Pa), by default Al 2014-T6 taken from Table IV of
+        Sullivan et al. 2006 (https://ntrs.nasa.gov/citations/20060021606)
+    inner_density : float
+        Density of inner wall material (kg/m^3), by default Al 2014-T6 taken from Table IV of
+        Sullivan et al. 2006 (https://ntrs.nasa.gov/citations/20060021606)
+    outer_safety_factor : float
+        Safety factor for sizing outer wall, by default 2
+    outer_youngs_modulus : float
+        Young's modulus of outer wall material (Pa), by default LiAl 2090 taken from Table XIII of
+        Sullivan et al. 2006 (https://ntrs.nasa.gov/citations/20060021606)
+    outer_density : float
+        Density of outer wall material (kg/m^3), by default LiAl 2090 taken from Table XIII of
+        Sullivan et al. 2006 (https://ntrs.nasa.gov/citations/20060021606)
     """
 
     def initialize(self):
@@ -102,6 +130,15 @@ class LH2Tank(om.Group):
         self.options.declare("ullage_T_init", default=21.0, desc="Initial ullage temp (K)")
         self.options.declare("ullage_P_init", default=1.5e5, desc="Initial ullage pressure (Pa)")
         self.options.declare("liquid_T_init", default=20.0, desc="Initial bulk liquid temp (K)")
+        self.options.declare("heat_multiplier", default=1.3, desc="Multiplier on heat leak")
+        self.options.declare("weight_fudge_factor", default=1.1, desc="Weight multiplier to account for other stuff")
+        self.options.declare("stiffening_multiplier", default=0.8, desc="Multiplier on wall thickness")
+        self.options.declare("inner_safety_factor", default=1.5, desc="Safety factor on inner wall thickness")
+        self.options.declare("inner_yield_stress", default=413.7e6, desc="Yield stress of inner wall material in Pa")
+        self.options.declare("inner_density", default=2796.0, desc="Density of inner wall material in kg/m^3")
+        self.options.declare("outer_safety_factor", default=2.0, desc="Safety factor on outer wall thickness")
+        self.options.declare("outer_youngs_modulus", default=8.0e10, desc="Young's modulus of outer wall material, Pa")
+        self.options.declare("outer_density", default=2699.0, desc="Density of outer wall material in kg/m^3")
 
     def setup(self):
         nn = self.options["num_nodes"]
@@ -122,7 +159,9 @@ class LH2Tank(om.Group):
 
         # Thermal model
         self.add_subsystem(
-            "heat_leak", HeatTransferVacuumTank(num_nodes=nn), promotes_inputs=["T_env", "N_layers", "T_liq", "T_gas"]
+            "heat_leak",
+            HeatTransferVacuumTank(num_nodes=nn, heat_multiplier=self.options["heat_multiplier"]),
+            promotes_inputs=["T_env", "N_layers", "T_liq", "T_gas"],
         )
         self.add_subsystem(
             "total_heat",
@@ -137,7 +176,16 @@ class LH2Tank(om.Group):
         # Structural weight model
         self.add_subsystem(
             "structure",
-            VacuumTankWeight(),
+            VacuumTankWeight(
+                weight_fudge_factor=self.options["weight_fudge_factor"],
+                stiffening_multiplier=self.options["stiffening_multiplier"],
+                inner_safety_factor=self.options["inner_safety_factor"],
+                inner_yield_stress=self.options["inner_yield_stress"],
+                inner_density=self.options["inner_density"],
+                outer_safety_factor=self.options["outer_safety_factor"],
+                outer_youngs_modulus=self.options["outer_youngs_modulus"],
+                outer_density=self.options["outer_density"],
+            ),
             promotes_inputs=[
                 "environment_design_pressure",
                 "max_expected_operating_pressure",
