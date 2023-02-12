@@ -140,7 +140,7 @@ class BoilOff(om.Group):
         self.connect("integ.V_gas", ["boil_off_ode.V_gas", "level_calc.V_gas"])
 
         # Set defaults for inputs promoted from multiple sources
-        self.set_input_defaults("radius", 2.0, units="m")
+        self.set_input_defaults("radius", 1.0, units="m")
         self.set_input_defaults("length", 0.5, units="m")
 
         # Set a solver specifically for this component in an attempt to increase robustness

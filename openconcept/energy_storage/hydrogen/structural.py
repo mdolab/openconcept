@@ -136,7 +136,7 @@ class VacuumTankWeight(om.Group):
         self.connect("MLI.weight", "total_weight.W_MLI")
 
         # Set defaults for inputs promoted from multiple sources
-        self.set_input_defaults("radius", 0.5, units="m")
+        self.set_input_defaults("radius", 1.0, units="m")
         self.set_input_defaults("length", 0.5, units="m")
 
 
