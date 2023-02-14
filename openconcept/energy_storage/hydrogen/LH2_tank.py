@@ -218,7 +218,7 @@ class LH2Tank(om.Group):
 
         # Use block Gauss-Seidel solver for this component
         self.nonlinear_solver = om.NonlinearBlockGS(iprint=2)
-        self.linear_solver = om.LinearBlockGS(iprint=2)
+        self.linear_solver = om.LinearBlockGS(iprint=0)
 
 
 if __name__ == "__main__":

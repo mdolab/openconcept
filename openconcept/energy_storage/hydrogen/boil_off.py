@@ -147,18 +147,48 @@ class BoilOff(om.Group):
         self.linear_solver = om.DirectSolver()
         self.nonlinear_solver = om.NewtonSolver()
         self.nonlinear_solver.options["solve_subsystems"] = False
-        self.nonlinear_solver.options["maxiter"] = 50
+        self.nonlinear_solver.options["maxiter"] = 30
         self.nonlinear_solver.options["iprint"] = 2
         self.nonlinear_solver.options["rtol"] = 1e-9
-        self.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(alpha=1.0, iprint=2, print_bound_enforce=False)
+        self.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(alpha=1.0, iprint=0, print_bound_enforce=False)
 
-    def guess_nonlinear(self, inputs, outputs, _):
+    def guess_nonlinear(self, inputs, outputs, resids):
         """
         Set both the guesses and the initial values at the beginning of the phase
         for the integrated states. The initial state values should get overwritten
         if this component lives in an intermediate phase and OpenConcept has linked
         the states from a previous phase to this one.
         """
+        # If the model is already converged, don't change anything
+        converged = True
+        for r in resids.values():
+            if np.any(np.abs(r) > 1e-2) or np.all(r == 0.0):
+                converged = False
+                break
+        if converged:
+            return
+
+        # If the initial integrated state values are not zero, they have either already
+        # been set appropriately or this component lives in the middle or end of a mission
+        # where the initial integrated state is set by the final integrated state in the
+        # previous mission phase. In any of these cases, the initial values should not
+        # be overwritten.
+        if (
+            inputs["integ.m_gas_initial"].item() != 0.0 and
+            inputs["integ.m_liq_initial"].item() != 0.0 and
+            inputs["integ.T_gas_initial"].item() != 0.0 and
+            inputs["integ.T_liq_initial"].item() != 0.0 and
+            inputs["integ.V_gas_initial"].item() != 0.0
+        ):
+            outputs["m_gas"] = inputs["integ.m_gas_initial"]
+            outputs["m_liq"] = inputs["integ.m_liq_initial"]
+            outputs["T_gas"] = inputs["integ.T_gas_initial"]
+            outputs["T_liq"] = inputs["integ.T_liq_initial"]
+            outputs["integ.V_gas"] = inputs["integ.V_gas_initial"]
+            return
+
+        # The remaining case is that the model is not yet converged and the
+        # initial values must be set, so do the thing
         r = inputs["level_calc.radius"]
         L = inputs["level_calc.length"]
         fill_init = self.options["init_fill_level"]
