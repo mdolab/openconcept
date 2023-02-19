@@ -74,7 +74,7 @@ Benjamin J. Brelje and Joaquim R.R.A. Martins, "Development of a Conceptual Desi
 	month = {July},
 	title = {Development of a Conceptual Design Model for Aircraft Electric Propulsion with Efficient Gradients},
 	year = {2018}
-	}
+}
 ```
 
 If using the integrated OpenAeroStruct VLM or aerostructural aerodynamic models, please cite the following [conference paper](https://www.researchgate.net/publication/357559489_Aerostructural_wing_design_optimization_considering_full_mission_analysis):
@@ -89,5 +89,5 @@ Eytan J. Adler and Joaquim R.R.A. Martins, "Aerostructural wing design optimizat
 	doi         = {10.2514/6.2022-0382},
 	month       = {January},
 	year        = {2022}
-	}
+}
 ```
