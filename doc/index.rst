@@ -54,7 +54,7 @@ Dependencies
 
 OpenConcept is tested regularly on builds with the oldest and latest supported package versions. The package versions in the oldest and latest builds are the following:
 
-.. list-table:: Oldest and latest tested dependencies
+.. list-table::
    :header-rows: 1
 
    * - Package
