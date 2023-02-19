@@ -49,18 +49,15 @@ The features section of the documentation describes most of the components and s
 
 <!-- Remember to change doc/index.rst too! -->
 
-This toolkit requires the use of [OpenMDAO](https://openmdao.org/) 3.10.0 or later.
-OpenMDAO requires a late NumPy and SciPy.
+OpenConcept is tested regularly on builds with the oldest and latest supported package versions. The package versions in the oldest and latest builds are the following:
 
-The latest versions all tests have passed on are
-
-| Package | Version |
-| ------- | ------- |
-| Python | 3.10.4 |
-| OpenMDAO | 3.16.0 |
-| NumPy | 1.22.4 |
-| SciPy | 1.7.3 |
-| OpenAeroStruct | 2.5.1 |
+| Package | Oldest | Latest |
+| ------- | ------- | ------ |
+| Python | 3.8 | 3.11 |
+| OpenMDAO | 3.10 | latest |
+| NumPy | 1.14 | latest |
+| SciPy | 1.0.0 | latest |
+| OpenAeroStruct | latest | latest |
 
 ## Citation
 

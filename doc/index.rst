@@ -52,25 +52,29 @@ Dependencies
 
 .. Remember to change in the readme too!
 
-This toolkit requires the use of `OpenMDAO <https://openmdao.org>`__ 3.10.0 or later due to backward-incompatible changes.
-OpenMDAO requires a recent NumPy and SciPy.
-Python 3.8, 3.9, or 3.10 are recommended since they are the versions with which the code is tested, but newer Python versions will likely work as well.
+OpenConcept is tested regularly on builds with the oldest and latest supported package versions. The package versions in the oldest and latest builds are the following:
 
-.. list-table:: Latest tested dependencies
+.. list-table:: Oldest and latest tested dependencies
    :header-rows: 1
 
    * - Package
-     - Version
+     - Oldest
+     - Latest
    * - Python
-     - 3.10.4
+     - 3.8
+     - 3.11
    * - OpenMDAO
-     - 3.16.0
+     - 3.10
+     - latest
    * - NumPy
-     - 1.22.4
+     - 1.14
+     - latest
    * - SciPy
-     - 1.7.3
+     - 1.0.0
+     - latest
    * - OpenAeroStruct
-     - 2.5.1
+     - latest
+     - latest
 
 ---------------
 Please Cite Us!
