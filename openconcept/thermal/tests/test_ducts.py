@@ -114,7 +114,6 @@ try:
 
         class MPDuct(pyc.MPCycle):
             def setup(self):
-
                 self.options["thermo_method"] = "CEA"
                 self.options["thermo_data"] = pyc.species_data.janaf
 

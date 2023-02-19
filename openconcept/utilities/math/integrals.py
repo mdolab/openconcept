@@ -125,7 +125,6 @@ def bdf3_cache_matrix(n, all_bdf=False):
 
 
 def simpson_cache_matrix(n):
-
     # Simpsons rule defines the "deltas" between each segment as [B] dqdt as follows
     # B is n-1 rows by n columns
     # the structure of this is (1/12) * the following:

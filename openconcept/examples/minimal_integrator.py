@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 
 # rst Imports (end)
 
+
 # rst Aircraft (beg)
 class AircraftWithFuelBurn(om.Group):
     """
