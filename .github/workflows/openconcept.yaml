@@ -23,10 +23,10 @@ jobs:
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
         dep-versions: ["oldest", "latest"]
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Set versions to test here ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        PYTHON_VERSION_OLDEST: ['3.6']
+        PYTHON_VERSION_OLDEST: ['3.8']
         PYTHON_VERSION_LATEST: ['3.11']
-        NUMPY_VERSION_OLDEST: ['1.14']  # latest is most recent on PyPI
-        SCIPY_VERSION_OLDEST: ['1.0.0']  # latest is most recent on PyPI
+        NUMPY_VERSION_OLDEST: ['1.20']  # latest is most recent on PyPI
+        SCIPY_VERSION_OLDEST: ['1.6.0']  # latest is most recent on PyPI
         OPENMDAO_VERSION_OLDEST: ['3.10']  # latest is most recent on PyPI
       fail-fast: false
     env:

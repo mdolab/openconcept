@@ -53,10 +53,10 @@ OpenConcept is tested regularly on builds with the oldest and latest supported p
 
 | Package | Oldest | Latest |
 | ------- | ------- | ------ |
-| Python | 3.6 | 3.11 |
+| Python | 3.8 | 3.11 |
 | OpenMDAO | 3.10 | latest |
-| NumPy | 1.14 | latest |
-| SciPy | 1.0.0 | latest |
+| NumPy | 1.20 | latest |
+| SciPy | 1.6.0 | latest |
 | OpenAeroStruct | latest | latest |
 
 ## Citation
