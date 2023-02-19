@@ -61,7 +61,7 @@ OpenConcept is tested regularly on builds with the oldest and latest supported p
      - Oldest
      - Latest
    * - Python
-     - 3.8
+     - 3.6
      - 3.11
    * - OpenMDAO
      - 3.10
