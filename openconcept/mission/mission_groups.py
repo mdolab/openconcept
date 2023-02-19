@@ -238,7 +238,8 @@ class IntegratorGroup(om.Group):
                             + "."
                             + var
                             + " "
-                            + "has no units specified. This can be dangerous."
+                            + "has no units specified. This can be dangerous.",
+                            stacklevel=2,
                         )
                     self.ode_integ.add_integrand(
                         state_name,
