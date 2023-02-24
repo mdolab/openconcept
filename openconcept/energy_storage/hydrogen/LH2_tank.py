@@ -216,9 +216,9 @@ class LH2Tank(om.Group):
         self.set_input_defaults("Q_add", np.zeros(nn), units="W")
         self.set_input_defaults("vacuum_gap", 5, units="cm")
 
-        # # Use block Gauss-Seidel solver for this component
-        # self.nonlinear_solver = om.NonlinearBlockGS(iprint=2, atol=1e-9, rtol=1e-9)
-        # self.linear_solver = om.LinearBlockGS(iprint=0)
+        # Use block Gauss-Seidel solver for this component
+        self.nonlinear_solver = om.NonlinearBlockGS(iprint=2, atol=1e-9, rtol=1e-9)
+        self.linear_solver = om.LinearBlockGS(iprint=0)
 
 
 if __name__ == "__main__":
