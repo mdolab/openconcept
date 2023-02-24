@@ -10,7 +10,7 @@ def aydelott_validation(case):
         "tank",
         LH2Tank(
             num_nodes=nn,
-            init_fill_level=case["fill_init"],
+            fill_level_init=case["fill_init"],
             ullage_T_init=case["T_init"],
             ullage_P_init=1e3 * case["P_init"],
         ),
@@ -67,7 +67,7 @@ def MHTB_validation(case):
         "tank",
         LH2Tank(
             num_nodes=nn,
-            init_fill_level=case["fill_init"],
+            fill_level_init=case["fill_init"],
             ullage_T_init=case["T_init"],
             ullage_P_init=1e3 * case["P_init"],
         ),
@@ -126,7 +126,7 @@ def Ball_HALE_validation(T_inf, Q_dot, boil_off):
     p = om.Problem()
     p.model.add_subsystem(
         "tank",
-        LH2Tank(num_nodes=nn, init_fill_level=0.95, ullage_T_init=21.0, ullage_P_init=85 * 6895.0),  # 85 PSIG
+        LH2Tank(num_nodes=nn, fill_level_init=0.95, ullage_T_init=21.0, ullage_P_init=85 * 6895.0),  # 85 PSIG
         promotes=["*"],
     )
     p.model.linear_solver = om.DirectSolver()
@@ -242,11 +242,53 @@ if __name__ == "__main__":
     # this test case is commented out. The other validation cases give good results.
     #
     #                                      W               kPa                 kPa                K                 K                  sec
-    cases = [{'fill_init': 0.514, 'Q_dot': 9.50, 'P_init': 105.462, 'P_final': 705.396, 'T_init': 20.28, 'T_final': 0.000, 'duration': 1441},
-             {'fill_init': 0.349, 'Q_dot': 31.4, 'P_init': 122.161, 'P_final': 671.488, 'T_init': 20.12, 'T_final': 35.44, 'duration': 433},
-             {'fill_init': 0.489, 'Q_dot': 34.1, 'P_init': 110.633, 'P_final': 741.566, 'T_init': 20.19, 'T_final': 31.17, 'duration': 400},
-             {'fill_init': 0.765, 'Q_dot': 38.1, 'P_init': 127.036, 'P_final': 658.015, 'T_init': 20.51, 'T_final': 63.85, 'duration': 272},
-             {'fill_init': 0.507, 'Q_dot': 58.5, 'P_init': 105.462, 'P_final': 717.103, 'T_init': 20.28, 'T_final': 0.000, 'duration': 222}]
+    cases = [
+        {
+            "fill_init": 0.514,
+            "Q_dot": 9.50,
+            "P_init": 105.462,
+            "P_final": 705.396,
+            "T_init": 20.28,
+            "T_final": 0.000,
+            "duration": 1441,
+        },
+        {
+            "fill_init": 0.349,
+            "Q_dot": 31.4,
+            "P_init": 122.161,
+            "P_final": 671.488,
+            "T_init": 20.12,
+            "T_final": 35.44,
+            "duration": 433,
+        },
+        {
+            "fill_init": 0.489,
+            "Q_dot": 34.1,
+            "P_init": 110.633,
+            "P_final": 741.566,
+            "T_init": 20.19,
+            "T_final": 31.17,
+            "duration": 400,
+        },
+        {
+            "fill_init": 0.765,
+            "Q_dot": 38.1,
+            "P_init": 127.036,
+            "P_final": 658.015,
+            "T_init": 20.51,
+            "T_final": 63.85,
+            "duration": 272,
+        },
+        {
+            "fill_init": 0.507,
+            "Q_dot": 58.5,
+            "P_init": 105.462,
+            "P_final": 717.103,
+            "T_init": 20.28,
+            "T_final": 0.000,
+            "duration": 222,
+        },
+    ]
     print("\n\n          AYDELOTT TESTS          ")
     print("----------------------------------")
     for case in cases:

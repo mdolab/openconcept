@@ -18,6 +18,11 @@ class BoilOff(om.Group):
     tank is nearly empty or nearly full. If used in an optimization problem,
     it may help to constrain the tank fill level to be greater than 1% or so.
 
+    WARNING: Do not modify or connect anything to the initial integrated delta state values
+             ("integ.delta_m_gas_initial", "integ.delta_m_liq_initial", etc.). They must
+             remain zero for the initial tank state to be the expected value. Set the initial
+             tank condition using the BoilOff options.
+
     Inputs
     ------
     radius : float
@@ -60,13 +65,13 @@ class BoilOff(om.Group):
     -------
     num_nodes : int
         Number of analysis points to run (scalar, dimensionless)
-    init_fill_level : float
-        Initial fill level (in range 0-1) of the tank, default 0.97
-        to leave space for boil off gas; 3% adopted from Cryoplane study (scalar, dimensionless)
+    fill_level_init : float
+        Initial fill level (in range 0-1) of the tank, default 0.95
+        to leave space for boil off gas; 5% adopted from Millis et al. 2009 (scalar, dimensionless)
     ullage_T_init : float
         Initial temperature of gas in ullage, default 21 K (scalar, K)
     ullage_P_init : float
-        Initial pressure of gas in ullage, default 120,000 Pa; ullage pressure must be higher than ambient
+        Initial pressure of gas in ullage, default 150,000 Pa; ullage pressure must be higher than ambient
         to prevent air leaking in and creating a combustible mixture (scalar, Pa)
     liquid_T_init : float
         Initial temperature of bulk liquid hydrogen, default 20 K (scalar, K)
@@ -74,9 +79,9 @@ class BoilOff(om.Group):
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of design points to run")
-        self.options.declare("init_fill_level", default=0.97, desc="Initial fill level")
+        self.options.declare("fill_level_init", default=0.95, desc="Initial fill level")
         self.options.declare("ullage_T_init", default=21.0, desc="Initial ullage temp (K)")
-        self.options.declare("ullage_P_init", default=1.2e5, desc="Initial ullage pressure (Pa)")
+        self.options.declare("ullage_P_init", default=1.5e5, desc="Initial ullage pressure (Pa)")
         self.options.declare("liquid_T_init", default=20.0, desc="Initial bulk liquid temp (K)")
 
     def setup(self):
@@ -114,17 +119,40 @@ class BoilOff(om.Group):
         self.connect("interface_params.A_wet", "boil_off_ode.A_wet")
         self.connect("interface_params.A_dry", "boil_off_ode.A_dry")
 
-        # Integrate the ODE
+        # The initial tank states are specified indirectly by the fill_level_init, ullage_T_init, ullage_P_init,
+        # and liquid_T_init options, along with the input tank radius and length. We can't connect a component
+        # directly to the integrator's inputs because those initial values are linked between phases. Thus, we
+        # use a bit of a trick where we actually integrate the change in the state values since the beginning
+        # of the mission and then add their correct initial values in the add_init_state_values component.
         integ = self.add_subsystem(
             "integ",
             Integrator(num_nodes=nn, diff_units="s", time_setup="duration", method="bdf3"),
-            promotes_outputs=["m_gas", "m_liq", "T_gas", "T_liq"],
         )
-        integ.add_integrand("m_gas", rate_name="m_dot_gas", units="kg", lower=1e-4)
-        integ.add_integrand("m_liq", rate_name="m_dot_liq", units="kg", lower=1e-2)
-        integ.add_integrand("T_gas", rate_name="T_dot_gas", units="K", lower=15, upper=50)
-        integ.add_integrand("T_liq", rate_name="T_dot_liq", units="K", lower=10, upper=25)
-        integ.add_integrand("V_gas", rate_name="V_dot_gas", units="m**3", lower=1e-3)
+        integ.add_integrand("delta_m_gas", rate_name="m_dot_gas", units="kg", val=0, start_val=0)
+        integ.add_integrand("delta_m_liq", rate_name="m_dot_liq", units="kg", val=0, start_val=0)
+        integ.add_integrand("delta_T_gas", rate_name="T_dot_gas", units="K", val=0, start_val=0)
+        integ.add_integrand("delta_T_liq", rate_name="T_dot_liq", units="K", val=0, start_val=0)
+        integ.add_integrand("delta_V_gas", rate_name="V_dot_gas", units="m**3", val=0, start_val=0)
+
+        self.add_subsystem(
+            "add_init_state_values",
+            InitialTankStateModification(
+                num_nodes=nn,
+                fill_level_init=self.options["fill_level_init"],
+                ullage_T_init=self.options["ullage_T_init"],
+                ullage_P_init=self.options["ullage_P_init"],
+                liquid_T_init=self.options["liquid_T_init"],
+            ),
+            promotes_inputs=["radius", "length"],
+            promotes_outputs=["m_liq", "m_gas", "T_liq", "T_gas"],
+        )
+
+        # Connect the integrated delta states to the component that increments them by their computed initial values
+        self.connect("integ.delta_m_gas", "add_init_state_values.delta_m_gas")
+        self.connect("integ.delta_m_liq", "add_init_state_values.delta_m_liq")
+        self.connect("integ.delta_T_gas", "add_init_state_values.delta_T_gas")
+        self.connect("integ.delta_T_liq", "add_init_state_values.delta_T_liq")
+        self.connect("integ.delta_V_gas", "add_init_state_values.delta_V_gas")
 
         # Connect the ODE to the integrator
         self.connect("boil_off_ode.m_dot_gas", "integ.m_dot_gas")
@@ -137,7 +165,7 @@ class BoilOff(om.Group):
         self.connect("m_liq", "boil_off_ode.m_liq")
         self.connect("T_gas", "boil_off_ode.T_gas")
         self.connect("T_liq", "boil_off_ode.T_liq")
-        self.connect("integ.V_gas", ["boil_off_ode.V_gas", "level_calc.V_gas"])
+        self.connect("add_init_state_values.V_gas", ["boil_off_ode.V_gas", "level_calc.V_gas"])
 
         # Set defaults for inputs promoted from multiple sources
         self.set_input_defaults("radius", 1.0, units="m")
@@ -150,48 +178,37 @@ class BoilOff(om.Group):
         self.nonlinear_solver.options["maxiter"] = 30
         self.nonlinear_solver.options["iprint"] = 2
         self.nonlinear_solver.options["rtol"] = 1e-9
-        self.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(alpha=1.0, iprint=0, print_bound_enforce=False)
+        self.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement="scalar", alpha=1.0, iprint=0, print_bound_enforce=False)
 
     def guess_nonlinear(self, inputs, outputs, resids):
-        """
-        Set both the guesses and the initial values at the beginning of the phase
-        for the integrated states. The initial state values should get overwritten
-        if this component lives in an intermediate phase and OpenConcept has linked
-        the states from a previous phase to this one.
-        """
         # If the model is already converged, don't change anything
-        converged = True
-        for r in resids.values():
-            if np.any(np.abs(r) > 1e-2) or np.all(r == 0.0):
-                converged = False
-                break
-        if converged:
+        norm = resids.get_norm()
+        if norm < 1e-2 and norm != 0.0:
             return
 
-        # If the initial integrated state values are not zero, they have either already
-        # been set appropriately or this component lives in the middle or end of a mission
-        # where the initial integrated state is set by the final integrated state in the
-        # previous mission phase. In any of these cases, the initial values should not
-        # be overwritten.
+        # If the initial integrated state values are not zero, this component lives in
+        # the middle or at the end of a mission where the initial integrated state is
+        # set by the final integrated state in the previous mission phase. In any of
+        # these cases, just use those initial values as the guess.
         if (
-            inputs["integ.m_gas_initial"].item() != 0.0 and
-            inputs["integ.m_liq_initial"].item() != 0.0 and
-            inputs["integ.T_gas_initial"].item() != 0.0 and
-            inputs["integ.T_liq_initial"].item() != 0.0 and
-            inputs["integ.V_gas_initial"].item() != 0.0
+            inputs["integ.delta_m_gas_initial"].item() != 0.0 and
+            inputs["integ.delta_m_liq_initial"].item() != 0.0 and
+            inputs["integ.delta_T_gas_initial"].item() != 0.0 and
+            inputs["integ.delta_T_liq_initial"].item() != 0.0 and
+            inputs["integ.delta_V_gas_initial"].item() != 0.0
         ):
-            outputs["m_gas"] = inputs["integ.m_gas_initial"]
-            outputs["m_liq"] = inputs["integ.m_liq_initial"]
-            outputs["T_gas"] = inputs["integ.T_gas_initial"]
-            outputs["T_liq"] = inputs["integ.T_liq_initial"]
-            outputs["integ.V_gas"] = inputs["integ.V_gas_initial"]
+            outputs["integ.delta_m_gas"] = inputs["integ.delta_m_gas_initial"]
+            outputs["integ.delta_m_liq"] = inputs["integ.delta_m_liq_initial"]
+            outputs["integ.delta_T_gas"] = inputs["integ.delta_T_gas_initial"]
+            outputs["integ.delta_T_liq"] = inputs["integ.delta_T_liq_initial"]
+            outputs["integ.delta_V_gas"] = inputs["integ.delta_V_gas_initial"]
             return
 
         # The remaining case is that the model is not yet converged and the
         # initial values must be set, so do the thing
         r = inputs["level_calc.radius"]
         L = inputs["level_calc.length"]
-        fill_init = self.options["init_fill_level"]
+        fill_init = self.options["fill_level_init"]
         T_gas_init = self.options["ullage_T_init"]
         P_gas_init = self.options["ullage_P_init"]
         T_liq_init = self.options["liquid_T_init"]
@@ -207,17 +224,7 @@ class BoilOff(om.Group):
         outputs["m_liq"] = m_liq
         outputs["T_gas"] = T_gas_init
         outputs["T_liq"] = T_liq_init
-        outputs["integ.V_gas"] = V_gas
-
-        # Set the initial values of the states for integration. Doing this here allows the values
-        # to be set properly while enabling them to be overwritten if this component lives within
-        # an intermediate phase and OpenConcept has connected the final states from the previous
-        # phase the the initial state of this one.
-        inputs["integ.m_gas_initial"] = m_gas
-        inputs["integ.m_liq_initial"] = m_liq
-        inputs["integ.T_gas_initial"] = T_gas_init
-        inputs["integ.T_liq_initial"] = T_liq_init
-        inputs["integ.V_gas_initial"] = V_gas
+        outputs["add_init_state_values.V_gas"] = V_gas
 
 
 class LiquidHeight(om.ImplicitComponent):
@@ -428,7 +435,9 @@ class BoilOffGeometry(om.ExplicitComponent):
         th_h = 2 / np.sqrt(1 - (1 - h / r) ** 2) / r
 
         J["A_interface", "h_liq_frac"] = c_h * (np.pi * c / 2 + L) * 2 * r
-        J["A_interface", "radius"] = c_r * (np.pi * c / 2 + L) + J["A_interface", "h_liq_frac"] / r * inputs["h_liq_frac"]
+        J["A_interface", "radius"] = (
+            c_r * (np.pi * c / 2 + L) + J["A_interface", "h_liq_frac"] / r * inputs["h_liq_frac"]
+        )
         J["A_interface", "length"] = c
 
         J["L_interface", "h_liq_frac"] = c_h * 2 * r
@@ -436,7 +445,9 @@ class BoilOffGeometry(om.ExplicitComponent):
         J["L_interface", "length"] *= 0.0
 
         J["A_wet", "h_liq_frac"] = (2 * np.pi * r + th_h * r * L) * 2 * r
-        J["A_wet", "radius"] = 2 * np.pi * h + th * L + th_r * r * L + J["A_wet", "h_liq_frac"] / r * inputs["h_liq_frac"]
+        J["A_wet", "radius"] = (
+            2 * np.pi * h + th * L + th_r * r * L + J["A_wet", "h_liq_frac"] / r * inputs["h_liq_frac"]
+        )
         J["A_wet", "length"] = th * r
 
         J["A_dry", "h_liq_frac"] = -J["A_wet", "h_liq_frac"]
@@ -1083,3 +1094,136 @@ class BoilOffFillLevelCalc(om.ExplicitComponent):
         J["fill_level", "V_gas"] = -1 / V_tank
         J["fill_level", "radius"] = inputs["V_gas"] / V_tank**2 * (4 * np.pi * r**2 + 2 * np.pi * r * L)
         J["fill_level", "length"] = inputs["V_gas"] / V_tank**2 * (np.pi * r**2)
+
+
+class InitialTankStateModification(om.ExplicitComponent):
+    """
+    Inputs
+    ------
+    delta_m_gas : float
+        Change in mass of the gaseous hydrogen in the tank ullage since the beginning of the mission (vector, kg)
+    delta_m_liq : float
+        Change in mass of liquid hydrogen in the tank since the beginning of the mission (vector, kg)
+    delta_T_gas : float
+        Change in temperature of the gaseous hydrogen in the ullage since the beginning of the mission (vector, K)
+    delta_T_liq : float
+        Change in temperature of the bulk liquid hydrogen since the beginning of the mission (vector, K)
+    delta_V_gas : float
+        Change in volume of the ullage since the beginning of the mission (vector, m^3)
+
+    Outputs
+    -------
+    m_gas : float
+        Mass of the gaseous hydrogen in the tank ullage (vector, kg)
+    m_liq : float
+        Mass of liquid hydrogen in the tank (vector, kg)
+    T_gas : float
+        Temperature of the gaseous hydrogen in the ullage (vector, K)
+    T_liq : float
+        Temperature of the bulk liquid hydrogen (vector, K)
+    V_gas : float
+        Volume of the ullage (vector, m^3)
+
+    Options
+    -------
+    num_nodes : int
+        Number of analysis points to run (scalar, dimensionless)
+    fill_level_init : float
+        Initial fill level (in range 0-1) of the tank, default 0.95
+        to leave space for boil off gas; 5% adopted from Millis et al. 2009 (scalar, dimensionless)
+    ullage_T_init : float
+        Initial temperature of gas in ullage, default 21 K (scalar, K)
+    ullage_P_init : float
+        Initial pressure of gas in ullage, default 150,000 Pa; ullage pressure must be higher than ambient
+        to prevent air leaking in and creating a combustible mixture (scalar, Pa)
+    liquid_T_init : float
+        Initial temperature of bulk liquid hydrogen, default 20 K (scalar, K)
+    """
+
+    def initialize(self):
+        self.options.declare("num_nodes", default=1, desc="Number of design points to run")
+        self.options.declare("fill_level_init", default=0.95, desc="Initial fill level")
+        self.options.declare("ullage_T_init", default=21.0, desc="Initial ullage temp (K)")
+        self.options.declare("ullage_P_init", default=1.5e5, desc="Initial ullage pressure (Pa)")
+        self.options.declare("liquid_T_init", default=20.0, desc="Initial bulk liquid temp (K)")
+
+    def setup(self):
+        nn = self.options["num_nodes"]
+
+        r_default = 1.0
+        L_default = 0.5
+        self.add_input("radius", val=r_default, units="m")
+        self.add_input("length", val=L_default, units="m")
+
+        self.add_input("delta_m_gas", shape=(nn,), units="kg", val=0.0)
+        self.add_input("delta_m_liq", shape=(nn,), units="kg", val=0.0)
+        self.add_input("delta_T_gas", shape=(nn,), units="K", val=0.0)
+        self.add_input("delta_T_liq", shape=(nn,), units="K", val=0.0)
+        self.add_input("delta_V_gas", shape=(nn,), units="m**3", val=0.0)
+
+        # Get reasonable default values for states
+        defaults = self._compute_initial_states(r_default, L_default)
+        self.add_output("m_gas", shape=(nn,), units="kg", lower=1e-6, val=defaults["m_gas_init"], upper=1e4)
+        self.add_output("m_liq", shape=(nn,), units="kg", lower=1e-2, val=defaults["m_liq_init"], upper=1e6)
+        self.add_output("T_gas", shape=(nn,), units="K", lower=15, val=defaults["T_gas_init"], upper=50)
+        self.add_output("T_liq", shape=(nn,), units="K", lower=10, val=defaults["T_liq_init"], upper=25)
+        self.add_output("V_gas", shape=(nn,), units="m**3", lower=1e-3, val=defaults["V_gas_init"], upper=1e4)
+
+        arng = np.arange(nn)
+        self.declare_partials("V_gas", "delta_V_gas", rows=arng, cols=arng, val=np.ones(nn))
+        self.declare_partials("m_liq", "delta_m_liq", rows=arng, cols=arng, val=np.ones(nn))
+        self.declare_partials("m_gas", "delta_m_gas", rows=arng, cols=arng, val=np.ones(nn))
+        self.declare_partials("T_gas", "delta_T_gas", rows=arng, cols=arng, val=np.ones(nn))
+        self.declare_partials("T_liq", "delta_T_liq", rows=arng, cols=arng, val=np.ones(nn))
+        self.declare_partials(["V_gas", "m_gas", "m_liq"], ["radius", "length"], rows=arng, cols=np.zeros(nn))
+
+    def compute(self, inputs, outputs):
+        init_states = self._compute_initial_states(inputs["radius"], inputs["length"])
+
+        outputs["V_gas"] = inputs["delta_V_gas"] + init_states["V_gas_init"]
+        outputs["m_gas"] = inputs["delta_m_gas"] + init_states["m_gas_init"]
+        outputs["m_liq"] = inputs["delta_m_liq"] + init_states["m_liq_init"]
+        outputs["T_gas"] = inputs["delta_T_gas"] + init_states["T_gas_init"]
+        outputs["T_liq"] = inputs["delta_T_liq"] + init_states["T_liq_init"]
+
+    def compute_partials(self, inputs, partials):
+        r = inputs["radius"]
+        L = inputs["length"]
+        fill_init = self.options["fill_level_init"]
+        T_gas_init = self.options["ullage_T_init"]
+        T_liq_init = self.options["liquid_T_init"]
+        P_init = self.options["ullage_P_init"]
+
+        # Partial derivatives of tank geometry w.r.t. radius and length
+        Vtank_r = 4 * np.pi * r**2 + 2 * np.pi * r * L
+        Vtank_L = np.pi * r**2
+
+        partials["V_gas", "radius"] = Vtank_r * (1 - fill_init)
+        partials["V_gas", "length"] = Vtank_L * (1 - fill_init)
+
+        coeff = P_init / T_gas_init / UNIVERSAL_GAS_CONST * MOLEC_WEIGHT_H2
+        partials["m_gas", "radius"] = coeff * partials["V_gas", "radius"]
+        partials["m_gas", "length"] = coeff * partials["V_gas", "length"]
+
+        partials["m_liq", "radius"] = (Vtank_r - partials["V_gas", "radius"]) * H2_prop.lh2_rho(T_liq_init)
+        partials["m_liq", "length"] = (Vtank_L - partials["V_gas", "length"]) * H2_prop.lh2_rho(T_liq_init)
+
+    def _compute_initial_states(self, radius, length):
+        """
+        Returns a dictionary with inital state values based on the specified options and tank geometry.
+        """
+        fill_init = self.options["fill_level_init"]
+        T_gas_init = self.options["ullage_T_init"]
+        T_liq_init = self.options["liquid_T_init"]
+        P_init = self.options["ullage_P_init"]
+
+        V_tank = 4 / 3 * np.pi * radius**3 + np.pi * radius**2 * length
+
+        res = {}
+        res["T_liq_init"] = T_liq_init
+        res["T_gas_init"] = T_gas_init
+        res["V_gas_init"] = V_tank * (1 - fill_init)
+        res["m_gas_init"] = P_init / T_gas_init / UNIVERSAL_GAS_CONST * res["V_gas_init"] * MOLEC_WEIGHT_H2
+        res["m_liq_init"] = (V_tank - res["V_gas_init"]) * H2_prop.lh2_rho(T_liq_init)
+
+        return res

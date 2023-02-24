@@ -148,7 +148,9 @@ class MLIWeightTestCase(unittest.TestCase):
         N = 10
 
         p = om.Problem()
-        p.model.add_subsystem("model", MLIWeight(foil_layer_areal_weight=rho_foil, spacer_layer_areal_weight=rho_spacer), promotes=["*"])
+        p.model.add_subsystem(
+            "model", MLIWeight(foil_layer_areal_weight=rho_foil, spacer_layer_areal_weight=rho_spacer), promotes=["*"]
+        )
 
         p.setup(force_alloc_complex=True)
 

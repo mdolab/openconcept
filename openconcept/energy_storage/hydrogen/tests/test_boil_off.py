@@ -13,17 +13,21 @@ class BoilOffTestCase(unittest.TestCase):
         """
         nn = 11
         p = om.Problem()
-        p.model.add_subsystem("model", BoilOff(num_nodes=nn, init_fill_level=0.9), promotes=["*"])
+        p.model.add_subsystem(
+            "model",
+            BoilOff(num_nodes=nn, fill_level_init=0.9, ullage_T_init=21, ullage_P_init=1.2e5, liquid_T_init=20),
+            promotes=["*"],
+        )
 
         p.setup(force_alloc_complex=True)
 
         p.set_val("integ.duration", 3, units="h")
         p.set_val("radius", 0.7, units="m")
         p.set_val("length", 0.3, units="m")
-        p.set_val("m_dot_gas_in", 0.7, shape=(nn,), units="kg/h")
-        p.set_val("m_dot_liq_in", 2.0, shape=(nn,), units="kg/h")
-        p.set_val("m_dot_gas_out", 0.2, shape=(nn,), units="kg/h")
-        p.set_val("m_dot_liq_out", 30.0, shape=(nn,), units="kg/h")
+        p.set_val("m_dot_gas_in", 0.7, units="kg/h")
+        p.set_val("m_dot_liq_in", 2.0, units="kg/h")
+        p.set_val("m_dot_gas_out", 0.2, units="kg/h")
+        p.set_val("m_dot_liq_out", 30.0, units="kg/h")
         p.set_val("Q_dot", 50, units="W")
 
         p.run_model()

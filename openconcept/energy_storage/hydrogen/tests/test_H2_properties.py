@@ -28,6 +28,7 @@ sat_funcs = [
     {"sat_func": [sat_gh2_T], "temp_input": False},
 ]
 
+
 @parameterized_class(real_gas_funcs)
 class RealGasPropertyTestCase(unittest.TestCase):
     def test_scalars(self):
@@ -129,5 +130,5 @@ class SaturatedPropertyTestCase(unittest.TestCase):
             assert_near_equal(np.imag(out[i]) / step, np.real(out_deriv[i]), tolerance=1e-13)
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     unittest.main()
