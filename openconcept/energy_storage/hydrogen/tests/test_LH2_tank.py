@@ -44,6 +44,11 @@ class LH2TankTestCase(unittest.TestCase):
             LH2Tank(num_nodes=nn, fill_level_init=0.95, ullage_P_init=1.5e5, ullage_T_init=21, liquid_T_init=20),
             promotes=["*"],
         )
+        p.model.linear_solver = om.DirectSolver()
+        p.model.nonlinear_solver = om.NewtonSolver()
+        p.model.nonlinear_solver.options["err_on_non_converge"] = True
+        p.model.nonlinear_solver.options["solve_subsystems"] = True
+        p.model.nonlinear_solver.options["maxiter"] = 20
 
         p.setup()
 
@@ -200,4 +205,44 @@ class LH2TankTestCase(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    # unittest.main()
+
+    duration = 15.0  # hr
+    nn = 21
+
+    p = om.Problem()
+    p.model.add_subsystem(
+        "tank",
+        LH2Tank(num_nodes=nn, fill_level_init=0.95, ullage_P_init=1.5e5, ullage_T_init=21, liquid_T_init=20),
+        promotes=["*"],
+    )
+
+    p.setup()
+
+    p.set_val("boil_off.integ.duration", duration, units="h")
+    p.set_val("radius", 2.75, units="m")
+    p.set_val("length", 2.0, units="m")
+    p.set_val("Q_add", np.linspace(1e3, 0.0, nn), units="W")
+    p.set_val("m_dot_gas_out", -1.0, units="kg/h")
+    p.set_val("m_dot_liq_out", 100.0, units="kg/h")
+    p.set_val("m_dot_gas_in", 1.0, units="kg/h")
+    p.set_val("m_dot_liq_in", 1.0, units="kg/h")
+    p.set_val("T_env", 300, units="K")
+    p.set_val("N_layers", 10)
+    p.set_val("environment_design_pressure", 1, units="atm")
+    p.set_val("max_expected_operating_pressure", 3, units="bar")
+    p.set_val("vacuum_gap", 0.1, units="m")
+
+    p.run_model()
+
+    import matplotlib.pyplot as plt
+    fig, axs = plt.subplots(2, 3)
+    axs = axs.flatten()
+    t = np.linspace(0, duration, nn)
+    for i, var in enumerate(["m_gas", "m_liq", "T_gas", "T_liq", "P", "fill_level"]):
+        axs[i].plot(t, p.get_val(var))
+        axs[i].set_xlabel("Time (hrs)")
+        axs[i].set_ylabel(var)
+    
+    plt.tight_layout()
+    plt.savefig("results.pdf")
