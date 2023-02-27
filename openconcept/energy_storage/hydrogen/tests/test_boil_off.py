@@ -194,8 +194,9 @@ class LiquidHeightTestCase(unittest.TestCase):
 class BoilOffGeometryTestCase(unittest.TestCase):
     def setup_model(self, nn):
         self.p = p = om.Problem()
-        p.model.add_subsystem("model", BoilOffGeometry(num_nodes=nn), promotes=["*"])
+        comp = p.model.add_subsystem("model", BoilOffGeometry(num_nodes=nn), promotes=["*"])
         p.setup(force_alloc_complex=True)
+        comp.adjust_h_liq_frac = False
 
         self.r = 0.7
         self.L = 0.3

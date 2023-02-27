@@ -2,8 +2,18 @@ import numpy as np
 from copy import deepcopy
 import openmdao.api as om
 from openconcept.utilities.constants import GRAV_CONST, UNIVERSAL_GAS_CONST, MOLEC_WEIGHT_H2
-import openconcept.energy_storage.hydrogen.H2_properties as H2_prop
 from openconcept.utilities import Integrator
+
+# TODO: These curve fits are poorly conditioned (hurt nonlinear solver performance)
+#       and might not cover a large enough range
+import openconcept.energy_storage.hydrogen.H2_properties as H2_prop
+
+
+# Sometimes OpenMDAO's bound enforcement doesn't work properly,
+# so enforce these bounds within compute methods to avoid divide
+# by zero errors.
+LIQ_HEIGHT_FRAC_LOWER_ENFORCE = 1e-7
+LIQ_HEIGHT_FRAC_UPPER_ENFORCE = 1.0 - 1e-7
 
 
 class BoilOff(om.Group):
@@ -178,7 +188,9 @@ class BoilOff(om.Group):
         self.nonlinear_solver.options["maxiter"] = 30
         self.nonlinear_solver.options["iprint"] = 2
         self.nonlinear_solver.options["rtol"] = 1e-9
-        self.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement="scalar", alpha=1.0, iprint=0, print_bound_enforce=False)
+        self.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(
+            bound_enforcement="scalar", alpha=1.0, iprint=0, print_bound_enforce=False
+        )
 
     def guess_nonlinear(self, inputs, outputs, resids):
         # If the model is already converged, don't change anything
@@ -191,11 +203,11 @@ class BoilOff(om.Group):
         # set by the final integrated state in the previous mission phase. In any of
         # these cases, just use those initial values as the guess.
         if (
-            inputs["integ.delta_m_gas_initial"].item() != 0.0 and
-            inputs["integ.delta_m_liq_initial"].item() != 0.0 and
-            inputs["integ.delta_T_gas_initial"].item() != 0.0 and
-            inputs["integ.delta_T_liq_initial"].item() != 0.0 and
-            inputs["integ.delta_V_gas_initial"].item() != 0.0
+            inputs["integ.delta_m_gas_initial"].item() != 0.0
+            and inputs["integ.delta_m_liq_initial"].item() != 0.0
+            and inputs["integ.delta_T_gas_initial"].item() != 0.0
+            and inputs["integ.delta_T_liq_initial"].item() != 0.0
+            and inputs["integ.delta_V_gas_initial"].item() != 0.0
         ):
             outputs["integ.delta_m_gas"] = inputs["integ.delta_m_gas_initial"]
             outputs["integ.delta_m_liq"] = inputs["integ.delta_m_liq_initial"]
@@ -283,7 +295,10 @@ class LiquidHeight(om.ImplicitComponent):
         fill = inputs["fill_level"]
         r = inputs["radius"]
         L = inputs["length"]
-        h = outputs["h_liq_frac"] * 2 * r
+        h_frac = outputs["h_liq_frac"]
+        h_frac[h_frac <= LIQ_HEIGHT_FRAC_LOWER_ENFORCE] = LIQ_HEIGHT_FRAC_LOWER_ENFORCE
+        h_frac[h_frac >= LIQ_HEIGHT_FRAC_UPPER_ENFORCE] = LIQ_HEIGHT_FRAC_UPPER_ENFORCE
+        h = h_frac * 2 * r
 
         # For the current guess of the liquid height, compute the
         # volume of fluid in the hemispherical and cylindrical
@@ -304,7 +319,10 @@ class LiquidHeight(om.ImplicitComponent):
         fill = inputs["fill_level"]
         r = inputs["radius"]
         L = inputs["length"]
-        h = outputs["h_liq_frac"] * 2 * r
+        h_frac = outputs["h_liq_frac"]
+        h_frac[h_frac <= LIQ_HEIGHT_FRAC_LOWER_ENFORCE] = LIQ_HEIGHT_FRAC_LOWER_ENFORCE
+        h_frac[h_frac >= LIQ_HEIGHT_FRAC_UPPER_ENFORCE] = LIQ_HEIGHT_FRAC_UPPER_ENFORCE
+        h = h_frac * 2 * r
 
         # Compute partials of spherical volume w.r.t. inputs and height
         Vsph_r = np.pi * h**2
@@ -400,10 +418,18 @@ class BoilOffGeometry(om.ExplicitComponent):
         self.declare_partials(["*"], "h_liq_frac", rows=arng, cols=arng)
         self.declare_partials(["*"], ["radius", "length"], rows=arng, cols=np.zeros(nn))
 
+        # Prevent h_liq_frac input from being evaluated at 0 or 1 (made a variable
+        # here so can be turned off for unit testing)
+        self.adjust_h_liq_frac = True
+
     def compute(self, inputs, outputs):
         r = inputs["radius"]
         L = inputs["length"]
-        h = inputs["h_liq_frac"] * 2 * r
+        h_frac = inputs["h_liq_frac"]
+        if self.adjust_h_liq_frac:
+            h_frac[h_frac <= LIQ_HEIGHT_FRAC_LOWER_ENFORCE] = LIQ_HEIGHT_FRAC_LOWER_ENFORCE
+            h_frac[h_frac >= LIQ_HEIGHT_FRAC_UPPER_ENFORCE] = LIQ_HEIGHT_FRAC_UPPER_ENFORCE
+        h = h_frac * 2 * r
 
         # Total area of the tank
         A_tank = 4 * np.pi * r**2 + 2 * np.pi * r * L
@@ -423,7 +449,11 @@ class BoilOffGeometry(om.ExplicitComponent):
     def compute_partials(self, inputs, J):
         r = inputs["radius"]
         L = inputs["length"]
-        h = inputs["h_liq_frac"] * 2 * r
+        h_frac = inputs["h_liq_frac"]
+        if self.adjust_h_liq_frac:
+            h_frac[h_frac <= LIQ_HEIGHT_FRAC_LOWER_ENFORCE] = LIQ_HEIGHT_FRAC_LOWER_ENFORCE
+            h_frac[h_frac >= LIQ_HEIGHT_FRAC_UPPER_ENFORCE] = LIQ_HEIGHT_FRAC_UPPER_ENFORCE
+        h = h_frac * 2 * r
 
         # Derivatives of chord and central angle of segment w.r.t. height and radius
         c = 2 * np.sqrt(2 * r * h - h**2)  # chord length of circular segment
@@ -618,7 +648,27 @@ class LH2BoilOffODE(om.ExplicitComponent):
         # Use this to check if the compute method has been called already with the same inputs
         self.inputs_cache = None
 
-    def compute(self, inputs, outputs):
+    def _process_inputs(self, inputs):
+        """
+        Adds a small perturbation to any input states that have values of zero or less and
+        shouldn't (either because it's nonphysical or causes divide by zero errors). Returns
+        a new dictionary with modified inputs.
+
+        See OpenMDAO issue #2824 for more details on why this might happen despite putting
+        bounds on these outputs.
+        """
+        adjusted_inputs = deepcopy(dict(inputs))
+        new_val = 1e-10
+        inputs_to_change = ["m_gas", "m_liq", "T_gas", "T_liq", "V_gas", "A_interface", "L_interface", "A_wet", "A_dry"]
+
+        for var in inputs_to_change:
+            adjusted_inputs[var][adjusted_inputs[var] <= new_val] = new_val
+
+        return adjusted_inputs
+
+    def compute(self, inputs_orig, outputs):
+        inputs = self._process_inputs(inputs_orig)
+
         # Unpack the states from the inputs
         m_gas = inputs["m_gas"]
         m_liq = inputs["m_liq"]
@@ -734,7 +784,9 @@ class LH2BoilOffODE(om.ExplicitComponent):
         # Ullage pressure (useful for other stuff)
         outputs["P_gas"] = P_gas
 
-    def compute_partials(self, inputs, J):
+    def compute_partials(self, inputs_orig, J):
+        inputs = self._process_inputs(inputs_orig)
+
         # Check that the compute method has been called with the same inputs
         if self.inputs_cache is None:
             self.compute(inputs, {})
@@ -1165,7 +1217,7 @@ class InitialTankStateModification(om.ExplicitComponent):
         defaults = self._compute_initial_states(r_default, L_default)
         self.add_output("m_gas", shape=(nn,), units="kg", lower=1e-6, val=defaults["m_gas_init"], upper=1e4)
         self.add_output("m_liq", shape=(nn,), units="kg", lower=1e-2, val=defaults["m_liq_init"], upper=1e6)
-        self.add_output("T_gas", shape=(nn,), units="K", lower=15, val=defaults["T_gas_init"], upper=50)
+        self.add_output("T_gas", shape=(nn,), units="K", lower=15, val=defaults["T_gas_init"], upper=60)
         self.add_output("T_liq", shape=(nn,), units="K", lower=10, val=defaults["T_liq_init"], upper=25)
         self.add_output("V_gas", shape=(nn,), units="m**3", lower=1e-3, val=defaults["V_gas_init"], upper=1e4)
 

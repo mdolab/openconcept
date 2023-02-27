@@ -1048,8 +1048,12 @@ def sat_gh2_T(P, deriv=False):
        Temperature of saturated gaseous hydrogen (K) or the derivative with respect
        to P if deriv is set to True
     """
+    is_float = not isinstance(P, np.ndarray)
+    if is_float:
+        P = np.array([P])
+
     if deriv:
-        return (
+        val = (
             + 9.5791e-6
             - 2 * 5.85e-12 * (P - 598825)
             + 3 * 3.292e-18 * (P - 598825) ** 2
@@ -1057,7 +1061,9 @@ def sat_gh2_T(P, deriv=False):
             + 5 * 2.053e-29 * (P - 598825) ** 4
             - 6 * 3.463e-35 * (P - 598825) ** 5
         )
-    return (
+        val[P > 1235172] = 0.0
+        return val.item() if is_float else val
+    val = (
         22.509518
         + 9.5791e-6 * P
         - 5.85e-12 * (P - 598825) ** 2
@@ -1066,3 +1072,9 @@ def sat_gh2_T(P, deriv=False):
         + 2.053e-29 * (P - 598825) ** 5
         - 3.463e-35 * (P - 598825) ** 6
     )
+
+    # The curve fit isn't meant to be used at very high pressures, so just use the
+    # max value if a high pressure is provided. The solution shouldn't use this value,
+    # but it may be requested in the middle of a nonlinear solution.
+    val[P > 1235172] = 32.459
+    return val.item() if is_float else val

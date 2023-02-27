@@ -45,6 +45,12 @@ class LH2TankTestCase(unittest.TestCase):
             promotes=["*"],
         )
 
+        p.model.linear_solver = om.DirectSolver()
+        p.model.nonlinear_solver = om.NewtonSolver()
+        p.model.nonlinear_solver.options["err_on_non_converge"] = True
+        p.model.nonlinear_solver.options["solve_subsystems"] = True
+        p.model.nonlinear_solver.options["maxiter"] = 30
+
         p.setup()
 
         p.set_val("boil_off.integ.duration", duration, units="h")
