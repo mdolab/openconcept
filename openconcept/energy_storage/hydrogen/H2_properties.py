@@ -878,7 +878,7 @@ def sat_gh2_h(T, deriv=False):
 
 def sat_gh2_cp(T, deriv=False):
     """
-    Enthalpy of saturated gaseous hydrogen.
+    Specific heat at constant pressure of saturated gaseous hydrogen.
     This fit is from Eugina Mendez Ramos's thesis (http://hdl.handle.net/1853/64797).
     The equations are based on data obtained from the NIST chemistry webbook for
     saturated thermophysical properties of hydrogen. Fits were done in JMP software
@@ -896,8 +896,8 @@ def sat_gh2_cp(T, deriv=False):
     Returns
     -------
     float or numpy array
-       Enthalpy of saturated gaseous hydrogen (J/kg) or the derivative with respect
-       to T if deriv is set to True
+       Specific heat at constant pressure of saturated gaseous hydrogen (J/(kg-K)) or
+       the derivative with respect to T if deriv is set to True
     """
     if deriv:
         return np.exp(

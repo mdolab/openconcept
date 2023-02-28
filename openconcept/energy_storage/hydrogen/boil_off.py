@@ -763,6 +763,8 @@ class LH2BoilOffODE(om.ExplicitComponent):
         self.V_dot_liq = self.m_dot_liq / self.rho_liq
         self.V_dot_gas = -self.V_dot_liq
 
+        # TODO: Think again about these equations. Should the m_dot_gas and m_dot_liq term in the numerators
+        #       actually be m_dot_boil_off? Should removing liquid from the tank decrease the liquid temp?
         self.T_dot_gas = (
             Q_dot_gas - Q_dot_gas_int - P_gas * self.V_dot_gas + self.m_dot_gas * (self.h_gas - self.u_gas)
         ) / (m_gas * self.cv_gas)
