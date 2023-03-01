@@ -246,6 +246,7 @@ if __name__ == "__main__":
 
     # =============== Takeoff plot ================
     import matplotlib.pyplot as plt
+
     takeoff_fig, takeoff_axs = plt.subplots(1, 3, figsize=[9, 2.7], constrained_layout=True)
     takeoff_axs = takeoff_axs.flatten()  # change 1x3 mtx of axes into 4-element vector
 

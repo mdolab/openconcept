@@ -142,6 +142,7 @@ if __name__ == "__main__":
 
     # Create plot with results
     import matplotlib.pyplot as plt
+
     fig, axs = plt.subplots(2, 2, constrained_layout=True)
     axs = axs.flatten()  # change 2x2 mtx of axes into 4-element vector
 

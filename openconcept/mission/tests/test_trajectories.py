@@ -573,6 +573,7 @@ class TestPhaseNoTime(unittest.TestCase):
     def test_raises_error(self):
         # Exception type changed from NameError to RuntimeError in OpenMDAO 3.22.0
         import openmdao
+
         om_version = openmdao.__version__
         version_split = om_version.split(".")
         major = int(version_split[0])
