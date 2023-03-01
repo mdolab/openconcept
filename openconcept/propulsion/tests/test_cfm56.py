@@ -68,7 +68,7 @@ class CFM56TestCase(unittest.TestCase):
             tolerance=5e-3,
         )
 
-        partials = p.check_partials(method="cs", compact_print=True)
+        partials = p.check_partials(method="fd", compact_print=True)
         assert_check_partials(partials)
 
 
