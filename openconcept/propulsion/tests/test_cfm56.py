@@ -42,7 +42,7 @@ class CFM56TestCase(unittest.TestCase):
     def test_vectorized(self):
         nn = 5
         p = Problem()
-        p.model = CFM56(num_nodes=nn)
+        p.model.add_subsystem("comp", CFM56(num_nodes=nn), promotes=["*"])
 
         p.setup(force_alloc_complex=True)
 
@@ -68,7 +68,7 @@ class CFM56TestCase(unittest.TestCase):
             tolerance=5e-3,
         )
 
-        partials = p.check_partials(method="fd", compact_print=True)
+        partials = p.check_partials(method="cs", compact_print=True)
         assert_check_partials(partials)
 
 
