@@ -38,7 +38,7 @@ class LH2TankNoBoilOff(om.Group):
         does not include the insulation (scalar, m).
     length : float
         Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
-    m_dot_LH2 : float
+    m_dot_liq : float
         Mass flow rate of liquid hydrogen out of the tank; positive indicates fuel leaving the tank (vector, kg/s)
     N_layers : float
         Number of reflective sheild layers in the MLI, should be at least ~10 for model
@@ -54,7 +54,7 @@ class LH2TankNoBoilOff(om.Group):
 
     Outputs
     -------
-    m_LH2 : float
+    m_liq : float
         Mass of the liquid hydrogen in the tank (vector, kg)
     fill_level : float
         Fraction of tank volume filled with liquid (vector, dimensionless)
@@ -147,9 +147,9 @@ class LH2TankNoBoilOff(om.Group):
         integ = self.add_subsystem(
             "integ",
             Integrator(num_nodes=nn, diff_units="s", time_setup="duration", method="simpson"),
-            promotes_inputs=["m_dot_LH2"],
+            promotes_inputs=["m_dot_liq"],
         )
-        integ.add_integrand("delta_m_LH2", rate_name="m_dot_LH2", units="kg", val=0, start_val=0)
+        integ.add_integrand("delta_m_liq", rate_name="m_dot_liq", units="kg", val=0, start_val=0)
 
         self.add_subsystem(
             "add_init_state_values",
@@ -159,20 +159,20 @@ class LH2TankNoBoilOff(om.Group):
                 LH2_density=self.options["LH2_density"],
             ),
             promotes_inputs=["radius", "length"],
-            promotes_outputs=["m_LH2", "fill_level"],
+            promotes_outputs=["m_liq", "fill_level"],
         )
-        self.connect("integ.delta_m_LH2", "add_init_state_values.delta_m_LH2")
+        self.connect("integ.delta_m_liq", "add_init_state_values.delta_m_liq")
 
         # Add all the weights
         self.add_subsystem(
             "sum_weight",
             AddSubtractComp(
                 output_name="total_weight",
-                input_names=["m_LH2", "tank_weight"],
+                input_names=["m_liq", "tank_weight"],
                 vec_size=[nn, 1],
                 units="kg",
             ),
-            promotes_inputs=["m_LH2", "tank_weight"],
+            promotes_inputs=["m_liq", "tank_weight"],
             promotes_outputs=["total_weight"],
         )
 
@@ -189,12 +189,12 @@ class InitialLH2MassModification(om.ExplicitComponent):
 
     Inputs
     ------
-    delta_m_LH2 : float
+    delta_m_liq : float
         Change in mass of liquid hydrogen in the tank since the beginning of the mission (vector, kg)
 
     Outputs
     -------
-    m_LH2 : float
+    m_liq : float
         Mass of liquid hydrogen in the tank (vector, kg)
     fill_level : float
         Fraction of the tank filled with LH2 (vector, dimensionless)
@@ -220,14 +220,14 @@ class InitialLH2MassModification(om.ExplicitComponent):
 
         self.add_input("radius", val=1.0, units="m")
         self.add_input("length", val=0.5, units="m")
-        self.add_input("delta_m_LH2", shape=(nn,), units="kg", val=0.0)
-        self.add_output("m_LH2", shape=(nn,), units="kg")
+        self.add_input("delta_m_liq", shape=(nn,), units="kg", val=0.0)
+        self.add_output("m_liq", shape=(nn,), units="kg")
         self.add_output("fill_level", shape=(nn,))
 
         arng = np.arange(nn)
-        self.declare_partials("m_LH2", "delta_m_LH2", rows=arng, cols=arng, val=-np.ones(nn))
-        self.declare_partials("fill_level", "delta_m_LH2", rows=arng, cols=arng)
-        self.declare_partials(["m_LH2", "fill_level"], ["radius", "length"], rows=arng, cols=np.zeros(nn))
+        self.declare_partials("m_liq", "delta_m_liq", rows=arng, cols=arng, val=-np.ones(nn))
+        self.declare_partials("fill_level", "delta_m_liq", rows=arng, cols=arng)
+        self.declare_partials(["m_liq", "fill_level"], ["radius", "length"], rows=arng, cols=np.zeros(nn))
 
     def compute(self, inputs, outputs):
         r = inputs["radius"]
@@ -237,8 +237,8 @@ class InitialLH2MassModification(om.ExplicitComponent):
 
         V_tank = 4 / 3 * np.pi * r**3 + np.pi * r**2 * L
         V_liq_init = V_tank * fill_init
-        outputs["m_LH2"] = V_liq_init * rho - inputs["delta_m_LH2"]
-        outputs["fill_level"] = outputs["m_LH2"] / (rho * V_tank)
+        outputs["m_liq"] = V_liq_init * rho - inputs["delta_m_liq"]
+        outputs["fill_level"] = outputs["m_liq"] / (rho * V_tank)
 
     def compute_partials(self, inputs, partials):
         r = inputs["radius"]
@@ -250,14 +250,14 @@ class InitialLH2MassModification(om.ExplicitComponent):
         Vtank_r = 4 * np.pi * r**2 + 2 * np.pi * r * L
         Vtank_L = np.pi * r**2
         V_liq_init = V_tank * fill_init
-        m_LH2 = V_liq_init * rho - inputs["delta_m_LH2"]
+        m_liq = V_liq_init * rho - inputs["delta_m_liq"]
 
-        partials["m_LH2", "radius"] = Vtank_r * fill_init * rho
-        partials["m_LH2", "length"] = Vtank_L * fill_init * rho
-        partials["fill_level", "delta_m_LH2"] = -1 / (rho * V_tank)
+        partials["m_liq", "radius"] = Vtank_r * fill_init * rho
+        partials["m_liq", "length"] = Vtank_L * fill_init * rho
+        partials["fill_level", "delta_m_liq"] = -1 / (rho * V_tank)
         partials["fill_level", "radius"] = (
-            partials["m_LH2", "radius"] / (rho * V_tank) - m_LH2 / (rho * V_tank) ** 2 * rho * Vtank_r
+            partials["m_liq", "radius"] / (rho * V_tank) - m_liq / (rho * V_tank) ** 2 * rho * Vtank_r
         )
         partials["fill_level", "length"] = (
-            partials["m_LH2", "length"] / (rho * V_tank) - m_LH2 / (rho * V_tank) ** 2 * rho * Vtank_L
+            partials["m_liq", "length"] / (rho * V_tank) - m_liq / (rho * V_tank) ** 2 * rho * Vtank_L
         )
