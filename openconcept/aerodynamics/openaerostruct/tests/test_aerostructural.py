@@ -238,7 +238,9 @@ class OASDataGenTestCase(unittest.TestCase):
         toverc = np.array([0.05, 0.1, 0.12])
         t_skin = np.array([5, 13, 15])  # mm
         t_spar = np.array([5, 13, 15])  # mm
-        p = om.Problem(
+        p = om.Problem()
+        p.model.add_subsystem(
+            "comp",
             OASDataGen(
                 num_x=3,
                 num_y=7,
@@ -249,7 +251,8 @@ class OASDataGenTestCase(unittest.TestCase):
                 Mach_train=np.linspace(0.1, 0.85, 2),
                 alpha_train=np.linspace(-10, 15, 2),
                 alt_train=np.linspace(0, 15e3, 2),
-            )
+            ),
+            promotes=["*"],
         )
         p.setup()
         p.set_val("fltcond|TempIncrement", 0, units="degC")
