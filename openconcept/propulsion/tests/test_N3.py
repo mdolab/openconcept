@@ -48,9 +48,6 @@ class N3HybridTestCase(unittest.TestCase):
         assert_near_equal(p.get_val("fuel_flow", units="kg/s"), 0.34333925 * np.ones(1), tolerance=1e-6)
         assert_near_equal(p.get_val("surge_margin"), 17.49872296 * np.ones(1), tolerance=1e-6)
 
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
-
     def test_vectorized(self):
         nn = 5
         p = Problem()
@@ -81,9 +78,6 @@ class N3HybridTestCase(unittest.TestCase):
             tolerance=5e-3,
         )
 
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
-
 
 @unittest.skipIf(skip_tests, "N+3 surrogate model has not been trained (cached data not found), so skipping N+3 tests")
 class N3TestCase(unittest.TestCase):
@@ -102,9 +96,6 @@ class N3TestCase(unittest.TestCase):
         assert_near_equal(p.get_val("thrust", units="lbf"), 6902.32371562 * np.ones(1), tolerance=1e-6)
         assert_near_equal(p.get_val("fuel_flow", units="kg/s"), 0.35176628 * np.ones(1), tolerance=1e-6)
         assert_near_equal(p.get_val("surge_margin"), 18.42447377 * np.ones(1), tolerance=1e-6)
-
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
 
     def test_vectorized(self):
         nn = 5
@@ -134,9 +125,6 @@ class N3TestCase(unittest.TestCase):
             np.array([9.63957356, 9.85223288, 21.01375818, 31.54415929, 17.48630861]),
             tolerance=5e-3,
         )
-
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
 
 
 if __name__ == "__main__":

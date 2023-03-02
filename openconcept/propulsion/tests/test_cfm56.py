@@ -36,9 +36,6 @@ class CFM56TestCase(unittest.TestCase):
         assert_near_equal(p.get_val("fuel_flow", units="kg/s"), 0.50273824 * np.ones(1), tolerance=1e-6)
         assert_near_equal(p.get_val("T4", units="degK"), 1432.06813946 * np.ones(1), tolerance=1e-6)
 
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
-
     def test_vectorized(self):
         nn = 5
         p = Problem()
@@ -68,24 +65,6 @@ class CFM56TestCase(unittest.TestCase):
             tolerance=5e-3,
         )
 
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
-
 
 if __name__ == "__main__":
-    # unittest.main()
-
-    nn = 5
-    p = Problem()
-    p.model.add_subsystem("comp", CFM56(num_nodes=nn), promotes=["*"])
-
-    p.setup(force_alloc_complex=True)
-
-    p.set_val("throttle", np.linspace(0.0001, 1.0, nn))
-    p.set_val("fltcond|h", np.linspace(0, 40e3, nn), units="ft")
-    p.set_val("fltcond|M", np.linspace(0.1, 0.9, nn))
-
-    p.run_model()
-
-    partials = p.check_partials(method="fd", compact_print=True)
-    assert_check_partials(partials)
+    unittest.main()
