@@ -22,7 +22,7 @@ if cached_thrust and cached_fuelburn and cached_T4:
 class CFM56TestCase(unittest.TestCase):
     def test_defaults(self):
         p = Problem()
-        p.model = CFM56()
+        p.model.add_subsystem("comp", CFM56(), promotes=["*"])
 
         p.setup(force_alloc_complex=True)
 

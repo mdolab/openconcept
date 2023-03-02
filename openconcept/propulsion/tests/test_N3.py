@@ -33,7 +33,7 @@ if cached_thrust and cached_fuelburn and cached_T4:
 class N3HybridTestCase(unittest.TestCase):
     def test_defaults(self):
         p = Problem()
-        p.model = N3Hybrid()
+        p.model.add_subsystem("comp", N3Hybrid(), promotes=["*"])
 
         p.setup(force_alloc_complex=True)
 
@@ -51,7 +51,7 @@ class N3HybridTestCase(unittest.TestCase):
     def test_vectorized(self):
         nn = 5
         p = Problem()
-        p.model = N3Hybrid(num_nodes=nn)
+        p.model.add_subsystem("comp", N3Hybrid(num_nodes=nn), promotes=["*"])
 
         p.setup(force_alloc_complex=True)
 
@@ -83,7 +83,7 @@ class N3HybridTestCase(unittest.TestCase):
 class N3TestCase(unittest.TestCase):
     def test_defaults(self):
         p = Problem()
-        p.model = N3()
+        p.model.add_subsystem("comp", N3(), promotes=["*"])
 
         p.setup(force_alloc_complex=True)
 
@@ -100,7 +100,7 @@ class N3TestCase(unittest.TestCase):
     def test_vectorized(self):
         nn = 5
         p = Problem()
-        p.model = N3Hybrid(num_nodes=nn)
+        p.model.add_subsystem("comp", N3Hybrid(num_nodes=nn), promotes=["*"])
 
         p.setup(force_alloc_complex=True)
 
