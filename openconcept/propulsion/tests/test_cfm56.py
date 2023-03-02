@@ -1,7 +1,7 @@
 import unittest
 import os
 import numpy as np
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.api import Problem
 import openconcept
 from openconcept.propulsion import CFM56
