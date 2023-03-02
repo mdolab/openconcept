@@ -79,7 +79,7 @@ if __name__ == "__main__":
     p = Problem()
     p.model.add_subsystem("comp", CFM56(num_nodes=nn), promotes=["*"])
 
-    p.setup()
+    p.setup(force_alloc_complex=True)
 
     p.set_val("throttle", np.linspace(0.0001, 1.0, nn))
     p.set_val("fltcond|h", np.linspace(0, 40e3, nn), units="ft")
