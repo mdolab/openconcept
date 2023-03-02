@@ -80,7 +80,11 @@ jobs:
         mv n3_hybrid* ./openconcept/propulsion/empirical_data/n+3_hybrid
         mv n3* ./openconcept/propulsion/empirical_data/n+3
 
-    - name: Build and Test
+    - name: CFM56 debugging
+      run: |
+        python ./openconcept/propulsion/tests/test_cfm56.py
+
+    - name: Test
       run: |
         python -m pytest --cov-config=.coveragerc --cov=openconcept --cov-report=xml
 

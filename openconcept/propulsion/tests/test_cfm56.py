@@ -73,4 +73,37 @@ class CFM56TestCase(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    # unittest.main()
+
+    print("Hello world")
+
+    nn = 5
+    p = Problem()
+    p.model.add_subsystem("comp", CFM56(num_nodes=nn), promotes=["*"])
+
+    p.setup(force_alloc_complex=True)
+
+    p.set_val("throttle", np.linspace(0.0001, 1.0, nn))
+    p.set_val("fltcond|h", np.linspace(0, 40e3, nn), units="ft")
+    p.set_val("fltcond|M", np.linspace(0.1, 0.9, nn))
+
+    p.run_model()
+
+    assert_near_equal(
+        p.get_val("thrust", units="lbf"),
+        np.array([1445.41349482, 3961.46624224, 5278.43191982, 5441.44404298, 6479.00525867]),
+        tolerance=5e-3,
+    )
+    assert_near_equal(
+        p.get_val("fuel_flow", units="kg/s"),
+        np.array([0.17032429, 0.25496437, 0.35745638, 0.40572545, 0.4924194]),
+        tolerance=5e-3,
+    )
+    assert_near_equal(
+        p.get_val("T4", units="degK"),
+        np.array([1005.38911171, 1207.57548728, 1381.94820904, 1508.07901676, 1665.37063872]),
+        tolerance=5e-3,
+    )
+
+    partials = p.check_partials(method="cs", compact_print=True)
+    assert_check_partials(partials)
