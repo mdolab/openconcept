@@ -79,7 +79,7 @@ if __name__ == "__main__":
     p = Problem()
     p.model.add_subsystem("comp", CFM56(num_nodes=nn), promotes=["*"])
 
-    p.setup(force_alloc_complex=True)
+    p.setup()
 
     p.set_val("throttle", np.linspace(0.0001, 1.0, nn))
     p.set_val("fltcond|h", np.linspace(0, 40e3, nn), units="ft")
@@ -87,19 +87,5 @@ if __name__ == "__main__":
 
     p.run_model()
 
-    print(f"T4: {p.get_val('T4', units='K')}")
-    print(f"fuel_flow: {p.get_val('fuel_flow', units='kg/s')}")
-    print(f"thrust: {p.get_val('thrust', units='N')}")
-
-    M_set = np.linspace(0.1, 0.9, nn)
-    M_set[0] += 1e-6
-    p.set_val("fltcond|M", M_set)
-
-    p.run_model()
-
-    print(f"T4: {p.get_val('T4', units='K')}")
-    print(f"fuel_flow: {p.get_val('fuel_flow', units='kg/s')}")
-    print(f"thrust: {p.get_val('thrust', units='N')}")
-
-    partials = p.check_partials(method="cs", compact_print=True)
+    partials = p.check_partials(method="fd", compact_print=True)
     assert_check_partials(partials)
