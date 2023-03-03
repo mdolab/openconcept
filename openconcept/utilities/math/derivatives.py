@@ -277,7 +277,10 @@ class FirstDerivative(ExplicitComponent):
             deriv_units = "(" + diff_units + ")** -1"
         elif diff_units is None:
             deriv_units = quantity_units
-            warnings.warn("You have specified a derivative with respect to a unitless differential. Be aware of this.")
+            warnings.warn(
+                "You have specified a derivative with respect to a unitless differential. Be aware of this.",
+                stacklevel=2,
+            )
         else:
             deriv_units = "(" + quantity_units + ") / (" + diff_units + ")"
         wrt_q, wrt_dt = first_deriv_partials(

@@ -49,18 +49,15 @@ The features section of the documentation describes most of the components and s
 
 <!-- Remember to change doc/index.rst too! -->
 
-This toolkit requires the use of [OpenMDAO](https://openmdao.org/) 3.10.0 or later.
-OpenMDAO requires a late NumPy and SciPy.
+OpenConcept is tested regularly on builds with the oldest and latest supported package versions. The package versions in the oldest and latest builds are the following:
 
-The latest versions all tests have passed on are
-
-| Package | Version |
-| ------- | ------- |
-| Python | 3.10.4 |
-| OpenMDAO | 3.16.0 |
-| NumPy | 1.22.4 |
-| SciPy | 1.7.3 |
-| OpenAeroStruct | 2.5.1 |
+| Package | Oldest | Latest |
+| ------- | ------- | ------ |
+| Python | 3.8 | 3.11 |
+| OpenMDAO | 3.10 | latest |
+| NumPy | 1.20 | latest |
+| SciPy | 1.6.0 | latest |
+| OpenAeroStruct | latest | latest |
 
 ## Citation
 
@@ -77,7 +74,7 @@ Benjamin J. Brelje and Joaquim R.R.A. Martins, "Development of a Conceptual Desi
 	month = {July},
 	title = {Development of a Conceptual Design Model for Aircraft Electric Propulsion with Efficient Gradients},
 	year = {2018}
-	}
+}
 ```
 
 If using the integrated OpenAeroStruct VLM or aerostructural aerodynamic models, please cite the following [conference paper](https://www.researchgate.net/publication/357559489_Aerostructural_wing_design_optimization_considering_full_mission_analysis):
@@ -92,5 +89,5 @@ Eytan J. Adler and Joaquim R.R.A. Martins, "Aerostructural wing design optimizat
 	doi         = {10.2514/6.2022-0382},
 	month       = {January},
 	year        = {2022}
-	}
+}
 ```

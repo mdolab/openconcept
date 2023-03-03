@@ -7,6 +7,9 @@ on:
       - main
     tags:
       - v*.*.*
+  schedule:
+    # Run the tests at 7:23pm UTC on the 9th and 24th of every month
+    - cron: '23 19 9,24 * *'
 
 jobs:
   black:
@@ -18,7 +21,13 @@ jobs:
     strategy:
       matrix:
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
-        python-version: ["3.8", "3.9", "3.10"]
+        dep-versions: ["oldest", "latest"]
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Set versions to test here ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        PYTHON_VERSION_OLDEST: ['3.8']
+        PYTHON_VERSION_LATEST: ['3.11']
+        NUMPY_VERSION_OLDEST: ['1.20']  # latest is most recent on PyPI
+        SCIPY_VERSION_OLDEST: ['1.6.0']  # latest is most recent on PyPI
+        OPENMDAO_VERSION_OLDEST: ['3.10']  # latest is most recent on PyPI
       fail-fast: false
     env:
       OMP_NUM_THREADS: 1
@@ -27,23 +36,40 @@ jobs:
         shell: bash -l {0}
     steps:
     - uses: actions/checkout@v2
-    - name: Set Python Version
+    - name: Setup Python ${{ matrix.PYTHON_VERSION_OLDEST }}
+      if: ${{ matrix.dep-versions == 'oldest' }}
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
-        python-version: ${{ matrix.python-version }}
-    - name: Setup conda
+        python-version: ${{ matrix.PYTHON_VERSION_OLDEST }}
+    - name: Setup Python ${{ matrix.PYTHON_VERSION_LATEST }}
+      if: ${{ matrix.dep-versions == 'latest' }}
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-update-conda: true
+        python-version: ${{ matrix.PYTHON_VERSION_LATEST }}
+
+    - name: Install dependencies (oldest versions)
+      if: ${{ matrix.dep-versions == 'oldest' }}
       run: |
         conda config --set always_yes yes
-        conda install numpy scipy
-    - name: Install
+        pip install numpy==${{ matrix.NUMPY_VERSION_OLDEST }} scipy==${{ matrix.SCIPY_VERSION_OLDEST }} openmdao==${{ matrix.OPENMDAO_VERSION_OLDEST }}
+    - name: Install dependencies (latest versions)
+      if: ${{ matrix.dep-versions == 'latest' }}
       run: |
-        pip install .[testing]
-        pip install .[docs]
+        conda config --set always_yes yes
+        pip install numpy scipy openmdao
+
+    - name: Install OpenConcept
+      run: |
+        pip install -e .[testing]
+        pip install -e .[docs]
+
     - name: List Python and package info
       run: |
         python --version
         pip list
+
     - name: Download engine deck surrogate model
       run: |
         curl -L -o engine_kriging_surrogate_model.tar.gz http://umich.edu/~mdolaboratory/repo_files/openconcept/engine_kriging_surrogate_model.tar.gz
@@ -53,9 +79,11 @@ jobs:
         mv cfm56* ./openconcept/propulsion/empirical_data/cfm56
         mv n3_hybrid* ./openconcept/propulsion/empirical_data/n+3_hybrid
         mv n3* ./openconcept/propulsion/empirical_data/n+3
-    - name: Build and Test
+
+    - name: Test
       run: |
         python -m pytest --cov-config=.coveragerc --cov=openconcept --cov-report=xml
+
     - name: Upload coverage to Codecov
       if: ${{ matrix.os == 'ubuntu-latest' }}
       uses: codecov/codecov-action@v2

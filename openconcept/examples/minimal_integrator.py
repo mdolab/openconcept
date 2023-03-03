@@ -8,9 +8,9 @@ import openmdao.api as om
 from openconcept.examples.minimal import Aircraft, setup_problem  # build off this aircraft model
 from openconcept.mission import BasicMission
 from openconcept.utilities import Integrator
-import matplotlib.pyplot as plt
 
 # rst Imports (end)
+
 
 # rst Aircraft (beg)
 class AircraftWithFuelBurn(om.Group):
@@ -140,6 +140,8 @@ if __name__ == "__main__":
     om.n2(prob, outfile="minimal_integrator_n2.html", show_browser=not hide_viz)
 
     # Create plot with results
+    import matplotlib.pyplot as plt
+
     fig, axs = plt.subplots(2, 3, figsize=[9, 4.8], constrained_layout=True)
     axs = axs.flatten()  # change 2x3 mtx of axes into 4-element vector
 

@@ -38,9 +38,11 @@ setup(
     license="MIT License",
     packages=find_packages(include=["openconcept*"]),
     install_requires=[
-        "scipy>=1.0.0",
-        "numpy>=1.14.0",
-        "openmdao>=3.10.0",
+        # Update the oldest package versions in the GitHub Actions build file, the readme,
+        # and the index.rst file in the docs when you change these
+        "numpy>=1.20",
+        "scipy>=1.6.0",
+        "openmdao>=3.10",
     ],
     extras_require={
         "testing": ["pytest", "pytest-cov", "coverage", "openaerostruct"],

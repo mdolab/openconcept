@@ -46,6 +46,7 @@ temp_rhs = np.array(
 )
 temp_coeffs = np.linalg.solve(tropopause_matrix, temp_rhs)
 
+
 # functions
 def get_mask_arrays(h_m):
     tropos_mask = h_m <= h_lower
