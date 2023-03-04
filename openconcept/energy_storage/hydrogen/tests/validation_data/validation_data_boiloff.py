@@ -1,3 +1,4 @@
+# fmt: off
 import numpy as np
 
 # Keys are the test IDs. Each value is a dictionary containing:
@@ -81,3 +82,5 @@ MHTB_results = {
         "EBM_model_Tl": np.array([20.700431034482758, 20.72894013970511, 20.766962170176527, 20.804973527797284, 20.843006231119357, 20.881033598016103, 20.926724137931032]),
     },
 }
+
+# fmt: on

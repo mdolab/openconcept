@@ -7,7 +7,7 @@ from openconcept.energy_storage.hydrogen.LH2_tank import *
 class LH2TankTestCase(unittest.TestCase):
     def test_simple(self):
         p = om.Problem()
-        p.model = LH2Tank(ullage_P_init=101325.0, init_fill_level=0.95, ullage_T_init=25)
+        p.model = LH2Tank(ullage_P_init=101325.0, fill_level_init=0.95, ullage_T_init=25)
         p.model.linear_solver = om.DirectSolver()
         p.model.nonlinear_solver = om.NewtonSolver()
         p.model.nonlinear_solver.options["err_on_non_converge"] = True
@@ -39,7 +39,17 @@ class LH2TankTestCase(unittest.TestCase):
         nn = 11
 
         p = om.Problem()
-        p.model.add_subsystem("tank", LH2Tank(num_nodes=nn, init_fill_level=0.95), promotes=["*"])
+        p.model.add_subsystem(
+            "tank",
+            LH2Tank(num_nodes=nn, fill_level_init=0.95, ullage_P_init=1.5e5, ullage_T_init=21, liquid_T_init=20),
+            promotes=["*"],
+        )
+
+        p.model.linear_solver = om.DirectSolver()
+        p.model.nonlinear_solver = om.NewtonSolver()
+        p.model.nonlinear_solver.options["err_on_non_converge"] = True
+        p.model.nonlinear_solver.options["solve_subsystems"] = True
+        p.model.nonlinear_solver.options["maxiter"] = 30
 
         p.setup()
 

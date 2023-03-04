@@ -64,10 +64,10 @@ class HeatTransferVacuumTankTestCase(unittest.TestCase):
 
         p.setup(force_alloc_complex=True)
 
-        p.set_val("T_env", 300, units="K", shape=(nn,))
+        p.set_val("T_env", 300, units="K")
         p.set_val("N_layers", 10)
-        p.set_val("T_liq", 21, units="K", shape=(nn,))
-        p.set_val("T_gas", 21, units="K", shape=(nn,))
+        p.set_val("T_liq", 21, units="K")
+        p.set_val("T_gas", 21, units="K")
         p.set_val("A_wet", np.array([1, 0, 0.5]), units="m**2")
         p.set_val("A_dry", np.array([0, 1, 0.5]), units="m**2")
 

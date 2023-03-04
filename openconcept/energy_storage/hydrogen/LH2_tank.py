@@ -84,9 +84,9 @@ class LH2Tank(om.Group):
     -------
     num_nodes : int
         Number of analysis points to run (scalar, dimensionless)
-    init_fill_level : float
-        Initial fill level (in range 0-1) of the tank, default 0.97
-        to leave space for boil off gas; 3% adopted from Cryoplane study (scalar, dimensionless)
+    fill_level_init : float
+        Initial fill level (in range 0-1) of the tank, default 0.95
+        to leave space for boil off gas; 5% adopted from Millis et al. 2009 (scalar, dimensionless)
     ullage_T_init : float
         Initial temperature of gas in ullage, default 20 K (scalar, K)
     ullage_P_init : float
@@ -126,7 +126,7 @@ class LH2Tank(om.Group):
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of design points to run")
-        self.options.declare("init_fill_level", default=0.97, desc="Initial fill level")
+        self.options.declare("fill_level_init", default=0.95, desc="Initial fill level")
         self.options.declare("ullage_T_init", default=21.0, desc="Initial ullage temp (K)")
         self.options.declare("ullage_P_init", default=1.5e5, desc="Initial ullage pressure (Pa)")
         self.options.declare("liquid_T_init", default=20.0, desc="Initial bulk liquid temp (K)")
@@ -148,7 +148,7 @@ class LH2Tank(om.Group):
             "boil_off",
             BoilOff(
                 num_nodes=nn,
-                init_fill_level=self.options["init_fill_level"],
+                fill_level_init=self.options["fill_level_init"],
                 ullage_T_init=self.options["ullage_T_init"],
                 ullage_P_init=self.options["ullage_P_init"],
                 liquid_T_init=self.options["liquid_T_init"],
@@ -216,9 +216,9 @@ class LH2Tank(om.Group):
         self.set_input_defaults("Q_add", np.zeros(nn), units="W")
         self.set_input_defaults("vacuum_gap", 5, units="cm")
 
-        # Use block Gauss-Seidel solver for this component
-        self.nonlinear_solver = om.NonlinearBlockGS(iprint=2)
-        self.linear_solver = om.LinearBlockGS(iprint=2)
+        # # Use block Gauss-Seidel solver for this component
+        # self.nonlinear_solver = om.NonlinearBlockGS(iprint=2, atol=1e-9, rtol=1e-9)
+        # self.linear_solver = om.LinearBlockGS(iprint=0)
 
 
 if __name__ == "__main__":
@@ -226,7 +226,7 @@ if __name__ == "__main__":
     nn = 51
 
     p = om.Problem()
-    p.model.add_subsystem("tank", LH2Tank(num_nodes=nn, init_fill_level=0.95), promotes=["*"])
+    p.model.add_subsystem("tank", LH2Tank(num_nodes=nn, fill_level_init=0.95), promotes=["*"])
 
     p.setup()
 
@@ -246,6 +246,7 @@ if __name__ == "__main__":
 
     p.run_model()
 
+    om.n2(p)
     # p.model.list_outputs(print_arrays=True)
 
     import numpy as np

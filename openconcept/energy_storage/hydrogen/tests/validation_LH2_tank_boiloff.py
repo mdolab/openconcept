@@ -52,7 +52,7 @@ def new_MHTB_validation_model(fill_init, T_init, P_init, Q_dot, duration, T_init
         "tank",
         BoilOff(
             num_nodes=nn,
-            init_fill_level=fill_init,
+            fill_level_init=fill_init,
             ullage_T_init=T_init,
             ullage_P_init=P_init,
             liquid_T_init=T_init_liq,
@@ -104,7 +104,7 @@ def MHTB_validation_model(fill_init, T_init, P_init, Q_dot, duration):
         "tank",
         LH2Tank(
             num_nodes=nn,
-            init_fill_level=fill_init,
+            fill_level_init=fill_init,
             ullage_T_init=T_init,
             ullage_P_init=P_init,
         ),
