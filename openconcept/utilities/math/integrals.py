@@ -125,7 +125,6 @@ def bdf3_cache_matrix(n, all_bdf=False):
 
 
 def simpson_cache_matrix(n):
-
     # Simpsons rule defines the "deltas" between each segment as [B] dqdt as follows
     # B is n-1 rows by n columns
     # the structure of this is (1/12) * the following:
@@ -600,14 +599,20 @@ class Integrator(ExplicitComponent):
             # infer rate units from diff units and quantity units
             if not diff_units:
                 rate_units = units
-                warnings.warn("You have specified a integral with respect to a unitless integrand. Be aware of this.")
+                warnings.warn(
+                    "You have specified a integral with respect to a unitless integrand. Be aware of this.",
+                    stacklevel=2,
+                )
             else:
                 rate_units = "(" + units + ") / (" + diff_units + ")"
         elif rate_units:
             # infer quantity units from rate units and diff units
             if not diff_units:
                 units = rate_units
-                warnings.warn("You have specified a integral with respect to a unitless integrand. Be aware of this.")
+                warnings.warn(
+                    "You have specified a integral with respect to a unitless integrand. Be aware of this.",
+                    stacklevel=2,
+                )
             else:
                 units = "(" + rate_units + ") * (" + diff_units + ")"
         elif diff_units:
@@ -956,7 +961,9 @@ class OldIntegrator(ExplicitComponent):
             rate_units = "(" + diff_units + ")** -1"
         elif diff_units is None:
             rate_units = quantity_units
-            warnings.warn("You have specified a integral with respect to a unitless integrand. Be aware of this.")
+            warnings.warn(
+                "You have specified a integral with respect to a unitless integrand. Be aware of this.", stacklevel=2
+            )
         else:
             rate_units = "(" + quantity_units + ") / (" + diff_units + ")"
         # the output of this function is of length nn - 1. NO partial for first row (initial value)

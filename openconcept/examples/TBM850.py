@@ -1,7 +1,6 @@
 # rst Imports (beg)
 import numpy as np
 import openmdao.api as om
-import matplotlib.pyplot as plt
 
 # OpenConcept imports for the airplane model
 from openconcept.propulsion import TurbopropPropulsionSystem
@@ -12,6 +11,7 @@ from openconcept.examples.aircraft_data.TBM850 import data as acdata
 from openconcept.utilities import AddSubtractComp, Integrator, DictIndepVarComp
 
 # rst Imports (end)
+
 
 # rst Aircraft (beg)
 class TBM850AirplaneModel(om.Group):
@@ -245,6 +245,8 @@ if __name__ == "__main__":
         print(f"{var['name']}: {prob.get_val(var['var'], units=var['units']).item()} {var['units']}")
 
     # =============== Takeoff plot ================
+    import matplotlib.pyplot as plt
+
     takeoff_fig, takeoff_axs = plt.subplots(1, 3, figsize=[9, 2.7], constrained_layout=True)
     takeoff_axs = takeoff_axs.flatten()  # change 1x3 mtx of axes into 4-element vector
 

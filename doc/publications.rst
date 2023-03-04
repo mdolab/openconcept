@@ -7,11 +7,45 @@ Publications
 2022
 ====
 
+Eytan J. Adler and Joaquim R.R.A. Martins,
+*Efficient Aerostructural Wing Optimization Considering Mission Analysis*,
+Journal of Aircraft, 2022
+DOI: `10.2514/1.c037096 <https://doi.org/10.2514/1.c037096>`_.
+PDF is available `here <https://www.researchgate.net/publication/366553107_Efficient_Aerostructural_Wing_Optimization_Considering_Mission_Analysis>`__.
+
+.. code-block:: bibtex
+
+	@article{Adler2022d,
+		author      = {Adler, Eytan J. and Martins, Joaquim R. R. A.},
+		title       = {Efficient Aerostructural Wing Optimization Considering Mission Analysis},
+		doi         = {10.2514/1.c037096},
+		issn        = {1533-3868},
+		journal     = {Journal of Aircraft},
+		month       = {December},
+		publisher   = {American Institute of Aeronautics and Astronautics},
+		year        = {2022}
+	}
+
+Mahmoud Fouda, Eytan J. Adler, Jasper H. Bussemaker, Joaquim R. R. A. Martins, D. F. Kurtulus, Luca Boggero, and Björn Nagel,
+*Automated Hybrid Propulsion Model Construction for Conceptual Aircraft Design and Optimization*,
+33rd Congress of the International Council of the Aeronautical Sciences, Stockholm, Sweden, September 2022,
+PDF is available `here <https://www.researchgate.net/publication/363405270_Automated_hybrid_propulsion_model_construction_for_conceptual_aircraft_design_and_optimization>`__.
+
+.. code-block:: bibtex
+
+	@inproceedings{Fouda2022,
+		author = {Mahmoud Fouda and Eytan J. Adler and Jasper H. Bussemaker and Joaquim R. R. A. Martins and D. F. Kurtulus and Luca Boggero and Bj\"orn Nagel},
+		title = {Automated Hybrid Propulsion Model Construction for Conceptual Aircraft Design and Optimization},
+		booktitle = {33rd Congress of the International Council of the Aeronautical Sciences},
+		month = {September},
+		year = {2022}
+	}
+
 Eytan J. Adler, Benjamin J. Brelje, and Joaquim R.R.A. Martins,
 *Thermal Management System Optimization for a Parallel Hybrid Aircraft Considering Mission Fuel Burn*,
 Aerospace, 9(5), 2022
 DOI: `10.3390/aerospace9050243 <https://doi.org/10.3390/aerospace9050243>`_.
-PDF is available `here <https://mdolab.engin.umich.edu/bibliography/Adler2022b>`__.
+PDF is available `here <https://www.researchgate.net/publication/360208814_Thermal_Management_System_Optimization_for_a_Parallel_Hybrid_Aircraft_Considering_Mission_Fuel_Burn>`__.
 
 .. code-block:: bibtex
 

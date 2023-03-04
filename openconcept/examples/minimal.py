@@ -9,9 +9,9 @@ does use the mission analysis methods.
 import openmdao.api as om
 from openconcept.mission import BasicMission
 import numpy as np
-import matplotlib.pyplot as plt
 
 # rst Imports (end)
+
 
 # rst Aircraft (beg)
 class Aircraft(om.ExplicitComponent):
@@ -141,6 +141,8 @@ if __name__ == "__main__":
     om.n2(prob, outfile="minimal_example_n2.html", show_browser=not hide_viz)
 
     # Create plot with results
+    import matplotlib.pyplot as plt
+
     fig, axs = plt.subplots(2, 2, constrained_layout=True)
     axs = axs.flatten()  # change 2x2 mtx of axes into 4-element vector
 

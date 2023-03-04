@@ -52,25 +52,29 @@ Dependencies
 
 .. Remember to change in the readme too!
 
-This toolkit requires the use of `OpenMDAO <https://openmdao.org>`__ 3.10.0 or later due to backward-incompatible changes.
-OpenMDAO requires a recent NumPy and SciPy.
-Python 3.8, 3.9, or 3.10 are recommended since they are the versions with which the code is tested, but newer Python versions will likely work as well.
+OpenConcept is tested regularly on builds with the oldest and latest supported package versions. The package versions in the oldest and latest builds are the following:
 
-.. list-table:: Latest tested dependencies
+.. list-table::
    :header-rows: 1
 
    * - Package
-     - Version
+     - Oldest
+     - Latest
    * - Python
-     - 3.10.4
+     - 3.8
+     - 3.11
    * - OpenMDAO
-     - 3.16.0
+     - 3.10
+     - latest
    * - NumPy
-     - 1.22.4
+     - 1.20
+     - latest
    * - SciPy
-     - 1.7.3
+     - 1.6.0
+     - latest
    * - OpenAeroStruct
-     - 2.5.1
+     - latest
+     - latest
 
 ---------------
 Please Cite Us!
@@ -95,19 +99,21 @@ AIAA Propulsion and Energy Forum, (AIAA 2018-4979) DOI: 10.2514/6.2018-4979
 	doi = {10.2514/6.2018-4979}
 	}
 
-If using the integrated OpenAeroStruct VLM or aerostructural aerodynamic models, please cite the following `conference paper <https://www.researchgate.net/publication/357559489_Aerostructural_wing_design_optimization_considering_full_mission_analysis>`__:
+If using the integrated OpenAeroStruct VLM or aerostructural aerodynamic models, please cite the following `journal paper <https://www.researchgate.net/publication/366553107_Efficient_Aerostructural_Wing_Optimization_Considering_Mission_Analysis>`__:
 
-Eytan J. Adler and Joaquim R.R.A. Martins, "Aerostructural wing design optimization considering full mission analysis", 2022 AIAA SciTech Forum, San Diego, CA, January 2022. DOI: 10.2514/6.2022-0382
+Eytan J. Adler and Joaquim R.R.A. Martins, "Efficient Aerostructural Wing Optimization Considering Mission Analysis", AIAA Journal of Aircraft, December 2022. DOI: 10.2514/1.c037096
 
 .. code-block:: bibtex
 
-    @inproceedings{Adler2022a,
-	author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
-	title       = {Aerostructural wing design optimization considering full mission analysis},
-	booktitle   = {AIAA SciTech Forum},
-	doi         = {10.2514/6.2022-0382},
-	month       = {January},
-	year        = {2022}
+    @article{Adler2022d,
+	author = {Adler, Eytan J. and Martins, Joaquim R. R. A.},
+	doi = {10.2514/1.c037096},
+	issn = {1533-3868},
+	journal = {Journal of Aircraft},
+	month = {December},
+	publisher = {American Institute of Aeronautics and Astronautics},
+	title = {Efficient Aerostructural Wing Optimization Considering Mission Analysis},
+	year = {2022}
 	}
 
 .. currentmodule:: openconcept
