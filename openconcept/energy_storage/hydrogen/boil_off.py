@@ -760,7 +760,7 @@ class LH2BoilOffODE(om.ExplicitComponent):
         self.T_dot_liq = (
             Q_liq
             - self.P_liq * self.V_dot_liq
-            + self.m_dot_liq * (self.h_liq - self.u_liq)
+            + self.m_dot_boil_off * (self.h_liq - self.u_liq)
             - m_dot_liq_out * self.h_liq
         ) / (m_liq * self.cp_liq)
 
