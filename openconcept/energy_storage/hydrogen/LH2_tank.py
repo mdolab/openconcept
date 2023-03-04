@@ -34,16 +34,9 @@ class LH2Tank(om.Group):
     Q_add : float
         Additional heat added to the tank other than the natural environment
         heat leak, make negative to remove heat (vector, W)
-    m_dot_gas_in : float
-        Mass flow rate of gaseous hydrogen into the ullage EXCLUDING any boil off (this is
-        handled internally in this component); unlikely to ever be nonzero but left here
-        to maintain generality (vector, kg/s)
     m_dot_gas_out : float
         Mass flow rate of gaseous hydrogen out of the ullage; could be for venting
         or gaseous hydrogen consumption (vector, kg/s)
-    m_dot_liq_in : float
-        Mass flow rate of liquid hydrogen into the bulk liquid; unlikely to ever be nonzero
-        but left here to maintain generality (vector, kg/s)
     m_dot_liq_out : float
         Mass flow rate of liquid hydrogen out of the tank; this is where fuel being consumed
         is bookkept, assuming it is removed from the tank as a liquid (vector, kg/s)
@@ -86,7 +79,7 @@ class LH2Tank(om.Group):
         Number of analysis points to run (scalar, dimensionless)
     fill_level_init : float
         Initial fill level (in range 0-1) of the tank, default 0.95
-        to leave space for boil off gas; 5% adopted from Millis et al. 2009 (scalar, dimensionless)
+        to leave space for boil-off gas; 5% adopted from Millis et al. 2009 (scalar, dimensionless)
     ullage_T_init : float
         Initial temperature of gas in ullage, default 20 K (scalar, K)
     ullage_P_init : float
@@ -153,7 +146,7 @@ class LH2Tank(om.Group):
                 ullage_P_init=self.options["ullage_P_init"],
                 liquid_T_init=self.options["liquid_T_init"],
             ),
-            promotes_inputs=["radius", "length", "m_dot_gas_in", "m_dot_gas_out", "m_dot_liq_in", "m_dot_liq_out"],
+            promotes_inputs=["radius", "length", "m_dot_gas_out", "m_dot_liq_out", "Q_add"],
             promotes_outputs=["m_gas", "m_liq", "T_gas", "T_liq", ("P_gas", "P"), "fill_level"],
         )
 
@@ -163,13 +156,10 @@ class LH2Tank(om.Group):
             HeatTransferVacuumTank(num_nodes=nn, heat_multiplier=self.options["heat_multiplier"]),
             promotes_inputs=["T_env", "N_layers", "T_liq", "T_gas"],
         )
-        self.add_subsystem(
-            "total_heat",
-            AddSubtractComp(output_name="Q", input_names=["heat_leak", "Q_add"], vec_size=[nn, nn], units="W"),
-            promotes_inputs=["Q_add"],
-        )
-        self.connect("heat_leak.Q", "total_heat.heat_leak")
-        self.connect("total_heat.Q", "boil_off.Q_dot")
+
+        # Create the cycle between the boil-off and heat leak
+        self.connect("heat_leak.Q_gas", "boil_off.Q_gas")
+        self.connect("heat_leak.Q_liq", "boil_off.Q_liq")
         self.connect("boil_off.interface_params.A_wet", "heat_leak.A_wet")
         self.connect("boil_off.interface_params.A_dry", "heat_leak.A_dry")
 
@@ -217,13 +207,13 @@ class LH2Tank(om.Group):
         self.set_input_defaults("vacuum_gap", 5, units="cm")
 
         # # Use block Gauss-Seidel solver for this component
-        # self.nonlinear_solver = om.NonlinearBlockGS(iprint=2, atol=1e-9, rtol=1e-9)
+        # self.nonlinear_solver = om.NonlinearBlockGS(iprint=2, atol=1e-9, rtol=1e-9, maxiter=6)
         # self.linear_solver = om.LinearBlockGS(iprint=0)
 
 
 if __name__ == "__main__":
-    duration = 15.0  # hr
-    nn = 51
+    duration = 10.0  # hr
+    nn = 21
 
     p = om.Problem()
     p.model.add_subsystem("tank", LH2Tank(num_nodes=nn, fill_level_init=0.95), promotes=["*"])
@@ -233,11 +223,9 @@ if __name__ == "__main__":
     p.set_val("boil_off.integ.duration", duration, units="h")
     p.set_val("radius", 2.75, units="m")
     p.set_val("length", 2.0, units="m")
-    p.set_val("Q_add", 1000.0, units="W")
+    p.set_val("Q_add", 1500.0, units="W")
     p.set_val("m_dot_gas_out", 0.0, units="kg/h")
-    p.set_val("m_dot_liq_out", 100.0, units="kg/h")
-    p.set_val("m_dot_gas_in", 0.0, units="kg/h")
-    p.set_val("m_dot_liq_in", 0.0, units="kg/h")
+    p.set_val("m_dot_liq_out", 700.0, units="kg/h")
     p.set_val("T_env", 300, units="K")
     p.set_val("N_layers", 10)
     p.set_val("environment_design_pressure", 1, units="atm")
@@ -269,12 +257,14 @@ if __name__ == "__main__":
     axs[2].set_xlabel("Time (hrs)")
     axs[2].set_ylabel("Liquid temperature (K)")
 
-    heat_leak = p.get_val("heat_leak.Q", units="W")
+    heat_leak_gas = p.get_val("heat_leak.Q_gas", units="W")
+    heat_leak_liq = p.get_val("heat_leak.Q_liq", units="W")
     Q_add = p.get_val("Q_add", units="W")
-    axs[3].plot(t, heat_leak, label="Heat leak")
-    axs[3].plot(t, Q_add, label="Additional heat")
+    axs[3].plot(t, heat_leak_gas, label="Heat leak into ullage")
+    axs[3].plot(t, heat_leak_liq, label="Heat leak into liquid")
+    axs[3].plot(t, Q_add, label="Added heat")
     axs[3].set_xlabel("Time (hrs)")
-    axs[3].set_ylabel("Heat leak (W)")
+    axs[3].set_ylabel("Heat (W)")
     axs[3].legend()
 
     axs[4].plot(t, 100 * p.get_val("fill_level"))
@@ -282,15 +272,13 @@ if __name__ == "__main__":
     axs[4].set_ylabel("Fill level (%)")
 
     m_liq_init = p.get_val("m_liq", units="kg")[0]
-    m_dot_boil_off = (
-        p.get_val("boil_off.boil_off_ode.m_dot_gas", units="kg/d")
-        - p.get_val("m_dot_gas_in", units="kg/d")
-        + p.get_val("m_dot_gas_out", units="kg/d")
+    m_dot_boil_off = p.get_val("boil_off.boil_off_ode.m_dot_gas", units="kg/d") + p.get_val(
+        "m_dot_gas_out", units="kg/d"
     )
     m_dot_boil_off *= 100 / m_liq_init
     axs[5].plot(t, m_dot_boil_off)
     axs[5].set_xlabel("Time (hrs)")
-    axs[5].set_ylabel("Boil off rate (% initial\nfuel weight per day)")
+    axs[5].set_ylabel("Boil-off rate (% initial\nfuel weight per day)")
 
     for ax in axs:
         ax.spines[["top", "right"]].set_visible(False)

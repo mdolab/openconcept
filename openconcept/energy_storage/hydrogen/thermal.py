@@ -1,8 +1,6 @@
 import numpy as np
 import openmdao.api as om
-from openconcept.utilities.constants import STEFAN_BOLTZMANN_CONST, GRAV_CONST
-from openconcept.energy_storage.hydrogen.H2_properties import lh2_cp, lh2_rho, sat_gh2_k
-from openconcept.utilities import AddSubtractComp, ElementMultiplyDivideComp
+from openconcept.utilities import ElementMultiplyDivideComp
 
 
 class HeatTransferVacuumTank(om.Group):
@@ -35,8 +33,10 @@ class HeatTransferVacuumTank(om.Group):
 
     Outputs
     -------
-    Q : float
-        Heat entering the propellant from the external environment (vector, W)
+    Q_gas : float
+        Heat flow rate through the tank walls into the ullage (vector, W)
+    Q_liq : float
+        Heat flow rate through the tank walls into the bulk liquid (vector, W)
 
     Options
     -------
@@ -68,34 +68,19 @@ class HeatTransferVacuumTank(om.Group):
 
         # Scale each flux by the associated area
         mult = self.add_subsystem(
-            "scale_by_area", ElementMultiplyDivideComp(vec_size=nn), promotes_inputs=["A_wet", "A_dry"]
+            "scale_by_area",
+            ElementMultiplyDivideComp(vec_size=nn),
+            promotes_inputs=["A_wet", "A_dry"],
+            promotes_outputs=["Q_liq", "Q_gas"],
         )
         mult.add_equation(
-            output_name="heat_liq", input_names=["flux_liq", "A_wet"], vec_size=nn, input_units=["W/m**2", "m**2"]
+            output_name="Q_liq", input_names=["flux_liq", "A_wet"], vec_size=nn, input_units=["W/m**2", "m**2"]
         )
         mult.add_equation(
-            output_name="heat_gas", input_names=["flux_gas", "A_dry"], vec_size=nn, input_units=["W/m**2", "m**2"]
+            output_name="Q_gas", input_names=["flux_gas", "A_dry"], vec_size=nn, input_units=["W/m**2", "m**2"]
         )
         self.connect("mli_heat_liq.heat_flux", "scale_by_area.flux_liq")
         self.connect("mli_heat_gas.heat_flux", "scale_by_area.flux_gas")
-
-        # Sum the heat into the liquid and gas to get total heat leak and scale by heat_multiplier
-        self.add_subsystem(
-            "sum_heats",
-            AddSubtractComp(
-                output_name="Q",
-                input_names=["Q_liq", "Q_gas"],
-                vec_size=nn,
-                scaling_factors=[
-                    self.options["heat_multiplier"],
-                    self.options["heat_multiplier"],
-                ],
-                units="W",
-            ),
-            promotes_outputs=["Q"],
-        )
-        self.connect("scale_by_area.heat_liq", "sum_heats.Q_liq")
-        self.connect("scale_by_area.heat_gas", "sum_heats.Q_gas")
 
 
 class MLIHeatFlux(om.ExplicitComponent):
