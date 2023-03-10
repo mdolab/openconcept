@@ -100,7 +100,8 @@ class MinCompTestCase(unittest.TestCase):
 
     def test_multiple_min(self):
         nn = 5
-        p = Problem(MinComp(num_nodes=nn))
+        p = Problem()
+        p.model.add_subsystem("comp", MinComp(num_nodes=nn), promotes=["*"])
         p.setup(check=True, force_alloc_complex=True)
         p.set_val("array", np.array([42.0, 7.0, 30.0, 58.0, 7.0]))
         p.run_model()

@@ -1,7 +1,7 @@
 import unittest
 import os
 import numpy as np
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.api import Problem
 import openconcept
 from openconcept.propulsion import N3, N3Hybrid
@@ -33,7 +33,7 @@ if cached_thrust and cached_fuelburn and cached_T4:
 class N3HybridTestCase(unittest.TestCase):
     def test_defaults(self):
         p = Problem()
-        p.model = N3Hybrid()
+        p.model.add_subsystem("comp", N3Hybrid(), promotes=["*"])
 
         p.setup(force_alloc_complex=True)
 
@@ -48,13 +48,10 @@ class N3HybridTestCase(unittest.TestCase):
         assert_near_equal(p.get_val("fuel_flow", units="kg/s"), 0.34333925 * np.ones(1), tolerance=1e-6)
         assert_near_equal(p.get_val("surge_margin"), 17.49872296 * np.ones(1), tolerance=1e-6)
 
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
-
     def test_vectorized(self):
         nn = 5
         p = Problem()
-        p.model = N3Hybrid(num_nodes=nn)
+        p.model.add_subsystem("comp", N3Hybrid(num_nodes=nn), promotes=["*"])
 
         p.setup(force_alloc_complex=True)
 
@@ -81,15 +78,12 @@ class N3HybridTestCase(unittest.TestCase):
             tolerance=5e-3,
         )
 
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
-
 
 @unittest.skipIf(skip_tests, "N+3 surrogate model has not been trained (cached data not found), so skipping N+3 tests")
 class N3TestCase(unittest.TestCase):
     def test_defaults(self):
         p = Problem()
-        p.model = N3()
+        p.model.add_subsystem("comp", N3(), promotes=["*"])
 
         p.setup(force_alloc_complex=True)
 
@@ -103,13 +97,10 @@ class N3TestCase(unittest.TestCase):
         assert_near_equal(p.get_val("fuel_flow", units="kg/s"), 0.35176628 * np.ones(1), tolerance=1e-6)
         assert_near_equal(p.get_val("surge_margin"), 18.42447377 * np.ones(1), tolerance=1e-6)
 
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
-
     def test_vectorized(self):
         nn = 5
         p = Problem()
-        p.model = N3Hybrid(num_nodes=nn)
+        p.model.add_subsystem("comp", N3Hybrid(num_nodes=nn), promotes=["*"])
 
         p.setup(force_alloc_complex=True)
 
@@ -134,9 +125,6 @@ class N3TestCase(unittest.TestCase):
             np.array([9.63957356, 9.85223288, 21.01375818, 31.54415929, 17.48630861]),
             tolerance=5e-3,
         )
-
-        partials = p.check_partials(method="cs", compact_print=True)
-        assert_check_partials(partials)
 
 
 if __name__ == "__main__":

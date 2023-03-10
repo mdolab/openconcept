@@ -114,7 +114,6 @@ try:
 
         class MPDuct(pyc.MPCycle):
             def setup(self):
-
                 self.options["thermo_method"] = "CEA"
                 self.options["thermo_data"] = pyc.species_data.janaf
 
@@ -346,7 +345,9 @@ if not HAS_PYCYCLE:
     class TestOCDuct(unittest.TestCase):
         def __init__(self, *args, **kwargs):
             self.list_output = False
-            warnings.warn("pycycle >= 3.0 must be installed to run reg tests using pycycle. Using cached values")
+            warnings.warn(
+                "pycycle >= 3.0 must be installed to run reg tests using pycycle. Using cached values", stacklevel=2
+            )
             super(TestOCDuct, self).__init__(*args, **kwargs)
 
         def test_baseline(self):

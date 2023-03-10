@@ -15,7 +15,7 @@ class LinearSelectorTestCase(unittest.TestCase):
     def test_bypass(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = LinearSelector()
+        p.model.add_subsystem("comp", LinearSelector(), promotes=["*"])
         p.setup(force_alloc_complex=True)
         p.run_model()
 
@@ -28,7 +28,7 @@ class LinearSelectorTestCase(unittest.TestCase):
     def test_no_bypass(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = LinearSelector()
+        p.model.add_subsystem("comp", LinearSelector(), promotes=["*"])
         p.setup(force_alloc_complex=True)
         p.set_val("bypass", np.zeros(1))
         p.run_model()
@@ -42,7 +42,7 @@ class LinearSelectorTestCase(unittest.TestCase):
     def test_vectorized(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = LinearSelector(num_nodes=3)
+        p.model.add_subsystem("comp", LinearSelector(num_nodes=3), promotes=["*"])
         p.setup(force_alloc_complex=True)
         p.set_val("bypass", np.array([0.0, 0.5, 1.0]))
         p.set_val("T_in_cold", np.array([295.0, 300.0, 305.0]), units="K")
@@ -63,7 +63,7 @@ class COPHeatPumpTestCase(unittest.TestCase):
     def test_single(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = COPHeatPump()
+        p.model.add_subsystem("comp", COPHeatPump(), promotes=["*"])
         p.setup(force_alloc_complex=True)
         p.set_val("COP", np.ones(1))
         p.set_val("power_rating", 1.0, units="kW")
@@ -77,7 +77,7 @@ class COPHeatPumpTestCase(unittest.TestCase):
     def test_vectorized(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = COPHeatPump(num_nodes=3)
+        p.model.add_subsystem("comp", COPHeatPump(num_nodes=3), promotes=["*"])
         p.setup(force_alloc_complex=True)
         p.set_val("COP", np.array([1.0, 1.5, 2.0]))
         p.set_val("power_rating", 1.0, units="kW")
@@ -93,7 +93,7 @@ class HeatPumpWeightTestCase(unittest.TestCase):
     def test_single(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = HeatPumpWeight()
+        p.model.add_subsystem("comp", HeatPumpWeight(), promotes=["*"])
         p.setup(force_alloc_complex=True)
         p.set_val("power_rating", 1.0, units="kW")
         p.set_val("specific_power", 200.0, units="W/kg")
@@ -169,7 +169,7 @@ class COPExplicitTestCase(unittest.TestCase):
     def test_single(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = COPExplicit()
+        p.model.add_subsystem("comp", COPExplicit(), promotes=["*"])
         p.setup()
         p.set_val("T_c", 300.0 * np.ones(1), units="K")
         p.set_val("T_h", 400.0 * np.ones(1), units="K")
@@ -181,7 +181,7 @@ class COPExplicitTestCase(unittest.TestCase):
     def test_vectorized(self):
         p = Problem()
         p.model.linear_solver = DirectSolver()
-        p.model = COPExplicit(num_nodes=4)
+        p.model.add_subsystem("comp", COPExplicit(num_nodes=4), promotes=["*"])
         p.setup()
         p.set_val("T_c", np.array([100.0, 110.0, 120.0, 130.0]), units="K")
         p.set_val("T_h", np.array([200.0, 190.0, 180.0, 170.0]), units="K")

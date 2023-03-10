@@ -23,13 +23,15 @@ except ImportError:
     raise ImportError("OpenAeroStruct must be installed to use the VLMDragPolar component")
 
 CITATION = """
-@InProceedings{Adler2022a,
-    author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
-    title       = {Aerostructural wing design optimization considering full mission analysis},
-    booktitle   = {AIAA SciTech Forum},
-    doi         = {10.2514/6.2022-0382},
-    month       = {January},
-    year        = {2022}
+@article{Adler2022d,
+    author = {Adler, Eytan J. and Martins, Joaquim R. R. A.},
+    doi = {10.2514/1.c037096},
+    issn = {1533-3868},
+    journal = {Journal of Aircraft},
+    month = {December},
+    publisher = {American Institute of Aeronautics and Astronautics},
+    title = {Efficient Aerostructural Wing Optimization Considering Mission Analysis},
+    year = {2022}
 }
 """
 

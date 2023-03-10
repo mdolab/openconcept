@@ -9,7 +9,6 @@ import numpy as np
 def plot_trajectory(
     prob, x_var, x_unit, y_vars, y_units, phases, x_label=None, y_labels=None, marker="o", plot_title="Trajectory"
 ):
-
     val_list = []
     for phase in phases:
         val_list.append(prob.get_val(phase + "." + x_var, units=x_unit))

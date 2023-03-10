@@ -182,7 +182,9 @@ class VLMDataGenTestCase(unittest.TestCase):
     def test_defaults(self):
         # Regression test
         twist = np.array([-1, -0.5, 2])
-        p = om.Problem(
+        p = om.Problem()
+        p.model.add_subsystem(
+            "comp",
             VLMDataGen(
                 num_x=3,
                 num_y=5,
@@ -190,7 +192,8 @@ class VLMDataGenTestCase(unittest.TestCase):
                 Mach_train=np.linspace(0.1, 0.85, 2),
                 alpha_train=np.linspace(-10, 15, 2),
                 alt_train=np.linspace(0, 15e3, 2),
-            )
+            ),
+            promotes=["*"],
         )
         p.setup()
         p.set_val("fltcond|TempIncrement", 0, units="degC")
@@ -375,7 +378,8 @@ class PlanformMeshTestCase(unittest.TestCase):
     def test_easy(self):
         nx = 3
         ny = 5
-        p = om.Problem(PlanformMesh(num_x=nx, num_y=ny))
+        p = om.Problem()
+        p.model.add_subsystem("comp", PlanformMesh(num_x=nx, num_y=ny), promotes=["*"])
         p.setup()
         p.set_val("S", 2, units="m**2")
         p.set_val("AR", 2)
@@ -394,7 +398,8 @@ class PlanformMeshTestCase(unittest.TestCase):
     def test_S_AR(self):
         nx = 3
         ny = 5
-        p = om.Problem(PlanformMesh(num_x=nx, num_y=ny))
+        p = om.Problem()
+        p.model.add_subsystem("comp", PlanformMesh(num_x=nx, num_y=ny), promotes=["*"])
         p.setup(force_alloc_complex=True)
         p.set_val("S", 48, units="m**2")
         p.set_val("AR", 3)
@@ -413,7 +418,8 @@ class PlanformMeshTestCase(unittest.TestCase):
     def test_taper(self):
         nx = 2
         ny = 3
-        p = om.Problem(PlanformMesh(num_x=nx, num_y=ny))
+        p = om.Problem()
+        p.model.add_subsystem("comp", PlanformMesh(num_x=nx, num_y=ny), promotes=["*"])
         p.setup()
         p.set_val("S", 1.3, units="m**2")
         p.set_val("AR", 4 / 1.3)  # pick S and AR for half span and root chord of 1
@@ -433,7 +439,8 @@ class PlanformMeshTestCase(unittest.TestCase):
     def test_sweep(self):
         nx = 3
         ny = 3
-        p = om.Problem(PlanformMesh(num_x=nx, num_y=ny))
+        p = om.Problem()
+        p.model.add_subsystem("comp", PlanformMesh(num_x=nx, num_y=ny), promotes=["*"])
         p.setup()
         p.set_val("S", 2, units="m**2")
         p.set_val("AR", 2)
@@ -455,7 +462,8 @@ class PlanformMeshTestCase(unittest.TestCase):
     def test_taper_sweep(self):
         nx = 2
         ny = 3
-        p = om.Problem(PlanformMesh(num_x=nx, num_y=ny))
+        p = om.Problem()
+        p.model.add_subsystem("comp", PlanformMesh(num_x=nx, num_y=ny), promotes=["*"])
         p.setup()
         p.set_val("S", 1.3, units="m**2")
         p.set_val("AR", 4 / 1.3)  # pick S and AR for half span and root chord of 1
@@ -477,7 +485,8 @@ class PlanformMeshTestCase(unittest.TestCase):
     def test_777ish_regression(self):
         nx = 3
         ny = 4
-        p = om.Problem(PlanformMesh(num_x=nx, num_y=ny))
+        p = om.Problem()
+        p.model.add_subsystem("comp", PlanformMesh(num_x=nx, num_y=ny), promotes=["*"])
         p.setup()
         p.set_val("S", 427.8, units="m**2")
         p.set_val("AR", 9.82)

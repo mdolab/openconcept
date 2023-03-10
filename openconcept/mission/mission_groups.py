@@ -4,6 +4,7 @@ from openconcept.utilities import Integrator, AddSubtractComp, ElementMultiplyDi
 
 import warnings
 
+
 # OpenConcept PhaseGroup will be used to hold analysis phases with time integration
 def find_integrators_in_model(system, abs_namespace, timevars, states):
     durationvar = system._problem_meta["oc_time_var"]
@@ -237,7 +238,8 @@ class IntegratorGroup(om.Group):
                             + "."
                             + var
                             + " "
-                            + "has no units specified. This can be dangerous."
+                            + "has no units specified. This can be dangerous.",
+                            stacklevel=2,
                         )
                     self.ode_integ.add_integrand(
                         state_name,
@@ -280,7 +282,6 @@ class TrajectoryGroup(om.Group):
         self._setup_var_data()
         for state_tuple in phase1_states:
             if state_tuple[0] in [state_tuple_2[0] for state_tuple_2 in phase2_states]:
-
                 phase1_abs_name = phase1.name + "." + state_tuple[0]
                 phase1_end_abs_name = phase1.name + "." + state_tuple[2]  # final
                 phase2_start_abs_name = phase2.name + "." + state_tuple[1]  # initial

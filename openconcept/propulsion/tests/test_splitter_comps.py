@@ -8,7 +8,7 @@ from openconcept.propulsion import PowerSplit
 class PowerSplitTestCase(unittest.TestCase):
     def test_default_settings(self):
         p = Problem()
-        p.model = PowerSplit()
+        p.model.add_subsystem("comp", PowerSplit(), promotes=["*"])
         p.setup(check=True, force_alloc_complex=True)
         p.run_model()
 
@@ -24,8 +24,10 @@ class PowerSplitTestCase(unittest.TestCase):
 
     def test_fraction(self):
         p = Problem()
-        p.model = PowerSplit(
-            num_nodes=3, efficiency=0.95, weight_inc=0.01, weight_base=1.0, cost_inc=0.02, cost_base=2.0
+        p.model.add_subsystem(
+            "comp",
+            PowerSplit(num_nodes=3, efficiency=0.95, weight_inc=0.01, weight_base=1.0, cost_inc=0.02, cost_base=2.0),
+            promotes=["*"],
         )
         p.setup(check=True, force_alloc_complex=True)
 
@@ -47,8 +49,18 @@ class PowerSplitTestCase(unittest.TestCase):
 
     def test_fixed(self):
         p = Problem()
-        p.model = PowerSplit(
-            num_nodes=3, rule="fixed", efficiency=0.95, weight_inc=0.01, weight_base=1.0, cost_inc=0.02, cost_base=2.0
+        p.model.add_subsystem(
+            "comp",
+            PowerSplit(
+                num_nodes=3,
+                rule="fixed",
+                efficiency=0.95,
+                weight_inc=0.01,
+                weight_base=1.0,
+                cost_inc=0.02,
+                cost_base=2.0,
+            ),
+            promotes=["*"],
         )
         p.setup(check=True)
 

@@ -225,7 +225,6 @@ class Groundspeeds(ExplicitComponent):
     """
 
     def initialize(self):
-
         self.options.declare(
             "num_nodes",
             default=1,
@@ -455,7 +454,6 @@ class SteadyFlightCL(ExplicitComponent):
     """
 
     def initialize(self):
-
         self.options.declare(
             "num_nodes",
             default=5,
