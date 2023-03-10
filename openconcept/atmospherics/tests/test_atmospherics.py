@@ -90,3 +90,7 @@ class ScalarAtmosTestCase(unittest.TestCase):
     def test_partials(self):
         partials = self.prob.check_partials(method="cs", out_stream=None)
         assert_check_partials(partials)
+
+
+if __name__=="__main__":
+    unittest.main()
