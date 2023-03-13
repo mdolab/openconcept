@@ -1,5 +1,6 @@
 try:
-    from matplotlib import pyplot as plt
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import LineCollection
 except ImportError:
     # don't want a matplotlib dependency on Travis/Appveyor
     pass
@@ -98,3 +99,72 @@ def plot_trajectory_grid(
     if savefig is not None:
         fig.tight_layout()
         plt.savefig(savefig + "_" + str(file_counter) + ".pdf")
+
+
+def plot_OAS_mesh(OAS_mesh, ax=None, set_xlim=True, turn_off_axis=True):
+    """
+    Plots the wing planform mesh from OpenConcept's OpenAeroStruct interface.
+
+    Parameters
+    ----------
+    OAS_mesh : ndarray
+        The mesh numpy array pulled out of the aerodynamics model (the output
+        of the mesh component).
+    ax : matplotlib axis object (optional)
+        Axis on which to plot the wingbox. If not specified, this function
+        creates and returns a figure and axis.
+    set_xlim : bool (optional)
+        Set the x limits on the axis to just fit the span of the wing.
+    turn_off_axis : bool (optional)
+        Turn off the spines, ticks, etc.
+
+    Returns
+    -------
+    fig, ax : matplotlib figure and axis objects
+        If ax is not specified, returns the created figure and axis.
+    """
+    # Duplicate the half mesh that is used by OAS
+    mesh = np.hstack((OAS_mesh, OAS_mesh[:, -2::-1, :] * np.array([1, -1, 1])))
+    chord_wing_front = mesh[0, :, 0]
+    span_wing = mesh[0, :, 1]
+    chord_wing_back = mesh[-1, :, 0]
+
+    return_ax = False
+    if ax is None:
+        # Figure out the size the plot should be
+        span = 2 * np.max(span_wing)
+        y_range = abs(np.min(chord_wing_front) - np.max(chord_wing_back))
+        x_size = 10
+        y_size = y_range / span * x_size
+
+        fig, ax = plt.subplots(figsize=(x_size, y_size))
+        return_ax = True
+
+    # Plot wing
+    ax.fill_between(
+        span_wing,
+        -chord_wing_front,
+        -chord_wing_back,
+        facecolor="#d5e4f5",
+        zorder=0,
+        edgecolor="#919191",
+        clip_on=False,
+    )
+
+    # Plot aerodynamic mesh
+    x = mesh[:, :, 1]
+    y = -mesh[:, :, 0]
+    segs1 = np.stack((x, y), axis=2)
+    segs2 = segs1.transpose(1, 0, 2)
+    ax.add_collection(LineCollection(segs1, color="#919191", zorder=2, linewidth=0.3))
+    ax.add_collection(LineCollection(segs2, color="#919191", zorder=2, linewidth=0.3))
+
+    # Set final plot details
+    ax.set_aspect("equal")
+    if turn_off_axis:
+        ax.set_axis_off()
+    if set_xlim:
+        ax.set_xlim((np.min(span_wing), np.max(span_wing)))
+
+    if return_ax:
+        return fig, ax
