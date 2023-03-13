@@ -25,7 +25,7 @@ try:
     from openaerostruct.integration.aerostruct_groups import AerostructPoint
     from openaerostruct.structures.spatial_beam_setup import SpatialBeamSetup
     from openaerostruct.structures.wingbox_group import WingboxGroup
-    from openconcept.aerodynamics.openaerostruct.drag_polar import PlanformMesh
+    from openconcept.aerodynamics.openaerostruct.mesh_gen import TrapezoidalPlanformMesh
 except ImportError:
     raise ImportError("OpenAeroStruct must be installed to use the AerostructDragPolar component")
 
@@ -1202,7 +1202,7 @@ class Aerostruct(om.Group):
         comp.add_spline(y_cp_name="t_over_c_cp", y_interp_name="t_over_c")
 
         # Wing mesh generator
-        wing_group.add_subsystem("mesh_gen", PlanformMesh(num_x=nx, num_y=ny), promotes_inputs=["*"])
+        wing_group.add_subsystem("mesh_gen", TrapezoidalPlanformMesh(num_x=nx, num_y=ny), promotes_inputs=["*"])
 
         # Apply twist spline to mesh
         wing_group.add_subsystem(
