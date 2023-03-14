@@ -126,13 +126,18 @@ class TrapezoidalPlanformMesh(om.ExplicitComponent):
         )
 
         dx_dsweep = (
-            0 * x_mesh + np.linspace(half_span, 0, self.ny).reshape(1, self.ny) / np.cos(np.deg2rad(sweep)) ** 2 * np.pi / 180.0
+            0 * x_mesh
+            + np.linspace(half_span, 0, self.ny).reshape(1, self.ny) / np.cos(np.deg2rad(sweep)) ** 2 * np.pi / 180.0
         )
 
         J["mesh", "S"] = np.dstack((dx_dS, dy_dS, np.zeros((self.nx, self.ny)))).flatten()
         J["mesh", "AR"] = np.dstack((dx_dAR, dy_dAR, np.zeros((self.nx, self.ny)))).flatten()
-        J["mesh", "taper"] = np.dstack((dx_dtaper, np.zeros((self.nx, self.ny)), np.zeros((self.nx, self.ny)))).flatten()
-        J["mesh", "sweep"] = np.dstack((dx_dsweep, np.zeros((self.nx, self.ny)), np.zeros((self.nx, self.ny)))).flatten()
+        J["mesh", "taper"] = np.dstack(
+            (dx_dtaper, np.zeros((self.nx, self.ny)), np.zeros((self.nx, self.ny)))
+        ).flatten()
+        J["mesh", "sweep"] = np.dstack(
+            (dx_dsweep, np.zeros((self.nx, self.ny)), np.zeros((self.nx, self.ny)))
+        ).flatten()
 
 
 class SectionPlanformMesh(om.ExplicitComponent):
@@ -219,16 +224,14 @@ class SectionPlanformMesh(om.ExplicitComponent):
 
     def setup(self):
         # Process mesh resolution options
-        self.nx = self.options["num_x"]
+        self.nx = self.options["num_x"] + 1  # nx is now number of coordinates, not panels
         self.n_sec = self.options["num_sections"]
         if self.n_sec < 2:
-            raise ValueError("Must define at least two sections along the span")
+            raise ValueError("Must define at least two sections along the half span")
         num_y = self.options["num_y"]
         if isinstance(num_y, int):
             # If it's an int, duplicate the number of sections for each region
-            self.ny = [
-                num_y,
-            ] * (self.n_sec - 1)
+            self.ny = [num_y] * (self.n_sec - 1)
         elif isinstance(num_y, (list, tuple, np.ndarray)):
             # If it is an iterable, make sure it's the right length
             if len(num_y) != self.n_sec - 1:
@@ -241,14 +244,14 @@ class SectionPlanformMesh(om.ExplicitComponent):
         self.add_input("chord_sec", shape=(self.n_sec,))
 
         # Generate default mesh
-        ny_tot = np.sum(self.ny) + 1
-        x, y = np.meshgrid(np.linspace(0, 1, self.nx + 1), np.linspace(-1, 0, ny_tot), indexing="ij")
+        self.ny_tot = np.sum(self.ny) + 1
+        x, y = np.meshgrid(np.linspace(0, 1, self.nx), np.linspace(-1, 0, self.ny_tot), indexing="ij")
         y *= 5
-        mesh = np.zeros((self.nx + 1, ny_tot, 3))
+        mesh = np.zeros((self.nx, self.ny_tot, 3))
         mesh[:, :, 0] = x
         mesh[:, :, 1] = y
 
-        self.add_output("mesh", val=mesh, shape=(self.nx + 1, ny_tot, 3), units="m")
+        self.add_output("mesh", val=mesh, shape=(self.nx, self.ny_tot, 3), units="m")
 
         self.declare_partials("mesh", "*")
 
@@ -262,9 +265,11 @@ class SectionPlanformMesh(om.ExplicitComponent):
         y_prev = 0
         A = 0.0  # nondimensional area of existing mesh
         for i_sec in range(self.n_sec - 1):
-            ny = self.ny[i_sec] + 1
+            ny = self.ny[i_sec] + 1  # number of coordinates in the current region (including at the ends)
             x_mesh, y_mesh = np.meshgrid(
-                cos_space(0, 1, self.nx + 1, dtype=x_sec.dtype), cos_space(y_sec[i_sec], y_sec[i_sec + 1], ny, dtype=x_sec.dtype), indexing="ij"
+                cos_space(0, 1, self.nx, dtype=x_sec.dtype),
+                cos_space(y_sec[i_sec], y_sec[i_sec + 1], ny, dtype=x_sec.dtype),
+                indexing="ij",
             )
             x_mesh *= cos_space(c_sec[i_sec], c_sec[i_sec + 1], ny)
             x_mesh += cos_space(x_sec[i_sec], x_sec[i_sec + 1], ny)
@@ -286,6 +291,90 @@ class SectionPlanformMesh(om.ExplicitComponent):
         # Scale the mesh by the reference area
         A *= 2  # we're only doing a half wing, so double to get total area
         outputs["mesh"] *= (S / A) ** 0.5
+
+    def compute_partials(self, inputs, partials):
+        S = inputs["S"].item()
+        x_sec = inputs["x_LE_sec"]
+        y_sec = np.hstack((inputs["y_sec"], 0))
+        c_sec = inputs["chord_sec"]
+
+        # Indices in flattened array
+        idx_x = 3 * np.arange(self.nx * self.ny_tot)
+        idx_y = idx_x + 1
+
+        mesh = np.zeros((self.nx, self.ny_tot, 3))
+
+        # Iterate through the defined trapezoidal regions between sections
+        y_prev = 0
+        A = 0.0  # nondimensional area of existing mesh
+        dA_dysec = np.zeros(self.n_sec - 1, dtype=float)
+        dA_dcsec = np.zeros(self.n_sec, dtype=float)
+        for i_sec in range(self.n_sec - 1):
+            ny = self.ny[i_sec] + 1  # number of coordinates in the current region (including at the ends)
+            x_mesh, y_mesh = np.meshgrid(
+                cos_space(0, 1, self.nx, dtype=x_sec.dtype),
+                cos_space(y_sec[i_sec], y_sec[i_sec + 1], ny, dtype=x_sec.dtype),
+                indexing="ij",
+            )
+
+            # Derivatives of this section
+            dymesh_dysec = np.tile(cos_space_deriv_start(ny, dtype=x_sec.dtype), (self.nx, 1))
+            dymesh_dysecnext = np.tile(cos_space_deriv_end(ny, dtype=x_sec.dtype), (self.nx, 1))
+            dxmesh_dcsec = x_mesh * cos_space_deriv_start(ny)
+            dxmesh_dcsecnext = x_mesh * cos_space_deriv_end(ny)
+            dxmesh_dxsec = np.tile(cos_space_deriv_start(ny), (self.nx, 1))
+            dxmesh_dxsecnext = np.tile(cos_space_deriv_end(ny), (self.nx, 1))
+
+            x_mesh *= cos_space(c_sec[i_sec], c_sec[i_sec + 1], ny)
+            x_mesh += cos_space(x_sec[i_sec], x_sec[i_sec + 1], ny)
+
+            # Indices in the mesh (not x, y, z values) corresponding to the coordinates in the current region
+            if i_sec == 0:
+                idx_mesh = (np.tile(np.arange(y_prev, y_prev + ny), (self.nx, 1)).T + np.arange(self.nx) * self.ny_tot).T.flatten()
+                partials["mesh", "y_sec"][idx_y[idx_mesh], i_sec] += dymesh_dysec.flatten()
+                # No derivative w.r.t. the y value at the root because it's always zero
+                if i_sec < self.n_sec - 2:
+                    partials["mesh", "y_sec"][idx_y[idx_mesh], i_sec + 1] += dymesh_dysecnext.flatten()
+                partials["mesh", "chord_sec"][idx_x[idx_mesh], i_sec] += dxmesh_dcsec.flatten()
+                partials["mesh", "chord_sec"][idx_x[idx_mesh], i_sec + 1] += dxmesh_dcsecnext.flatten()
+                partials["mesh", "x_LE_sec"][idx_x[idx_mesh], i_sec] += dxmesh_dxsec.flatten()
+                partials["mesh", "x_LE_sec"][idx_x[idx_mesh], i_sec + 1] += dxmesh_dxsecnext.flatten()
+            else:
+                idx_mesh = (np.tile(np.arange(y_prev + 1, y_prev + ny), (self.nx, 1)).T + np.arange(self.nx) * self.ny_tot).T.flatten()
+                partials["mesh", "y_sec"][idx_y[idx_mesh], i_sec] += dymesh_dysec[:, 1:].flatten()
+                # No derivative w.r.t. the y value at the root because it's always zero
+                if i_sec < self.n_sec - 2:
+                    partials["mesh", "y_sec"][idx_y[idx_mesh], i_sec + 1] += dymesh_dysecnext[:, 1:].flatten()
+                partials["mesh", "chord_sec"][idx_x[idx_mesh], i_sec] += dxmesh_dcsec[:, 1:].flatten()
+                partials["mesh", "chord_sec"][idx_x[idx_mesh], i_sec + 1] += dxmesh_dcsecnext[:, 1:].flatten()
+                partials["mesh", "x_LE_sec"][idx_x[idx_mesh], i_sec] += dxmesh_dxsec[:, 1:].flatten()
+                partials["mesh", "x_LE_sec"][idx_x[idx_mesh], i_sec + 1] += dxmesh_dxsecnext[:, 1:].flatten()
+
+            # Because y_prev is incremented by ny - 1, rather than by ny, the furthest inboard
+            # coordinates from this region will be "overwritten" (with the same values) by
+            # the next region (not particularly important to know, but might be useful for debugging)
+            mesh[:, y_prev : y_prev + ny, 0] = x_mesh
+            mesh[:, y_prev : y_prev + ny, 1] = y_mesh
+
+            # Add the area of this trapezoidal region to the total nondimensional planform area
+            A += (y_sec[i_sec + 1] - y_sec[i_sec]) * (c_sec[i_sec] + c_sec[i_sec + 1]) * 0.5
+            dA_dysec[i_sec] += -0.5 * (c_sec[i_sec] + c_sec[i_sec + 1])
+            if i_sec < self.n_sec - 2:
+                dA_dysec[i_sec + 1] += 0.5 * (c_sec[i_sec] + c_sec[i_sec + 1])
+            dA_dcsec[i_sec:i_sec + 2] += 0.5 * (y_sec[i_sec + 1] - y_sec[i_sec])
+
+            y_prev += ny - 1
+
+        # Scale the mesh by the reference area
+        A *= 2  # we're only doing a half wing, so double to get total area
+        dA_dysec *= 2
+        dA_dcsec *= 2
+        coeff = (S / A) ** 0.5
+        for var in ["y_sec", "chord_sec", "x_LE_sec"]:
+            partials["mesh", var] *= coeff
+        partials["mesh", "y_sec"] += np.outer(-0.5 * mesh.flatten() * S**0.5 * A**(-1.5), dA_dysec)
+        partials["mesh", "chord_sec"] += np.outer(-0.5 * mesh.flatten() * S**0.5 * A**(-1.5), dA_dcsec)
+        partials["mesh", "S"] = 0.5 * S**(-0.5) / A**0.5 * mesh.flatten()
 
 
 def cos_space(start, end, num, dtype=float):

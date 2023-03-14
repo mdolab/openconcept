@@ -18,7 +18,7 @@ class TrapezoidalPlanformMeshTestCase(unittest.TestCase):
         nx = 3
         ny = 5
         p = om.Problem()
-        p.model.add_subsystem("comp", TrapezoidalPlanformMesh(num_x=nx-1, num_y=ny-1), promotes=["*"])
+        p.model.add_subsystem("comp", TrapezoidalPlanformMesh(num_x=nx - 1, num_y=ny - 1), promotes=["*"])
         p.setup()
         p.set_val("S", 2, units="m**2")
         p.set_val("AR", 2)
@@ -38,7 +38,7 @@ class TrapezoidalPlanformMeshTestCase(unittest.TestCase):
         nx = 3
         ny = 5
         p = om.Problem()
-        p.model.add_subsystem("comp", TrapezoidalPlanformMesh(num_x=nx-1, num_y=ny-1), promotes=["*"])
+        p.model.add_subsystem("comp", TrapezoidalPlanformMesh(num_x=nx - 1, num_y=ny - 1), promotes=["*"])
         p.setup(force_alloc_complex=True)
         p.set_val("S", 48, units="m**2")
         p.set_val("AR", 3)
@@ -58,7 +58,7 @@ class TrapezoidalPlanformMeshTestCase(unittest.TestCase):
         nx = 2
         ny = 3
         p = om.Problem()
-        p.model.add_subsystem("comp", TrapezoidalPlanformMesh(num_x=nx-1, num_y=ny-1), promotes=["*"])
+        p.model.add_subsystem("comp", TrapezoidalPlanformMesh(num_x=nx - 1, num_y=ny - 1), promotes=["*"])
         p.setup()
         p.set_val("S", 1.3, units="m**2")
         p.set_val("AR", 4 / 1.3)  # pick S and AR for half span and root chord of 1
@@ -79,7 +79,7 @@ class TrapezoidalPlanformMeshTestCase(unittest.TestCase):
         nx = 3
         ny = 3
         p = om.Problem()
-        p.model.add_subsystem("comp", TrapezoidalPlanformMesh(num_x=nx-1, num_y=ny-1), promotes=["*"])
+        p.model.add_subsystem("comp", TrapezoidalPlanformMesh(num_x=nx - 1, num_y=ny - 1), promotes=["*"])
         p.setup()
         p.set_val("S", 2, units="m**2")
         p.set_val("AR", 2)
@@ -102,7 +102,7 @@ class TrapezoidalPlanformMeshTestCase(unittest.TestCase):
         nx = 2
         ny = 3
         p = om.Problem()
-        p.model.add_subsystem("comp", TrapezoidalPlanformMesh(num_x=nx-1, num_y=ny-1), promotes=["*"])
+        p.model.add_subsystem("comp", TrapezoidalPlanformMesh(num_x=nx - 1, num_y=ny - 1), promotes=["*"])
         p.setup()
         p.set_val("S", 1.3, units="m**2")
         p.set_val("AR", 4 / 1.3)  # pick S and AR for half span and root chord of 1
@@ -125,7 +125,7 @@ class TrapezoidalPlanformMeshTestCase(unittest.TestCase):
         nx = 3
         ny = 4
         p = om.Problem()
-        p.model.add_subsystem("comp", TrapezoidalPlanformMesh(num_x=nx-1, num_y=ny-1), promotes=["*"])
+        p.model.add_subsystem("comp", TrapezoidalPlanformMesh(num_x=nx - 1, num_y=ny - 1), promotes=["*"])
         p.setup()
         p.set_val("S", 427.8, units="m**2")
         p.set_val("AR", 9.82)
