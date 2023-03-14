@@ -92,9 +92,9 @@ class VLMDragPolar(om.Group):
     num_nodes : int
         Number of analysis points per mission segment (scalar, dimensionless)
     num_x : int
-        Number of points in x (streamwise) direction (scalar, dimensionless)
+        Number of panels in x (streamwise) direction (scalar, dimensionless)
     num_y : int
-        Number of points in y (spanwise) direction for one wing because
+        Number of panels in y (spanwise) direction for one wing because
         uses symmetry (scalar, dimensionless)
     num_twist : int
         Number of spline control points for twist (scalar, dimensionless)
@@ -119,8 +119,8 @@ class VLMDragPolar(om.Group):
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of analysis points to run")
-        self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
-        self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
+        self.options.declare("num_x", default=2, desc="Number of streamwise mesh panels")
+        self.options.declare("num_y", default=6, desc="Number of spanwise (half wing) mesh panels")
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
         self.options.declare(
             "Mach_train",
@@ -242,9 +242,9 @@ class VLMDataGen(om.ExplicitComponent):
     Options
     -------
     num_x : int
-        Number of points in x (streamwise) direction (scalar, dimensionless)
+        Number of panels in x (streamwise) direction (scalar, dimensionless)
     num_y : int
-        Number of points in y (spanwise) direction for one wing because
+        Number of panels in y (spanwise) direction for one wing because
         uses symmetry (scalar, dimensionless)
     num_twist : int
         Number of spline control points for twist (scalar, dimensionless)
@@ -268,8 +268,8 @@ class VLMDataGen(om.ExplicitComponent):
         self.cite = CITATION
 
     def initialize(self):
-        self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
-        self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
+        self.options.declare("num_x", default=2, desc="Number of streamwise mesh panels")
+        self.options.declare("num_y", default=6, desc="Number of spanwise (half wing) mesh panels")
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
         self.options.declare(
             "Mach_train",
@@ -430,9 +430,9 @@ inputs : dict
         List of twist angles at control points of spline (vector, degrees)
         NOTE: length of vector is num_twist (set in options of VLMDataGen)
     num_x: int
-        number of points in x (streamwise) direction (scalar, dimensionless)
+        number of panels in x (streamwise) direction (scalar, dimensionless)
     num_y: int
-        number of points in y (spanwise) direction for one wing because
+        number of panels in y (spanwise) direction for one wing because
         uses symmetry (scalar, dimensionless)
 surf_dict : dict
     Dictionary of OpenAeroStruct surface options; any options provided here
@@ -614,9 +614,9 @@ class VLM(om.Group):
     Options
     -------
     num_x : int
-        Number of points in x (streamwise) direction (scalar, dimensionless)
+        Number of panels in x (streamwise) direction (scalar, dimensionless)
     num_y : int
-        Number of points in y (spanwise) direction for one wing because
+        Number of panels in y (spanwise) direction for one wing because
         uses symmetry (scalar, dimensionless)
     num_twist : int
         Number of spline control points for twist (scalar, dimensionless)
@@ -634,14 +634,16 @@ class VLM(om.Group):
         self.cite = CITATION
 
     def initialize(self):
-        self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
-        self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
+        self.options.declare("num_x", default=2, desc="Number of streamwise mesh panels")
+        self.options.declare("num_y", default=6, desc="Number of spanwise (half wing) mesh panels")
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
         self.options.declare("surf_options", default=None, desc="Dictionary of OpenAeroStruct surface options")
 
     def setup(self):
-        nx = int(self.options["num_x"])
-        ny = int(self.options["num_y"])
+        # Number of coordinates is one more than the number of panels
+        nx = int(self.options["num_x"]) + 1
+        ny = int(self.options["num_y"]) + 1
+
         n_twist = int(self.options["num_twist"])
 
         # =================================================================
@@ -649,7 +651,7 @@ class VLM(om.Group):
         # =================================================================
         self.add_subsystem(
             "mesh",
-            TrapezoidalPlanformMesh(num_x=nx, num_y=ny),
+            TrapezoidalPlanformMesh(num_x=self.options["num_x"], num_y=self.options["num_y"]),
             promotes_inputs=[
                 ("S", "ac|geom|wing|S_ref"),
                 ("AR", "ac|geom|wing|AR"),
@@ -777,9 +779,9 @@ class VLM(om.Group):
         # NOTE: for aerostructural cases, this should be a design variable with control points over a spline
         if isinstance(surf_dict["t_over_c"], (int, float)) or surf_dict["t_over_c"].size == 1:
             self.set_input_defaults(
-                f"aero_point.{surf_dict['name']}_perf.t_over_c", val=surf_dict["t_over_c"] * np.ones(ny - 1)
+                f"aero_point.{surf_dict['name']}_perf.t_over_c", val=surf_dict["t_over_c"] * np.ones(self.options["num_y"])
             )
-        elif surf_dict["t_over_c"].size == ny - 1:
+        elif surf_dict["t_over_c"].size == self.options["num_y"]:
             self.set_input_defaults(f"aero_point.{surf_dict['name']}_perf.t_over_c", val=surf_dict["t_over_c"])
         else:
             raise ValueError(
@@ -794,8 +796,8 @@ class VLM(om.Group):
 def example_usage():
     # Define parameters
     nn = 1
-    num_x = 3
-    num_y = 5
+    num_x = 2
+    num_y = 4
     S = 427.8  # m^2
     AR = 9.82
     taper = 0.149

@@ -34,7 +34,7 @@ class VLMDragPolarTestCase(unittest.TestCase):
         twist = np.array([-1, -0.5, 2])
 
         # Generate mesh to pass to OpenAeroStruct
-        mesh = om.Problem(VLM(num_x=3, num_y=5, num_twist=twist.size))
+        mesh = om.Problem(VLM(num_x=2, num_y=4, num_twist=twist.size))
         mesh.setup()
         mesh.set_val("ac|geom|wing|S_ref", 100, units="m**2")
         mesh.set_val("ac|geom|wing|AR", 10)
@@ -49,8 +49,8 @@ class VLMDragPolarTestCase(unittest.TestCase):
         p = om.Problem(
             VLMDragPolar(
                 num_nodes=1,
-                num_x=3,
-                num_y=5,
+                num_x=2,
+                num_y=4,
                 num_twist=twist.size,
                 Mach_train=np.linspace(0.1, 0.8, 3),
                 alpha_train=np.linspace(-11, 15, 3),
@@ -105,8 +105,8 @@ class VLMDragPolarTestCase(unittest.TestCase):
         p = om.Problem(
             VLMDragPolar(
                 num_nodes=nn,
-                num_x=3,
-                num_y=5,
+                num_x=2,
+                num_y=4,
                 num_twist=twist.size,
                 Mach_train=np.linspace(0.1, 0.8, 2),
                 alpha_train=np.linspace(-11, 15, 2),
@@ -139,8 +139,8 @@ class VLMDragPolarTestCase(unittest.TestCase):
         p = om.Problem(
             VLMDragPolar(
                 num_nodes=nn,
-                num_x=3,
-                num_y=5,
+                num_x=2,
+                num_y=4,
                 num_twist=twist.size,
                 Mach_train=np.linspace(0.1, 0.8, 2),
                 alpha_train=np.linspace(-11, 15, 2),
@@ -185,8 +185,8 @@ class VLMDataGenTestCase(unittest.TestCase):
         p.model.add_subsystem(
             "comp",
             VLMDataGen(
-                num_x=3,
-                num_y=5,
+                num_x=2,
+                num_y=4,
                 num_twist=twist.size,
                 Mach_train=np.linspace(0.1, 0.85, 2),
                 alpha_train=np.linspace(-10, 15, 2),
@@ -249,7 +249,7 @@ class VLMDataGenTestCase(unittest.TestCase):
 class VLMTestCase(unittest.TestCase):
     def test_defaults(self):
         twist = np.array([-1, -0.5, 2])
-        p = om.Problem(VLM(num_x=3, num_y=5, num_twist=twist.size))
+        p = om.Problem(VLM(num_x=2, num_y=4, num_twist=twist.size))
         p.setup()
         p.set_val("fltcond|alpha", 2, units="deg")
         p.set_val("fltcond|M", 0.6)
@@ -280,7 +280,7 @@ class VLMTestCase(unittest.TestCase):
 
     def test_wave_drag(self):
         twist = np.array([-1, -0.5, 2])
-        p = om.Problem(VLM(num_x=3, num_y=5, num_twist=twist.size, surf_options={"with_wave": False}))
+        p = om.Problem(VLM(num_x=2, num_y=4, num_twist=twist.size, surf_options={"with_wave": False}))
         p.setup()
         p.set_val("fltcond|alpha", 2, units="deg")
         p.set_val("fltcond|M", 0.85)
@@ -311,7 +311,7 @@ class VLMTestCase(unittest.TestCase):
 
     def test_viscous_drag(self):
         twist = np.array([-1, -0.5, 2])
-        p = om.Problem(VLM(num_x=3, num_y=5, num_twist=twist.size, surf_options={"with_viscous": False}))
+        p = om.Problem(VLM(num_x=2, num_y=4, num_twist=twist.size, surf_options={"with_viscous": False}))
         p.setup()
         p.set_val("fltcond|alpha", 2, units="deg")
         p.set_val("fltcond|M", 0.85)
@@ -342,7 +342,7 @@ class VLMTestCase(unittest.TestCase):
 
     def test_t_over_c(self):
         twist = np.array([-1, -0.5, 2])
-        p = om.Problem(VLM(num_x=3, num_y=3, num_twist=twist.size, surf_options={"t_over_c": np.array([0.1, 0.2])}))
+        p = om.Problem(VLM(num_x=2, num_y=2, num_twist=twist.size, surf_options={"t_over_c": np.array([0.1, 0.2])}))
         p.setup()
         p.set_val("fltcond|alpha", 2, units="deg")
         p.set_val("fltcond|M", 0.85)

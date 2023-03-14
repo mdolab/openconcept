@@ -67,7 +67,7 @@ class B738AirplaneModel(IntegratorGroup):
         oas_surf_dict["t_over_c"] = acdata["ac"]["geom"]["wing"]["toverc"]["value"]
         self.add_subsystem(
             "drag",
-            VLMDragPolar(num_nodes=nn, num_x=3, num_y=7, num_twist=3, surf_options=oas_surf_dict),
+            VLMDragPolar(num_nodes=nn, num_x=2, num_y=6, num_twist=3, surf_options=oas_surf_dict),
             promotes_inputs=[
                 "fltcond|CL",
                 "fltcond|M",

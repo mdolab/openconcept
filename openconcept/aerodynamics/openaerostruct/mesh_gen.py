@@ -27,23 +27,24 @@ class TrapezoidalPlanformMesh(om.ExplicitComponent):
     Options
     -------
     num_x: int
-        number of points in x (streamwise) direction (scalar, dimensionless)
+        number of panels in x (streamwise) direction (scalar, dimensionless)
     num_y: int
-        number of points in y (spanwise) direction (scalar, dimensionless)
+        number of panels in y (spanwise) direction (scalar, dimensionless)
     """
 
     def initialize(self):
-        self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
-        self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
+        self.options.declare("num_x", default=2, desc="Number of streamwise mesh panels")
+        self.options.declare("num_y", default=6, desc="Number of spanwise (half wing) mesh panels")
 
     def setup(self):
-        nx = int(self.options["num_x"])
-        ny = int(self.options["num_y"])
+        # Number of coordinates is one more than the number of panels
+        self.nx = int(self.options["num_x"]) + 1
+        self.ny = int(self.options["num_y"]) + 1
 
         # Generate default mesh
-        x, y = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
+        x, y = np.meshgrid(np.linspace(0, 1, self.nx), np.linspace(-1, 0, self.ny), indexing="ij")
         y *= 5
-        mesh = np.zeros((nx, ny, 3))
+        mesh = np.zeros((self.nx, self.ny, 3))
         mesh[:, :, 0] = x
         mesh[:, :, 1] = y
 
@@ -52,7 +53,7 @@ class TrapezoidalPlanformMesh(om.ExplicitComponent):
         self.add_input("taper", val=1.0)
         self.add_input("sweep", val=10, units="deg")
 
-        self.add_output("mesh", val=mesh, shape=(nx, ny, 3), units="m")
+        self.add_output("mesh", val=mesh, shape=(self.nx, self.ny, 3), units="m")
 
         self.declare_partials("mesh", "*")
 
@@ -61,26 +62,24 @@ class TrapezoidalPlanformMesh(om.ExplicitComponent):
         AR = inputs["AR"]
         taper = inputs["taper"]
         sweep = inputs["sweep"]
-        nx = int(self.options["num_x"])
-        ny = int(self.options["num_y"])
 
         # Compute absolute dimensions from wing geometry spec
         half_span = np.sqrt(AR * S) / 2
         c_root = S / (half_span * (1 + taper))
 
         # Create baseline square mesh from 0 to 1 in each direction
-        x_mesh, y_mesh = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
+        x_mesh, y_mesh = np.meshgrid(np.linspace(0, 1, self.nx), np.linspace(-1, 0, self.ny), indexing="ij")
 
         # Morph the mesh to fit the desired wing shape
         x_mesh *= c_root
         y_mesh *= half_span  # rectangular wing with correct root chord and wingspan
-        x_mesh *= np.linspace(taper, 1, ny).reshape(1, ny)  # taper wing
-        x_mesh -= np.linspace(c_root * taper, c_root, ny).reshape(1, ny) / 4  # shift to quarter chord at x=0
-        x_mesh += np.linspace(half_span, 0, ny).reshape(1, ny) * np.tan(
+        x_mesh *= np.linspace(taper, 1, self.ny).reshape(1, self.ny)  # taper wing
+        x_mesh -= np.linspace(c_root * taper, c_root, self.ny).reshape(1, self.ny) / 4  # shift to quarter chord at x=0
+        x_mesh += np.linspace(half_span, 0, self.ny).reshape(1, self.ny) * np.tan(
             np.deg2rad(sweep)
         )  # sweep wing at quarter chord
 
-        mesh = np.zeros((nx, ny, 3))
+        mesh = np.zeros((self.nx, self.ny, 3))
         mesh[:, :, 0] = x_mesh
         mesh[:, :, 1] = y_mesh
 
@@ -91,15 +90,13 @@ class TrapezoidalPlanformMesh(om.ExplicitComponent):
         AR = inputs["AR"]
         taper = inputs["taper"]
         sweep = inputs["sweep"]
-        nx = int(self.options["num_x"])
-        ny = int(self.options["num_y"])
 
         # Compute absolute dimensions from wing geometry spec
         half_span = np.sqrt(AR * S) / 2
         c_root = S / (half_span * (1 + taper))
 
         # Create baseline square mesh from 0 to 1 in each direction
-        x_mesh, y_mesh = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
+        x_mesh, y_mesh = np.meshgrid(np.linspace(0, 1, self.nx), np.linspace(-1, 0, self.ny), indexing="ij")
 
         # Compute derivatives in a way analogous to forward AD
         db_dS = AR / (4 * np.sqrt(AR * S))
@@ -111,31 +108,31 @@ class TrapezoidalPlanformMesh(om.ExplicitComponent):
         dy_dS = y_mesh * db_dS
         dy_dAR = y_mesh * db_dAR
 
-        dx_dS = x_mesh * np.linspace(taper, 1, ny).reshape(1, ny) * dcroot_dS
-        dx_dS -= np.linspace(dcroot_dS * taper, dcroot_dS, ny).reshape(1, ny) / 4
-        dx_dS += np.linspace(db_dS, 0, ny).reshape(1, ny) * np.tan(np.deg2rad(sweep))
+        dx_dS = x_mesh * np.linspace(taper, 1, self.ny).reshape(1, self.ny) * dcroot_dS
+        dx_dS -= np.linspace(dcroot_dS * taper, dcroot_dS, self.ny).reshape(1, self.ny) / 4
+        dx_dS += np.linspace(db_dS, 0, self.ny).reshape(1, self.ny) * np.tan(np.deg2rad(sweep))
 
-        dx_dAR = x_mesh * np.linspace(taper, 1, ny).reshape(1, ny) * dcroot_dAR
-        dx_dAR -= np.linspace(dcroot_dAR * taper, dcroot_dAR, ny).reshape(1, ny) / 4
-        dx_dAR += np.linspace(db_dAR, 0, ny).reshape(1, ny) * np.tan(np.deg2rad(sweep))
+        dx_dAR = x_mesh * np.linspace(taper, 1, self.ny).reshape(1, self.ny) * dcroot_dAR
+        dx_dAR -= np.linspace(dcroot_dAR * taper, dcroot_dAR, self.ny).reshape(1, self.ny) / 4
+        dx_dAR += np.linspace(db_dAR, 0, self.ny).reshape(1, self.ny) * np.tan(np.deg2rad(sweep))
 
         dx_dtaper = (
-            x_mesh * c_root * np.linspace(1, 0, ny).reshape(1, ny)
-            + x_mesh * np.linspace(taper, 1, ny).reshape(1, ny) * dcroot_dtaper
+            x_mesh * c_root * np.linspace(1, 0, self.ny).reshape(1, self.ny)
+            + x_mesh * np.linspace(taper, 1, self.ny).reshape(1, self.ny) * dcroot_dtaper
         )
         dx_dtaper -= (
-            np.linspace(c_root, 0, ny).reshape(1, ny) / 4
-            + np.linspace(dcroot_dtaper * taper, dcroot_dtaper, ny).reshape(1, ny) / 4
+            np.linspace(c_root, 0, self.ny).reshape(1, self.ny) / 4
+            + np.linspace(dcroot_dtaper * taper, dcroot_dtaper, self.ny).reshape(1, self.ny) / 4
         )
 
         dx_dsweep = (
-            0 * x_mesh + np.linspace(half_span, 0, ny).reshape(1, ny) / np.cos(np.deg2rad(sweep)) ** 2 * np.pi / 180.0
+            0 * x_mesh + np.linspace(half_span, 0, self.ny).reshape(1, self.ny) / np.cos(np.deg2rad(sweep)) ** 2 * np.pi / 180.0
         )
 
-        J["mesh", "S"] = np.dstack((dx_dS, dy_dS, np.zeros((nx, ny)))).flatten()
-        J["mesh", "AR"] = np.dstack((dx_dAR, dy_dAR, np.zeros((nx, ny)))).flatten()
-        J["mesh", "taper"] = np.dstack((dx_dtaper, np.zeros((nx, ny)), np.zeros((nx, ny)))).flatten()
-        J["mesh", "sweep"] = np.dstack((dx_dsweep, np.zeros((nx, ny)), np.zeros((nx, ny)))).flatten()
+        J["mesh", "S"] = np.dstack((dx_dS, dy_dS, np.zeros((self.nx, self.ny)))).flatten()
+        J["mesh", "AR"] = np.dstack((dx_dAR, dy_dAR, np.zeros((self.nx, self.ny)))).flatten()
+        J["mesh", "taper"] = np.dstack((dx_dtaper, np.zeros((self.nx, self.ny)), np.zeros((self.nx, self.ny)))).flatten()
+        J["mesh", "sweep"] = np.dstack((dx_dsweep, np.zeros((self.nx, self.ny)), np.zeros((self.nx, self.ny)))).flatten()
 
 
 class SectionPlanformMesh(om.ExplicitComponent):
@@ -196,9 +193,9 @@ class SectionPlanformMesh(om.ExplicitComponent):
     Options
     -------
     num_x: int
-        Number of points in x (streamwise) direction (scalar, dimensionless)
+        Number of panels in x (streamwise) direction (scalar, dimensionless)
     num_y: int or iterable of ints
-        Number of spanwise points in the trapezoidal regions between each pair of
+        Number of spanwise panels in the trapezoidal regions between each pair of
         adjacent sections; can be specified either as a single integer, where that
         same value is used for each region, or as an iterable of integers of length
         num_sections to enable different numbers of spanwise coordinates for each
