@@ -22,7 +22,7 @@ class TrapezoidalPlanformMesh(om.ExplicitComponent):
     Outputs
     -------
     mesh: ndarray
-        OpenAeroStruct 3D mesh (num_x x num_y x 3 ndarray, m)
+        OpenAeroStruct 3D mesh (num_x + 1 x num_y + 1 x 3 ndarray, m)
 
     Options
     -------
@@ -188,7 +188,7 @@ class SectionPlanformMesh(om.ExplicitComponent):
     Outputs
     -------
     mesh: ndarray
-        OpenAeroStruct 3D mesh (num_x x sum(num_y) x 3 ndarray, m)
+        OpenAeroStruct 3D mesh (num_x + 1 x sum(num_y) + 1 x 3 ndarray, m)
 
     Options
     -------
@@ -241,14 +241,14 @@ class SectionPlanformMesh(om.ExplicitComponent):
         self.add_input("chord_sec", shape=(self.n_sec,))
 
         # Generate default mesh
-        ny_tot = np.sum(self.ny)
-        x, y = np.meshgrid(np.linspace(0, 1, self.nx), np.linspace(-1, 0, ny_tot), indexing="ij")
+        ny_tot = np.sum(self.ny) + 1
+        x, y = np.meshgrid(np.linspace(0, 1, self.nx + 1), np.linspace(-1, 0, ny_tot), indexing="ij")
         y *= 5
-        mesh = np.zeros((self.nx, ny_tot, 3))
+        mesh = np.zeros((self.nx + 1, ny_tot, 3))
         mesh[:, :, 0] = x
         mesh[:, :, 1] = y
 
-        self.add_output("mesh", val=mesh, shape=(self.nx, ny_tot, 3), units="m")
+        self.add_output("mesh", val=mesh, shape=(self.nx + 1, ny_tot, 3), units="m")
 
         self.declare_partials("mesh", "*")
 
@@ -262,20 +262,23 @@ class SectionPlanformMesh(om.ExplicitComponent):
         y_prev = 0
         A = 0.0  # nondimensional area of existing mesh
         for i_sec in range(self.n_sec - 1):
-            ny = self.ny[i_sec]
+            ny = self.ny[i_sec] + 1
             x_mesh, y_mesh = np.meshgrid(
-                cos_space(0, 1, self.nx, dtype=x_sec.dtype), cos_space(y_sec[i_sec], y_sec[i_sec + 1], ny, dtype=x_sec.dtype), indexing="ij"
+                cos_space(0, 1, self.nx + 1, dtype=x_sec.dtype), cos_space(y_sec[i_sec], y_sec[i_sec + 1], ny, dtype=x_sec.dtype), indexing="ij"
             )
             x_mesh *= cos_space(c_sec[i_sec], c_sec[i_sec + 1], ny)
             x_mesh += cos_space(x_sec[i_sec], x_sec[i_sec + 1], ny)
 
+            # Because y_prev is incremented by ny - 1, rather than by ny, the furthest inboard
+            # coordinates from this region will be "overwritten" (with the same values) by
+            # the next region (not particularly important to know, but might be useful for debugging)
             outputs["mesh"][:, y_prev : y_prev + ny, 0] = x_mesh
             outputs["mesh"][:, y_prev : y_prev + ny, 1] = y_mesh
 
             # Add the area of this trapezoidal region to the total nondimensional planform area
             A += (y_sec[i_sec + 1] - y_sec[i_sec]) * (c_sec[i_sec] + c_sec[i_sec + 1]) * 0.5
 
-            y_prev += ny
+            y_prev += ny - 1
 
         # Zero any z coordinates
         outputs["mesh"][:, :, 2] = 0.0
