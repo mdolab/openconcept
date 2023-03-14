@@ -779,7 +779,8 @@ class VLM(om.Group):
         # NOTE: for aerostructural cases, this should be a design variable with control points over a spline
         if isinstance(surf_dict["t_over_c"], (int, float)) or surf_dict["t_over_c"].size == 1:
             self.set_input_defaults(
-                f"aero_point.{surf_dict['name']}_perf.t_over_c", val=surf_dict["t_over_c"] * np.ones(self.options["num_y"])
+                f"aero_point.{surf_dict['name']}_perf.t_over_c",
+                val=surf_dict["t_over_c"] * np.ones(self.options["num_y"]),
             )
         elif surf_dict["t_over_c"].size == self.options["num_y"]:
             self.set_input_defaults(f"aero_point.{surf_dict['name']}_perf.t_over_c", val=surf_dict["t_over_c"])

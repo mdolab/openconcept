@@ -281,7 +281,9 @@ class SectionPlanformMesh(om.ExplicitComponent):
 
             # Indices in the mesh (not x, y, z values) corresponding to the coordinates in the current region
             if i_sec == 0:
-                idx_mesh = (np.tile(np.arange(y_prev, y_prev + ny), (self.nx, 1)).T + np.arange(self.nx) * self.ny_tot).T.flatten()
+                idx_mesh = (
+                    np.tile(np.arange(y_prev, y_prev + ny), (self.nx, 1)).T + np.arange(self.nx) * self.ny_tot
+                ).T.flatten()
                 self.dmesh_dysec_no_S_influence[idx_y[idx_mesh], i_sec] += dymesh_dysec.flatten()
                 # No derivative w.r.t. the y value at the root because it's always zero
                 if i_sec < self.n_sec - 2:
@@ -291,7 +293,9 @@ class SectionPlanformMesh(om.ExplicitComponent):
                 self.dmesh_dxLEsec_no_S_influence[idx_x[idx_mesh], i_sec] += dxmesh_dxsec.flatten()
                 self.dmesh_dxLEsec_no_S_influence[idx_x[idx_mesh], i_sec + 1] += dxmesh_dxsecnext.flatten()
             else:
-                idx_mesh = (np.tile(np.arange(y_prev + 1, y_prev + ny), (self.nx, 1)).T + np.arange(self.nx) * self.ny_tot).T.flatten()
+                idx_mesh = (
+                    np.tile(np.arange(y_prev + 1, y_prev + ny), (self.nx, 1)).T + np.arange(self.nx) * self.ny_tot
+                ).T.flatten()
                 self.dmesh_dysec_no_S_influence[idx_y[idx_mesh], i_sec] += dymesh_dysec[:, 1:].flatten()
                 # No derivative w.r.t. the y value at the root because it's always zero
                 if i_sec < self.n_sec - 2:
@@ -372,7 +376,7 @@ class SectionPlanformMesh(om.ExplicitComponent):
             dA_dysec[i_sec] += -0.5 * (c_sec[i_sec] + c_sec[i_sec + 1])
             if i_sec < self.n_sec - 2:
                 dA_dysec[i_sec + 1] += 0.5 * (c_sec[i_sec] + c_sec[i_sec + 1])
-            dA_dcsec[i_sec:i_sec + 2] += 0.5 * (y_sec[i_sec + 1] - y_sec[i_sec])
+            dA_dcsec[i_sec : i_sec + 2] += 0.5 * (y_sec[i_sec + 1] - y_sec[i_sec])
 
         # Scale the mesh by the reference area
         A *= 2  # we're only doing a half wing, so double to get total area
@@ -381,9 +385,11 @@ class SectionPlanformMesh(om.ExplicitComponent):
         coeff = (S / A) ** 0.5
         for var in ["y_sec", "chord_sec", "x_LE_sec"]:
             partials["mesh", var] *= coeff
-        partials["mesh", "y_sec"] += np.outer(-0.5 * self.unscaled_mesh.flatten() * S**0.5 * A**(-1.5), dA_dysec)
-        partials["mesh", "chord_sec"] += np.outer(-0.5 * self.unscaled_mesh.flatten() * S**0.5 * A**(-1.5), dA_dcsec)
-        partials["mesh", "S"] = 0.5 * S**(-0.5) / A**0.5 * self.unscaled_mesh.flatten()
+        partials["mesh", "y_sec"] += np.outer(-0.5 * self.unscaled_mesh.flatten() * S**0.5 * A ** (-1.5), dA_dysec)
+        partials["mesh", "chord_sec"] += np.outer(
+            -0.5 * self.unscaled_mesh.flatten() * S**0.5 * A ** (-1.5), dA_dcsec
+        )
+        partials["mesh", "S"] = 0.5 * S ** (-0.5) / A**0.5 * self.unscaled_mesh.flatten()
 
 
 def cos_space(start, end, num, dtype=float):

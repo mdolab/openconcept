@@ -1204,7 +1204,11 @@ class Aerostruct(om.Group):
         comp.add_spline(y_cp_name="t_over_c_cp", y_interp_name="t_over_c")
 
         # Wing mesh generator
-        wing_group.add_subsystem("mesh_gen", TrapezoidalPlanformMesh(num_x=self.options["num_x"], num_y=self.options["num_y"]), promotes_inputs=["*"])
+        wing_group.add_subsystem(
+            "mesh_gen",
+            TrapezoidalPlanformMesh(num_x=self.options["num_x"], num_y=self.options["num_y"]),
+            promotes_inputs=["*"],
+        )
 
         # Apply twist spline to mesh
         wing_group.add_subsystem(
