@@ -239,14 +239,14 @@ class SectionPlanformMesh(om.ExplicitComponent):
                 raise ValueError("If specified as an iterable, the num_y option must have a length of num_sections")
             self.ny = [int(x) for x in num_y]  # cast anything that's not an integer to an integer
 
-        self.add_input("S", units="m**2")
-        self.add_input("x_LE_sec", shape=(self.n_sec,))
-        self.add_input("y_sec", shape=(self.n_sec - 1,))
-        self.add_input("chord_sec", shape=(self.n_sec,))
+        self.add_input("S", val=10, units="m**2")
+        self.add_input("x_LE_sec", val=0, shape=(self.n_sec,))
+        self.add_input("y_sec", val=np.linspace(-5, 0, self.n_sec)[:-1], shape=(self.n_sec - 1,))
+        self.add_input("chord_sec", val=1, shape=(self.n_sec,))
 
         # Generate default mesh
         self.ny_tot = np.sum(self.ny) + 1
-        x, y = np.meshgrid(np.linspace(0, 1, self.nx), np.linspace(-1, 0, self.ny_tot), indexing="ij")
+        x, y = np.meshgrid(cos_space(0, 1, self.nx), cos_space(-5, 0, self.ny_tot), indexing="ij")
         y *= 5
         mesh = np.zeros((self.nx, self.ny_tot, 3))
         mesh[:, :, 0] = x
@@ -261,9 +261,9 @@ class SectionPlanformMesh(om.ExplicitComponent):
         # Compute some values for partial derivatives that don't depend on input values
         self.dmesh_dysec_no_S_influence = np.zeros((self.nx * self.ny_tot * 3, self.n_sec - 1), dtype=float)
         self.dmesh_dcsec_no_S_influence = np.zeros((self.nx * self.ny_tot * 3, self.n_sec), dtype=float)
-        self.dmesh_dxLEsec_no_S_influence = np.array(
-            [], dtype=float
-        )  # np.zeros((self.nx * self.ny_tot * 3, self.n_sec), dtype=float)
+        self.dmesh_dxLEsec_no_S_influence = np.zeros(self.ny_tot * self.nx * 2, dtype=float)
+        dmesh_dxLEsec_rows = np.zeros(self.ny_tot * self.nx * 2, dtype=int)  # rows for partial derivative sparsity
+        dmesh_dxLEsec_cols = np.zeros(self.ny_tot * self.nx * 2, dtype=int)  # cols for partial derivative sparsity
 
         # Indices in flattened array
         idx_x = 3 * np.arange(self.nx * self.ny_tot)
@@ -271,8 +271,7 @@ class SectionPlanformMesh(om.ExplicitComponent):
 
         # Iterate through the defined trapezoidal regions between sections
         y_prev = 0
-        dmesh_dxLEsec_rows = np.array([], dtype=int)  # rows for partial derivative sparsity
-        dmesh_dxLEsec_cols = np.array([], dtype=int)  # cols for partial derivative sparsity
+        idx_dmesh_dxLE_prev = 0
         for i_sec in range(self.n_sec - 1):
             ny = self.ny[i_sec] + 1  # number of coordinates in the current region (including at the ends)
             x_mesh = np.repeat(cos_space(0, 1, self.nx), ny).reshape(self.nx, ny)
@@ -306,24 +305,24 @@ class SectionPlanformMesh(om.ExplicitComponent):
             self.dmesh_dcsec_no_S_influence[idx_x[idx_mesh], i_sec] += dxmesh_dcsec[:, y_idx_start:].flatten()
 
             # Derivatives w.r.t. x_LE_sec are sparse, so track rows and cols
-            dmesh_dxLEsec_rows = np.hstack((dmesh_dxLEsec_rows, idx_x[idx_mesh], idx_x[idx_mesh]))
-            dmesh_dxLEsec_cols = np.hstack(
-                (dmesh_dxLEsec_cols, np.full_like(idx_mesh, i_sec + 1), np.full_like(idx_mesh, i_sec))
-            )
-            self.dmesh_dxLEsec_no_S_influence = np.hstack(
-                (
-                    self.dmesh_dxLEsec_no_S_influence,
-                    dxmesh_dxsecnext[:, y_idx_start:].flatten(),
-                    dxmesh_dxsec[:, y_idx_start:].flatten(),
-                )
-            )
+            idx_end = idx_dmesh_dxLE_prev + idx_mesh.size
+            dmesh_dxLEsec_rows[idx_dmesh_dxLE_prev:idx_end] = idx_x[idx_mesh]
+            dmesh_dxLEsec_cols[idx_dmesh_dxLE_prev:idx_end] = i_sec + 1
+            self.dmesh_dxLEsec_no_S_influence[idx_dmesh_dxLE_prev:idx_end] = dxmesh_dxsecnext[:, y_idx_start:].flatten()
+            idx_dmesh_dxLE_prev += idx_mesh.size
+
+            idx_end += idx_mesh.size
+            dmesh_dxLEsec_rows[idx_dmesh_dxLE_prev:idx_end] = idx_x[idx_mesh]
+            dmesh_dxLEsec_cols[idx_dmesh_dxLE_prev:idx_end] = i_sec
+            self.dmesh_dxLEsec_no_S_influence[idx_dmesh_dxLE_prev:idx_end] = dxmesh_dxsec[:, y_idx_start:].flatten()
+            idx_dmesh_dxLE_prev += idx_mesh.size
 
             y_prev += ny - 1
 
-        # Use sparsity for w.r.t. x_LE_sec (jacobian is ~15% nonzero, regardless of mesh size),
-        # but don't use sparsity for w.r.t. y_sec and chord_sec since they're ~2/3 nonzero regardless of mesh size;
-        # still might be better to make y_sec and chord_sec zero since derivatives of all z values are zero
-        # and the Jacobian will end up as a sparse data structure under the hood
+        # Use sparsity for w.r.t. x_LE_sec but don't use sparsity for w.r.t. y_sec and chord_sec since
+        # they're ~2/3 nonzero regardless of mesh size; still might be better to make y_sec and chord_sec
+        # zero since derivatives of all z values are zero and the Jacobian will end up as a sparse data
+        # structure under the hood
         self.declare_partials("mesh", ["y_sec", "chord_sec", "S"])
         self.declare_partials("mesh", "x_LE_sec", rows=dmesh_dxLEsec_rows, cols=dmesh_dxLEsec_cols)
 
