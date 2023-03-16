@@ -1,4 +1,4 @@
-from .profiles import MissionWithReserve, FullMissionAnalysis, BasicMission
+from .profiles import MissionWithReserve, FullMissionAnalysis, BasicMission, FullMissionWithReserve
 from .phases import (
     ClimbAngleComp,
     BFLImplicitSolve,

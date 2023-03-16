@@ -1,11 +1,12 @@
 import numpy as np
+import warnings
 from openmdao.api import ExplicitComponent
 from openmdao.api import Group
 
-class FuelCellSOFC(Group):
+class FuelCellPEM(Group):
     """
-    This is a model of a Solid Oxide Fuel Cell (SOFC).  It is primarily based on the book "Fuel Cell Fundementals" by O'Hayre et. al. (2016), 
-    beginning on page 216, with a few modifications.  It is a 1D model with a number of simplifying assumptions, but represents the highest 
+    This is a model of a Polymer Electrolyte Membrane (PEM) Fuel Cell.  It is primarily based on the book "Fuel Cell Fundementals" by O'Hayre et. al. (2016), 
+    beginning on page 219, with a few modifications.  It is a 1D model with a number of simplifying assumptions, but represents the highest 
     available fidelity without moving to CFD analysis.  The most critical assumption is that of j_L, or the limit current density, which sets 
     the shape of the voltage vs. current density curves.  This value should in theory be set by the cathode thickness, which is highly dependent 
     on the state of modern technology.
@@ -112,7 +113,6 @@ class FuelCellSOFC(Group):
 
         # # Likely to change:
         # self.options.declare("t_M"         , default = 20e-6     , desc = "Membrane thickness [m]")
-        # self.options.declare("A_SOFC"      , default = 9e7       , desc = "Electrolyte constant [K/(ohm*m)]")
         
         # # May Change:
         # self.options.declare("E_thermo"    , default = 1.06      , desc = "Thermodynamic voltage [V]")
@@ -129,17 +129,20 @@ class FuelCellSOFC(Group):
 
     def setup(self):
         hidden_options_dict = {
-                                    "t_M"         : 20e-6,
-                                    "A_SOFC"      : 9e7,
-                                    "E_thermo"    : 1.06,
-                                    "DeltaG_act"  : 100e3,
+                                    "t_M"         : 125e-6,
+                                    "t_A"         : 350e-6,
+                                    "t_C"         : 350e-6,
+                                    "E_thermo"    : 1.20,
+                                    "D_lam"       : 3.81e-6 * 10000,
                                     "alpha"       : 0.5,
-                                    "j0"          : 0.1,
+                                    "j0"          : 0.0001,
                                     "eps"         : 0.4,
                                     "tau"         : 1.5,
                                     "R"           : 8.314,
                                     "F"           : 96485.34,
-                                    "x_O2d"       : 0.21,
+                                    "x_H2"        : 1.0,
+                                    "x_O2"        : 0.19,
+                                    "x_H2O"       : 0.1,
                               }
 
         jmax_dict     = {"n_samples":self.options["n_samples"],
@@ -157,7 +160,16 @@ class FuelCellSOFC(Group):
                          "eta_dcdc":self.options["eta_dcdc"]} | hidden_options_dict
 
         self.add_subsystem("ComputeDiffusivity_O2N2", 
-                           ComputeDiffusivity(medium1="O2", medium2="N2"), 
+                           ComputeDiffusivity(medium1="O2", medium2="N2"))
+        
+        self.add_subsystem("ComputeDiffusivity_H2H2O", 
+                           ComputeDiffusivity(medium1="H2", medium2="H2O")) 
+
+        self.add_subsystem("ComputeDiffusivity_O2H2O", 
+                           ComputeDiffusivity(medium1="O2", medium2="H2O")) 
+
+        self.add_subsystem("VaporSaturationPressure", 
+                           BuckEquation(), 
                            promotes_inputs=["*"], promotes_outputs=["*"])
 
         self.add_subsystem("ComputeEpsThermo", 
@@ -172,14 +184,19 @@ class FuelCellSOFC(Group):
         #                    SOFCSizing(**sizing_dict), 
         #                    promotes_inputs=["*"], promotes_outputs=["*"])
 
-        self.add_subsystem("SOFCAnalysis", 
-                           SOFCAnalysis(**analysis_dict), 
+        self.add_subsystem("PEMAnalysis", 
+                           PEMAnalysis(**analysis_dict), 
                            promotes_inputs=["*"], promotes_outputs=["*"])
 
 
-class FuelCellSOFC_RatedPower(Group):
+        self.connect("ComputeDiffusivity_O2N2.diffusivity","diffusivity_O2N2")
+        self.connect("ComputeDiffusivity_H2H2O.diffusivity","diffusivity_H2H2O")
+        self.connect("ComputeDiffusivity_O2H2O.diffusivity","diffusivity_O2H2O")
+
+
+class FuelCellPEM_RatedPower(Group):
     """
-    This is a model that predicts the rated power of a Solid Oxide Fuel Cell (SOFC). 
+    This is a model that predicts the rated power of a Polymer Electrolyte Membrane (PEM) Fuel Cell. 
 
     Inputs
     ------
@@ -193,12 +210,14 @@ class FuelCellSOFC_RatedPower(Group):
     area : float
         Working area of the fuel cell
         (scalar, m)
+    throttle : float
 
     Outputs
     -------
     ratedPower : float
         The maximum output power of the fuel cell
         (scalar, W)
+
 
     Options
     -------
@@ -217,7 +236,7 @@ class FuelCellSOFC_RatedPower(Group):
     """
 
     def initialize(self):
-        # self.options.declare("num_nodes"   , default=1           , desc = "Number of flight/control conditions")
+        self.options.declare("num_nodes"   , default=1           , desc = "Number of flight/control conditions")
         self.options.declare("n_samples"   , default=1000        , desc = "Number of samples to take in finding j_max")
 
         # Very likely to change:
@@ -228,7 +247,6 @@ class FuelCellSOFC_RatedPower(Group):
 
         # # Likely to change:
         # self.options.declare("t_M"         , default = 20e-6     , desc = "Membrane thickness [m]")
-        # self.options.declare("A_SOFC"      , default = 9e7       , desc = "Electrolyte constant [K/(ohm*m)]")
         
         # # May Change:
         # self.options.declare("E_thermo"    , default = 1.06      , desc = "Thermodynamic voltage [V]")
@@ -245,17 +263,20 @@ class FuelCellSOFC_RatedPower(Group):
 
     def setup(self):
         hidden_options_dict = {
-                                    "t_M"         : 20e-6,
-                                    "A_SOFC"      : 9e7,
-                                    "E_thermo"    : 1.06,
-                                    "DeltaG_act"  : 100e3,
+                                    "t_M"         : 125e-6,
+                                    "t_A"         : 350e-6,
+                                    "t_C"         : 350e-6,
+                                    "E_thermo"    : 1.20,
+                                    "D_lam"       : 3.81e-6 * 10000,
                                     "alpha"       : 0.5,
-                                    "j0"          : 0.1,
+                                    "j0"          : 0.0001,
                                     "eps"         : 0.4,
                                     "tau"         : 1.5,
                                     "R"           : 8.314,
                                     "F"           : 96485.34,
-                                    "x_O2d"       : 0.21,
+                                    "x_H2"        : 1.0,
+                                    "x_O2"        : 0.19,
+                                    "x_H2O"       : 0.1,
                               }
 
         jmax_dict     = {"n_samples":self.options["n_samples"],
@@ -273,7 +294,16 @@ class FuelCellSOFC_RatedPower(Group):
                          "eta_dcdc":self.options["eta_dcdc"]} | hidden_options_dict
 
         self.add_subsystem("ComputeDiffusivity_O2N2", 
-                           ComputeDiffusivity(medium1="O2", medium2="N2"), 
+                           ComputeDiffusivity(medium1="O2", medium2="N2"))
+        
+        self.add_subsystem("ComputeDiffusivity_H2H2O", 
+                           ComputeDiffusivity(medium1="H2", medium2="H2O")) 
+
+        self.add_subsystem("ComputeDiffusivity_O2H2O", 
+                           ComputeDiffusivity(medium1="O2", medium2="H2O")) 
+
+        self.add_subsystem("VaporSaturationPressure", 
+                           BuckEquation(), 
                            promotes_inputs=["*"], promotes_outputs=["*"])
 
         self.add_subsystem("ComputeEpsThermo", 
@@ -288,9 +318,15 @@ class FuelCellSOFC_RatedPower(Group):
         #                    SOFCSizing(**sizing_dict), 
         #                    promotes_inputs=["*"], promotes_outputs=["*"])
 
-        self.add_subsystem("SOFCRatedPower", 
-                           SOFCRatedPowerAnalysis(**analysis_dict), 
+        self.add_subsystem("PEMRatedPowerAnalysis", 
+                           PEMRatedPowerAnalysis(**analysis_dict), 
                            promotes_inputs=["*"], promotes_outputs=["*"])
+
+
+        self.connect("ComputeDiffusivity_O2N2.diffusivity","diffusivity_O2N2")
+        self.connect("ComputeDiffusivity_H2H2O.diffusivity","diffusivity_H2H2O")
+        self.connect("ComputeDiffusivity_O2H2O.diffusivity","diffusivity_O2H2O")
+
 
 
 class ComputeDiffusivity(ExplicitComponent):
@@ -309,9 +345,8 @@ class ComputeDiffusivity(ExplicitComponent):
 
     Outputs
     -------
-    diffusivity_O2N2 : float
-        In this context, the model specifically outputs the binary diffusion coefficient for oxygen and nitrogen, though the model
-        is capable of more general analysis using the options
+    diffusivity : float
+        Binary diffusion coefficient between the two media
         (scalar, m**2/s)
 
     Options
@@ -333,7 +368,7 @@ class ComputeDiffusivity(ExplicitComponent):
         self.add_input("pressure"    , units="atm" , desc = "Fuel cell pressure")
         self.add_input("temperature" , units="K"   , desc = "Fuel cell temperature")
 
-        self.add_output("diffusivity_O2N2", units="m**2/s", desc = "Diffusivity")
+        self.add_output("diffusivity", units="m**2/s", desc = "Diffusivity")
 
         self.declare_partials('*', '*', method='cs')
 
@@ -399,7 +434,7 @@ class ComputeDiffusivity(ExplicitComponent):
         #formula is in cm**2/s and needs to be corrected
         D_ij/=10000
 
-        outputs["diffusivity_O2N2"] = D_ij
+        outputs["diffusivity"] = D_ij
 
 
 class ComputeEpsThermo(ExplicitComponent):
@@ -474,6 +509,41 @@ class ComputeEpsThermo(ExplicitComponent):
         eps_thermo = Delta_g/Delta_h_HHV
         outputs["eps_thermo"] = eps_thermo
 
+class BuckEquation(ExplicitComponent):
+    """
+    This is a model for vapor saturation pressure using the Buck equation from  "Fuel Cell Fundementals" 
+    by O'Hayre et. al. (2016).  
+
+    Inputs
+    ------
+    temperature : float
+        Ambient temperature
+        (scalar, Kelvin)
+
+    Outputs
+    -------
+    p_SAT : float
+        Vapor satuation pressure
+        (scalar, Pa)
+
+    """
+
+    def initialize(self):
+        pass
+
+    def setup(self):
+        self.add_input("temperature", units="K", desc = "Fuel cell temperature")
+
+        self.add_output("p_SAT", units="Pa", desc = "Saturation pressure")
+
+        self.declare_partials('*', '*', method='cs')
+
+    def compute(self, inputs, outputs):
+        T = inputs["temperature"]
+        T = T - 273.15 # Convert to Celsius
+        P = 0.61121 * np.exp((18.678-T/234.5)*(T/(257.14+T)))
+        # P: vapor saturation pressure in Pa
+        outputs["p_SAT"] = P*1000
 
 class ComputeJMax(ExplicitComponent):
     """
@@ -492,6 +562,15 @@ class ComputeJMax(ExplicitComponent):
     diffusivity_O2N2 : float
         Binary diffusion coefficient for oxygen and nitrogen, comes from previous model
         (scalar, m**2/s)
+    diffusivity_H2H2O : float
+        Binary diffusion coefficient for hydrogen and water, comes from previous model
+        (scalar, m**2/s)
+    diffusivity_O2H2O : float
+        Binary diffusion coefficient for oxygen and water, comes from previous model
+        (scalar, m**2/s)
+    p_SAT : float
+        Vapor saturation pressure, comes from previous model
+        (scalar, Pa)
     eps_thermo : float
         Max theoretical efficiency of the fuel cell, comes from previous model
         (scalar, dimensionless)
@@ -501,190 +580,6 @@ class ComputeJMax(ExplicitComponent):
     j_max : float
         Current density that produces the maximum power
         (scalar, A/cm**2)
-
-    Options
-    -------
-    n_samples : int
-        Number of samples used in finding the j_max value
-        (default 1000)
-    j_L : float
-        Limit current density, primarily driven by the thickness of the cathode
-        (default 2.0, A/cm**2)
-    t_M : float
-        Membrane thickness for the electrolyte passing material [m]
-        (default 20e-6)
-    A_SOFC : float
-        Electrolyte constant, essentially the resistivity of the electrolyte material [K/(ohm*m)]
-        (default  9e7)
-    E_thermo     
-        Thermodynamic voltage, theoretical value that probably should not change [V]
-        ( default 1.06 )     
-    DeltaG_act   
-        Electrolyte activation energy [J/mol]
-        ( default 100e3 )    
-    alpha        
-        Transfer coefficient, ranges from 0.2 to 0.5
-        ( default 0.5 )      
-    j0           
-        Exchange current density [A/cm**2]
-        ( default 0.1 )      
-    eps          
-        Porosity of the electrodes
-        ( default 0.4 )      
-    tau          
-        Tortuosity of the electrodes, ranges from 1.5 to 10
-        ( default 1.5 )      
-    R            
-        Gas constant [J/(mol*K)]
-        ( default 8.314 )    
-    F            
-        Faraday constant [C/mol]
-        ( default 96485.34 ) 
-    x_O2d        
-        Oxygen inlet mole fraction
-        ( default 0.21 )    
-
-    """
-    def initialize(self):
-        # Setup
-        self.options.declare("n_samples"   , default = 300       , desc = "Number of samples to find j_max")
-
-        # Very likely to change:
-        self.options.declare("j_L"         , default = 2.0       , desc = "Limit currrent density [A/cm**2]")
-
-        # Likely to change:
-        self.options.declare("t_M"         , default = 20e-6     , desc = "Membrane thickness [m]")
-        self.options.declare("A_SOFC"      , default = 9e7       , desc = "Electrolyte constant [K/(ohm*m)]")
-        
-        # May Change:
-        self.options.declare("E_thermo"    , default = 1.06      , desc = "Thermodynamic voltage [V]")
-        self.options.declare("DeltaG_act"  , default = 100e3     , desc = "Electrolyte activation energy [J/mol]")
-        self.options.declare("alpha"       , default = 0.5       , desc = "Transfer coefficient")                    # Range: 0.2-0.5
-        self.options.declare("j0"          , default = 0.1       , desc = "Exchange current density [A/cm**2]")
-        self.options.declare("eps"         , default = 0.4       , desc = "Porosity")                                # Range: 0.4
-        self.options.declare("tau"         , default = 1.5       , desc = "Tortuosity")                              # Range: 1.5-10
-        
-        # Should not change
-        self.options.declare("R"           , default = 8.314     , desc = "Gas constant [J/(mol*K)]")
-        self.options.declare("F"           , default = 96485.34  , desc = "Faraday constant [C/mol]")
-        self.options.declare("x_O2d"       , default = 0.21      , desc = "Oxygen inlet mole fraction")
-
-    def setup(self):
-        # self.add_input("ratedPower"       , units="W"      , desc = "Rated Power")
-        self.add_input("pressure"         , units="atm"    , desc = "Fuel cell pressure")
-        self.add_input("temperature"      , units="K"      , desc = "Fuel cell temperature")
-        self.add_input("diffusivity_O2N2" , units="m**2/s" , desc = "Diffusivity of oxygen and nitrogen")
-        self.add_input("eps_thermo"       ,                  desc = "Max theoretical thermo efficiency")
-
-        self.add_output("j_max", units="A/cm**2", desc = "Fuel cell current density at max power")
-
-        self.declare_partials('*', '*', method='cs')
-
-    def compute(self, inputs, outputs):
-        p          = inputs["pressure"]
-        T          = inputs["temperature"]
-        D_ij       = inputs["diffusivity_O2N2"]
-        eps_thermo = inputs["eps_thermo"]
-
-        j_L        = self.options["j_L"]
-        t_M        = self.options["t_M"]
-        A_SOFC     = self.options["A_SOFC"]
-        E_thermo   = self.options["E_thermo"]
-        DeltaG_act = self.options["DeltaG_act"]
-        alpha      = self.options["alpha"]
-        j0         = self.options["j0"]
-        eps        = self.options["eps"]
-        tau        = self.options["tau"]
-        R          = self.options["R"]
-        F          = self.options["F"]
-        x_O2d      = self.options["x_O2d"]
-
-        j_max = 0
-        powerRate_prev = 0.0
-        jarr = np.linspace(0,j_L,self.options["n_samples"])
-        for j in jarr[1:]:
-            eta_ohmic = j * 1e4 * (t_M * T) / (A_SOFC * np.exp(-DeltaG_act / (R*T)))
-
-            p_atm = 101325   # Atmospheric pressure in Pa
-            p_c = p * p_atm  # Convert cathode pressure to Pa
-
-            D_eff_O2N2 = eps / tau * D_ij
-            cr = x_O2d*p_c/ R/T
-            t_C = 4 * F * D_eff_O2N2 / j_L * cr/10000
-            f_j = j/j_L
-            if j == 0:
-                eta_cathode = 0
-            elif f_j>=1:
-                eta_cathode = E_thermo
-            else:
-                eta_cathode =  R * T / (4 * alpha * F) * np.log( f_j*(4*F*D_eff_O2N2*p_atm/(t_C*R*T)) /(j0*10000*(1-f_j)))
-
-            # This is the formula from the book, but it didn't work as expected.
-            # Implemented a re-derived version instead that is much better
-            # eta_cathode = R * T / (4 * alpha * F) * np.log( j / ( j0 * p ) * (1 / (x_O2d - t_C * ((j*10000 * R * T)/(4 * F * p_atm * D_eff_O2N2)))) )
-            
-            V = E_thermo - eta_ohmic - max([eta_cathode,0])
-            
-            n_H2 = 2  # H2 reaction rejects 2 electrons
-            n_O2 = 4  # O2 reaction accepts 4 electrons
-            
-            molarMass_H2 = 2.016
-            molarMass_O2 = 15.999
-            massFraction_O2inAir = .2313333 # air is 23% oxygen by mass
-
-            J_H2 = j/(n_H2*F)  # mol/s
-            mdot_H2 = J_H2*molarMass_H2 # g/s
-            
-            J_O2 = j/(n_O2*F)  # mol/s
-            mdot_O2 = J_O2*molarMass_O2 # g/s
-            
-            mdot_Air = mdot_O2/massFraction_O2inAir 
-            
-            eps_voltage = V/E_thermo
-            eps_fuel = 1.0 # Assume for aircraft no fuel will be wasted, recycling injector?
-            eps_total = eps_thermo * eps_voltage * eps_fuel
-            
-            powerRate = V*j
-            powerRate_ideal = powerRate/eps_total
-            heatRate = powerRate_ideal - powerRate
-            
-            if powerRate_prev < powerRate:
-                j_max = j
-                powerRate_prev = powerRate
-        
-        outputs['j_max'] = j_max
-
-class SOFCRatedPowerAnalysis(ExplicitComponent):
-    """
-    This is a model for determining the max power of SOFC fuel cells based on the book "Fuel Cell Fundementals" 
-    by O'Hayre et. al. (2016).   
-
-    Inputs
-    ------
-    j_max : float
-        Current density that maximizes power output
-        (scalar, A/cm**2)
-    pressure : float
-        Ambient pressure
-        (scalar, atmospheres)
-    temperature : float
-        Ambient temperature
-        (scalar, Kelvin)
-    diffusivity_O2N2 : float
-        Binary diffusion coefficient for oxygen and nitrogen, comes from previous model
-        (scalar, m**2/s)
-    eps_thermo : float
-        Max theoretical efficiency of the fuel cell, comes from previous model
-        (scalar, dimensionless)
-    area : float
-        Working area of the fuel cell
-        (scalar, m**2)
-
-    Outputs
-    -------
-    ratedPower : float
-        The maximum output power of the fuel cell
-        (scalar, W)
 
     Options
     -------
@@ -715,36 +610,290 @@ class SOFCRatedPowerAnalysis(ExplicitComponent):
     t_M : float
         Membrane thickness for the electrolyte passing material [m]
         (default 20e-6)
-    A_SOFC : float
-        Electrolyte constant, essentially the resistivity of the electrolyte material [K/(ohm*m)]
-        (default  9e7)
-    E_thermo     
+    t_A : float
+        Annode thickness [m]
+        (default 350e-6)
+    t_C : float
+        Cathode thickness [m]
+        (default 350e-6)
+    E_thermo : float
         Thermodynamic voltage, theoretical value that probably should not change [V]
         ( default 1.06 )     
-    DeltaG_act   
-        Electrolyte activation energy [J/mol]
+    D_lam : float   
+        Water diffusivity in Nafion [m**2/s]
         ( default 100e3 )    
-    alpha        
+    alpha : float       
         Transfer coefficient, ranges from 0.2 to 0.5
         ( default 0.5 )      
-    j0           
+    j0 : float          
         Exchange current density [A/cm**2]
         ( default 0.1 )      
-    eps          
+    eps : float         
         Porosity of the electrodes
         ( default 0.4 )      
-    tau          
+    tau : float         
         Tortuosity of the electrodes, ranges from 1.5 to 10
         ( default 1.5 )      
-    R            
+    R : float           
         Gas constant [J/(mol*K)]
         ( default 8.314 )    
-    F            
+    F : float           
         Faraday constant [C/mol]
         ( default 96485.34 ) 
-    x_O2d        
-        Oxygen inlet mole fraction
-        ( default 0.21 )    
+    x_H2 : float        
+        Hydrogen mole fraction in the fuel
+        ( default 1.0 )    
+    x_O2 : float        
+        Oxygen mole fraction
+        ( default 0.19 )    
+    x_H2O : float        
+        Water mole fraction
+        ( default 0.1 )       
+
+    """
+    def initialize(self):
+        # Setup
+        self.options.declare("n_samples"   , default = 1000       , desc = "Number of samples to find j_max")
+
+        # Very likely to change:
+        self.options.declare("j_L"         , default = 2.0       , desc = "Limit currrent density [A/cm**2]")
+
+        # Likely to change:
+        self.options.declare("t_M"         , default = 20e-6     , desc = "Membrane thickness [m]")
+        self.options.declare("t_A"         , default = 350e-6    , desc = "Annode thickness [m]")
+        self.options.declare("t_C"         , default = 350e-6    , desc = "Cathode thickness [m]")
+        
+        # May Change:
+        self.options.declare("E_thermo"    , default = 1.06      , desc = "Thermodynamic voltage [V]")
+        self.options.declare("D_lam"       , default = 3.81e-6 * 10000 , desc = "Water diffusivity in Nafion [m**2/s]")
+        self.options.declare("alpha"       , default = 0.5       , desc = "Transfer coefficient")                    # Range: 0.2-0.5
+        self.options.declare("j0"          , default = 0.1       , desc = "Exchange current density [A/cm**2]")
+        self.options.declare("eps"         , default = 0.4       , desc = "Porosity")                                # Range: 0.4
+        self.options.declare("tau"         , default = 1.5       , desc = "Tortuosity")                              # Range: 1.5-10
+        
+        # Should not change
+        self.options.declare("R"           , default = 8.314     , desc = "Gas constant [J/(mol*K)]")
+        self.options.declare("F"           , default = 96485.34  , desc = "Faraday constant [C/mol]")
+        self.options.declare("x_H2"        , default = 1.0       , desc = "Hydrogen fuel mole fraction")
+        self.options.declare("x_O2"        , default = 0.19      , desc = "Oxygen mole fraction")
+        self.options.declare("x_H2O"       , default = 0.1       , desc = "Water mole fraction")
+
+    def setup(self):
+        # self.add_input("ratedPower"       , units="W"      , desc = "Rated Power")
+        self.add_input("pressure"         , units="atm"    , desc = "Fuel cell pressure")
+        self.add_input("temperature"      , units="K"      , desc = "Fuel cell temperature")
+        self.add_input("diffusivity_O2N2" , units="m**2/s" , desc = "Diffusivity of oxygen and nitrogen")
+        self.add_input("diffusivity_H2H2O", units="m**2/s" , desc = "Diffusivity of hydrogen and water")
+        self.add_input("diffusivity_O2H2O", units="m**2/s" , desc = "Diffusivity of oxygen and water")
+        self.add_input("p_SAT"            , units="Pa"     , desc = "Vapor saturation pressure")
+
+        self.add_input("eps_thermo"       ,                  desc = "Max theoretical thermo efficiency")
+
+        self.add_output("j_max", units="A/cm**2", desc = "Fuel cell current density at max power")
+
+        self.declare_partials('*', '*', method='cs')
+
+    def compute(self, inputs, outputs):
+        p          = inputs["pressure"]
+        T          = inputs["temperature"]
+        D_ij_O2N2  = inputs["diffusivity_O2N2"]
+        D_ij_H2H2O = inputs["diffusivity_H2H2O"]
+        D_ij_O2H2O = inputs["diffusivity_O2H2O"]
+        eps_thermo = inputs["eps_thermo"]
+        p_SAT      = inputs["p_SAT"]
+
+        j_L        = self.options["j_L"]
+        t_M        = self.options["t_M"]
+        t_A        = self.options["t_A"]
+        t_C        = self.options["t_C"]
+        E_thermo   = self.options["E_thermo"]
+        D_lam      = self.options["D_lam"]
+        alpha      = self.options["alpha"]
+        j0         = self.options["j0"]
+        eps        = self.options["eps"]
+        tau        = self.options["tau"]
+        R          = self.options["R"]
+        F          = self.options["F"]
+        x_H2       = self.options["x_H2"]
+        x_O2       = self.options["x_O2"]
+        x_H2O      = self.options["x_H2O"]
+
+        D_eff_O2N2  = eps ** tau * D_ij_O2N2
+        D_eff_H2H2O = eps ** tau * D_ij_H2H2O
+        D_eff_O2H2O = eps ** tau * D_ij_O2H2O
+
+        p_in_atms = p
+        p_of_atm = 101325
+        p_C = p_in_atms * p_of_atm
+        p_A = p_in_atms * p_of_atm
+
+        j_max = 0
+        powerRate_prev = 0.0
+        jarr = np.linspace(0,j_L,self.options["n_samples"])
+        for j in jarr[1:]:
+            a11 = 4.4 + 14 * (p_A / p_SAT) * (t_A * ( j*10000 * R * T )/(2*F*p_A*D_eff_H2H2O))
+            a12 = 1.0
+            b1  = 14 * (p_A / p_SAT) * x_H2O
+            
+            K = t_C * j*10000 * R * T / (4 * F * p_C * D_eff_O2H2O)
+            pRat = p_C/p_SAT
+            a21 = 4.4 + (4*pRat*K)
+            a22 = np.exp(0.000598 * (j*10000/10000)*(t_M*100)/(D_lam/10000))
+            b2  = 10.0 + 4*pRat*(x_H2O + K)
+            
+            alphaStar = (b1 - a12*b2/a22) / (a11-a12*a21/a22)
+            C         = (b2-a21*alphaStar)/a22
+
+            z = np.linspace(0,t_M*100,10000)
+            lam = 4.4*alphaStar + C*np.exp(0.000598 * (j)*(z)/(D_lam/10000))
+            sigma = (0.005193*lam - 0.003261)*np.exp(1268*(1/303-1/T))
+            integrand = 1/sigma
+            dz = z[1]-z[0]
+            A_PEMFC=np.sum(dz*integrand)/10000
+
+            eta_ohmic = j * 1e4 * A_PEMFC
+
+            cr = x_O2*p_in_atms*p_of_atm/ R/T
+            t_C = 4 * F * D_eff_O2N2 / j_L * cr/10000
+            f_j = j/j_L
+            if j == 0:
+                eta_cathode = 0
+            elif f_j>=1:
+                eta_cathode = E_thermo
+            else:
+                eta_cathode =  R * T / (4 * alpha * F) * np.log( f_j*(4*F*D_eff_O2N2*p_of_atm/(t_C*R*T)) /(j0*10000*(1-f_j)))
+            
+            V = E_thermo - max([eta_ohmic,0]) - max([eta_cathode,0])
+            
+            n_H2 = 2  # H2 reaction rejects 2 electrons
+            n_O2 = 4  # O2 reaction accepts 4 electrons
+            
+            molarMass_H2 = 2.016
+            molarMass_O2 = 15.999
+            massFraction_O2inAir = .2313333 # air is 23% oxygen by mass
+
+            J_H2 = j/(n_H2*F)  # mol/s
+            mdot_H2 = J_H2*molarMass_H2 # g/s
+            
+            J_O2 = j/(n_O2*F)  # mol/s
+            mdot_O2 = J_O2*molarMass_O2 # g/s
+            
+            mdot_Air = mdot_O2/massFraction_O2inAir 
+            
+            eps_voltage = V/E_thermo
+            eps_fuel = 1.0 # Assume for aircraft no fuel will be wasted, recycling injector?
+            eps_total = eps_thermo * eps_voltage * eps_fuel
+            
+            powerRate = V*j
+            
+            if powerRate_prev < powerRate:
+                j_max = j
+                powerRate_prev = powerRate
+        
+        outputs['j_max'] = j_max
+
+class PEMRatedPowerAnalysis(ExplicitComponent):
+    """
+    This is a model for sizing SOFC fuel cells based on the book "Fuel Cell Fundementals" by O'Hayre et. al. (2016).   
+
+    Inputs
+    ------
+    j_max : float
+        Current density that maximizes power output
+        (scalar, A/cm**2)
+    pressure : float
+        Ambient pressure
+        (scalar, atmospheres)
+    temperature : float
+        Ambient temperature
+        (scalar, Kelvin)
+    diffusivity_O2N2 : float
+        Binary diffusion coefficient for oxygen and nitrogen, comes from previous model
+        (scalar, m**2/s)
+    diffusivity_H2H2O : float
+        Binary diffusion coefficient for hydrogen and water, comes from previous model
+        (scalar, m**2/s)
+    diffusivity_O2H2O : float
+        Binary diffusion coefficient for oxygen and water, comes from previous model
+        (scalar, m**2/s)
+    p_SAT : float
+        Vapor saturation pressure, comes from previous model
+        (scalar, Pa)
+    eps_thermo : float
+        Max theoretical efficiency of the fuel cell, comes from previous model
+        (scalar, dimensionless)
+
+    Outputs
+    -------
+    ratedPower : float
+        The maximum output power of the fuel cell
+        (scalar, W)
+
+    Options
+    -------
+    j_L : float
+        Limit current density, primarily driven by the thickness of the cathode
+        (default 2.0, A/cm**2)
+    A : float
+        Mass coefficient for the area based contribution.  The default
+        value is based only on a single bus engine and should not be 
+        relied on for real designs.  Mass prediction attempts to do both
+        fuel cell components, along with Balance of Plant, however
+        a compressor that raises ambient pressure is not included.
+        (default 0.5, kg/m**2)
+    B : float   
+        Mass coefficient for the rated power based contribution.  The default
+        value is based only on a single bus engine and should not be 
+        relied on for real designs.  Mass prediction attempts to do both
+        fuel cell components, along with Balance of Plant, however
+        a compressor that raises ambient pressure is not included.
+        (default 15.0, kg/W)
+    eta_dcdc : float
+        Conversion efficiency of the expected DC-DC converter.  The heat from 
+        this conversion is included in the usable heat output.
+        (default 0.9, dimensionless)
+    t_M : float
+        Membrane thickness for the electrolyte passing material [m]
+        (default 20e-6)
+    t_A : float
+        Annode thickness [m]
+        (default 350e-6)
+    t_C : float
+        Cathode thickness [m]
+        (default 350e-6)
+    E_thermo : float
+        Thermodynamic voltage, theoretical value that probably should not change [V]
+        ( default 1.06 )     
+    D_lam : float   
+        Water diffusivity in Nafion [m**2/s]
+        ( default 100e3 )    
+    alpha : float       
+        Transfer coefficient, ranges from 0.2 to 0.5
+        ( default 0.5 )      
+    j0 : float          
+        Exchange current density [A/cm**2]
+        ( default 0.1 )      
+    eps : float         
+        Porosity of the electrodes
+        ( default 0.4 )      
+    tau : float         
+        Tortuosity of the electrodes, ranges from 1.5 to 10
+        ( default 1.5 )      
+    R : float           
+        Gas constant [J/(mol*K)]
+        ( default 8.314 )    
+    F : float           
+        Faraday constant [C/mol]
+        ( default 96485.34 ) 
+    x_H2 : float        
+        Hydrogen mole fraction in the fuel
+        ( default 1.0 )    
+    x_O2 : float        
+        Oxygen mole fraction
+        ( default 0.19 )    
+    x_H2O : float        
+        Water mole fraction
+        ( default 0.1 )    
 
     """
 
@@ -757,11 +906,12 @@ class SOFCRatedPowerAnalysis(ExplicitComponent):
 
         # Likely to change:
         self.options.declare("t_M"         , default = 20e-6     , desc = "Membrane thickness [m]")
-        self.options.declare("A_SOFC"      , default = 9e7       , desc = "Electrolyte constant [K/(ohm*m)]")
+        self.options.declare("t_A"         , default = 350e-6    , desc = "Annode thickness [m]")
+        self.options.declare("t_C"         , default = 350e-6    , desc = "Cathode thickness [m]")
         
         # May Change:
         self.options.declare("E_thermo"    , default = 1.06      , desc = "Thermodynamic voltage [V]")
-        self.options.declare("DeltaG_act"  , default = 100e3     , desc = "Electrolyte activation energy [J/mol]")
+        self.options.declare("D_lam"       , default = 3.81e-6 * 10000 , desc = "Water diffusivity in Nafion [m**2/s]")
         self.options.declare("alpha"       , default = 0.5       , desc = "Transfer coefficient")                    # Range: 0.2-0.5
         self.options.declare("j0"          , default = 0.1       , desc = "Exchange current density [A/cm**2]")
         self.options.declare("eps"         , default = 0.4       , desc = "Porosity")                                # Range: 0.4
@@ -770,55 +920,94 @@ class SOFCRatedPowerAnalysis(ExplicitComponent):
         # Should not change
         self.options.declare("R"           , default = 8.314     , desc = "Gas constant [J/(mol*K)]")
         self.options.declare("F"           , default = 96485.34  , desc = "Faraday constant [C/mol]")
-        self.options.declare("x_O2d"       , default = 0.21      , desc = "Oxygen inlet mole fraction")
+        self.options.declare("x_H2"        , default = 1.0       , desc = "Hydrogen fuel mole fraction")
+        self.options.declare("x_O2"        , default = 0.19      , desc = "Oxygen mole fraction")
+        self.options.declare("x_H2O"       , default = 0.1       , desc = "Water mole fraction")
+
 
 
     def setup(self):
+        # self.add_input("ratedPower"       , units="W"       , desc = "Rated Power")
         self.add_input("j_max"            , units="A/cm**2" , desc = "Fuel cell current density")
         self.add_input("pressure"         , units="atm"     , desc = "Fuel cell pressure")
         self.add_input("temperature"      , units="K"       , desc = "Fuel cell temperature")
-        self.add_input("diffusivity_O2N2" , units="m**2/s"  , desc = "Diffusivity of oxygen and nitrogen")
+        self.add_input("diffusivity_O2N2" , units="m**2/s" , desc = "Diffusivity of oxygen and nitrogen")
+        self.add_input("diffusivity_H2H2O", units="m**2/s" , desc = "Diffusivity of hydrogen and water")
+        self.add_input("diffusivity_O2H2O", units="m**2/s" , desc = "Diffusivity of oxygen and water")
+        self.add_input("p_SAT"            , units="Pa"     , desc = "Vapor saturation pressure")
         self.add_input("eps_thermo"       ,                   desc = "Max theoretical thermo efficiency")
-        self.add_input('area'             , units="m**2"    , desc = "Fuel cell area")
+        self.add_input('area'             , units = "m**2" , desc = "Fuel cell area")
 
-        self.add_output("ratedPower"      , units="W"       , desc = "Rated Power")
+        self.add_output('ratedPower', units = "W"   , desc = "Fuel cell rated power")
+        # self.add_output('area', units = "m**2" , desc = "Fuel cell area")
 
         self.declare_partials('*', '*', method='cs')
 
     def compute(self, inputs, outputs):
         j_max      = inputs["j_max"]
+        # ratedPower = inputs["ratedPower"]
         p          = inputs["pressure"]
         T          = inputs["temperature"]
-        D_ij       = inputs["diffusivity_O2N2"]
+        D_ij_O2N2  = inputs["diffusivity_O2N2"]
+        D_ij_H2H2O = inputs["diffusivity_H2H2O"]
+        D_ij_O2H2O = inputs["diffusivity_O2H2O"]
         eps_thermo = inputs["eps_thermo"]
-        # ratedPower = inputs["ratedPower"]
+        p_SAT      = inputs["p_SAT"]
         area       = inputs["area"]
 
         j_L        = self.options["j_L"]
         t_M        = self.options["t_M"]
-        A_SOFC     = self.options["A_SOFC"]
+        t_A        = self.options["t_A"]
+        t_C        = self.options["t_C"]
         E_thermo   = self.options["E_thermo"]
-        DeltaG_act = self.options["DeltaG_act"]
+        D_lam      = self.options["D_lam"]
         alpha      = self.options["alpha"]
         j0         = self.options["j0"]
         eps        = self.options["eps"]
         tau        = self.options["tau"]
         R          = self.options["R"]
         F          = self.options["F"]
-        x_O2d      = self.options["x_O2d"]
+        x_H2       = self.options["x_H2"]
+        x_O2       = self.options["x_O2"]
+        x_H2O      = self.options["x_H2O"]
         eta_dcdc   = self.options["eta_dcdc"]
-        # A          = self.options["A"]
-        # B          = self.options["B"]
+        A          = self.options["A"]
+        B          = self.options["B"]
+
+        D_eff_O2N2  = eps ** tau * D_ij_O2N2
+        D_eff_H2H2O = eps ** tau * D_ij_H2H2O
+        D_eff_O2H2O = eps ** tau * D_ij_O2H2O
+
+        p_in_atms = p
+        p_of_atm = 101325
+        p_C = p_in_atms * p_of_atm
+        p_A = p_in_atms * p_of_atm
         
         j = j_max
 
-        eta_ohmic = j * 1e4 * (t_M * T) / (A_SOFC * np.exp(-DeltaG_act / (R*T)))
+        a11 = 4.4 + 14 * (p_A / p_SAT) * (t_A * ( j*10000 * R * T )/(2*F*p_A*D_eff_H2H2O))
+        a12 = 1.0
+        b1  = 14 * (p_A / p_SAT) * x_H2O
+        
+        K = t_C * j*10000 * R * T / (4 * F * p_C * D_eff_O2H2O)
+        pRat = p_C/p_SAT
+        a21 = 4.4 + (4*pRat*K)
+        a22 = np.exp(0.000598 * (j*10000/10000)*(t_M*100)/(D_lam/10000))
+        b2  = 10.0 + 4*pRat*(x_H2O + K)
+        
+        alphaStar = (b1 - a12*b2/a22) / (a11-a12*a21/a22)
+        C         = (b2-a21*alphaStar)/a22
 
-        p_atm = 101325   # Atmospheric pressure in Pa
-        p_c = p * p_atm  # Convert cathode pressure to Pa
+        z = np.linspace(0,t_M*100,10000)
+        lam = 4.4*alphaStar + C*np.exp(0.000598 * (j)*(z)/(D_lam/10000))
+        sigma = (0.005193*lam - 0.003261)*np.exp(1268*(1/303-1/T))
+        integrand = 1/sigma
+        dz = z[1]-z[0]
+        A_PEMFC=np.sum(dz*integrand)/10000
 
-        D_eff_O2N2 = eps / tau * D_ij
-        cr = x_O2d*p_c/ R/T
+        eta_ohmic = j * 1e4 * A_PEMFC
+
+        cr = x_O2*p_in_atms*p_of_atm/ R/T
         t_C = 4 * F * D_eff_O2N2 / j_L * cr/10000
         f_j = j/j_L
         if j == 0:
@@ -826,20 +1015,44 @@ class SOFCRatedPowerAnalysis(ExplicitComponent):
         elif f_j>=1:
             eta_cathode = E_thermo
         else:
-            eta_cathode =  R * T / (4 * alpha * F) * np.log( f_j*(4*F*D_eff_O2N2*p_atm/(t_C*R*T)) /(j0*10000*(1-f_j)))
+            eta_cathode =  R * T / (4 * alpha * F) * np.log( f_j*(4*F*D_eff_O2N2*p_of_atm/(t_C*R*T)) /(j0*10000*(1-f_j)))
         
-        # This is the formula from the book, but it didn't work as expected.
-        # Implemented a re-derived version instead that is much better
-        # eta_cathode = R * T / (4 * alpha * F) * np.log( j / ( j0 * p ) * (1 / (x_O2d - t_C * ((j*10000 * R * T)/(4 * F * p_atm * D_eff_O2N2)))) )
+        V = E_thermo - max([eta_ohmic,0]) - max([eta_cathode,0])
+        
+        n_H2 = 2  # H2 reaction rejects 2 electrons
+        n_O2 = 4  # O2 reaction accepts 4 electrons
+        
+        molarMass_H2 = 2.016
+        molarMass_O2 = 15.999
+        massFraction_O2inAir = .2313333 # air is 23% oxygen by mass
 
-        V = E_thermo - eta_ohmic - max([eta_cathode,0])
+        J_H2 = j/(n_H2*F)  # mol/s
+        mdot_H2 = J_H2*molarMass_H2 # g/s
         
+        J_O2 = j/(n_O2*F)  # mol/s
+        mdot_O2 = J_O2*molarMass_O2 # g/s
+        
+        mdot_Air = mdot_O2/massFraction_O2inAir 
+        
+        eps_voltage = V/E_thermo
+        eps_fuel = 1.0 # Assume for aircraft no fuel will be wasted, recycling injector?
+        eps_total = eps_thermo * eps_voltage * eps_fuel
+        
+        powerRate = V*j
+        powerRate_ideal = powerRate/eps_total
+        heatRate = powerRate_ideal - powerRate
+
         ratedPower = (V*j_max*10000) * area * eta_dcdc
         outputs['ratedPower'] = ratedPower
+
+        # area = ratedPower / eta_dcdc / (V*j_max) / 10000
+        # usablePower = powerRate * area *10000 * eta_dcdc
+        # mass = A*area + B*usablePower/1000
+        # outputs['mass'] = mass
         # outputs['area'] = area
 
 
-class SOFCAnalysis(ExplicitComponent):
+class PEMAnalysis(ExplicitComponent):
     """
     This is a model for analysis of SOFC fuel cells based on the book "Fuel Cell Fundementals" by O'Hayre et. al. (2016).   
 
@@ -867,6 +1080,15 @@ class SOFCAnalysis(ExplicitComponent):
     diffusivity_O2N2 : float
         Binary diffusion coefficient for oxygen and nitrogen, comes from previous model
         (scalar, m**2/s)
+    diffusivity_H2H2O : float
+        Binary diffusion coefficient for hydrogen and water, comes from previous model
+        (scalar, m**2/s)
+    diffusivity_O2H2O : float
+        Binary diffusion coefficient for oxygen and water, comes from previous model
+        (scalar, m**2/s)
+    p_SAT : float
+        Vapor saturation pressure, comes from previous model
+        (scalar, Pa)
     eps_thermo : float
         Max theoretical efficiency of the fuel cell, comes from previous model
         (scalar, dimensionless)
@@ -929,36 +1151,45 @@ class SOFCAnalysis(ExplicitComponent):
     t_M : float
         Membrane thickness for the electrolyte passing material [m]
         (default 20e-6)
-    A_SOFC : float
-        Electrolyte constant, essentially the resistivity of the electrolyte material [K/(ohm*m)]
-        (default  9e7)
-    E_thermo     
+    t_A : float
+        Annode thickness [m]
+        (default 350e-6)
+    t_C : float
+        Cathode thickness [m]
+        (default 350e-6)
+    E_thermo : float
         Thermodynamic voltage, theoretical value that probably should not change [V]
         ( default 1.06 )     
-    DeltaG_act   
-        Electrolyte activation energy [J/mol]
+    D_lam : float   
+        Water diffusivity in Nafion [m**2/s]
         ( default 100e3 )    
-    alpha        
+    alpha : float       
         Transfer coefficient, ranges from 0.2 to 0.5
         ( default 0.5 )      
-    j0           
+    j0 : float          
         Exchange current density [A/cm**2]
         ( default 0.1 )      
-    eps          
+    eps : float         
         Porosity of the electrodes
         ( default 0.4 )      
-    tau          
+    tau : float         
         Tortuosity of the electrodes, ranges from 1.5 to 10
         ( default 1.5 )      
-    R            
+    R : float           
         Gas constant [J/(mol*K)]
         ( default 8.314 )    
-    F            
+    F : float           
         Faraday constant [C/mol]
         ( default 96485.34 ) 
-    x_O2d        
-        Oxygen inlet mole fraction
-        ( default 0.21 )    
+    x_H2 : float        
+        Hydrogen mole fraction in the fuel
+        ( default 1.0 )    
+    x_O2 : float        
+        Oxygen mole fraction
+        ( default 0.19 )    
+    x_H2O : float        
+        Water mole fraction
+        ( default 0.1 )    
 
     """
 
@@ -973,11 +1204,12 @@ class SOFCAnalysis(ExplicitComponent):
 
         # Likely to change:
         self.options.declare("t_M"         , default = 20e-6     , desc = "Membrane thickness [m]")
-        self.options.declare("A_SOFC"      , default = 9e7       , desc = "Electrolyte constant [K/(ohm*m)]")
+        self.options.declare("t_A"         , default = 350e-6    , desc = "Annode thickness [m]")
+        self.options.declare("t_C"         , default = 350e-6    , desc = "Cathode thickness [m]")
         
         # May Change:
         self.options.declare("E_thermo"    , default = 1.06      , desc = "Thermodynamic voltage [V]")
-        self.options.declare("DeltaG_act"  , default = 100e3     , desc = "Electrolyte activation energy [J/mol]")
+        self.options.declare("D_lam"       , default = 3.81e-6 * 10000 , desc = "Water diffusivity in Nafion [m**2/s]")
         self.options.declare("alpha"       , default = 0.5       , desc = "Transfer coefficient")                    # Range: 0.2-0.5
         self.options.declare("j0"          , default = 0.1       , desc = "Exchange current density [A/cm**2]")
         self.options.declare("eps"         , default = 0.4       , desc = "Porosity")                                # Range: 0.4
@@ -986,7 +1218,9 @@ class SOFCAnalysis(ExplicitComponent):
         # Should not change
         self.options.declare("R"           , default = 8.314     , desc = "Gas constant [J/(mol*K)]")
         self.options.declare("F"           , default = 96485.34  , desc = "Faraday constant [C/mol]")
-        self.options.declare("x_O2d"       , default = 0.21      , desc = "Oxygen inlet mole fraction")
+        self.options.declare("x_H2"        , default = 1.0       , desc = "Hydrogen fuel mole fraction")
+        self.options.declare("x_O2"        , default = 0.19      , desc = "Oxygen mole fraction")
+        self.options.declare("x_H2O"       , default = 0.1       , desc = "Water mole fraction")
 
     def setup(self):
         nn = self.options["num_nodes"]
@@ -995,7 +1229,10 @@ class SOFCAnalysis(ExplicitComponent):
         self.add_input("j_max"            , units="A/cm**2" , desc = "Fuel cell current density")
         self.add_input("pressure"         , units="atm"     , desc = "Fuel cell pressure")
         self.add_input("temperature"      , units="K"       , desc = "Fuel cell temperature")
-        self.add_input("diffusivity_O2N2" , units="m**2/s"  , desc = "Diffusivity of oxygen and nitrogen")
+        self.add_input("diffusivity_O2N2" , units="m**2/s" , desc = "Diffusivity of oxygen and nitrogen")
+        self.add_input("diffusivity_H2H2O", units="m**2/s" , desc = "Diffusivity of hydrogen and water")
+        self.add_input("diffusivity_O2H2O", units="m**2/s" , desc = "Diffusivity of oxygen and water")
+        self.add_input("p_SAT"            , units="Pa"     , desc = "Vapor saturation pressure")
         self.add_input("eps_thermo"       ,                   desc = "Max theoretical thermo efficiency")
         self.add_input('area'             , units = "m**2"  , desc = "Fuel cell voltage")
 
@@ -1013,58 +1250,93 @@ class SOFCAnalysis(ExplicitComponent):
     def compute(self, inputs, outputs):
         throttle   = inputs["throttle"]
         j_max      = inputs["j_max"]
+        # ratedPower = inputs["ratedPower"]
         p          = inputs["pressure"]
         T          = inputs["temperature"]
-        D_ij       = inputs["diffusivity_O2N2"]
+        D_ij_O2N2  = inputs["diffusivity_O2N2"]
+        D_ij_H2H2O = inputs["diffusivity_H2H2O"]
+        D_ij_O2H2O = inputs["diffusivity_O2H2O"]
         eps_thermo = inputs["eps_thermo"]
-        # ratedPower = inputs["ratedPower"]
-        area       = inputs["area"]
+        p_SAT      = inputs["p_SAT"]
+        area      = inputs["area"]
 
         j_L        = self.options["j_L"]
         t_M        = self.options["t_M"]
-        A_SOFC     = self.options["A_SOFC"]
+        t_A        = self.options["t_A"]
+        t_C        = self.options["t_C"]
         E_thermo   = self.options["E_thermo"]
-        DeltaG_act = self.options["DeltaG_act"]
+        D_lam      = self.options["D_lam"]
         alpha      = self.options["alpha"]
         j0         = self.options["j0"]
         eps        = self.options["eps"]
         tau        = self.options["tau"]
         R          = self.options["R"]
         F          = self.options["F"]
-        x_O2d      = self.options["x_O2d"]
+        x_H2       = self.options["x_H2"]
+        x_O2       = self.options["x_O2"]
+        x_H2O      = self.options["x_H2O"]
         eta_dcdc   = self.options["eta_dcdc"]
-        # A          = self.options["A"]
-        # B          = self.options["B"]
+        A          = self.options["A"]
+        B          = self.options["B"]
 
-        j = throttle * j_max
+        D_eff_O2N2  = eps ** tau * D_ij_O2N2
+        D_eff_H2H2O = eps ** tau * D_ij_H2H2O
+        D_eff_O2H2O = eps ** tau * D_ij_O2H2O
 
-        eta_ohmic = j * 1e4 * (t_M * T) / (A_SOFC * np.exp(-DeltaG_act / (R*T)))
+        p_in_atms = p
+        p_of_atm = 101325
+        p_C = p_in_atms * p_of_atm
+        p_A = p_in_atms * p_of_atm
+    
+        jValues = throttle * j_max
 
-        p_atm = 101325   # Atmospheric pressure in Pa
-        p_c = p * p_atm  # Convert cathode pressure to Pa
+        V = np.zeros(len(jValues),dtype=np.complex_)
+        for i in range(0,len(jValues)):
+            j = jValues[i]
 
-        D_eff_O2N2 = eps / tau * D_ij
-        cr = x_O2d*p_c/ R/T
-        t_C = 4 * F * D_eff_O2N2 / j_L * cr/10000
-        V = np.zeros(len(j),dtype=np.complex_)
-        for i in range(0,len(j)):
-            jval = j[i]
-            f_j = jval/j_L
-            if jval == 0:
-                eta_cathode = 0
-            elif f_j>=1:
-                eta_cathode = E_thermo
+            if j == 0:
+                V[i] = 0.0
             else:
-                eta_cathode =  R * T / (4 * alpha * F) * np.log( f_j*(4*F*D_eff_O2N2*p_atm/(t_C*R*T)) /(j0*10000*(1-f_j)))
+                a11 = 4.4 + 14 * (p_A / p_SAT) * (t_A * ( j*10000 * R * T )/(2*F*p_A*D_eff_H2H2O))
+                a12 = 1.0
+                b1  = 14 * (p_A / p_SAT) * x_H2O
+                
+                K = t_C * j*10000 * R * T / (4 * F * p_C * D_eff_O2H2O)
+                pRat = p_C/p_SAT
+                a21 = 4.4 + (4*pRat*K)
+                a22 = np.exp(0.000598 * (j*10000/10000)*(t_M*100)/(D_lam/10000))
+                b2  = 10.0 + 4*pRat*(x_H2O + K)
+                
+                alphaStar = (b1 - a12*b2/a22) / (a11-a12*a21/a22)
+                C         = (b2-a21*alphaStar)/a22
 
-            # This is the formula from the book, but it didn't work as expected.
-            # Implemented a re-derived version instead that is much better
-            # eta_cathode = R * T / (4 * alpha * F) * np.log( j / ( j0 * p ) * (1 / (x_O2d - t_C * ((j*10000 * R * T)/(4 * F * p_atm * D_eff_O2N2)))) )
-            
-            # print(E_thermo - eta_ohmic[i] - max([eta_cathode,0]))
-            # print("=========================")
-            V[i] = E_thermo - eta_ohmic[i] - max([eta_cathode,0])
-        
+                z = np.linspace(0,t_M*100,10000)
+                lam = 4.4*alphaStar + C*np.exp(0.000598 * (j)*(z)/(D_lam/10000))
+                sigma = (0.005193*lam - 0.003261)*np.exp(1268*(1/303-1/T))
+                integrand = 1/sigma
+                dz = z[1]-z[0]
+                A_PEMFC=np.sum(dz*integrand)/10000
+
+                eta_ohmic = j * 1e4 * A_PEMFC
+
+                cr = x_O2*p_in_atms*p_of_atm/ R/T
+                t_C = 4 * F * D_eff_O2N2 / j_L * cr/10000
+                f_j = j/j_L
+                if j == 0:
+                    eta_cathode = 0
+                elif f_j>=1:
+                    eta_cathode = E_thermo
+                else:
+                    eta_cathode =  R * T / (4 * alpha * F) * np.log( f_j*(4*F*D_eff_O2N2*p_of_atm/(t_C*R*T)) /(j0*10000*(1-f_j)))
+                
+
+                V[i] = E_thermo - max([eta_ohmic,0]) - max([eta_cathode,0])
+
+        if np.sum(abs(V.imag)) == 0.0:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*complex")
+                V = V.astype('float')
+
         n_H2 = 2  # H2 reaction rejects 2 electrons
         n_O2 = 4  # O2 reaction accepts 4 electrons
         
@@ -1078,15 +1350,29 @@ class SOFCAnalysis(ExplicitComponent):
         J_O2 = j/(n_O2*F)  # mol/s
         mdot_O2 = J_O2*molarMass_O2 # g/s
         
-        mdot_Air = mdot_O2/massFraction_O2inAir         
+        mdot_Air = mdot_O2/massFraction_O2inAir 
         
         eps_voltage = V/E_thermo
         eps_fuel = 1.0 # Assume for aircraft no fuel will be wasted, recycling injector?
         eps_total = eps_thermo * eps_voltage * eps_fuel
-        
+
         powerRate = V*j
-        powerRate_ideal = powerRate/eps_total
-        heatRate = powerRate_ideal - powerRate
+        
+        heatRate = np.zeros(len(jValues),dtype=np.complex_)
+        for i in range(0,len(jValues)):
+            j = jValues[i]
+            if j == 0:
+                heatRate[i] = 0
+            else:
+                powerRate_ideal = powerRate[i]/eps_total[i]
+                heatRate[i] = powerRate_ideal - powerRate[i]
+
+        if np.sum(abs(heatRate.imag)) == 0.0:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*complex")
+                heatRate = heatRate.astype('float')
+
+        usablePower = powerRate * area *10000 * eta_dcdc
 
         # must convert the j values to m**2 and not cm**2
         outputs['mdot_H2']       = mdot_H2   * area * 10000
@@ -1098,6 +1384,7 @@ class SOFCAnalysis(ExplicitComponent):
         outputs['heat']          = heatRate  * area * 10000
         outputs['usableHeat']    = heatRate  * area * 10000 + (1-eta_dcdc) * powerRate * area * 10000
     
+
 # ==========================================================================================================================================================================================================================================
 # Run script
 # ==========================================================================================================================================================================================================================================
@@ -1108,7 +1395,7 @@ if __name__ == "__main__":
 
     # Predict rated power
     prob = om.Problem()
-    prob.model.add_subsystem('FuelCellModel',FuelCellSOFC_RatedPower(), promotes_inputs=["*"], promotes_outputs=["*"])
+    prob.model.add_subsystem('FuelCellModel',FuelCellPEM_RatedPower(), promotes_inputs=["*"], promotes_outputs=["*"])
     prob.setup()
     # prob['throttle']=np.linspace(0,1,11)
     prob['pressure']=1.0
@@ -1117,14 +1404,14 @@ if __name__ == "__main__":
     prob.run_model()
     prob.check_partials(compact_print=True, show_only_incorrect=True)
     # Generate N2 diagram
-    om.n2(prob, outfile="fuelCellSOFC_ratedPower.html", show_browser=True)
+    om.n2(prob, outfile="fuelCellPEM_ratedPower.html", show_browser=True)
     print(prob.get_val('ratedPower',units='W'))
 
 
     # Do full analysis
     nn = 11
     prob = om.Problem()
-    prob.model.add_subsystem('FuelCellModel',FuelCellSOFC(num_nodes=nn), promotes_inputs=["*"], promotes_outputs=["*"])
+    prob.model.add_subsystem('FuelCellModel',FuelCellPEM(num_nodes=nn), promotes_inputs=["*"], promotes_outputs=["*"])
     prob.setup()
     prob['throttle']=np.linspace(0,1,11)
     prob['pressure']=1.0
@@ -1135,12 +1422,9 @@ if __name__ == "__main__":
     prob.check_partials(compact_print=True, show_only_incorrect=True)
 
     # Generate N2 diagram
-    om.n2(prob, outfile="fuelCellSOFC.html", show_browser=True)
+    om.n2(prob, outfile="fuelCellPEM.html", show_browser=True)
 
     print(prob.get_val('usablePower',units="W"))
     print(prob.get_val('usableHeat',units="W"))
-
-
-
 
 

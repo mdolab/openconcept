@@ -10,3 +10,17 @@ from .weights_turboprop import (
     EquipmentWeight_SmallTurboprop,
 )
 from .weights_twin_hybrid import TwinSeriesHybridEmptyWeight
+
+from .weights_jettransport import (
+    WingWeight_JetTrasport,
+    HstabConst_JetTransport,
+    HstabWeight_JetTransport,
+    VstabWeight_JetTransport,
+    FuselageConst1_JetTransport,
+    FuselageConst2_JetTransport,
+    FuselageWeight_JetTransport,
+    MainLandingGear_JetTransport,
+    NoseLandingGear_JetTransport,
+    Engine_JetTransport,
+    EngineSystems_JetTransport,
+)

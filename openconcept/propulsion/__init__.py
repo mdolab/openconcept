@@ -20,3 +20,7 @@ from .systems import (
     TwinSeriesHybridElectricThermalPropulsionSystem,
     TwinSeriesHybridElectricThermalPropulsionRefrigerated,
 )
+
+# Fuel Cell Models
+from .fuel_cell_SOFC import FuelCellSOFC, FuelCellSOFC_RatedPower
+from .fuel_cell_PEM import FuelCellPEM, FuelCellPEM_RatedPower
