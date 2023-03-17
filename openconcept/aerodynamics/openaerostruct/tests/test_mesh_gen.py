@@ -5,6 +5,7 @@ import openmdao.api as om
 from openconcept.aerodynamics.openaerostruct.mesh_gen import (
     TrapezoidalPlanformMesh,
     SectionPlanformMesh,
+    ThicknessChordRatioInterp,
     cos_space,
     cos_space_deriv_start,
     cos_space_deriv_end,
@@ -316,6 +317,58 @@ class SectionPlanformMeshTestCase(unittest.TestCase):
         assert_near_equal(p.get_val("mesh", units="m")[:, :, 2], np.zeros_like(x_mesh))
 
         partials = p.check_partials(method="cs", out_stream=None, compact_print=True, show_only_incorrect=True)
+        assert_check_partials(partials)
+
+
+class ThicknessChordRatioInterpTestCase(unittest.TestCase):
+    def test_simple(self):
+        ny = 4
+        p = om.Problem()
+        p.model.add_subsystem("comp", ThicknessChordRatioInterp(num_y=ny, num_sections=2, cos_spacing=False), promotes=["*"])
+        p.setup(force_alloc_complex=True)
+
+        p.set_val("section_toverc", [1, 3])
+        p.run_model()
+
+        assert_near_equal(p.get_val("panel_toverc"), 1 + 2 * np.array([0.125, 0.375, 0.625, 0.875]))
+
+        partials = p.check_partials(method="cs")
+        assert_check_partials(partials)
+
+    def test_cos_spacing(self):
+        ny = 4
+        p = om.Problem()
+        p.model.add_subsystem("comp", ThicknessChordRatioInterp(num_y=ny, num_sections=2, cos_spacing=True), promotes=["*"])
+        p.setup(force_alloc_complex=True)
+
+        p.set_val("section_toverc", [3, 1])
+        p.run_model()
+
+        cos_spacing = cos_space(0, 1, ny + 1)
+        panel_toverc = 3 - (cos_spacing[:-1] + cos_spacing[1:])
+        assert_near_equal(p.get_val("panel_toverc"), panel_toverc)
+
+        partials = p.check_partials(method="cs")
+        assert_check_partials(partials)
+
+    def test_multiple_sections(self):
+        ny = np.array([2, 4, 1])
+        n_sec = 4
+        p = om.Problem()
+        p.model.add_subsystem("comp", ThicknessChordRatioInterp(num_y=ny, num_sections=n_sec, cos_spacing=True), promotes=["*"])
+        p.setup(force_alloc_complex=True)
+
+        sec_toverc = [0, 2, -2, 1]
+        p.set_val("section_toverc", sec_toverc)
+        p.run_model()
+
+        panel_toverc = []
+        for i_sec in range(n_sec - 1):
+            cos_spacing = cos_space(sec_toverc[i_sec], sec_toverc[i_sec + 1], ny[i_sec] + 1)
+            panel_toverc += list(0.5 * (cos_spacing[:-1] + cos_spacing[1:]))
+        assert_near_equal(p.get_val("panel_toverc"), panel_toverc)
+
+        partials = p.check_partials(method="cs")
         assert_check_partials(partials)
 
 
