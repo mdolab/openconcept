@@ -324,7 +324,9 @@ class ThicknessChordRatioInterpTestCase(unittest.TestCase):
     def test_simple(self):
         ny = 4
         p = om.Problem()
-        p.model.add_subsystem("comp", ThicknessChordRatioInterp(num_y=ny, num_sections=2, cos_spacing=False), promotes=["*"])
+        p.model.add_subsystem(
+            "comp", ThicknessChordRatioInterp(num_y=ny, num_sections=2, cos_spacing=False), promotes=["*"]
+        )
         p.setup(force_alloc_complex=True)
 
         p.set_val("section_toverc", [1, 3])
@@ -338,7 +340,9 @@ class ThicknessChordRatioInterpTestCase(unittest.TestCase):
     def test_cos_spacing(self):
         ny = 4
         p = om.Problem()
-        p.model.add_subsystem("comp", ThicknessChordRatioInterp(num_y=ny, num_sections=2, cos_spacing=True), promotes=["*"])
+        p.model.add_subsystem(
+            "comp", ThicknessChordRatioInterp(num_y=ny, num_sections=2, cos_spacing=True), promotes=["*"]
+        )
         p.setup(force_alloc_complex=True)
 
         p.set_val("section_toverc", [3, 1])
@@ -355,7 +359,9 @@ class ThicknessChordRatioInterpTestCase(unittest.TestCase):
         ny = np.array([2, 4, 1])
         n_sec = 4
         p = om.Problem()
-        p.model.add_subsystem("comp", ThicknessChordRatioInterp(num_y=ny, num_sections=n_sec, cos_spacing=True), promotes=["*"])
+        p.model.add_subsystem(
+            "comp", ThicknessChordRatioInterp(num_y=ny, num_sections=n_sec, cos_spacing=True), promotes=["*"]
+        )
         p.setup(force_alloc_complex=True)
 
         sec_toverc = [0, 2, -2, 1]

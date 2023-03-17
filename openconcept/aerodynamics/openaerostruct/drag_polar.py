@@ -6,7 +6,11 @@ import multiprocessing as mp
 
 # Atmospheric calculations
 from openconcept.atmospherics import TemperatureComp, PressureComp, DensityComp, SpeedOfSoundComp
-from openconcept.aerodynamics.openaerostruct.mesh_gen import TrapezoidalPlanformMesh, SectionPlanformMesh, ThicknessChordRatioInterp
+from openconcept.aerodynamics.openaerostruct.mesh_gen import (
+    TrapezoidalPlanformMesh,
+    SectionPlanformMesh,
+    ThicknessChordRatioInterp,
+)
 
 # Progress bar
 progress_bar = True
@@ -270,7 +274,7 @@ class VLMDragPolar(om.Group):
         # promote the thickness-to-chord ratio directly)
         VLM_promote_inputs = ["ac|aero|CD_nonwing", "fltcond|TempIncrement"]
         if geo == "mesh":
-            VLM_promote_inputs += "ac|geom|wing|toverc"
+            VLM_promote_inputs += ["ac|geom|wing|toverc"]
         else:
             self.connect("t_over_c_interp.panel_toverc", "training_data.ac|geom|wing|toverc")
 
@@ -279,7 +283,7 @@ class VLMDragPolar(om.Group):
             "training_data",
             VLMDataGen(
                 num_x=nx,
-                num_y=ny,
+                num_y=ny_tot - 1,
                 alpha_train=self.options["alpha_train"],
                 Mach_train=self.options["Mach_train"],
                 alt_train=self.options["alt_train"],
@@ -460,7 +464,11 @@ class VLMDataGen(om.ExplicitComponent):
 
         # If the inputs are unchaged, use the previously calculated values
         tol = 1e-13  # floating point comparison tolerance
-        if np.all(np.abs(mesh - VLMDataGen.mesh) < tol) and np.all(np.abs(toverc - VLMDataGen.toverc) < tol) and np.abs(temp_incr - VLMDataGen.temp_incr) < tol:
+        if (
+            np.all(np.abs(mesh - VLMDataGen.mesh) < tol)
+            and np.all(np.abs(toverc - VLMDataGen.toverc) < tol)
+            and np.abs(temp_incr - VLMDataGen.temp_incr) < tol
+        ):
             outputs["CL_train"] = VLMDataGen.CL
             outputs["CD_train"] = VLMDataGen.CD + CD_nonwing
             return

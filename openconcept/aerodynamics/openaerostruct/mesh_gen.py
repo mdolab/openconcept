@@ -413,7 +413,7 @@ class SectionPlanformMesh(om.ExplicitComponent):
 class ThicknessChordRatioInterp(om.ExplicitComponent):
     """
     Linearly interpolate thickness to chord ratio defined at each section.
-    Take the average of the 
+    Take the average of the
 
     Inputs
     ------
@@ -450,7 +450,9 @@ class ThicknessChordRatioInterp(om.ExplicitComponent):
             types=(int, list, tuple, np.ndarray),
             desc="Number of spanwise mesh points per trapezoidal region",
         )
-        self.options.declare("num_sections", default=2, types=int, desc="Number of defined sections along the half span")
+        self.options.declare(
+            "num_sections", default=2, types=int, desc="Number of defined sections along the half span"
+        )
         self.options.declare("cos_spacing", default=True, types=bool, desc="Mesh is cosine spaced within each region")
 
     def setup(self):
@@ -489,19 +491,27 @@ class ThicknessChordRatioInterp(om.ExplicitComponent):
                 dnodal_dend = np.linspace(0, 1, ny + 1)
 
             # For each panel's t/c, take the average of the nodal t/c's on the panel's two sides
-            dpanel_dsection_rows[idx_partial_vec:idx_partial_vec + ny] = np.arange(y_prev, y_prev + ny)
-            dpanel_dsection_cols[idx_partial_vec:idx_partial_vec + ny] = i_sec
-            dpanel_dsection_vals[idx_partial_vec:idx_partial_vec + ny] = 0.5 * (dnodal_dstart[:-1] + dnodal_dstart[1:])
+            dpanel_dsection_rows[idx_partial_vec : idx_partial_vec + ny] = np.arange(y_prev, y_prev + ny)
+            dpanel_dsection_cols[idx_partial_vec : idx_partial_vec + ny] = i_sec
+            dpanel_dsection_vals[idx_partial_vec : idx_partial_vec + ny] = 0.5 * (
+                dnodal_dstart[:-1] + dnodal_dstart[1:]
+            )
             idx_partial_vec += ny
 
-            dpanel_dsection_rows[idx_partial_vec:idx_partial_vec + ny] = np.arange(y_prev, y_prev + ny)
-            dpanel_dsection_cols[idx_partial_vec:idx_partial_vec + ny] = i_sec + 1
-            dpanel_dsection_vals[idx_partial_vec:idx_partial_vec + ny] = 0.5 * (dnodal_dend[:-1] + dnodal_dend[1:])
+            dpanel_dsection_rows[idx_partial_vec : idx_partial_vec + ny] = np.arange(y_prev, y_prev + ny)
+            dpanel_dsection_cols[idx_partial_vec : idx_partial_vec + ny] = i_sec + 1
+            dpanel_dsection_vals[idx_partial_vec : idx_partial_vec + ny] = 0.5 * (dnodal_dend[:-1] + dnodal_dend[1:])
             idx_partial_vec += ny
 
             y_prev += ny
 
-        self.declare_partials("panel_toverc", "section_toverc", rows=dpanel_dsection_rows, cols=dpanel_dsection_cols, val=dpanel_dsection_vals)
+        self.declare_partials(
+            "panel_toverc",
+            "section_toverc",
+            rows=dpanel_dsection_rows,
+            cols=dpanel_dsection_cols,
+            val=dpanel_dsection_vals,
+        )
 
     def compute(self, inputs, outputs):
         tc_section = inputs["section_toverc"]
@@ -517,7 +527,7 @@ class ThicknessChordRatioInterp(om.ExplicitComponent):
                 tc_nodal = np.linspace(tc_section[i_sec], tc_section[i_sec + 1], ny + 1, dtype=tc_section.dtype)
 
             # For each panel's t/c, take the average of the nodal t/c's on the panel's two sides
-            outputs["panel_toverc"][y_prev:y_prev + ny] = 0.5 * (tc_nodal[:-1] + tc_nodal[1:])
+            outputs["panel_toverc"][y_prev : y_prev + ny] = 0.5 * (tc_nodal[:-1] + tc_nodal[1:])
 
             y_prev += ny
 
