@@ -110,6 +110,9 @@ class VLMDragPolar(om.Group):
     -------
     drag : float
         Drag force (vector, Newtons)
+    twisted_mesh : float
+        OpenAeroStruct mesh that has been twisted according to twist inputs; is unchanged from the
+        input mesh if geometry options is set to \"mesh\" (num_x + 1 x num_y + 1 x 3 vector, m)
 
     Options
     -------
@@ -155,9 +158,16 @@ class VLMDragPolar(om.Group):
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of analysis points to run")
-        self.options.declare("geometry", default="trapezoidal", values=["trapezoidal", "section", "mesh"], desc="OpenAeroStruct mesh parameterization")
+        self.options.declare(
+            "geometry",
+            default="trapezoidal",
+            values=["trapezoidal", "section", "mesh"],
+            desc="OpenAeroStruct mesh parameterization",
+        )
         self.options.declare("num_x", default=2, desc="Number of streamwise mesh panels")
-        self.options.declare("num_y", default=6, types=(int, list, tuple, np.ndarray), desc="Number of spanwise (half wing) mesh panels")
+        self.options.declare(
+            "num_y", default=6, types=(int, list, tuple, np.ndarray), desc="Number of spanwise (half wing) mesh panels"
+        )
         self.options.declare(
             "num_sections", default=2, types=int, desc="Number of sections along the half span to define"
         )
@@ -168,10 +178,10 @@ class VLMDragPolar(om.Group):
             desc="List of Mach number training values (dimensionless)",
         )
         self.options.declare(
-            "alpha_train", default=np.linspace(-10, 15, 4), desc="List of angle of attack training values (degrees)"
+            "alpha_train", default=np.linspace(-10, 15, 6), desc="List of angle of attack training values (degrees)"
         )
         self.options.declare(
-            "alt_train", default=np.linspace(0, 12e3, 2), desc="List of altitude training values (meters)"
+            "alt_train", default=np.linspace(0, 12e3, 4), desc="List of altitude training values (meters)"
         )
         self.options.declare("surf_options", default={}, desc="Dictionary of OpenAeroStruct surface options")
 
@@ -232,10 +242,15 @@ class VLMDragPolar(om.Group):
             promotes_inputs=[("twist_cp", "ac|geom|wing|twist")],
         )
         comp.add_spline(y_cp_name="twist_cp", y_interp_name="twist", y_units="deg")
-        self.set_input_defaults("ac|geom|wing|twist", 0.0, units="deg")
+        self.set_input_defaults("ac|geom|wing|twist", np.zeros(n_twist), units="deg")
 
         # Apply twist spline to mesh
-        self.add_subsystem("twist_mesh", Rotate(val=np.zeros(ny), mesh_shape=(nx, ny, 3), symmetry=True), promotes_inputs=[("in_mesh", "ac|geom|wing|OAS_mesh")])
+        self.add_subsystem(
+            "twist_mesh",
+            Rotate(val=np.zeros(ny_tot), mesh_shape=(nx + 1, ny_tot, 3), symmetry=True),
+            promotes_inputs=[("in_mesh", "ac|geom|wing|OAS_mesh")],
+            promotes_outputs=[("mesh", "twisted_mesh")],
+        )
         self.connect("twist_bsp.twist", "twist_mesh.twist")
 
         # Training data
@@ -254,7 +269,7 @@ class VLMDragPolar(om.Group):
                 "fltcond|TempIncrement",
             ],
         )
-        self.connect("twist_mesh.mesh", "training_data.ac|geom|wing|OAS_mesh")
+        self.connect("twisted_mesh", "training_data.ac|geom|wing|OAS_mesh")
 
         # Surrogate model
         interp = om.MetaModelStructuredComp(
@@ -294,6 +309,9 @@ class VLMDragPolar(om.Group):
             promotes_outputs=["drag"],
         )
         self.connect("aero_surrogate.CD", "drag_calc.CD")
+
+        # Set input defaults for inputs promoted from different places with different values
+        self.set_input_defaults("ac|geom|wing|S_ref", 1.0, units="m**2")
 
 
 class VLMDataGen(om.ExplicitComponent):
@@ -418,10 +436,7 @@ class VLMDataGen(om.ExplicitComponent):
 
         # If the inputs are unchaged, use the previously calculated values
         tol = 1e-13  # floating point comparison tolerance
-        if (
-            np.all(np.abs(mesh - VLMDataGen.mesh) < tol)
-            and np.abs(temp_incr - VLMDataGen.temp_incr) < tol
-        ):
+        if np.all(np.abs(mesh - VLMDataGen.mesh) < tol) and np.abs(temp_incr - VLMDataGen.temp_incr) < tol:
             outputs["CL_train"] = VLMDataGen.CL
             outputs["CD_train"] = VLMDataGen.CD + CD_nonwing
             return
@@ -573,6 +588,7 @@ def compute_aerodynamic_data(point):
     p.model.set_input_defaults("fltcond|TempIncrement", val=inputs["TempIncrement"], units="degC")
     p.model.set_input_defaults("ac|geom|wing|OAS_mesh", val=inputs["mesh"], units="m")
     from time import time
+
     t_start = time()
     p.setup(mode="rev")
     print(f"Setup in {time() - t_start} sec")
@@ -580,7 +596,6 @@ def compute_aerodynamic_data(point):
     p.set_val("fltcond|M", point[0])
     p.set_val("fltcond|alpha", point[1], units="deg")
     p.set_val("fltcond|h", point[2], units="m")
-
 
     t_start = time()
     p.run_model()
@@ -773,7 +788,7 @@ class VLM(om.Group):
         )
         self.promotes(
             subsys_name="aero_point",
-            inputs=[(f"aero_states.{self.surf_dict['name']}_def_mesh", "ac|geom|wing|OAS_mesh")]
+            inputs=[(f"aero_states.{self.surf_dict['name']}_def_mesh", "ac|geom|wing|OAS_mesh")],
         )
 
         # Set input defaults for inputs that go to multiple locations
@@ -792,7 +807,9 @@ class VLM(om.Group):
                 val=self.surf_dict["t_over_c"] * np.ones(self.options["num_y"]),
             )
         elif self.surf_dict["t_over_c"].size == self.options["num_y"]:
-            self.set_input_defaults(f"aero_point.{self.surf_dict['name']}_perf.t_over_c", val=self.surf_dict["t_over_c"])
+            self.set_input_defaults(
+                f"aero_point.{self.surf_dict['name']}_perf.t_over_c", val=self.surf_dict["t_over_c"]
+            )
         else:
             raise ValueError(
                 f"t_over_c in the surface dict must be either a number or an ndarray "
@@ -861,17 +878,12 @@ def example_usage():
 
     # Call OpenAeroStruct at the same flight condition to compare
     prob = om.Problem()
-    prob.model.add_subsystem("model", VLM(num_x=num_x, num_y=num_y, num_twist=n_twist), promotes=["*"])
+    prob.model.add_subsystem("model", VLM(num_x=num_x, num_y=num_y), promotes=["*"])
 
     prob.setup()
 
-    # Set values
-    # Geometry
-    prob.set_val("ac|geom|wing|S_ref", S, units="m**2")
-    prob.set_val("ac|geom|wing|AR", AR)
-    prob.set_val("ac|geom|wing|taper", taper)
-    prob.set_val("ac|geom|wing|c4sweep", sweep, units="deg")
-    prob.set_val("ac|geom|wing|twist", twist, units="deg")
+    # Set mesh value
+    prob.set_val("ac|geom|wing|OAS_mesh", p.get_val("twisted_mesh", units="m"), units="m")
 
     # Flight condition
     prob.set_val("fltcond|M", M)
