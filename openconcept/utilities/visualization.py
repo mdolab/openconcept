@@ -170,7 +170,9 @@ def plot_OAS_mesh(OAS_mesh, ax=None, set_xlim=True, turn_off_axis=True):
         return fig, ax
 
 
-def plot_OAS_force_contours(OAS_mesh, panel_forces, ax=None, set_xlim=True, turn_off_axis=True, wing="both", force_dir=2, **contourf_kwargs):
+def plot_OAS_force_contours(
+    OAS_mesh, panel_forces, ax=None, set_xlim=True, turn_off_axis=True, wing="both", force_dir=2, **contourf_kwargs
+):
     """
     Plots contours of the force per area on the surface of the wing. The units are
     the force units of panel_forces divided by the square of the lenght units of OAS_mesh.
@@ -205,10 +207,10 @@ def plot_OAS_force_contours(OAS_mesh, panel_forces, ax=None, set_xlim=True, turn
         If ax is not specified, returns the created figure and axis.
     """
     if wing not in ["left", "right", "both"]:
-        raise ValueError(f"\"{wing}\" is not a valid value for wing, must be \"left\", \"right\", or \"both\"")
+        raise ValueError(f'"{wing}" is not a valid value for wing, must be "left", "right", or "both"')
     if force_dir not in [0, 1, 2]:
         raise ValueError("force_dir must be either 0, 1, or 2")
-    
+
     x_mesh = OAS_mesh[:, :, 0]
     y_mesh = OAS_mesh[:, :, 1]
     chord_wing_front = x_mesh[0, :]
@@ -241,8 +243,8 @@ def plot_OAS_force_contours(OAS_mesh, panel_forces, ax=None, set_xlim=True, turn
     panel_pressures = panel_forces[:, :, force_dir] / panel_areas
 
     # Expand the panel forces to be at individual mesh points
-    le_wt=0.75 * 0.5
-    te_wt=0.25 * 0.5
+    le_wt = 0.75 * 0.5
+    te_wt = 0.25 * 0.5
     nodal_pressures = np.zeros_like(x_mesh)
     nodal_pressures[:-1, :-1] += panel_pressures * le_wt
     nodal_pressures[1:, :-1] += panel_pressures * te_wt
