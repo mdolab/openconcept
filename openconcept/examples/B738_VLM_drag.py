@@ -14,7 +14,7 @@ Please cite it if you use this for your own publication!
 }
 
 Eytan Adler (Jan 2022)
-"""
+"""  # noqa
 
 import numpy as np
 
