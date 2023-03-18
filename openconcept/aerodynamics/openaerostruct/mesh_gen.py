@@ -158,23 +158,25 @@ class SectionPlanformMesh(om.ExplicitComponent):
     spanwise direction within each trapezoidal region of the wing defined by
     pairs of section properties.
 
-                                       ----> +y
-                                      |
-                                      |
-                                      v +x
+    .. code-block:: text
 
-      _     Section 1       Section 2     _
-     |                  |          _-'     |
-     |                  |       _-'        |
-     |                  |    _-'           |
-     |                    _-'            chord_sec
-    x_LE_sec           _-'                 |
-     |              _-'                    |
-     |           _-'   _--------------    _|
-     |        _-'   _-'
-     |_    _-'   _-'    |--- y_sec ---|
-          |   _-'
-          |_-'
+                                          ----> +y
+                                         |
+                                         |
+                                         v +x
+
+         _     Section 1       Section 2     _
+        |                  |          _-'     |
+        |                  |       _-'        |
+        |                  |    _-'           |
+        |                    _-'            chord_sec
+       x_LE_sec           _-'                 |
+        |              _-'                    |
+        |           _-'   _--------------    _|
+        |        _-'   _-'
+        |_    _-'   _-'    |--- y_sec ---|
+             |   _-'
+             |_-'
 
     Inputs
     ------
