@@ -316,6 +316,7 @@ class HeatPipeVaporTempDrop(ExplicitComponent):
     -------
     num_nodes : int
         Number of analysis points to run, default 1 (scalar, dimensionless)
+
     Other options shouldn't be adjusted since they're for ammonia and there is a
     hardcoded curve fit also for ammonia in the compute method
     """

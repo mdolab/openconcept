@@ -78,7 +78,7 @@ class ElementMultiplyDivideComp(ExplicitComponent):
         input_units : iterable of str
             Units for each of the input vectors in order.
             Output units will be dimensionally consistent.
-        **kwargs : str
+        kwargs : str
             Any other arguments to pass to the addition system
             (same as add_output method for ExplicitComponent)
             Examples include units (str or None), desc (str)

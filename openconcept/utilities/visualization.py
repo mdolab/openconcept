@@ -196,7 +196,7 @@ def plot_OAS_force_contours(
     force_dir : int (optional)
         Force direction of which to plot contours. 0 is x force (drag direction),
         1 is y force (spanwise inward), and 2 is z force (lift direction).
-    **contourf_kwargs
+    contourf_kwargs
         Any keyword arguments to pass to matplotlib's contourf function.
 
     Returns
