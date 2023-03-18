@@ -214,7 +214,7 @@ class SectionPlanformMesh(om.ExplicitComponent):
         Number of spanwise sections to define planform shape (scalar, dimensionless)
     scale_area : bool
         Scale the mesh to match a planform area provided as an input
-    """
+    """ # noqa
 
     def initialize(self):
         self.options.declare("num_x", default=3, types=int, desc="Number of streamwise mesh points")
