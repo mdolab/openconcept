@@ -150,7 +150,9 @@ class SectionPlanformMesh(om.ExplicitComponent):
 
     The sectional properties (x offset, y value, and chord) are nondimensional,
     but their relative magnitudes reflect the actual shape. The full planform
-    is scaled to match the requested planform area.
+    is scaled to match the requested planform area. Optionally, this scaling
+    can be turned off (by setting scale_area=False) and the planform area is
+    then computed as an output.
 
     The mesh points are cosine spaced in the chordwise direction and in the
     spanwise direction within each trapezoidal region of the wing defined by
@@ -177,24 +179,26 @@ class SectionPlanformMesh(om.ExplicitComponent):
     Inputs
     ------
     S: float
-        full planform area (scalar, m^2)
+        Full planform area; only an input when scale_area is True (the default) (scalar, m^2)
     x_LE_sec : float
         Streamwise offset of the section's leading edge, starting with the outboard
         section (wing tip) and moving inboard toward the root (vector of length
-        num_sections, dimensionless)
+        num_sections, m)
     y_sec : float
         Spanwise location of each section, starting with the outboard section (wing
         tip) at the MOST NEGATIVE y value and moving inboard (increasing y value)
         toward the root; the user does not provide a value for the root because it
-        is always 0.0 (vector of length num_sections - 1, dimensionless)
+        is always 0.0 (vector of length num_sections - 1, m)
     chord_sec : float
         Chord of each section, starting with the outboard section (wing tip) and
-        moving inboard toward the root (vector of length num_sections, dimensionless)
+        moving inboard toward the root (vector of length num_sections, m)
 
     Outputs
     -------
     mesh: ndarray
         OpenAeroStruct 3D mesh (num_x + 1 x sum(num_y) + 1 x 3 ndarray, m)
+    S: float
+        Full planform area; only an output when scale_area is False (scalar, m^2)
 
     Options
     -------
@@ -208,6 +212,8 @@ class SectionPlanformMesh(om.ExplicitComponent):
         region (scalar or vector, dimensionless)
     num_sections : int
         Number of spanwise sections to define planform shape (scalar, dimensionless)
+    scale_area : bool
+        Scale the mesh to match a planform area provided as an input
     """
 
     def initialize(self):
@@ -221,6 +227,7 @@ class SectionPlanformMesh(om.ExplicitComponent):
         self.options.declare(
             "num_sections", default=2, types=int, desc="Number of sections along the half span to define"
         )
+        self.options.declare("scale_area", default=True, types=bool, desc="Scale the planform area")
 
     def setup(self):
         # Process mesh resolution options
@@ -238,10 +245,17 @@ class SectionPlanformMesh(om.ExplicitComponent):
                 raise ValueError("If specified as an iterable, the num_y option must have a length of num_sections")
             self.ny = [int(x) for x in num_y]  # cast anything that's not an integer to an integer
 
-        self.add_input("S", val=10, units="m**2")
-        self.add_input("x_LE_sec", val=0, shape=(self.n_sec,))
-        self.add_input("y_sec", val=np.linspace(-5, 0, self.n_sec)[:-1], shape=(self.n_sec - 1,))
-        self.add_input("chord_sec", val=1, shape=(self.n_sec,))
+        self.scale = self.options["scale_area"]
+
+        self.add_input("x_LE_sec", val=0, shape=(self.n_sec,), units="m")
+        self.add_input("y_sec", val=np.linspace(-5, 0, self.n_sec)[:-1], shape=(self.n_sec - 1,), units="m")
+        self.add_input("chord_sec", val=1, shape=(self.n_sec,), units="m")
+        if self.scale:
+            self.add_input("S", val=10, units="m**2")
+            self.declare_partials("mesh", "S")
+        else:
+            self.add_output("S", val=10, units="m**2")
+            self.declare_partials("S", ["y_sec", "chord_sec"])
 
         # Generate default mesh
         self.ny_tot = np.sum(self.ny) + 1
@@ -322,11 +336,10 @@ class SectionPlanformMesh(om.ExplicitComponent):
         # they're ~2/3 nonzero regardless of mesh size; still might be better to make y_sec and chord_sec
         # zero since derivatives of all z values are zero and the Jacobian will end up as a sparse data
         # structure under the hood
-        self.declare_partials("mesh", ["y_sec", "chord_sec", "S"])
+        self.declare_partials("mesh", ["y_sec", "chord_sec"])
         self.declare_partials("mesh", "x_LE_sec", rows=dmesh_dxLEsec_rows, cols=dmesh_dxLEsec_cols)
 
     def compute(self, inputs, outputs):
-        S = inputs["S"].item()
         x_sec = inputs["x_LE_sec"]
         y_sec = np.hstack((inputs["y_sec"], 0))
         c_sec = inputs["chord_sec"]
@@ -365,10 +378,12 @@ class SectionPlanformMesh(om.ExplicitComponent):
 
         # Scale the mesh by the reference area
         A *= 2  # we're only doing a half wing, so double to get total area
-        outputs["mesh"] *= (S / A) ** 0.5
+        if self.scale:
+            outputs["mesh"] *= (inputs["S"] / A) ** 0.5
+        else:
+            outputs["S"] = A
 
     def compute_partials(self, inputs, partials):
-        S = inputs["S"].item()
         y_sec = np.hstack((inputs["y_sec"], 0))
         c_sec = inputs["chord_sec"]
 
@@ -400,14 +415,21 @@ class SectionPlanformMesh(om.ExplicitComponent):
         A *= 2  # we're only doing a half wing, so double to get total area
         dA_dysec *= 2
         dA_dcsec *= 2
-        coeff = (S / A) ** 0.5
-        for var in ["y_sec", "chord_sec", "x_LE_sec"]:
-            partials["mesh", var] *= coeff
-        partials["mesh", "y_sec"] += np.outer(-0.5 * self.unscaled_flattened_mesh * S**0.5 * A ** (-1.5), dA_dysec)
-        partials["mesh", "chord_sec"] += np.outer(
-            -0.5 * self.unscaled_flattened_mesh * S**0.5 * A ** (-1.5), dA_dcsec
-        )
-        partials["mesh", "S"] = 0.5 * S ** (-0.5) / A**0.5 * self.unscaled_flattened_mesh
+        if self.scale:
+            S = inputs["S"].item()
+            coeff = (S / A) ** 0.5
+            for var in ["y_sec", "chord_sec", "x_LE_sec"]:
+                partials["mesh", var] *= coeff
+            partials["mesh", "y_sec"] += np.outer(
+                -0.5 * self.unscaled_flattened_mesh * S**0.5 * A ** (-1.5), dA_dysec
+            )
+            partials["mesh", "chord_sec"] += np.outer(
+                -0.5 * self.unscaled_flattened_mesh * S**0.5 * A ** (-1.5), dA_dcsec
+            )
+            partials["mesh", "S"] = 0.5 * S ** (-0.5) / A**0.5 * self.unscaled_flattened_mesh
+        else:
+            partials["S", "y_sec"] = dA_dysec
+            partials["S", "chord_sec"] = dA_dcsec
 
 
 class ThicknessChordRatioInterp(om.ExplicitComponent):

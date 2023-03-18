@@ -97,18 +97,18 @@ class VLMDragPolar(om.Group):
             - **ac|geom|wing|toverc** *(float)* - Wing tip and wing root airfoil thickness to chord ratio in that order; panel
               thickness to chord ratios are linearly interpolated between the tip and root (vector of length 2, dimensionless)
 
-        If geometry option is \"section\"
+        If geometry option is \"section\" (despite inputs in m, they are scaled to provided planform area)
             - **ac|geom|wing|x_LE_sec** *(float)* - Streamwise offset of the section's leading edge, starting with the outboard
               section (wing tip) and moving inboard toward the root (vector of length
-              num_sections, dimensionless)
+              num_sections, m)
             - **ac|geom|wing|y_sec** *(float)* - Spanwise location of each section, starting with the outboard section (wing
               tip) at the MOST NEGATIVE y value and moving inboard (increasing y value)
               toward the root; the user does not provide a value for the root because it
-              is always 0.0 (vector of length num_sections - 1, dimensionless)
+              is always 0.0 (vector of length num_sections - 1, m)
             - **ac|geom|wing|chord_sec** *(float)* - Chord of each section, starting with the outboard section (wing tip) and
-              moving inboard toward the root (vector of length num_sections, dimensionless)
+              moving inboard toward the root (vector of length num_sections, m)
             - **ac|geom|wing|toverc** *(float)* - Thickness to chord ratio of the airfoil at each defined section starting at the wing tip
-              and moving wing root airfoil; panel thickness to chord ratios is linearly interpolated (vector of length num_sections, dimensionless)
+              and moving wing root airfoil; panel thickness to chord ratios is linearly interpolated (vector of length num_sections, m)
 
         If geometry option is \"mesh\"
             - **ac|geom|wing|OAS_mesh** *(float)* - OpenAeroStruct 3D mesh (num_x + 1 x num_y + 1 x 3 vector, m)
@@ -222,7 +222,7 @@ class VLMDragPolar(om.Group):
         elif geo == "section":
             self.add_subsystem(
                 "gen_mesh",
-                SectionPlanformMesh(num_x=nx, num_y=ny, num_sections=self.options["num_sections"]),
+                SectionPlanformMesh(num_x=nx, num_y=ny, num_sections=self.options["num_sections"], scale_area=True),
                 promotes_inputs=[
                     ("S", "ac|geom|wing|S_ref"),
                     ("x_LE_sec", "ac|geom|wing|x_LE_sec"),

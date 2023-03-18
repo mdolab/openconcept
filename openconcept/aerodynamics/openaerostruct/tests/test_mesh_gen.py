@@ -214,6 +214,25 @@ class SectionPlanformMeshTestCase(unittest.TestCase):
         partials = p.check_partials(method="cs", out_stream=None, compact_print=True, show_only_incorrect=True)
         assert_check_partials(partials)
 
+    def test_scale_area_off(self):
+        p = om.Problem()
+        p.model.add_subsystem(
+            "comp", SectionPlanformMesh(num_x=3, num_y=3, num_sections=3, scale_area=False), promotes=["*"]
+        )
+        p.setup(force_alloc_complex=True)
+
+        p.set_val("S", 2.0, units="m**2")
+        p.set_val("x_LE_sec", [2, 0.2, 0.0], units="m")
+        p.set_val("y_sec", [-1.0, -0.2], units="m")
+        p.set_val("chord_sec", [0.2, 0.4, 0.4], units="m")
+
+        p.run_model()
+
+        assert_near_equal(p.get_val("S", units="m**2"), 2 * (0.3 * 0.8 + 0.4 * 0.2))
+
+        partials = p.check_partials(method="cs", out_stream=None, compact_print=True, show_only_incorrect=True)
+        assert_check_partials(partials)
+
     def test_chordwise_cos_spacing(self):
         nx = 7
         ny = 2
