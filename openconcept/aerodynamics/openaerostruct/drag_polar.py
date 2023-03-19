@@ -6,10 +6,11 @@ import multiprocessing as mp
 
 # Atmospheric calculations
 from openconcept.atmospherics import TemperatureComp, PressureComp, DensityComp, SpeedOfSoundComp
-from openconcept.aerodynamics.openaerostruct.mesh_gen import (
+from openconcept.aerodynamics.openaerostruct import (
     TrapezoidalPlanformMesh,
     SectionPlanformMesh,
     ThicknessChordRatioInterp,
+    SectionLinearInterp,
 )
 
 # Progress bar
@@ -76,8 +77,6 @@ class VLMDragPolar(om.Group):
         Dynamic pressure (vector, Pascals)
     ac|geom|wing|S_ref : float
         Full planform area (scalar, m^2)
-    ac|geom|wing|twist : float
-        List of twist angles at control points of spline (vector of length num_twist, degrees)
     ac|aero|CD_nonwing : float
         Drag coefficient of components other than the wing; e.g. fuselage,
         tail, interference drag, etc.; this value is simply added to the
@@ -96,6 +95,7 @@ class VLMDragPolar(om.Group):
             - **ac|geom|wing|c4sweep** *(float)* - Quarter chord sweep angle (scalar, degrees)
             - **ac|geom|wing|toverc** *(float)* - Wing tip and wing root airfoil thickness to chord ratio in that order; panel
               thickness to chord ratios are linearly interpolated between the tip and root (vector of length 2, dimensionless)
+            - **ac|geom|wing|twist** *(float)* - Twist at spline control points, ordered from tip to root (vector of length num_twist, degrees)
 
         If geometry option is \"section\" (despite inputs in m, they are scaled to provided planform area)
             - **ac|geom|wing|x_LE_sec** *(float)* - Streamwise offset of the section's leading edge, starting with the outboard
@@ -109,6 +109,7 @@ class VLMDragPolar(om.Group):
               moving inboard toward the root (vector of length num_sections, m)
             - **ac|geom|wing|toverc** *(float)* - Thickness to chord ratio of the airfoil at each defined section starting at the wing tip
               and moving wing root airfoil; panel thickness to chord ratios is linearly interpolated (vector of length num_sections, m)
+            - **ac|geom|wing|twist** *(float)* - Twist at each section, ordered from tip to root (vector of length num_sections, degrees)
 
         If geometry option is \"mesh\"
             - **ac|geom|wing|OAS_mesh** *(float)* - OpenAeroStruct 3D mesh (num_x + 1 x num_y + 1 x 3 vector, m)
@@ -120,8 +121,8 @@ class VLMDragPolar(om.Group):
     drag : float
         Drag force (vector, Newtons)
     twisted_mesh : float
-        OpenAeroStruct mesh that has been twisted according to twist inputs; is unchanged from the
-        input mesh if geometry options is set to \"mesh\" (num_x + 1 x num_y + 1 x 3 vector, m)
+        OpenAeroStruct mesh that has been twisted according to twist inputs; only an output if geometry options
+        is set to \"trapezoidal\" or \"section\" (num_x + 1 x num_y + 1 x 3 vector, m)
 
     Options
     -------
@@ -145,7 +146,9 @@ class VLMDragPolar(om.Group):
         Only if geometry option is \"section\", this represents the number of spanwise sections
         to define planform shape. This parameter is ignored for other geometry options (scalar, dimensionless)
     num_twist : int
-        Number of spline control points for twist (scalar, dimensionless)
+        Number of spline control points for twist, only used if geometry is set to \"trapezoidal\" because
+        \"mesh\" linearly interpolates twist between sections and \"mesh\" does not provide twist
+        functionality (scalar, dimensionless)
     alpha_train : list or ndarray
         List of angle of attack values at which to train the model (ndarray, degrees)
     Mach_train : list or ndarray
@@ -183,15 +186,24 @@ class VLMDragPolar(om.Group):
         self.options.declare(
             "Mach_train",
             default=np.array([0.1, 0.3, 0.45, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9]),
+            types=(list, np.ndarray),
             desc="List of Mach number training values (dimensionless)",
         )
         self.options.declare(
-            "alpha_train", default=np.linspace(-10, 15, 6), desc="List of angle of attack training values (degrees)"
+            "alpha_train",
+            default=np.linspace(-10, 15, 6),
+            types=(list, np.ndarray),
+            desc="List of angle of attack training values (degrees)",
         )
         self.options.declare(
-            "alt_train", default=np.linspace(0, 12e3, 4), desc="List of altitude training values (meters)"
+            "alt_train",
+            default=np.linspace(0, 12e3, 4),
+            types=(list, np.ndarray),
+            desc="List of altitude training values (meters)",
         )
-        self.options.declare("surf_options", default={}, desc="Dictionary of OpenAeroStruct surface options")
+        self.options.declare(
+            "surf_options", default={}, types=(dict), desc="Dictionary of OpenAeroStruct surface options"
+        )
 
     def setup(self):
         nn = self.options["num_nodes"]
@@ -203,7 +215,15 @@ class VLMDragPolar(om.Group):
         n_Mach = self.options["Mach_train"].size
         n_alt = self.options["alt_train"].size
 
-        # Generate the mesh if geometry parameterization says we should
+        # Get the total number of y coordinates if it's not a scalar
+        if geo == "section" and isinstance(ny, int):
+            ny_tot = (self.options["num_sections"] - 1) * ny + 1
+        elif not isinstance(ny, int):
+            ny_tot = np.sum(ny) + 1
+        else:
+            ny_tot = ny + 1
+
+        # Generate the mesh if geometry parameterization says we should and twist it
         if geo == "trapezoidal":
             if not isinstance(ny, int):
                 raise ValueError("The num_y option must be an integer if the geometry option is trapezoidal")
@@ -219,6 +239,29 @@ class VLMDragPolar(om.Group):
                 ],
                 promotes_outputs=[("mesh", "ac|geom|wing|OAS_mesh")],
             )
+
+            # Compute the twist at mesh y-coordinates
+            comp = self.add_subsystem(
+                "twist_bsp",
+                om.SplineComp(
+                    method="bsplines",
+                    x_interp_val=np.linspace(0, 1, ny_tot),
+                    num_cp=n_twist,
+                    interp_options={"order": min(n_twist, 4)},
+                ),
+                promotes_inputs=[("twist_cp", "ac|geom|wing|twist")],
+            )
+            comp.add_spline(y_cp_name="twist_cp", y_interp_name="twist", y_units="deg")
+            self.set_input_defaults("ac|geom|wing|twist", np.zeros(n_twist), units="deg")
+
+            # Apply twist spline to mesh
+            self.add_subsystem(
+                "twist_mesh",
+                Rotate(val=np.zeros(ny_tot), mesh_shape=(nx + 1, ny_tot, 3), symmetry=True),
+                promotes_inputs=[("in_mesh", "ac|geom|wing|OAS_mesh")],
+                promotes_outputs=[("mesh", "twisted_mesh")],
+            )
+            self.connect("twist_bsp.twist", "twist_mesh.twist")
         elif geo == "section":
             self.add_subsystem(
                 "gen_mesh",
@@ -232,6 +275,23 @@ class VLMDragPolar(om.Group):
                 promotes_outputs=[("mesh", "ac|geom|wing|OAS_mesh")],
             )
 
+            # Compute the twist at mesh y-coordinates
+            self.add_subsystem(
+                "twist_sec",
+                SectionLinearInterp(num_y=ny, num_sections=self.options["num_sections"], units="deg", cos_spacing=True),
+                promotes_inputs=[("property_sec", "ac|geom|wing|twist")],
+            )
+            self.set_input_defaults("ac|geom|wing|twist", np.zeros(self.options["num_sections"]), units="deg")
+
+            # Apply twist spline to mesh
+            self.add_subsystem(
+                "twist_mesh",
+                Rotate(val=np.zeros(ny_tot), mesh_shape=(nx + 1, ny_tot, 3), symmetry=True),
+                promotes_inputs=[("in_mesh", "ac|geom|wing|OAS_mesh")],
+                promotes_outputs=[("mesh", "twisted_mesh")],
+            )
+            self.connect("twist_sec.property_node", "twist_mesh.twist")
+
         # Interpolate the thickness to chord ratios for each panel
         if geo in ["trapezoidal", "section"]:
             n_sections = self.options["num_sections"] if geo == "section" else 2
@@ -241,42 +301,14 @@ class VLMDragPolar(om.Group):
                 promotes_inputs=[("section_toverc", "ac|geom|wing|toverc")],
             )
 
-        # Get the total number of y coordinates if it's not a scalar
-        if geo == "section" and isinstance(ny, int):
-            ny_tot = (self.options["num_sections"] - 1) * ny + 1
-        elif not isinstance(ny, int):
-            ny_tot = np.sum(ny) + 1
-        else:
-            ny_tot = ny + 1
-
-        # Add bspline component for twist
-        x_interp = np.linspace(0.0, 1.0, ny_tot)
-        comp = self.add_subsystem(
-            "twist_bsp",
-            om.SplineComp(
-                method="bsplines", x_interp_val=x_interp, num_cp=n_twist, interp_options={"order": min(n_twist, 4)}
-            ),
-            promotes_inputs=[("twist_cp", "ac|geom|wing|twist")],
-        )
-        comp.add_spline(y_cp_name="twist_cp", y_interp_name="twist", y_units="deg")
-        self.set_input_defaults("ac|geom|wing|twist", np.zeros(n_twist), units="deg")
-
-        # Apply twist spline to mesh
-        self.add_subsystem(
-            "twist_mesh",
-            Rotate(val=np.zeros(ny_tot), mesh_shape=(nx + 1, ny_tot, 3), symmetry=True),
-            promotes_inputs=[("in_mesh", "ac|geom|wing|OAS_mesh")],
-            promotes_outputs=[("mesh", "twisted_mesh")],
-        )
-        self.connect("twist_bsp.twist", "twist_mesh.twist")
-
         # Inputs to promote from the calls to OpenAeroStruct (if geometry is "mesh",
         # promote the thickness-to-chord ratio directly)
         VLM_promote_inputs = ["ac|aero|CD_nonwing", "fltcond|TempIncrement"]
         if geo == "mesh":
-            VLM_promote_inputs += ["ac|geom|wing|toverc"]
+            VLM_promote_inputs += ["ac|geom|wing|toverc", "ac|geom|wing|OAS_mesh"]
         else:
             self.connect("t_over_c_interp.panel_toverc", "training_data.ac|geom|wing|toverc")
+            self.connect("twisted_mesh", "training_data.ac|geom|wing|OAS_mesh")
 
         # Training data
         self.add_subsystem(
@@ -291,7 +323,6 @@ class VLMDragPolar(om.Group):
             ),
             promotes_inputs=VLM_promote_inputs,
         )
-        self.connect("twisted_mesh", "training_data.ac|geom|wing|OAS_mesh")
 
         # Surrogate model
         interp = om.MetaModelStructuredComp(

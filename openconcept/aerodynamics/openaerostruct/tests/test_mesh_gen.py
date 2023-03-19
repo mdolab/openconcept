@@ -6,6 +6,7 @@ from openconcept.aerodynamics.openaerostruct.mesh_gen import (
     TrapezoidalPlanformMesh,
     SectionPlanformMesh,
     ThicknessChordRatioInterp,
+    SectionLinearInterp,
     cos_space,
     cos_space_deriv_start,
     cos_space_deriv_end,
@@ -392,6 +393,46 @@ class ThicknessChordRatioInterpTestCase(unittest.TestCase):
             cos_spacing = cos_space(sec_toverc[i_sec], sec_toverc[i_sec + 1], ny[i_sec] + 1)
             panel_toverc += list(0.5 * (cos_spacing[:-1] + cos_spacing[1:]))
         assert_near_equal(p.get_val("panel_toverc"), panel_toverc)
+
+        partials = p.check_partials(method="cs")
+        assert_check_partials(partials)
+
+
+class SectionLinearInterpTestCase(unittest.TestCase):
+    def test_cos_spacing(self):
+        ny = np.array([3, 2, 1])
+        n_sec = 4
+        p = om.Problem()
+        p.model.add_subsystem(
+            "comp", SectionLinearInterp(num_y=ny, num_sections=n_sec, units="deg", cos_spacing=True), promotes=["*"]
+        )
+        p.setup(force_alloc_complex=True)
+
+        prop = [0, 2, -2, 1]
+        p.set_val("property_sec", prop)
+        p.run_model()
+
+        prop_node = np.hstack((cos_space(0, 2, 4), cos_space(2, -2, 3)[1:], [1]))
+        assert_near_equal(p.get_val("property_node"), prop_node)
+
+        partials = p.check_partials(method="cs")
+        assert_check_partials(partials)
+
+    def test_linear_spacing(self):
+        ny = np.array([3, 2, 1])
+        n_sec = 4
+        p = om.Problem()
+        p.model.add_subsystem(
+            "comp", SectionLinearInterp(num_y=ny, num_sections=n_sec, units="deg", cos_spacing=False), promotes=["*"]
+        )
+        p.setup(force_alloc_complex=True)
+
+        prop = [0, 2, -2, 1]
+        p.set_val("property_sec", prop)
+        p.run_model()
+
+        prop_node = np.hstack((np.linspace(0, 2, 4), np.linspace(2, -2, 3)[1:], [1]))
+        assert_near_equal(p.get_val("property_node"), prop_node)
 
         partials = p.check_partials(method="cs")
         assert_check_partials(partials)
