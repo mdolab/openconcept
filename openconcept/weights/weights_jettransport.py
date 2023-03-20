@@ -1,14 +1,13 @@
-from __future__ import division
-from multiprocessing.context import ForkContext
-from xml.dom.minidom import Element
-from matplotlib import units
 import numpy as np
 from openmdao.api import ExplicitComponent, IndepVarComp
 from openmdao.api import Group
 from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
 
+# TODO: Double check the formulas in this, seems like there are some errors (such as mistaking fuselage length to diameter ratio as lift to drag ratio).
+#       Also does this need to include the additional components in Raymer such as furnishings, avionics, electrical, etc.
 
-class WingWeight_JetTrasport(ExplicitComponent):
+
+class WingWeight_JetTransport(ExplicitComponent):
     """Inputs: MTOW, ac|geom|wing|S_ref, ac|geom|wing|AR, ac|geom|wing|c4sweep, ac|geom|wing|taper, ac|geom|wing|toverc, V_H (max SL speed)
     Outputs: W_wing
     Metadata: n_ult (ult load factor)
@@ -18,7 +17,7 @@ class WingWeight_JetTrasport(ExplicitComponent):
     def initialize(self):
         # self.options.declare('num_nodes', default=1, desc='Number of flight/control conditions')
         # define configuration parameters
-        self.options.declare("n_ult", default=3.8 * 1.5, desc="Ultimate load factor (dimensionless)")
+        self.options.declare("n_ult", default=2.5 * 1.5, desc="Ultimate load factor (dimensionless)")
 
     def setup(self):
         # nn = self.options['num_nodes']
@@ -42,7 +41,7 @@ class WingWeight_JetTrasport(ExplicitComponent):
             * (inputs["ac|geom|wing|toverc"]) ** -0.4
             * (1 + inputs["ac|geom|wing|taper"]) ** 0.1
             * np.cos(inputs["ac|geom|wing|c4sweep"]) ** -1
-            * (0.12 ** 0.1)
+            * (0.12**0.1)
         )  # *(inputs['ac|geom|wing|S_ref'])**0.1
 
         outputs["W_wing"] = W_wing_Raymer
@@ -54,7 +53,7 @@ class WingWeight_JetTrasport(ExplicitComponent):
         J["W_wing", "ac|weights|MTOW"] = (
             (0.0051 * 0.557)
             * (inputs["ac|weights|MTOW"] ** (0.557 - 1))
-            * n_ult ** 0.557
+            * n_ult**0.557
             * (inputs["ac|geom|wing|S_ref"]) ** 0.649
             * (inputs["ac|geom|wing|AR"]) ** 0.5
             * (inputs["ac|geom|wing|toverc"]) ** -0.4
@@ -71,7 +70,7 @@ class WingWeight_JetTrasport(ExplicitComponent):
             * (inputs["ac|geom|wing|toverc"]) ** -0.4
             * (1 + inputs["ac|geom|wing|taper"]) ** 0.1
             * np.cos(inputs["ac|geom|wing|c4sweep"]) ** -1
-            * (0.12 ** 0.1)
+            * (0.12**0.1)
         )
         J["W_wing", "ac|geom|wing|AR"] = (
             0.0051
@@ -82,7 +81,7 @@ class WingWeight_JetTrasport(ExplicitComponent):
             * (inputs["ac|geom|wing|toverc"]) ** -0.4
             * (1 + inputs["ac|geom|wing|taper"]) ** 0.1
             * np.cos(inputs["ac|geom|wing|c4sweep"]) ** -1
-            * (0.12 ** 0.1)
+            * (0.12**0.1)
             * (inputs["ac|geom|wing|S_ref"]) ** 0.1
         )
         J["W_wing", "ac|geom|wing|c4sweep"] = (
@@ -95,7 +94,7 @@ class WingWeight_JetTrasport(ExplicitComponent):
             * -1
             * np.cos(inputs["ac|geom|wing|c4sweep"]) ** -2
             * (-1 * np.sin(inputs["ac|geom|wing|c4sweep"]))
-            * (0.12 ** 0.1)
+            * (0.12**0.1)
         )
         J["W_wing", "ac|geom|wing|taper"] = (
             0.0051
@@ -106,7 +105,7 @@ class WingWeight_JetTrasport(ExplicitComponent):
             * 0.1
             * (1 + inputs["ac|geom|wing|taper"]) ** (0.1 - 1)
             * np.cos(inputs["ac|geom|wing|c4sweep"]) ** -1
-            * (0.12 ** 0.1)
+            * (0.12**0.1)
             * (inputs["ac|geom|wing|S_ref"]) ** 0.1
         )
         J["W_wing", "ac|geom|wing|toverc"] = (
@@ -118,7 +117,7 @@ class WingWeight_JetTrasport(ExplicitComponent):
             * (inputs["ac|geom|wing|toverc"]) ** (-0.4 - 1)
             * (1 + inputs["ac|geom|wing|taper"]) ** 0.1
             * np.cos(inputs["ac|geom|wing|c4sweep"]) ** -1
-            * (0.12 ** 0.1)
+            * (0.12**0.1)
             * (inputs["ac|geom|wing|S_ref"]) ** 0.1
         )
 
@@ -146,7 +145,7 @@ class HstabConst_JetTransport(ExplicitComponent):
 class HstabWeight_JetTransport(ExplicitComponent):
     def initialize(self):
         self.options.declare("K_uht", default=1.143, desc="Scaling for all moving stabilizer")
-        self.options.declare("n_ult", default=3.8 * 1.5, desc="Ultimate load factor (dimensionless)")
+        self.options.declare("n_ult", default=2.5 * 1.5, desc="Ultimate load factor (dimensionless)")
 
     def setup(self):
         self.add_input("ac|weights|MTOW", units="lb", desc="Maximum rated takeoff weight")
@@ -170,9 +169,9 @@ class HstabWeight_JetTransport(ExplicitComponent):
             * K_uht
             * inputs["HstabConst"] ** -0.25
             * inputs["ac|weights|MTOW"] ** 0.639
-            * n_ult ** 0.10
+            * n_ult**0.10
             * inputs["ac|geom|hstab|S_ref"] ** 0.75
-            * (0.3 ** 0.704)
+            * (0.3**0.704)
             * inputs["ac|geom|hstab|c4_to_wing_c4"] ** -0.296
             * np.cos(inputs["ac|geom|hstab|c4sweep"]) ** -1
             * inputs["ac|geom|hstab|AR"] ** 0.166
@@ -192,7 +191,7 @@ class HstabWeight_JetTransport(ExplicitComponent):
             * inputs["HstabConst"] ** -0.25
             * 0.639
             * inputs["ac|weights|MTOW"] ** (0.639 - 1)
-            * n_ult ** 0.10
+            * n_ult**0.10
             * inputs["ac|geom|hstab|S_ref"] ** 0.75
             * inputs["ac|geom|hstab|c4_to_wing_c4"] ** -1
             * (0.3 * inputs["ac|geom|hstab|c4_to_wing_c4"]) ** 0.704
@@ -205,10 +204,10 @@ class HstabWeight_JetTransport(ExplicitComponent):
             * K_uht
             * inputs["HstabConst"] ** -0.25
             * inputs["ac|weights|MTOW"] ** 0.639
-            * n_ult ** 0.10
+            * n_ult**0.10
             * 0.75
             * inputs["ac|geom|hstab|S_ref"] ** (0.75 - 1)
-            * (0.3 ** 0.704)
+            * (0.3**0.704)
             * inputs["ac|geom|hstab|c4_to_wing_c4"] ** -0.296
             * np.cos(inputs["ac|geom|hstab|c4sweep"]) ** -1
             * inputs["ac|geom|hstab|AR"] ** 0.166
@@ -219,9 +218,9 @@ class HstabWeight_JetTransport(ExplicitComponent):
             * K_uht
             * inputs["HstabConst"] ** -0.25
             * inputs["ac|weights|MTOW"] ** 0.639
-            * n_ult ** 0.10
+            * n_ult**0.10
             * inputs["ac|geom|hstab|S_ref"] ** 0.75
-            * (0.3 ** 0.704)
+            * (0.3**0.704)
             * inputs["ac|geom|hstab|c4_to_wing_c4"] ** -0.296
             * np.cos(inputs["ac|geom|hstab|c4sweep"]) ** -1
             * 0.166
@@ -233,7 +232,7 @@ class HstabWeight_JetTransport(ExplicitComponent):
             * K_uht
             * inputs["HstabConst"] ** -0.25
             * inputs["ac|weights|MTOW"] ** 0.639
-            * n_ult ** 0.10
+            * n_ult**0.10
             * inputs["ac|geom|hstab|S_ref"] ** 0.75
             * inputs["ac|geom|hstab|c4_to_wing_c4"] ** -1
             * (0.3 * inputs["ac|geom|hstab|c4_to_wing_c4"]) ** 0.704
@@ -247,9 +246,9 @@ class HstabWeight_JetTransport(ExplicitComponent):
             * K_uht
             * inputs["HstabConst"] ** -0.25
             * inputs["ac|weights|MTOW"] ** 0.639
-            * n_ult ** 0.10
+            * n_ult**0.10
             * inputs["ac|geom|hstab|S_ref"] ** 0.75
-            * (0.3 ** 0.704)
+            * (0.3**0.704)
             * -0.296
             * inputs["ac|geom|hstab|c4_to_wing_c4"] ** (-0.296 - 1)
             * np.cos(inputs["ac|geom|hstab|c4sweep"]) ** -1
@@ -262,9 +261,9 @@ class HstabWeight_JetTransport(ExplicitComponent):
             * -0.25
             * inputs["HstabConst"] ** (-0.25 - 1)
             * inputs["ac|weights|MTOW"] ** 0.639
-            * n_ult ** 0.10
+            * n_ult**0.10
             * inputs["ac|geom|hstab|S_ref"] ** 0.75
-            * (0.3 ** 0.704)
+            * (0.3**0.704)
             * inputs["ac|geom|hstab|c4_to_wing_c4"] ** -0.296
             * np.cos(inputs["ac|geom|hstab|c4sweep"]) ** -1
             * inputs["ac|geom|hstab|AR"] ** 0.166
@@ -274,7 +273,7 @@ class HstabWeight_JetTransport(ExplicitComponent):
 
 class VstabWeight_JetTransport(ExplicitComponent):
     def initialize(self):
-        self.options.declare("n_ult", default=3.8 * 1.5, desc="Ultimate load factor (dimensionless)")
+        self.options.declare("n_ult", default=2.5 * 1.5, desc="Ultimate load factor (dimensionless)")
 
     def setup(self):
         self.add_input("ac|weights|MTOW", units="lb", desc="Maximum rated takeoff weight")
@@ -295,7 +294,7 @@ class VstabWeight_JetTransport(ExplicitComponent):
         W_vstab_raymer = (
             0.0026
             * inputs["ac|weights|MTOW"] ** 0.556
-            * n_ult ** 0.536
+            * n_ult**0.536
             * inputs["ac|geom|hstab|c4_to_wing_c4"] ** (-0.5 + 0.875)
             * inputs["ac|geom|vstab|S_ref"] ** 0.5
             * np.cos(inputs["ac|geom|vstab|c4sweep"]) ** -1
@@ -311,7 +310,7 @@ class VstabWeight_JetTransport(ExplicitComponent):
             0.0026
             * 0.556
             * inputs["ac|weights|MTOW"] ** (0.556 - 1)
-            * n_ult ** 0.536
+            * n_ult**0.536
             * inputs["ac|geom|hstab|c4_to_wing_c4"] ** (-0.5 + 0.875)
             * inputs["ac|geom|vstab|S_ref"] ** 0.5
             * np.cos(inputs["ac|geom|vstab|c4sweep"]) ** -1
@@ -323,7 +322,7 @@ class VstabWeight_JetTransport(ExplicitComponent):
             * inputs["ac|geom|vstab|AR"] ** 0.3500
             * inputs["ac|geom|hstab|c4_to_wing_c4"] ** 0.3750
             * inputs["ac|weights|MTOW"] ** 0.5560
-            * n_ult ** 0.5360
+            * n_ult**0.5360
         ) / (
             inputs["ac|geom|vstab|S_ref"] ** 0.5000
             * inputs["ac|geom|vstab|toverc"] ** 0.5000
@@ -333,7 +332,7 @@ class VstabWeight_JetTransport(ExplicitComponent):
             9.1000e-04
             * inputs["ac|geom|hstab|c4_to_wing_c4"] ** 0.3750
             * inputs["ac|weights|MTOW"] ** 0.5560
-            * n_ult ** 0.5360
+            * n_ult**0.5360
             * inputs["ac|geom|vstab|S_ref"] ** (1 / 2)
         ) / (
             inputs["ac|geom|vstab|AR"] ** 0.6500
@@ -345,7 +344,7 @@ class VstabWeight_JetTransport(ExplicitComponent):
             * inputs["ac|geom|vstab|AR"] ** 0.3500
             * inputs["ac|geom|hstab|c4_to_wing_c4"] ** 0.3750
             * inputs["ac|weights|MTOW"] ** 0.5560
-            * n_ult ** 0.5360
+            * n_ult**0.5360
             * inputs["ac|geom|vstab|S_ref"] ** (1 / 2)
             * np.sin(inputs["ac|geom|vstab|c4sweep"])
         ) / (inputs["ac|geom|vstab|toverc"] ** 0.5000 * (np.sin(inputs["ac|geom|vstab|c4sweep"]) ** 2 - 1))
@@ -353,7 +352,7 @@ class VstabWeight_JetTransport(ExplicitComponent):
             9.7500e-04
             * inputs["ac|geom|vstab|AR"] ** 0.3500
             * inputs["ac|weights|MTOW"] ** 0.5560
-            * n_ult ** 0.5360
+            * n_ult**0.5360
             * inputs["ac|geom|vstab|S_ref"] ** (1 / 2)
         ) / (
             inputs["ac|geom|hstab|c4_to_wing_c4"] ** 0.6250
@@ -365,7 +364,7 @@ class VstabWeight_JetTransport(ExplicitComponent):
             * inputs["ac|geom|vstab|AR"] ** 0.3500
             * inputs["ac|geom|hstab|c4_to_wing_c4"] ** 0.3750
             * inputs["ac|weights|MTOW"] ** 0.5560
-            * n_ult ** 0.5360
+            * n_ult**0.5360
             * inputs["ac|geom|vstab|S_ref"] ** (1 / 2)
         ) / (inputs["ac|geom|vstab|toverc"] ** 1.5000 * np.cos(inputs["ac|geom|vstab|c4sweep"]))
 
@@ -452,7 +451,7 @@ class FuselageConst2_JetTransport(ExplicitComponent):
 
 class FuselageWeight_JetTransport(ExplicitComponent):
     def initialize(self):
-        self.options.declare("n_ult", default=3.8 * 1.5, desc="Ultimate load factor (dimensionless)")
+        self.options.declare("n_ult", default=2.5 * 1.5, desc="Ultimate load factor (dimensionless)")
         self.options.declare("k_door", default=1, desc="Ultimate load factor (dimensionless)")
         self.options.declare("k_lg", default=1.12, desc="Ultimate load factor (dimensionless)")
 
@@ -460,7 +459,7 @@ class FuselageWeight_JetTransport(ExplicitComponent):
         self.add_input("ac|weights|MTOW", units="lb", desc="Maximum rated takeoff weight")
         self.add_input("ac|geom|fuselage|length", units="ft", desc="fuselage structural length")
         self.add_input("ac|geom|fuselage|S_wet", units="ft**2", desc="fuselage wetted area")
-        self.add_input("ac|aero|LoverD", desc="Design L/D of aircraft")
+        self.add_input("ac|geom|fuselage|L_D", desc="Fuselage length to diameter ratio")
         self.add_input("K_ws")
 
         self.add_output("W_fuselage", units="lb", desc="fuselage weight")
@@ -476,11 +475,11 @@ class FuselageWeight_JetTransport(ExplicitComponent):
             * k_door
             * k_lg
             * inputs["ac|weights|MTOW"] ** 0.5
-            * n_ult ** 0.5
+            * n_ult**0.5
             * inputs["ac|geom|fuselage|length"] ** 0.25
             * inputs["ac|geom|fuselage|S_wet"] ** 0.302
             * (1 + inputs["K_ws"]) ** 0.04
-            * inputs["ac|aero|LoverD"] ** 0.10
+            * inputs["ac|geom|fuselage|L_D"] ** 0.10
         )
         outputs["W_fuselage"] = W_fuselage_raymer
 
@@ -495,108 +494,65 @@ class FuselageWeight_JetTransport(ExplicitComponent):
             * k_lg
             * 0.5
             * inputs["ac|weights|MTOW"] ** (0.5 - 1)
-            * n_ult ** 0.5
+            * n_ult**0.5
             * inputs["ac|geom|fuselage|length"] ** 0.25
             * inputs["ac|geom|fuselage|S_wet"] ** 0.302
             * (1 + inputs["K_ws"]) ** 0.04
-            * inputs["ac|aero|LoverD"] ** 0.10
+            * inputs["ac|geom|fuselage|L_D"] ** 0.10
         )
         J["W_fuselage", "ac|geom|fuselage|length"] = (
             0.3280
             * k_door
             * k_lg
             * inputs["ac|weights|MTOW"] ** 0.5
-            * n_ult ** 0.5
+            * n_ult**0.5
             * 0.25
             * inputs["ac|geom|fuselage|length"] ** (0.25 - 1)
             * inputs["ac|geom|fuselage|S_wet"] ** 0.302
             * (1 + inputs["K_ws"]) ** 0.04
-            * inputs["ac|aero|LoverD"] ** 0.10
+            * inputs["ac|geom|fuselage|L_D"] ** 0.10
         )
         J["W_fuselage", "ac|geom|fuselage|S_wet"] = (
             0.3280
             * k_door
             * k_lg
             * inputs["ac|weights|MTOW"] ** 0.5
-            * n_ult ** 0.5
+            * n_ult**0.5
             * inputs["ac|geom|fuselage|length"] ** 0.25
             * 0.302
             * inputs["ac|geom|fuselage|S_wet"] ** (0.302 - 1)
             * (1 + inputs["K_ws"]) ** 0.04
-            * inputs["ac|aero|LoverD"] ** 0.10
+            * inputs["ac|geom|fuselage|L_D"] ** 0.10
         )
-        J["W_fuselage", "ac|aero|LoverD"] = (
+        J["W_fuselage", "ac|geom|fuselage|L_D"] = (
             0.3280
             * k_door
             * k_lg
             * inputs["ac|weights|MTOW"] ** 0.5
-            * n_ult ** 0.5
+            * n_ult**0.5
             * inputs["ac|geom|fuselage|length"] ** 0.25
             * inputs["ac|geom|fuselage|S_wet"] ** 0.302
             * (1 + inputs["K_ws"]) ** 0.04
             * 0.10
-            * inputs["ac|aero|LoverD"] ** (0.10 - 1)
+            * inputs["ac|geom|fuselage|L_D"] ** (0.10 - 1)
         )
         J["W_fuselage", "K_ws"] = (
             0.3280
             * k_door
             * k_lg
             * inputs["ac|weights|MTOW"] ** 0.5
-            * n_ult ** 0.5
+            * n_ult**0.5
             * inputs["ac|geom|fuselage|length"] ** 0.25
             * inputs["ac|geom|fuselage|S_wet"] ** 0.302
             * 0.04
             * (1 + inputs["K_ws"]) ** (0.04 - 1)
-            * inputs["ac|aero|LoverD"] ** 0.10
+            * inputs["ac|geom|fuselage|L_D"] ** 0.10
         )
-
-
-# class FuselageWeight_JetTransport(ExplicitComponent):
-
-#     def initialize(self):
-#         self.options.declare('n_ult', default=3.8*1.5, desc='Ultimate load factor (dimensionless)')
-#         self.options.declare('k_door', default=1, desc='Ultimate load factor (dimensionless)')
-#         self.options.declare('k_lg', default=1.12, desc='Ultimate load factor (dimensionless)')
-
-#     def setup(self):
-#         self.add_input('ac|weights|MTOW', units='lb', desc='Maximum rated takeoff weight')
-#         self.add_input('ac|geom|wing|S_ref', units='ft**2', desc='Reference wing area in sq ft')
-#         self.add_input('ac|geom|wing|AR', desc='Wing aspect ratio')
-#         self.add_input('ac|geom|wing|c4sweep', units='rad', desc='Quarter-chord sweep angle')
-#         self.add_input('ac|geom|wing|taper', desc='Wing taper ratio')
-#         self.add_input('ac|geom|fuselage|length', units='ft', desc='fuselage structural length')
-#         self.add_input('ac|geom|fuselage|S_wet', units='ft**2', desc='fuselage wetted area')
-#         self.add_input('ac|aero|LoverD', desc='Design L/D of aircraft')
-
-#         self.add_output('W_fuselage', units='lb', desc='fuselage weight')
-#         self.declare_partials(['W_fuselage'],['*'])
-
-#     def compute(self, inputs, outputs):
-#         n_ult = self.options['n_ult']
-#         k_door = self.options['k_door']
-#         k_lg = self.options['k_lg']
-
-#         W_fuselage_raymer = 0.3280*k_door*k_lg*(inputs['ac|weights|MTOW']*n_ult)**0.5*inputs['ac|geom|fuselage|length']**0.25*inputs['ac|geom|fuselage|S_wet']**0.302*(1+0.75*(1+(2*inputs['ac|geom|wing|taper'])/(1+inputs['ac|geom|wing|taper']))*(inputs['ac|geom|wing|S_ref']*inputs['ac|geom|wing|AR'])**0.5*np.tan(inputs['ac|geom|wing|c4sweep']/inputs['ac|geom|fuselage|length']))**0.04*inputs['ac|aero|LoverD']**0.10
-#         outputs['W_fuselage'] = W_fuselage_raymer
-
-#     def compute_partials(self, inputs, J):
-#         n_ult = self.options['n_ult']
-#         k_door = self.options['k_door']
-#         k_lg = self.options['k_lg']
-
-#         J['W_fuselage','ac|weights|MTOW'] = 0.3280*k_door*k_lg*0.5*inputs['ac|weights|MTOW']**-0.5*n_ult**0.5*inputs['ac|geom|fuselage|length']**0.25*inputs['ac|geom|fuselage|S_wet']**0.302*(1+0.75*(1+(2*inputs['ac|geom|wing|taper'])/(1+inputs['ac|geom|wing|taper']))*(inputs['ac|geom|wing|S_ref']*inputs['ac|geom|wing|AR'])**0.5*np.tan(inputs['ac|geom|wing|c4sweep']/inputs['ac|geom|fuselage|length']))**0.04*inputs['ac|aero|LoverD']**0.10
-#         J['W_fuselage','ac|geom|wing|S_ref'] = (0.0186*inputs['ac|geom|wing|AR']*k_door*k_lg*inputs['ac|geom|fuselage|length']**0.2500*inputs['ac|aero|LoverD']**0.1000*inputs['ac|geom|fuselage|S_wet']**0.3020*np.tan(inputs['ac|geom|wing|c4sweep']/inputs['ac|geom|fuselage|length'])*(3*inputs['ac|geom|wing|taper'] + 1)*(inputs['ac|weights|MTOW']*n_ult)**(1/2))/((inputs['ac|geom|wing|AR']*inputs['ac|geom|wing|S_ref'])**0.5000*((3*np.tan(inputs['ac|geom|wing|c4sweep']/inputs['ac|geom|fuselage|length'])*(3*inputs['ac|geom|wing|taper'] + 1)*(inputs['ac|geom|wing|AR']*inputs['ac|geom|wing|S_ref'])**(1/2))/(inputs['ac|geom|wing|taper'] + 1) + 4)**0.9600*(inputs['ac|geom|wing|taper'] + 1))
-#         J['W_fuselage','ac|geom|wing|AR'] = (0.0186*k_door*k_lg*inputs['ac|geom|fuselage|length']**0.2500*inputs['ac|aero|LoverD']**0.1000*inputs['ac|geom|wing|S_ref']*inputs['ac|geom|fuselage|S_wet']**0.3020*np.tan(inputs['ac|geom|wing|c4sweep']/inputs['ac|geom|fuselage|length'])*(3*inputs['ac|geom|wing|taper'] + 1)*(inputs['ac|weights|MTOW']*n_ult)**(1/2))/((inputs['ac|geom|wing|AR']*inputs['ac|geom|wing|S_ref'])**0.5000*((3*np.tan(inputs['ac|geom|wing|c4sweep']/inputs['ac|geom|fuselage|length'])*(3*inputs['ac|geom|wing|taper'] + 1)*(inputs['ac|geom|wing|AR']*inputs['ac|geom|wing|S_ref'])**(1/2))/(inputs['ac|geom|wing|taper'] + 1) + 4)**0.9600*(inputs['ac|geom|wing|taper'] + 1))
-#         J['W_fuselage','ac|geom|wing|c4sweep'] = (0.0372*k_door*k_lg*inputs['ac|aero|LoverD']**0.1000*inputs['ac|geom|fuselage|S_wet']**0.3020*(3*inputs['ac|geom|wing|taper'] + 1)*(inputs['ac|geom|wing|AR']*inputs['ac|geom|wing|S_ref'])**(1/2)*(inputs['ac|weights|MTOW']*n_ult)**(1/2)*(np.tan(inputs['ac|geom|wing|c4sweep']/inputs['ac|geom|fuselage|length'])**2 + 1))/(inputs['ac|geom|fuselage|length']**0.7500*((3*np.tan(inputs['ac|geom|wing|c4sweep']/inputs['ac|geom|fuselage|length'])*(3*inputs['ac|geom|wing|taper'] + 1)*(inputs['ac|geom|wing|AR']*inputs['ac|geom|wing|S_ref'])**(1/2))/(inputs['ac|geom|wing|taper'] + 1) + 4)**0.9600*(inputs['ac|geom|wing|taper'] + 1))
-#         J['W_fuselage','ac|geom|wing|taper'] = (0.0745*k_door*k_lg*inputs['ac|geom|fuselage|length']**0.2500*inputs['ac|aero|LoverD']**0.1000*inputs['ac|geom|fuselage|S_wet']**0.3020*np.tan(inputs['ac|geom|wing|c4sweep']/inputs['ac|geom|fuselage|length'])*(inputs['ac|geom|wing|AR']*inputs['ac|geom|wing|S_ref'])**(1/2)*(inputs['ac|weights|MTOW']*n_ult)**(1/2))/(((3*np.tan(inputs['ac|geom|wing|c4sweep']/inputs['ac|geom|fuselage|length'])*(3*inputs['ac|geom|wing|taper'] + 1)*(inputs['ac|geom|wing|AR']*inputs['ac|geom|wing|S_ref'])**(1/2))/(inputs['ac|geom|wing|taper'] + 1) + 4)**0.9600*(inputs['ac|geom|wing|taper'] + 1)**2)
-#         J['W_fuselage','ac|geom|fuselage|length'] = 0.3280*k_door*k_lg*(inputs['ac|weights|MTOW']*n_ult)**0.5*0.25*inputs['ac|geom|fuselage|length']**(0.25-1)*inputs['ac|geom|fuselage|S_wet']**0.302*(1+0.75*(1+(2*inputs['ac|geom|wing|taper'])/(1+inputs['ac|geom|wing|taper']))*(inputs['ac|geom|wing|S_ref']*inputs['ac|geom|wing|AR'])**0.5*np.tan(inputs['ac|geom|wing|c4sweep']/inputs['ac|geom|fuselage|length']))**0.04*inputs['ac|aero|LoverD']**0.10
-#         J['W_fuselage','ac|geom|fuselage|S_wet'] = 0.3280*k_door*k_lg*(inputs['ac|weights|MTOW']*n_ult)**0.5*inputs['ac|geom|fuselage|length']**0.25*0.302*inputs['ac|geom|fuselage|S_wet']**(0.302-1)*(1+0.75*(1+(2*inputs['ac|geom|wing|taper'])/(1+inputs['ac|geom|wing|taper']))*(inputs['ac|geom|wing|S_ref']*inputs['ac|geom|wing|AR'])**0.5*np.tan(inputs['ac|geom|wing|c4sweep']/inputs['ac|geom|fuselage|length']))**0.04*inputs['ac|aero|LoverD']**0.10
-#         J['W_fuselage','ac|aero|LoverD'] = 0.3280*k_door*k_lg*(inputs['ac|weights|MTOW']*n_ult)**0.5*inputs['ac|geom|fuselage|length']**0.25*inputs['ac|geom|fuselage|S_wet']**0.302*(1+0.75*(1+(2*inputs['ac|geom|wing|taper'])/(1+inputs['ac|geom|wing|taper']))*(inputs['ac|geom|wing|S_ref']*inputs['ac|geom|wing|AR'])**0.5*np.tan(inputs['ac|geom|wing|c4sweep']/inputs['ac|geom|fuselage|length']))**0.04*0.10*inputs['ac|aero|LoverD']**(0.10-1)
 
 
 class MainLandingGear_JetTransport(ExplicitComponent):
     def initialize(self):
-        self.options.declare("n_ult", default=3 * 1.5, desc="ultimate landing load factor, N_gear*1.5")
+        self.options.declare("n_ult", default=2.5 * 1.5, desc="ultimate landing load factor, N_gear*1.5")
 
     def setup(self):
         self.add_input("ac|geom|maingear|length", units="inch", desc="main landing gear length")
@@ -613,7 +569,7 @@ class MainLandingGear_JetTransport(ExplicitComponent):
         W_maingear_raymer = (
             0.0106
             * inputs["ac|weights|MLW"] ** 0.888
-            * n_ult ** 0.25
+            * n_ult**0.25
             * inputs["ac|geom|maingear|length"] ** 0.4
             * inputs["ac|geom|maingear|n_wheels"] ** 0.321
             * inputs["ac|aero|Vstall_land"] ** 0.1
@@ -626,7 +582,7 @@ class MainLandingGear_JetTransport(ExplicitComponent):
             0.0106
             * 0.888
             * inputs["ac|weights|MLW"] ** (0.888 - 1)
-            * n_ult ** 0.25
+            * n_ult**0.25
             * inputs["ac|geom|maingear|length"] ** 0.4
             * inputs["ac|geom|maingear|n_wheels"] ** 0.321
             * inputs["ac|aero|Vstall_land"] ** 0.1
@@ -634,7 +590,7 @@ class MainLandingGear_JetTransport(ExplicitComponent):
         J["W_mlg", "ac|geom|maingear|length"] = (
             0.0106
             * inputs["ac|weights|MLW"] ** 0.888
-            * n_ult ** 0.25
+            * n_ult**0.25
             * 0.4
             * inputs["ac|geom|maingear|length"] ** (0.4 - 1)
             * inputs["ac|geom|maingear|n_wheels"] ** 0.321
@@ -643,7 +599,7 @@ class MainLandingGear_JetTransport(ExplicitComponent):
         J["W_mlg", "ac|geom|maingear|n_wheels"] = (
             0.0106
             * inputs["ac|weights|MLW"] ** 0.888
-            * n_ult ** 0.25
+            * n_ult**0.25
             * inputs["ac|geom|maingear|length"] ** 0.4
             * 0.321
             * inputs["ac|geom|maingear|n_wheels"] ** (0.321 - 1)
@@ -652,7 +608,7 @@ class MainLandingGear_JetTransport(ExplicitComponent):
         J["W_mlg", "ac|aero|Vstall_land"] = (
             0.0106
             * inputs["ac|weights|MLW"] ** 0.888
-            * n_ult ** 0.25
+            * n_ult**0.25
             * inputs["ac|geom|maingear|length"] ** 0.4
             * inputs["ac|geom|maingear|n_wheels"] ** 0.321
             * 0.1
@@ -662,7 +618,7 @@ class MainLandingGear_JetTransport(ExplicitComponent):
 
 class NoseLandingGear_JetTransport(ExplicitComponent):
     def initialize(self):
-        self.options.declare("n_ult", default=3 * 1.5, desc="ultimate landing load factor, N_gear*1.5")
+        self.options.declare("n_ult", default=2.5 * 1.5, desc="ultimate landing load factor, N_gear*1.5")
 
     def setup(self):
         self.add_input("ac|geom|nosegear|length", units="inch", desc="nose landing gear length")
@@ -677,7 +633,7 @@ class NoseLandingGear_JetTransport(ExplicitComponent):
         W_nosegear_raymer = (
             0.032
             * inputs["ac|weights|MLW"] ** 0.646
-            * n_ult ** 0.2
+            * n_ult**0.2
             * inputs["ac|geom|nosegear|length"] ** 0.5
             * inputs["ac|geom|nosegear|n_wheels"] ** 0.45
         )
@@ -689,18 +645,18 @@ class NoseLandingGear_JetTransport(ExplicitComponent):
             0.032
             * 0.646
             * inputs["ac|weights|MLW"] ** (0.646 - 1)
-            * n_ult ** 0.2
+            * n_ult**0.2
             * inputs["ac|geom|nosegear|length"] ** 0.5
             * inputs["ac|geom|nosegear|n_wheels"] ** 0.45
         )
         J["W_nlg", "ac|geom|nosegear|length"] = (
             0.0160
-            * n_ult ** 0.2000
+            * n_ult**0.2000
             * inputs["ac|geom|nosegear|n_wheels"] ** 0.4500
             * inputs["ac|weights|MLW"] ** 0.6460
         ) / inputs["ac|geom|nosegear|length"] ** 0.5000
         J["W_nlg", "ac|geom|nosegear|n_wheels"] = (
-            0.0144 * n_ult ** 0.2000 * inputs["ac|weights|MLW"] ** 0.6460 * inputs["ac|geom|nosegear|length"] ** (1 / 2)
+            0.0144 * n_ult**0.2000 * inputs["ac|weights|MLW"] ** 0.6460 * inputs["ac|geom|nosegear|length"] ** (1 / 2)
         ) / inputs["ac|geom|nosegear|n_wheels"] ** 0.5500
 
 
@@ -728,7 +684,7 @@ class NoseLandingGear_JetTransport(ExplicitComponent):
 class Engine_JetTransport(ExplicitComponent):
     # Uses regression method in Roskam
     def initialize(self):
-        self.options.declare("n_ult", default=3 * 1.5, desc="ultimate landing load factor, N_gear*1.5")
+        self.options.declare("n_ult", default=2.5 * 1.5, desc="ultimate landing load factor, N_gear*1.5")
 
     def setup(self):
         self.add_input("ac|propulsion|engine|rating", units="lbf", desc="Rated thrust per engine")
@@ -752,7 +708,7 @@ class EngineSystems_JetTransport(ExplicitComponent):
 
     def compute(self, inputs, outputs):
         W_engineSystems_Roskam = (
-            9.3300 * 0.0010 ** 1.0780 * inputs["W_engine"] ** 1.0780
+            9.3300 * 0.0010**1.0780 * inputs["W_engine"] ** 1.0780
             + 0.2600 * inputs["ac|propulsion|engine|rating"] ** (1 / 2)
             + 0.0820 * inputs["ac|propulsion|engine|rating"] ** 0.6500
             + 0.0340 * inputs["ac|propulsion|engine|rating"]
@@ -765,7 +721,7 @@ class EngineSystems_JetTransport(ExplicitComponent):
             + 0.1300 / inputs["ac|propulsion|engine|rating"] ** 0.5000
             + 0.0340
         )
-        J["W_engineSystems", "W_engine"] = 9.3300 * 0.0010 ** 1.0780 * 1.0780 * inputs["W_engine"] ** 0.0780
+        J["W_engineSystems", "W_engine"] = 9.3300 * 0.0010**1.0780 * 1.0780 * inputs["W_engine"] ** 0.0780
 
 
 class JetTransportEmptyWeight(Group):
@@ -774,7 +730,7 @@ class JetTransportEmptyWeight(Group):
         # const.add_output('W_fluids', val=20, units='kg')
         const.add_output("structural_fudge", val=1.6, units="m/m")
         const.add_output("n_engines", val=2, units="m/m")
-        self.add_subsystem("wing", WingWeight_JetTrasport(), promotes_inputs=["*"], promotes_outputs=["*"])
+        self.add_subsystem("wing", WingWeight_JetTransport(), promotes_inputs=["*"], promotes_outputs=["*"])
         self.add_subsystem("hstabconst", HstabConst_JetTransport(), promotes_inputs=["*"], promotes_outputs=["*"])
         self.add_subsystem("hstab", HstabWeight_JetTransport(), promotes_inputs=["*"], promotes_outputs=["*"])
         self.add_subsystem("vstab", VstabWeight_JetTransport(), promotes_inputs=["*"], promotes_outputs=["*"])
