@@ -13,7 +13,7 @@ from .weights_twin_hybrid import TwinSeriesHybridEmptyWeight
 
 from .weights_jettransport import (
     JetTransportEmptyWeight,
-    WingWeight_JetTrasport,
+    WingWeight_JetTransport,
     HstabConst_JetTransport,
     HstabWeight_JetTransport,
     VstabWeight_JetTransport,
