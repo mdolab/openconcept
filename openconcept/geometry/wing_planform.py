@@ -1,10 +1,6 @@
 from __future__ import division
-from matplotlib import units
 import numpy as np
-from openmdao.api import ExplicitComponent, IndepVarComp
-from openmdao.api import Group
-from openconcept.utilities.math import AddSubtractComp, ElementMultiplyDivideComp
-import math
+from openmdao.api import ExplicitComponent
 
 
 class WingRoot_LinearTaper(ExplicitComponent):
