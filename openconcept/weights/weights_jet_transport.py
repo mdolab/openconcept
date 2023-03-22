@@ -1376,11 +1376,111 @@ class JetTransportEmptyWeight(om.Group):
 
     Inputs
     ------
-
+    ac|num_passengers_max : float
+        Maximum number of passengers (scalar, dimensionless)
+    ac|num_flight_deck_crew : float
+        Number of flight crew members (scalar, dimensionless)
+    ac|num_cabin_crew : float
+        Number of flight attendants (scalar, dimensionless)
+    ac|cabin_pressure : float
+        Cabin pressure (scalar, psi)
+    ac|aero|Mach_max : float
+        Maximum aircraft Mach number (scalar, dimensionless)
+    ac|aero|Vstall_land : float
+        Landing stall speed (scalar, knots)
+    ac|geom|wing|S_ref : float
+        Wing planform reference area (scalar, sq ft)
+    ac|geom|wing|AR : float
+        Wing aspect ratio (scalar, dimensionless)
+    ac|geom|wing|c4sweep : float
+        Wing sweep at 25% mean aerodynamic chord (scalar, radians)
+    ac|geom|wing|taper : float
+        Wing taper ratio (scalar, dimensionless)
+    ac|geom|wing|toverc : float
+        Wing root thickness-to-chord ratio (scalar, dimensionless)
+    ac|geom|hstab|S_ref : float
+        Horizontal stabilizer reference area (scalar, sq ft)
+    ac|geom|hstab|AR : float
+        Horizontal stabilizer aspect ratio (scalar, dimensionless)
+    ac|geom|hstab|c4sweep : float
+        Horizontal stabilizer sweep at 25% mean aerodynamic chord (scalar, radians)
+    ac|geom|vstab|S_ref : float
+        vertical stabilizer wing area (scalar, sq ft)
+    ac|geom|vstab|AR : float
+        vertical stabilizer aspect ratio (scalar, dimensionless)
+    ac|geom|vstab|c4sweep : float
+        vertical stabilizer sweep at 25% mean aerodynamic chord (scalar, radians)
+    ac|geom|fuselage|diameter : float
+        Fuselage diameter (scalar, ft)
+    ac|geom|fuselage|length : float
+        Fuselage length, used to compute distance between quarter chord of wing and horizontal stabilizer (scalar, ft)
+    ac|geom|fuselage|S_wet : float
+        Fuselage wetted area (scalar, sq ft)
+    ac|geom|maingear|length : float
+        Length of the main landing gear (scalar, inch)
+    ac|geom|maingear|num_wheels : float
+        Total number of main landing gear wheels (scalar, dimensionless)
+    ac|geom|maingear|num_shock_struts : float
+        Total number of main landing gear shock struts (scalar, dimensionless)
+    ac|geom|nosegear|length : float
+        Length of the nose landing gear (scalar, inch)
+    ac|geom|nosegear|num_wheels : float
+        Total number of nose landing gear wheels (scalar, dimensionless)
+    ac|propulsion|engine|rating : float
+        Rated thrust of each engine (scalar, lbf)
+    ac|propulsion|num_engines : float
+        Number of engines (scalar, dimensionless)
+    ac|weights|MTOW : float
+        Maximum takeoff weight (scalar, lb)
+    ac|weights|MLW : float
+        Maximum landing weight (scalar, lb)
+    ac|weights|W_fuel_max : float
+        Maximum fuel weight (scalar, lb)
 
     Outputs
     -------
-
+    OEW : float
+        Total operating empty weight (scalar, lb)
+    W_wing : float
+        Estimated wing weight without structural fudge factor multiplier (scalar, lb)
+    W_hstab : float
+        Weight of the horizontal stabilizer without structural fudge factor multiplier (scalar, lb)
+    W_vstab : float
+        Weight of the vertical stabilizer without structural fudge factor multiplier (scalar, lb)
+    W_fuselage : float
+        Fuselage weight without structural fudge factor multiplier (scalar, lb)
+    W_mlg : float
+        Main landing gear weight without structural fudge factor multiplier (scalar, lb)
+    W_nlg : float
+        Nose landing gear weight without structural fudge factor multiplier (scalar, lb)
+    W_structure : float
+        Total structural weight = fudge factor * (W_wing + W_hstab + W_vstab + W_fuselage + W_mlg + W_nlg) (scalar, lb)
+    W_engines : float
+        Total dry engine weight (scalar, lb)
+    W_thrust_rev : float
+        Total thrust reverser weight (scalar, lb)
+    W_eng_control : float
+        Total engine control weight (scalar, lb)
+    W_fuelsystem : float
+        Total fuel system weight including tanks and plumbing (scalar, lb)
+    W_eng_start : float
+        Total engine starter weight (scalar, lb)
+    W_nacelle : float
+        Weight of the nacelles (scalar, lb)
+    W_furnishings : float
+        Weight estimate of seats, galleys, lavatories, and other furnishings (scalar, lb)
+    W_flight_controls : float
+        Flight control system weight (scalar, lb)
+    W_avionics : float
+        Intrumentation, avionics, and electronics weight (scalar, lb)
+    W_electrical : float
+        Electrical system weight (scalar, lb)
+    W_ac_pressurize_antiice : float
+        Air conditioning, pressurization, and anti-icing system weight (scalar, lb)
+    W_oxygen : float
+        Oxygen system weight (scalar, lb)
+    W_APU : float
+        Auxiliary power unit weight (scalar, lb)
 
     Options
     -------
@@ -1738,64 +1838,3 @@ class JetTransportEmptyWeight(om.Group):
             promotes_inputs=["*"],
             promotes_outputs=["OEW"],
         )
-
-
-if __name__ == "__main__":
-    prob = om.Problem()
-    prob.model = om.Group()
-    dvs = prob.model.add_subsystem("dvs", om.IndepVarComp(), promotes_outputs=["*"])
-    dvs.add_output("ac|weights|MTOW", 79002, units="kg")
-    dvs.add_output("ac|geom|wing|S_ref", 124.6, units="m**2")
-    dvs.add_output("ac|geom|wing|AR", 9.45)
-    dvs.add_output("ac|geom|wing|c4sweep", 25, units="deg")
-    dvs.add_output("ac|geom|wing|taper", 0.159)
-    dvs.add_output("ac|geom|wing|toverc", 0.12)
-    # dvs.add_output('V_H',255, units='kn')
-
-    dvs.add_output("ac|geom|hstab|S_ref", 37.28, units="m**2")
-    dvs.add_output("ac|geom|hstab|AR", 4.13)
-    dvs.add_output("ac|geom|hstab|c4_to_wing_c4", 17.9, units="m")
-    dvs.add_output("ac|geom|hstab|taper", 0.203)
-    dvs.add_output("ac|geom|hstab|c4sweep", 30, units="deg")
-    dvs.add_output("ac|geom|vstab|S_ref", 26.44, units="m**2")
-    dvs.add_output("ac|geom|vstab|c4sweep", 35, units="deg")
-    dvs.add_output("ac|geom|vstab|toverc", 0.12)
-    dvs.add_output("ac|geom|vstab|AR", 1.94)
-
-    dvs.add_output("ac|geom|fuselage|length", 39.12, units="m")
-    dvs.add_output("ac|geom|fuselage|height", 4.01, units="m")
-    dvs.add_output("ac|geom|fuselage|width", 3.76, units="m")
-    dvs.add_output("ac|geom|fuselage|S_wet", 1077, units="m**2")
-    # dvs.add_output('V_C',201, units='kn') #IAS (converted from 315kt true at 28,000 )
-    # dvs.add_output('V_MO',266, units='kn')
-    dvs.add_output("ac|propulsion|engine|rating", 27000, units="lbf")
-    dvs.add_output("ac|weights|W_fuel_max", 2000, units="lb")
-    dvs.add_output("ac|weights|MLW", 66349, units="kg")
-    dvs.add_output("ac|geom|nosegear|length", 3, units="ft")
-    dvs.add_output("ac|geom|nosegear|num_wheels", 2)
-    dvs.add_output("ac|geom|maingear|length", 4, units="ft")
-    dvs.add_output("ac|geom|maingear|num_wheels", 4)
-    dvs.add_output("ac|aero|Vstall_land", 110, units="kn")
-    dvs.add_output("ac|aero|LoverD", 17)
-
-    prob.model.add_subsystem("OEW", JetTransportEmptyWeight(), promotes_inputs=["*"])
-
-    prob.setup(force_alloc_complex=True)
-    prob.run_model()
-    print("Wing weight:")
-    print(prob["OEW.W_wing"])
-    print("Fuselage weight:")
-    print(prob["OEW.W_fuselage"])
-    print("Hstab Weight:")
-    print(prob["OEW.W_hstab"])
-    print("Vstab weight:")
-    print(prob["OEW.W_vstab"])
-    print("Main landing gear weight")
-    print(prob["OEW.W_mlg"])
-    print("Nose landing gear weight")
-    print(prob["OEW.W_nlg"])
-    print("Total engine weight")
-    print(prob["OEW.W_engines_total"])
-    print("Operating empty weight:")
-    print(prob["OEW.OEW"])
-    data = prob.check_partials(method="cs", compact_print=True, show_only_incorrect=False)
