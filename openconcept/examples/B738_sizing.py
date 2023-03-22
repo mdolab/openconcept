@@ -7,13 +7,9 @@
 # ==========================================================================================================================================================================================================================================
 # Standard Imports
 # ==========================================================================================================================================================================================================================================
-from __future__ import division
-from pickle import TRUE
 import sys
 import os
 import numpy as np
-
-from openconcept.thermal.ducts import ExplicitIncompressibleDuct
 
 sys.path.insert(0, os.getcwd())
 import openmdao.api as om
@@ -29,9 +25,8 @@ from openconcept.mission.profiles import (
     FullMissionAnalysis,
     BasicMission,
 )
-from openconcept.propulsion.cfm56 import CFM56
-from openconcept.aerodynamics.openaerostruct.drag_polar import VLMDragPolar
-from openconcept.utilities.math import ElementMultiplyDivideComp
+from openconcept.propulsion import CFM56
+from openconcept.aerodynamics import VLMDragPolar
 
 # ==========================================================================================================================================================================================================================================
 # Experimental stuff
@@ -85,8 +80,8 @@ class B738AirplaneModel(IntegratorGroup):
         # doubles outputs from propulsion model to scale for twin engine aircraft
         doubler = om.ExecComp(
             [
-                "thrust=2*thrust_in*0.5*(1+propulsor_active)*(rating/27000)",
-                "fuel_flow=2*fuel_flow_in*0.5*(1+propulsor_active)*(rating/27000)",
+                "thrust=thrust_in * (1 + propulsor_active) * (rating/27000)",
+                "fuel_flow=fuel_flow_in * (1 + propulsor_active) * (rating/27000)",
             ],
             thrust_in={"val": 1.0 * np.ones((nn,)), "units": "kN"},
             thrust={"val": 1.0 * np.ones((nn,)), "units": "kN"},
@@ -180,7 +175,6 @@ class B738AnalysisGroup(om.Group):
         dv_comp.add_output_from_dict("ac|aero|polar|e")
         dv_comp.add_output_from_dict("ac|aero|polar|CD0_TO")
         dv_comp.add_output_from_dict("ac|aero|Vstall_land")
-        dv_comp.add_output_from_dict("ac|aero|LoverD")
         dv_comp.add_output_from_dict("ac|aero|Cl_max")
 
         dv_comp.add_output_from_dict("ac|geom|wing|S_ref")
@@ -202,9 +196,10 @@ class B738AnalysisGroup(om.Group):
         dv_comp.add_output_from_dict("ac|geom|fuselage|height")
 
         dv_comp.add_output_from_dict("ac|geom|nosegear|length")
-        dv_comp.add_output_from_dict("ac|geom|nosegear|n_wheels")
+        dv_comp.add_output_from_dict("ac|geom|nosegear|num_wheels")
         dv_comp.add_output_from_dict("ac|geom|maingear|length")
-        dv_comp.add_output_from_dict("ac|geom|maingear|n_wheels")
+        dv_comp.add_output_from_dict("ac|geom|maingear|num_wheels")
+        dv_comp.add_output_from_dict("ac|geom|maingear|num_shock_struts")
 
         dv_comp.add_output_from_dict("ac|weights|MLW")
 
@@ -212,8 +207,12 @@ class B738AnalysisGroup(om.Group):
 
         dv_comp.add_output_from_dict("ac|propulsion|engine|rating")
         dv_comp.add_output_from_dict("ac|propulsion|engine|BPR")
+        dv_comp.add_output_from_dict("ac|propulsion|num_engines")
 
         dv_comp.add_output_from_dict("ac|num_passengers_max")
+        dv_comp.add_output_from_dict("ac|num_flight_deck_crew")
+        dv_comp.add_output_from_dict("ac|num_cabin_crew")
+        dv_comp.add_output_from_dict("ac|cabin_pressure")
         dv_comp.add_output_from_dict("ac|q_cruise")
 
         # The follow subsystems compute all geometry parameters that are dependent on wing area and other defined geometry
@@ -258,11 +257,7 @@ class B738AnalysisGroup(om.Group):
             "OEW",
             JetTransportEmptyWeight(),
             promotes_inputs=["*"],
-            promotes_outputs=[
-                ("OEW", "ac|weights|OEW"),
-                ("W_engine", "ac|propulsion|engine|weight"),
-                "W_structure_adjusted",
-            ],
+            promotes_outputs=[("OEW", "ac|weights|OEW")],
         )
 
         # computes aircraft MTOW in the top level model based on implicitly solved fuel burn
@@ -298,7 +293,7 @@ class B738AnalysisGroup(om.Group):
             promotes_outputs=["*"],
         )
 
-        # the following sections comptue cash operating cost
+        # the following sections compute cash operating cost
         self.add_subsystem(
             "mission_duration",
             AddSubtractComp(
@@ -330,10 +325,11 @@ def configure_problem():
     prob.model = B738AnalysisGroup()
     prob.model.nonlinear_solver = om.NewtonSolver(iprint=2, solve_subsystems=True)
     prob.model.linear_solver = om.DirectSolver()
-    prob.model.nonlinear_solver.options["maxiter"] = 50
+    prob.model.nonlinear_solver.options["maxiter"] = 20
     prob.model.nonlinear_solver.options["atol"] = 1e-6
     prob.model.nonlinear_solver.options["rtol"] = 1e-6
-    prob.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement="scalar", print_bound_enforce=True)
+    # prob.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement="scalar", print_bound_enforce=False, iprint=2)
+    prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement="scalar", print_bound_enforce=False)
 
     # declare optimization driver and history files
     # prob.driver = om.pyOptSparseDriver(optimizer="IPOPT")
@@ -388,8 +384,8 @@ def configure_problem():
 def set_values(prob, num_nodes):
     # set some (required) mission parameters. Each pahse needs a vertical and air-speed
     # the entire mission needs a cruise altitude and range
-    prob.set_val("climb.fltcond|vs", np.linspace(2300.0, 600.0, num_nodes), units="ft/min")
-    prob.set_val("climb.fltcond|Ueas", np.linspace(230, 220, num_nodes), units="kn")
+    prob.set_val("climb.fltcond|vs", np.linspace(2300.0, 400.0, num_nodes), units="ft/min")
+    prob.set_val("climb.fltcond|Ueas", np.linspace(230, 230, num_nodes), units="kn")
     prob.set_val("cruise.fltcond|vs", np.ones((num_nodes,)) * 4.0, units="ft/min")
     prob.set_val("cruise.fltcond|Ueas", np.linspace(265, 258, num_nodes), units="kn")
     prob.set_val("descent.fltcond|vs", np.linspace(-500, -150, num_nodes), units="ft/min")  # set this in optimizer
@@ -457,8 +453,8 @@ def run_738_analysis(plots=True):
     prob = configure_problem()
     prob.setup(check=True, mode="fwd")
     set_values(prob, num_nodes)
-    # prob.run_model()
-    prob.run_driver()
+    prob.run_model()
+    # prob.run_driver()
     prob.model.list_outputs()
     om.n2(prob, outfile="B738_fullsizing_originaldesign.html")
     if plots:
