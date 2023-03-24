@@ -1,1 +1,1 @@
-from .wing_planform import WingMAC_Trapezoidal, WingRoot_LinearTaper, WingSpan
+from .wing_planform import WingMAC_Trapezoidal, WingRoot_LinearTaper, WingSpan, WingMACTrapezoidal
