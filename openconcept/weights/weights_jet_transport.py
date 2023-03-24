@@ -39,6 +39,8 @@ class JetTransportEmptyWeight(om.Group):
         Horizontal stabilizer aspect ratio (scalar, dimensionless)
     ac|geom|hstab|c4sweep : float
         Horizontal stabilizer sweep at 25% mean aerodynamic chord (scalar, radians)
+    ac|geom|hstab|c4_to_wing_c4 : float
+        Distance from the horizontal stabilizer's quarter chord (of the MAC) to the wing's quarter chord (scalar, ft)
     ac|geom|vstab|S_ref : float
         Vertical stabilizer wing area (scalar, sq ft)
     ac|geom|vstab|AR : float
@@ -47,6 +49,8 @@ class JetTransportEmptyWeight(om.Group):
         Vertical stabilizer sweep at 25% mean aerodynamic chord (scalar, radians)
     ac|geom|vstab|toverc : float
         Vertical stabilizer thickness-to-chord ratio (scalar, dimensionless)
+    ac|geom|vstab|c4_to_wing_c4 : float
+        Distance from the vertical stabilizer's quarter chord (of the MAC) to the wing's quarter chord (scalar, ft)
     ac|geom|fuselage|height : float
         Fuselage height (scalar, ft)
     ac|geom|fuselage|length : float
@@ -141,8 +145,6 @@ class JetTransportEmptyWeight(om.Group):
         Fuselage width at horizontal tail intersection divided by fuselage diameter, by default 0.5 (scalar, dimensionless)
     K_uht : float
         Correction for all-moving tail; set to 1.143 for all-moving tail or 1.0 otherwise, by default 1.0 (scalar, dimensionless)
-    tail_length_fuselage_frac : float
-        Distance between quarter chord of wing and tail divided by fuselage length, by default 0.5 (scalar, dimensionless)
     elevator_area_frac : float
         Fraction of horizontal stabilizer area covered by elevators, by default 0.2 (scalar, dimensionless)
     T_tail : bool
@@ -188,7 +190,6 @@ class JetTransportEmptyWeight(om.Group):
             "fuselage_width_frac", default=0.5, desc="Fuselage width at tail intersection divided by fuselage diameter"
         )
         self.options.declare("K_uht", default=1.0, desc="Scaling for all moving stabilizer")
-        self.options.declare("tail_length_fuselage_frac", default=0.5, desc="Tail lever arm over fuselage length")
         self.options.declare(
             "elevator_area_frac", default=0.2, desc="Fraction of horizontal stabilizer covered by elevators"
         )
@@ -241,7 +242,6 @@ class JetTransportEmptyWeight(om.Group):
             HstabWeight_JetTransport(
                 n_ult=n_ult,
                 K_uht=self.options["K_uht"],
-                tail_length_fuselage_frac=self.options["tail_length_fuselage_frac"],
                 elevator_area_frac=self.options["elevator_area_frac"],
             ),
             promotes_inputs=[
@@ -249,7 +249,7 @@ class JetTransportEmptyWeight(om.Group):
                 "ac|geom|hstab|S_ref",
                 "ac|geom|hstab|AR",
                 "ac|geom|hstab|c4sweep",
-                "ac|geom|fuselage|length",
+                "ac|geom|hstab|c4_to_wing_c4",
             ],
             promotes_outputs=["W_hstab"],
         )
@@ -261,7 +261,6 @@ class JetTransportEmptyWeight(om.Group):
             "vstab",
             VstabWeight_JetTransport(
                 n_ult=n_ult,
-                tail_length_fuselage_frac=self.options["tail_length_fuselage_frac"],
                 T_tail=self.options["T_tail"],
             ),
             promotes_inputs=[
@@ -270,7 +269,7 @@ class JetTransportEmptyWeight(om.Group):
                 "ac|geom|vstab|AR",
                 "ac|geom|vstab|c4sweep",
                 "ac|geom|vstab|toverc",
-                "ac|geom|fuselage|length",
+                "ac|geom|vstab|c4_to_wing_c4",
             ],
             promotes_outputs=["W_vstab"],
         )
@@ -686,6 +685,8 @@ class HstabWeight_JetTransport(om.ExplicitComponent):
         Horizontal stabilizer sweep at 25% mean aerodynamic chord (scalar, radians)
     ac|geom|fuselage|length : float
         Fuselage length, used to compute distance between quarter chord of wing and horizontal stabilizer (scalar, ft)
+    ac|geom|hstab|c4_to_wing_c4 : float
+        Distance from the horizontal stabilizer's quarter chord (of the MAC) to the wing's quarter chord (scalar, ft)
     HstasbConst : float
         The 1 + Fw/Bh term in the weight estimate (scalar, dimensionless)
 
@@ -700,8 +701,6 @@ class HstabWeight_JetTransport(om.ExplicitComponent):
         Ultimate load factor, 1.5 x limit load factor, by default 1.5 x 2.5 (scalar, dimensionless)
     K_uht : float
         Correction for all-moving tail; set to 1.143 for all-moving tail or 1.0 otherwise, by default 1.0 (scalar, dimensionless)
-    tail_length_fuselage_frac : float
-        Distance between quarter chord of wing and tail divided by fuselage length, by default 0.5 (scalar, dimensionless)
     elevator_area_frac : float
         Fraction of horizontal stabilizer area covered by elevators, by default 0.2 (scalar, dimensionless)
     """
@@ -709,7 +708,6 @@ class HstabWeight_JetTransport(om.ExplicitComponent):
     def initialize(self):
         self.options.declare("n_ult", default=2.5 * 1.5, desc="Ultimate load factor (dimensionless)")
         self.options.declare("K_uht", default=1.0, desc="Scaling for all moving stabilizer")
-        self.options.declare("tail_length_fuselage_frac", default=0.5, desc="Tail lever arm over fuselage length")
         self.options.declare(
             "elevator_area_frac", default=0.2, desc="Fraction of horizontal stabilizer covered by elevators"
         )
@@ -719,7 +717,7 @@ class HstabWeight_JetTransport(om.ExplicitComponent):
         self.add_input("ac|geom|hstab|S_ref", units="ft**2", desc="Reference wing area in sq ft")
         self.add_input("ac|geom|hstab|AR", desc="Wing aspect ratio")
         self.add_input("ac|geom|hstab|c4sweep", units="rad", desc="Quarter-chord sweep angle")
-        self.add_input("ac|geom|fuselage|length", units="ft", desc="Fuselage length")
+        self.add_input("ac|geom|hstab|c4_to_wing_c4", units="ft", desc="Distance from wing to tail quarter chord")
         self.add_input("HstabConst", desc="1 + Fw/Bh term in equation")
 
         self.add_output("W_hstab", units="lb", desc="Hstab weight")
@@ -728,9 +726,8 @@ class HstabWeight_JetTransport(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         n_ult = self.options["n_ult"]
         K_uht = self.options["K_uht"]
-        tail_fuse_frac = self.options["tail_length_fuselage_frac"]
         Se_Sht = self.options["elevator_area_frac"]
-        c4_wing_c4_tail = tail_fuse_frac * inputs["ac|geom|fuselage|length"]
+        c4_wing_c4_tail = inputs["ac|geom|hstab|c4_to_wing_c4"]
 
         outputs["W_hstab"] = (
             0.0379
@@ -749,9 +746,8 @@ class HstabWeight_JetTransport(om.ExplicitComponent):
     def compute_partials(self, inputs, J):
         n_ult = self.options["n_ult"]
         K_uht = self.options["K_uht"]
-        tail_fuse_frac = self.options["tail_length_fuselage_frac"]
         Se_Sht = self.options["elevator_area_frac"]
-        c4_wing_c4_tail = tail_fuse_frac * inputs["ac|geom|fuselage|length"]
+        c4_wing_c4_tail = inputs["ac|geom|hstab|c4_to_wing_c4"]
 
         J["W_hstab", "ac|weights|MTOW"] = (
             0.0379
@@ -813,7 +809,7 @@ class HstabWeight_JetTransport(om.ExplicitComponent):
             * (1 + Se_Sht) ** 0.1
         )
 
-        J["W_hstab", "ac|geom|fuselage|length"] = (
+        J["W_hstab", "ac|geom|hstab|c4_to_wing_c4"] = (
             0.0379
             * K_uht
             * inputs["HstabConst"] ** -0.25
@@ -823,7 +819,6 @@ class HstabWeight_JetTransport(om.ExplicitComponent):
             * 0.3**0.704
             * (-0.296)
             * c4_wing_c4_tail**-1.296
-            * tail_fuse_frac
             * np.cos(inputs["ac|geom|hstab|c4sweep"]) ** -1
             * inputs["ac|geom|hstab|AR"] ** 0.166
             * (1 + Se_Sht) ** 0.1
@@ -864,8 +859,8 @@ class VstabWeight_JetTransport(om.ExplicitComponent):
         vertical stabilizer thickness-to-chord ratio (scalar, dimensionless)
     ac|geom|vstab|c4sweep : float
         vertical stabilizer sweep at 25% mean aerodynamic chord (scalar, radians)
-    ac|geom|fuselage|length : float
-        Fuselage length, used to compute distance between quarter chord of wing and vertical stabilizer (scalar, ft)
+    ac|geom|vstab|c4_to_wing_c4 : float
+        Distance from the vertical stabilizer's quarter chord (of the MAC) to the wing's quarter chord (scalar, ft)
 
     Outputs
     -------
@@ -876,15 +871,12 @@ class VstabWeight_JetTransport(om.ExplicitComponent):
     -------
     n_ult : float
         Ultimate load factor, 1.5 x limit load factor, by default 1.5 x 2.5 (scalar, dimensionless)
-    tail_length_fuselage_frac : float
-        Distance between quarter chord of wing and tail divided by fuselage length, by default 0.5 (scalar, dimensionless)
     T_tail : bool
         True if the tail is a T-tail, False otherwise
     """
 
     def initialize(self):
         self.options.declare("n_ult", default=2.5 * 1.5, desc="Ultimate load factor (dimensionless)")
-        self.options.declare("tail_length_fuselage_frac", default=0.5, desc="Tail lever arm over fuselage length")
         self.options.declare("T_tail", default=False, types=bool, desc="True if T-tail, False otherwise")
 
     def setup(self):
@@ -892,7 +884,7 @@ class VstabWeight_JetTransport(om.ExplicitComponent):
         self.add_input("ac|geom|vstab|S_ref", units="ft**2", desc="Reference vtail area in sq ft")
         self.add_input("ac|geom|vstab|AR", desc="vtail aspect ratio")
         self.add_input("ac|geom|vstab|c4sweep", units="rad", desc="Quarter-chord sweep angle")
-        self.add_input("ac|geom|fuselage|length", units="ft", desc="Fuselage length")
+        self.add_input("ac|geom|vstab|c4_to_wing_c4", units="ft", desc="Distance from wing to tail quarter chord")
         self.add_input("ac|geom|vstab|toverc", desc="root t/c of v-tail, estimated same as wing")
 
         self.add_output("W_vstab", units="lb", desc="Vstab weight")
@@ -900,9 +892,8 @@ class VstabWeight_JetTransport(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
         n_ult = self.options["n_ult"]
-        tail_fuse_frac = self.options["tail_length_fuselage_frac"]
         Ht_Hv = 1.0 if self.options["T_tail"] else 0.0
-        c4_wing_c4_tail = tail_fuse_frac * inputs["ac|geom|fuselage|length"]
+        c4_wing_c4_tail = inputs["ac|geom|vstab|c4_to_wing_c4"]
 
         outputs["W_vstab"] = (
             0.0026
@@ -918,9 +909,8 @@ class VstabWeight_JetTransport(om.ExplicitComponent):
 
     def compute_partials(self, inputs, J):
         n_ult = self.options["n_ult"]
-        tail_fuse_frac = self.options["tail_length_fuselage_frac"]
         Ht_Hv = 1.0 if self.options["T_tail"] else 0.0
-        c4_wing_c4_tail = tail_fuse_frac * inputs["ac|geom|fuselage|length"]
+        c4_wing_c4_tail = inputs["ac|geom|vstab|c4_to_wing_c4"]
 
         J["W_vstab", "ac|weights|MTOW"] = (
             0.0026
@@ -970,14 +960,13 @@ class VstabWeight_JetTransport(om.ExplicitComponent):
             * inputs["ac|geom|vstab|AR"] ** 0.35
             * inputs["ac|geom|vstab|toverc"] ** -0.5
         )
-        J["W_vstab", "ac|geom|fuselage|length"] = (
+        J["W_vstab", "ac|geom|vstab|c4_to_wing_c4"] = (
             0.0026
             * (1 + Ht_Hv) ** 0.225
             * inputs["ac|weights|MTOW"] ** 0.556
             * n_ult**0.536
             * (-0.5 + 0.875)
             * c4_wing_c4_tail ** (-0.5 + 0.875 - 1)
-            * tail_fuse_frac
             * inputs["ac|geom|vstab|S_ref"] ** 0.5
             * np.cos(inputs["ac|geom|vstab|c4sweep"]) ** -1
             * inputs["ac|geom|vstab|AR"] ** 0.35

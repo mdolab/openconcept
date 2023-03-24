@@ -33,11 +33,13 @@ class JetTransportEmptyWeightTestCase(unittest.TestCase):
         dvs.add_output("ac|geom|hstab|S_ref", 28.99, units="m**2")
         dvs.add_output("ac|geom|hstab|AR", 4.15)
         dvs.add_output("ac|geom|hstab|c4sweep", 30, units="deg")
+        dvs.add_output("ac|geom|hstab|c4_to_wing_c4", 29.54 / 2, units="m")  # guess (half of fuselage length)
 
         dvs.add_output("ac|geom|vstab|S_ref", 20.81, units="m**2")
         dvs.add_output("ac|geom|vstab|AR", 1.64)
         dvs.add_output("ac|geom|vstab|c4sweep", 35, units="deg")
         dvs.add_output("ac|geom|vstab|toverc", 0.12)  # guess
+        dvs.add_output("ac|geom|vstab|c4_to_wing_c4", 29.54 / 2, units="m")  # guess (half of fuselage length)
 
         dvs.add_output("ac|geom|fuselage|height", 3.76, units="m")
         dvs.add_output("ac|geom|fuselage|length", 29.54, units="m")
@@ -95,11 +97,13 @@ class JetTransportEmptyWeightTestCase(unittest.TestCase):
         dvs.add_output("ac|geom|hstab|S_ref", 32.78, units="m**2")
         dvs.add_output("ac|geom|hstab|AR", 6.16)
         dvs.add_output("ac|geom|hstab|c4sweep", 30, units="deg")
+        dvs.add_output("ac|geom|hstab|c4_to_wing_c4", 38.08 / 2, units="m")  # guess (half of fuselage length)
 
         dvs.add_output("ac|geom|vstab|S_ref", 26.44, units="m**2")
         dvs.add_output("ac|geom|vstab|AR", 1.91)
         dvs.add_output("ac|geom|vstab|c4sweep", 35, units="deg")
         dvs.add_output("ac|geom|vstab|toverc", 0.12)  # guess
+        dvs.add_output("ac|geom|vstab|c4_to_wing_c4", 38.08 / 2, units="m")  # guess (half of fuselage length)
 
         dvs.add_output("ac|geom|fuselage|height", 3.76, units="m")
         dvs.add_output("ac|geom|fuselage|length", 38.08, units="m")
@@ -152,11 +156,13 @@ class JetTransportEmptyWeightTestCase(unittest.TestCase):
         dvs.add_output("ac|geom|hstab|S_ref", 77.3, units="m**2")
         dvs.add_output("ac|geom|hstab|AR", 5)
         dvs.add_output("ac|geom|hstab|c4sweep", 36, units="deg")
+        dvs.add_output("ac|geom|hstab|c4_to_wing_c4", 61 / 2, units="m")  # guess (half of fuselage length)
 
         dvs.add_output("ac|geom|vstab|S_ref", 39.7, units="m**2")
         dvs.add_output("ac|geom|vstab|AR", 1.7)
         dvs.add_output("ac|geom|vstab|c4sweep", 40, units="deg")
         dvs.add_output("ac|geom|vstab|toverc", 0.1)  # guess
+        dvs.add_output("ac|geom|vstab|c4_to_wing_c4", 61 / 2, units="m")  # guess (half of fuselage length)
 
         dvs.add_output("ac|geom|fuselage|height", 5.9, units="m")
         dvs.add_output("ac|geom|fuselage|length", 61, units="m")
