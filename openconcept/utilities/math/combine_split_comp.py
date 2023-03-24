@@ -43,7 +43,7 @@ class VectorConcatenateComp(ExplicitComponent):
             Default is 1 (i.e. a vector of scalars)
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
-        **kwargs : str
+        kwargs : str
             Any other arguments to pass to the addition system
             (same as add_output method for ExplicitComponent)
             Examples include units (str or None), desc (str)
@@ -262,7 +262,7 @@ class VectorSplitComp(ExplicitComponent):
             Default is 1 (i.e. a vector of scalars)
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
-        **kwargs : str
+        kwargs : str
             Any other arguments to pass to the addition system
             (same as add_output method for ExplicitComponent)
             Examples include units (str or None), desc (str)

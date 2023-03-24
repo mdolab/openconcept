@@ -50,8 +50,8 @@ class AerostructDragPolarTestCase(unittest.TestCase):
         # Generate mesh to pass to OpenAeroStruct
         mesh = om.Problem(
             Aerostruct(
-                num_x=3,
-                num_y=7,
+                num_x=2,
+                num_y=6,
                 num_twist=twist.size,
                 num_toverc=toverc.size,
                 num_skin=t_skin.size,
@@ -75,8 +75,8 @@ class AerostructDragPolarTestCase(unittest.TestCase):
         p = om.Problem(
             AerostructDragPolar(
                 num_nodes=1,
-                num_x=3,
-                num_y=7,
+                num_x=2,
+                num_y=6,
                 num_twist=twist.size,
                 num_toverc=toverc.size,
                 num_skin=t_skin.size,
@@ -144,8 +144,8 @@ class AerostructDragPolarTestCase(unittest.TestCase):
         p = om.Problem(
             AerostructDragPolar(
                 num_nodes=nn,
-                num_x=3,
-                num_y=7,
+                num_x=2,
+                num_y=6,
                 num_twist=twist.size,
                 num_toverc=toverc.size,
                 num_skin=t_skin.size,
@@ -187,8 +187,8 @@ class AerostructDragPolarTestCase(unittest.TestCase):
         p = om.Problem(
             AerostructDragPolar(
                 num_nodes=nn,
-                num_x=3,
-                num_y=7,
+                num_x=2,
+                num_y=6,
                 num_twist=twist.size,
                 num_toverc=toverc.size,
                 num_skin=t_skin.size,
@@ -242,8 +242,8 @@ class OASDataGenTestCase(unittest.TestCase):
         p.model.add_subsystem(
             "comp",
             OASDataGen(
-                num_x=3,
-                num_y=7,
+                num_x=2,
+                num_y=6,
                 num_twist=twist.size,
                 num_toverc=toverc.size,
                 num_skin=t_skin.size,
@@ -317,7 +317,7 @@ class OASDataGenTestCase(unittest.TestCase):
 class AerostructTestCase(unittest.TestCase):
     def get_prob(self, surf_dict={}):
         p = om.Problem(
-            Aerostruct(num_x=3, num_y=5, num_twist=2, num_toverc=2, num_skin=2, num_spar=2, surf_options=surf_dict)
+            Aerostruct(num_x=2, num_y=4, num_twist=2, num_toverc=2, num_skin=2, num_spar=2, surf_options=surf_dict)
         )
         p.setup()
         p.set_val("fltcond|alpha", 3.0, units="deg")
@@ -374,7 +374,7 @@ class AerostructDragPolarExactTestCase(unittest.TestCase):
         q = 0.5 * 0.55427276 * 264.20682682**2
         nn = 3
         p = om.Problem(
-            AerostructDragPolarExact(num_nodes=nn, num_x=3, num_y=5, num_twist=2, num_toverc=2, num_skin=2, num_spar=2)
+            AerostructDragPolarExact(num_nodes=nn, num_x=2, num_y=4, num_twist=2, num_toverc=2, num_skin=2, num_spar=2)
         )
         p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, atol=1e-8, rtol=1e-10)
         p.model.linear_solver = om.DirectSolver()

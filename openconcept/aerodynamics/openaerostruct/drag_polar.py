@@ -6,6 +6,12 @@ import multiprocessing as mp
 
 # Atmospheric calculations
 from openconcept.atmospherics import TemperatureComp, PressureComp, DensityComp, SpeedOfSoundComp
+from openconcept.aerodynamics.openaerostruct import (
+    TrapezoidalPlanformMesh,
+    SectionPlanformMesh,
+    ThicknessChordRatioInterp,
+    SectionLinearInterp,
+)
 
 # Progress bar
 progress_bar = True
@@ -39,14 +45,25 @@ CITATION = """
 class VLMDragPolar(om.Group):
     """
     Drag polar generated using OpenAeroStruct's vortex lattice method and a surrogate
-    model to decrease the computational cost.
+    model to decrease the computational cost. It allows for three planform definitions.
+    The first is a trapezoidal planform defined by aspect ratio, taper, and sweep. The
+    second builds a planform from sections definitions, each defined by a streamwise
+    offset of the leading edge, spanwise position, and chord length. The mesh is linearly
+    lofted between the sections. Finally, this component can take in a mesh directly to
+    enable more flexibility. This component enables twisting of the mesh as well.
 
     Notes
     -----
     Twist is ordered starting at the tip and moving to the root; a twist
-    of [-1, 0, 1] would have a tip twist of -1 deg and root twist of 1 deg
+    of [-1, 0, 1] would have a tip twist of -1 deg and root twist of 1 deg.
+    This is the same ordering as for the section definitions if the geometry
+    option is set to \"section\".
 
     Set the OMP_NUM_THREADS environment variable to 1 for much better parallel training performance!
+
+    Make sure that the wing reference area provided to this group is consistent both with the reference
+    area used by OpenAeroStruct (projected area by default) AND the reference area used by OpenConcept
+    to compute the lift coefficient it provides.
 
     Inputs
     ------
@@ -60,15 +77,6 @@ class VLMDragPolar(om.Group):
         Dynamic pressure (vector, Pascals)
     ac|geom|wing|S_ref : float
         Full planform area (scalar, m^2)
-    ac|geom|wing|AR : float
-        Aspect ratio (scalar, dimensionless)
-    ac|geom|wing|taper : float
-        Taper ratio (must be >0 and <=1); tip chord / root chord (scalar, dimensionless)
-    ac|geom|wing|c4sweep : float
-        Quarter chord sweep angle (scalar, degrees)
-    ac|geom|wing|twist : float
-        List of twist angles at control points of spline (vector, degrees)
-        NOTE: length of vector is num_twist (set in options), NOT num_nodes
     ac|aero|CD_nonwing : float
         Drag coefficient of components other than the wing; e.g. fuselage,
         tail, interference drag, etc.; this value is simply added to the
@@ -76,27 +84,70 @@ class VLMDragPolar(om.Group):
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
         NOTE: fltcond|TempIncrement is a scalar in this component but a vector in OC. \
-              This will be the case for the forseeable future because of the way the \
-              VLMDataGen component is set up. To make it work, TempIncrement would \
-              need to be an input to the surrogate, which is not worth the extra \
-              training cost (at minimum a 2x increase).
+            This is the case because of the way the VLMDataGen component is set up. To \
+            make it work, TempIncrement would need to be an input to the surrogate, \
+            which is not worth the extra training cost (at minimum a 2x increase).
+
+        If geometry option is \"trapezoidal\" (the default)
+            - **ac|geom|wing|AR** *(float)* - Aspect ratio (scalar, dimensionless)
+            - **ac|geom|wing|taper** *(float)* - Taper ratio (must be >0 and <=1); tip chord / root chord (scalar, dimensionless)
+            - **ac|geom|wing|c4sweep** *(float)* - Quarter chord sweep angle (scalar, degrees)
+            - **ac|geom|wing|toverc** *(float)* - Wing tip and wing root airfoil thickness to chord ratio in that order; panel
+              thickness to chord ratios are linearly interpolated between the tip and root (vector of length 2, dimensionless)
+            - **ac|geom|wing|twist** *(float)* - Twist at spline control points, ordered from tip to root (vector of length num_twist, degrees)
+
+        If geometry option is \"section\" (despite inputs in m, they are scaled to provided planform area)
+            - **ac|geom|wing|x_LE_sec** *(float)* - Streamwise offset of the section's leading edge, starting with the outboard
+              section (wing tip) and moving inboard toward the root (vector of length
+              num_sections, m)
+            - **ac|geom|wing|y_sec** *(float)* - Spanwise location of each section, starting with the outboard section (wing
+              tip) at the MOST NEGATIVE y value and moving inboard (increasing y value)
+              toward the root; the user does not provide a value for the root because it
+              is always 0.0 (vector of length num_sections - 1, m)
+            - **ac|geom|wing|chord_sec** *(float)* - Chord of each section, starting with the outboard section (wing tip) and
+              moving inboard toward the root (vector of length num_sections, m)
+            - **ac|geom|wing|toverc** *(float)* - Thickness to chord ratio of the airfoil at each defined section starting at the wing tip
+              and moving wing root airfoil; panel thickness to chord ratios is linearly interpolated (vector of length num_sections, m)
+            - **ac|geom|wing|twist** *(float)* - Twist at each section, ordered from tip to root (vector of length num_sections, degrees)
+
+        If geometry option is \"mesh\"
+            - **ac|geom|wing|OAS_mesh** *(float)* - OpenAeroStruct 3D mesh (num_x + 1 x num_y + 1 x 3 vector, m)
+            - **ac|geom|wing|toverc** *(float)* - Thickness to chord ratio of each streamwise strip of panels ordered from
+              wing tip to wing root (vector of length num_y, dimensionless)
 
     Outputs
     -------
     drag : float
         Drag force (vector, Newtons)
+    twisted_mesh : float
+        OpenAeroStruct mesh that has been twisted according to twist inputs; only an output if geometry options
+        is set to \"trapezoidal\" or \"section\" (num_x + 1 x num_y + 1 x 3 vector, m)
 
     Options
     -------
     num_nodes : int
         Number of analysis points per mission segment (scalar, dimensionless)
+    geometry : float
+        Choose the geometry parameterization from the following options (by default trapezoidal):
+
+            - "trapezoidal": Create a trapezoidal mesh based on apsect ratio, taper, and sweep
+            - "section": Create a mesh lofted between defined sections
+            - "mesh": Pass in a mesh directly to this component
+
     num_x : int
-        Number of points in x (streamwise) direction (scalar, dimensionless)
+        Number of panels in x (streamwise) direction (scalar, dimensionless)
     num_y : int
-        Number of points in y (spanwise) direction for one wing because
-        uses symmetry (scalar, dimensionless)
+        Number of panels in y (spanwise) direction for half wing. If geometry option
+        is set to \"section\", this value represents the number of panels between each
+        pair of sections. In that case, it can also be a vector with potentially a different
+        number of panels between each pair of sections (scalar or vector, dimensionless)
+    num_sections : int
+        Only if geometry option is \"section\", this represents the number of spanwise sections
+        to define planform shape. This parameter is ignored for other geometry options (scalar, dimensionless)
     num_twist : int
-        Number of spline control points for twist (scalar, dimensionless)
+        Number of spline control points for twist, only used if geometry is set to \"trapezoidal\" because
+        \"mesh\" linearly interpolates twist between sections and \"mesh\" does not provide twist
+        functionality (scalar, dimensionless)
     alpha_train : list or ndarray
         List of angle of attack values at which to train the model (ndarray, degrees)
     Mach_train : list or ndarray
@@ -107,9 +158,8 @@ class VLMDragPolar(om.Group):
         Dictionary of OpenAeroStruct surface options; any options provided here
         will override the default ones; see the OpenAeroStruct documentation for more information.
         Because the geometry transformations are excluded in this model (to simplify the interface),
-        the <transformation>_cp options are not supported. The input ac|geom|wing|twist is the same
-        as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
-        is limited to adjusting the input parameters to this component.
+        the <transformation>_cp options are not supported. The t_over_c option is also removed since
+        it is provided instead as an input.
     """
 
     def __init__(self, **kwargs):
@@ -118,49 +168,159 @@ class VLMDragPolar(om.Group):
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of analysis points to run")
-        self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
-        self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
+        self.options.declare(
+            "geometry",
+            default="trapezoidal",
+            values=["trapezoidal", "section", "mesh"],
+            desc="OpenAeroStruct mesh parameterization",
+        )
+        self.options.declare("num_x", default=2, desc="Number of streamwise mesh panels")
+        self.options.declare(
+            "num_y", default=6, types=(int, list, tuple, np.ndarray), desc="Number of spanwise (half wing) mesh panels"
+        )
+        self.options.declare(
+            "num_sections", default=2, types=int, desc="Number of sections along the half span to define"
+        )
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
         self.options.declare(
             "Mach_train",
             default=np.array([0.1, 0.3, 0.45, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9]),
+            types=(list, np.ndarray),
             desc="List of Mach number training values (dimensionless)",
         )
         self.options.declare(
-            "alpha_train", default=np.linspace(-10, 15, 6), desc="List of angle of attack training values (degrees)"
+            "alpha_train",
+            default=np.linspace(-10, 15, 6),
+            types=(list, np.ndarray),
+            desc="List of angle of attack training values (degrees)",
         )
         self.options.declare(
-            "alt_train", default=np.linspace(0, 12e3, 4), desc="List of altitude training values (meters)"
+            "alt_train",
+            default=np.linspace(0, 12e3, 4),
+            types=(list, np.ndarray),
+            desc="List of altitude training values (meters)",
         )
-        self.options.declare("surf_options", default={}, desc="Dictionary of OpenAeroStruct surface options")
+        self.options.declare(
+            "surf_options", default={}, types=(dict), desc="Dictionary of OpenAeroStruct surface options"
+        )
 
     def setup(self):
         nn = self.options["num_nodes"]
+        nx = self.options["num_x"]
+        ny = self.options["num_y"]
+        n_twist = self.options["num_twist"]
+        geo = self.options["geometry"]
         n_alpha = self.options["alpha_train"].size
         n_Mach = self.options["Mach_train"].size
         n_alt = self.options["alt_train"].size
+
+        # Get the total number of y coordinates if it's not a scalar
+        if geo == "section" and isinstance(ny, int):
+            ny_tot = (self.options["num_sections"] - 1) * ny + 1
+        elif not isinstance(ny, int):
+            ny_tot = np.sum(ny) + 1
+        else:
+            ny_tot = ny + 1
+
+        # Generate the mesh if geometry parameterization says we should and twist it
+        if geo == "trapezoidal":
+            if not isinstance(ny, int):
+                raise ValueError("The num_y option must be an integer if the geometry option is trapezoidal")
+
+            self.add_subsystem(
+                "gen_mesh",
+                TrapezoidalPlanformMesh(num_x=nx, num_y=ny),
+                promotes_inputs=[
+                    ("S", "ac|geom|wing|S_ref"),
+                    ("AR", "ac|geom|wing|AR"),
+                    ("taper", "ac|geom|wing|taper"),
+                    ("sweep", "ac|geom|wing|c4sweep"),
+                ],
+                promotes_outputs=[("mesh", "ac|geom|wing|OAS_mesh")],
+            )
+
+            # Compute the twist at mesh y-coordinates
+            comp = self.add_subsystem(
+                "twist_bsp",
+                om.SplineComp(
+                    method="bsplines",
+                    x_interp_val=np.linspace(0, 1, ny_tot),
+                    num_cp=n_twist,
+                    interp_options={"order": min(n_twist, 4)},
+                ),
+                promotes_inputs=[("twist_cp", "ac|geom|wing|twist")],
+            )
+            comp.add_spline(y_cp_name="twist_cp", y_interp_name="twist", y_units="deg")
+            self.set_input_defaults("ac|geom|wing|twist", np.zeros(n_twist), units="deg")
+
+            # Apply twist spline to mesh
+            self.add_subsystem(
+                "twist_mesh",
+                Rotate(val=np.zeros(ny_tot), mesh_shape=(nx + 1, ny_tot, 3), symmetry=True),
+                promotes_inputs=[("in_mesh", "ac|geom|wing|OAS_mesh")],
+                promotes_outputs=[("mesh", "twisted_mesh")],
+            )
+            self.connect("twist_bsp.twist", "twist_mesh.twist")
+        elif geo == "section":
+            self.add_subsystem(
+                "gen_mesh",
+                SectionPlanformMesh(num_x=nx, num_y=ny, num_sections=self.options["num_sections"], scale_area=True),
+                promotes_inputs=[
+                    ("S", "ac|geom|wing|S_ref"),
+                    ("x_LE_sec", "ac|geom|wing|x_LE_sec"),
+                    ("y_sec", "ac|geom|wing|y_sec"),
+                    ("chord_sec", "ac|geom|wing|chord_sec"),
+                ],
+                promotes_outputs=[("mesh", "ac|geom|wing|OAS_mesh")],
+            )
+
+            # Compute the twist at mesh y-coordinates
+            self.add_subsystem(
+                "twist_sec",
+                SectionLinearInterp(num_y=ny, num_sections=self.options["num_sections"], units="deg", cos_spacing=True),
+                promotes_inputs=[("property_sec", "ac|geom|wing|twist")],
+            )
+            self.set_input_defaults("ac|geom|wing|twist", np.zeros(self.options["num_sections"]), units="deg")
+
+            # Apply twist spline to mesh
+            self.add_subsystem(
+                "twist_mesh",
+                Rotate(val=np.zeros(ny_tot), mesh_shape=(nx + 1, ny_tot, 3), symmetry=True),
+                promotes_inputs=[("in_mesh", "ac|geom|wing|OAS_mesh")],
+                promotes_outputs=[("mesh", "twisted_mesh")],
+            )
+            self.connect("twist_sec.property_node", "twist_mesh.twist")
+
+        # Interpolate the thickness to chord ratios for each panel
+        if geo in ["trapezoidal", "section"]:
+            n_sections = self.options["num_sections"] if geo == "section" else 2
+            self.add_subsystem(
+                "t_over_c_interp",
+                ThicknessChordRatioInterp(num_y=ny, num_sections=n_sections),
+                promotes_inputs=[("section_toverc", "ac|geom|wing|toverc")],
+            )
+
+        # Inputs to promote from the calls to OpenAeroStruct (if geometry is "mesh",
+        # promote the thickness-to-chord ratio directly)
+        VLM_promote_inputs = ["ac|aero|CD_nonwing", "fltcond|TempIncrement"]
+        if geo == "mesh":
+            VLM_promote_inputs += ["ac|geom|wing|toverc", "ac|geom|wing|OAS_mesh"]
+        else:
+            self.connect("t_over_c_interp.panel_toverc", "training_data.ac|geom|wing|toverc")
+            self.connect("twisted_mesh", "training_data.ac|geom|wing|OAS_mesh")
 
         # Training data
         self.add_subsystem(
             "training_data",
             VLMDataGen(
-                num_x=self.options["num_x"],
-                num_y=self.options["num_y"],
-                num_twist=self.options["num_twist"],
+                num_x=nx,
+                num_y=ny_tot - 1,
                 alpha_train=self.options["alpha_train"],
                 Mach_train=self.options["Mach_train"],
                 alt_train=self.options["alt_train"],
                 surf_options=self.options["surf_options"],
             ),
-            promotes_inputs=[
-                "ac|geom|wing|S_ref",
-                "ac|geom|wing|AR",
-                "ac|geom|wing|taper",
-                "ac|geom|wing|c4sweep",
-                "ac|geom|wing|twist",
-                "ac|aero|CD_nonwing",
-                "fltcond|TempIncrement",
-            ],
+            promotes_inputs=VLM_promote_inputs,
         )
 
         # Surrogate model
@@ -202,28 +362,26 @@ class VLMDragPolar(om.Group):
         )
         self.connect("aero_surrogate.CD", "drag_calc.CD")
 
+        # Set input defaults for inputs promoted from different places with different values
+        self.set_input_defaults("ac|geom|wing|S_ref", 1.0, units="m**2")
+
 
 class VLMDataGen(om.ExplicitComponent):
     """
     Generates a grid of OpenAeroStruct lift and drag data to train
     a surrogate model. The grid is defined by the options and the
-    planform geometry by the inputs. This component will only recalculate
-    the lift and drag grid when the planform shape changes. All VLMDataGen
+    mesh geometry by the input. This component will only recalculate
+    the lift and drag grid when the mesh changes. All VLMDataGen
     components in the model must use the same training points and surf_options.
 
     Inputs
     ------
-    ac|geom|wing|S_ref : float
-        Full planform area (scalar, m^2)
-    ac|geom|wing|AR : float
-        Aspect ratio (scalar, dimensionless)
-    ac|geom|wing|taper : float
-        Taper ratio (must be >0 and <=1); tip chord / root chord (scalar, dimensionless)
-    ac|geom|wing|c4sweep : float
-        Quarter chord sweep angle (scalar, degrees)
-    ac|geom|wing|twist : float
-        List of twist angles at control points of spline (vector, degrees)
-        NOTE: length of vector is num_twist (set in options)
+    ac|geom|wing|OAS_mesh: float
+        OpenAeroStruct 3D mesh (num_x + 1 x num_y + 1 x 3 vector, m)
+    ac|geom|wing|toverc : float
+        Thickness to chord ratio of each streamwise strip of panels ordered from wing
+        tip to wing root; used for the viscous and wave drag calculations
+        (vector of length num_y, dimensionless)
     ac|aero|CD_nonwing : float
         Drag coefficient of components other than the wing; e.g. fuselage,
         tail, interference drag, etc.; this value is simply added to the
@@ -241,12 +399,10 @@ class VLMDataGen(om.ExplicitComponent):
     Options
     -------
     num_x : int
-        Number of points in x (streamwise) direction (scalar, dimensionless)
+        Number of panels in x (streamwise) direction (scalar, dimensionless)
     num_y : int
-        Number of points in y (spanwise) direction for one wing because
+        Number of panels in y (spanwise) direction for one wing because
         uses symmetry (scalar, dimensionless)
-    num_twist : int
-        Number of spline control points for twist (scalar, dimensionless)
     Mach_train : list or ndarray
         List of Mach numbers at which to train the model (ndarray, dimensionless)
     alpha_train : list or ndarray
@@ -257,9 +413,8 @@ class VLMDataGen(om.ExplicitComponent):
         Dictionary of OpenAeroStruct surface options; any options provided here
         will override the default ones; see the OpenAeroStruct documentation for more information.
         Because the geometry transformations are excluded in this model (to simplify the interface),
-        the <transformation>_cp options are not supported. The input ac|geom|wing|twist is the same
-        as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
-        is limited to adjusting the input parameters to this component.
+        the <transformation>_cp options are not supported. The t_over_c option is also removed since
+        it is provided instead as an input.
     """
 
     def __init__(self, **kwargs):
@@ -267,9 +422,8 @@ class VLMDataGen(om.ExplicitComponent):
         self.cite = CITATION
 
     def initialize(self):
-        self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
-        self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
-        self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
+        self.options.declare("num_x", default=2, desc="Number of streamwise mesh panels")
+        self.options.declare("num_y", default=6, desc="Number of spanwise (half wing) mesh panels")
         self.options.declare(
             "Mach_train",
             default=np.array([0.1, 0.3, 0.45, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9]),
@@ -284,16 +438,11 @@ class VLMDataGen(om.ExplicitComponent):
         self.options.declare("surf_options", default={}, desc="Dictionary of OpenAeroStruct surface options")
 
     def setup(self):
-        self.add_input("ac|geom|wing|S_ref", units="m**2")
-        self.add_input("ac|geom|wing|AR")
-        self.add_input("ac|geom|wing|taper")
-        self.add_input("ac|geom|wing|c4sweep", units="deg")
-        self.add_input(
-            "ac|geom|wing|twist",
-            val=np.zeros(self.options["num_twist"]),
-            shape=(self.options["num_twist"],),
-            units="deg",
-        )
+        nx = self.options["num_x"]
+        ny = self.options["num_y"]
+
+        self.add_input("ac|geom|wing|OAS_mesh", units="m", shape=(nx + 1, ny + 1, 3))
+        self.add_input("ac|geom|wing|toverc", shape=(ny,), val=0.12)
         self.add_input("ac|aero|CD_nonwing", val=0.0)
         self.add_input("fltcond|TempIncrement", val=0.0, units="degC")
 
@@ -327,11 +476,8 @@ class VLMDataGen(om.ExplicitComponent):
             VLMDataGen.surf_options = deepcopy(self.options["surf_options"])
 
         # Generate grids and default cached values for training inputs and outputs
-        VLMDataGen.S = -np.ones(1)
-        VLMDataGen.AR = -np.ones(1)
-        VLMDataGen.taper = -np.ones(1)
-        VLMDataGen.c4sweep = -np.ones(1)
-        VLMDataGen.twist = -1 * np.ones((self.options["num_twist"],))
+        VLMDataGen.mesh = -np.ones((nx + 1, ny + 1, 3))
+        VLMDataGen.toverc = -np.ones(ny)
         VLMDataGen.temp_incr = -42 * np.ones(1)
         VLMDataGen.Mach, VLMDataGen.alpha, VLMDataGen.alt = np.meshgrid(
             self.options["Mach_train"], self.options["alpha_train"], self.options["alt_train"], indexing="ij"
@@ -341,35 +487,25 @@ class VLMDataGen(om.ExplicitComponent):
         VLMDataGen.partials = None
 
     def compute(self, inputs, outputs):
-        S = inputs["ac|geom|wing|S_ref"]
-        AR = inputs["ac|geom|wing|AR"]
-        taper = inputs["ac|geom|wing|taper"]
-        sweep = inputs["ac|geom|wing|c4sweep"]
-        twist = inputs["ac|geom|wing|twist"]
+        mesh = inputs["ac|geom|wing|OAS_mesh"]
+        toverc = inputs["ac|geom|wing|toverc"]
         CD_nonwing = inputs["ac|aero|CD_nonwing"]
         temp_incr = inputs["fltcond|TempIncrement"]
 
         # If the inputs are unchaged, use the previously calculated values
         tol = 1e-13  # floating point comparison tolerance
         if (
-            np.abs(S - VLMDataGen.S) < tol
-            and np.abs(AR - VLMDataGen.AR) < tol
-            and np.abs(taper - VLMDataGen.taper) < tol
-            and np.abs(sweep - VLMDataGen.c4sweep) < tol
-            and np.all(np.abs(twist - VLMDataGen.twist) < tol)
+            np.all(np.abs(mesh - VLMDataGen.mesh) < tol)
+            and np.all(np.abs(toverc - VLMDataGen.toverc) < tol)
             and np.abs(temp_incr - VLMDataGen.temp_incr) < tol
         ):
             outputs["CL_train"] = VLMDataGen.CL
             outputs["CD_train"] = VLMDataGen.CD + CD_nonwing
             return
 
-        print(f"S = {S}; AR = {AR}; taper = {taper}; sweep = {sweep}; twist = {twist}; temp_incr = {temp_incr}")
         # Copy new values to cached ones
-        VLMDataGen.S[:] = S
-        VLMDataGen.AR[:] = AR
-        VLMDataGen.taper[:] = taper
-        VLMDataGen.c4sweep[:] = sweep
-        VLMDataGen.twist[:] = twist
+        VLMDataGen.mesh[:, :, :] = mesh
+        VLMDataGen.toverc[:] = toverc
         VLMDataGen.temp_incr[:] = temp_incr
 
         # Compute new training values
@@ -378,11 +514,8 @@ class VLMDataGen(om.ExplicitComponent):
         train_in["alpha_grid"] = VLMDataGen.alpha
         train_in["alt_grid"] = VLMDataGen.alt
         train_in["TempIncrement"] = temp_incr
-        train_in["S_ref"] = S
-        train_in["AR"] = AR
-        train_in["taper"] = taper
-        train_in["c4sweep"] = sweep
-        train_in["twist"] = twist
+        train_in["mesh"] = mesh
+        train_in["toverc"] = toverc
         train_in["num_x"] = self.options["num_x"]
         train_in["num_y"] = self.options["num_y"]
 
@@ -417,29 +550,23 @@ inputs : dict
         Altitude (3D meshgrid 'ij'-style ndarray, m)
     TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
-    S_ref : float
-        Wing planform area (scalar, m^2)
-    AR : float
-        Wing aspect ratio (scalar, dimensionless)
-    taper : float
-        Wing taper ratio (scalar, dimensionless)
-    c4sweep : float
-        Wing sweep measured at quarter chord (scalar, degrees)
-    twist : float
-        List of twist angles at control points of spline (vector, degrees)
-        NOTE: length of vector is num_twist (set in options of VLMDataGen)
+    mesh: ndarray
+        OpenAeroStruct 3D mesh (num_x + 1 x num_y + 1 x 3 ndarray, m)
+    toverc : float
+        Thickness to chord ratio of each streamwise strip of panels ordered from wing
+        tip to wing root; used for the viscous and wave drag calculations
+        (vector of length num_y, dimensionless)
     num_x: int
-        number of points in x (streamwise) direction (scalar, dimensionless)
+        number of panels in x (streamwise) direction (scalar, dimensionless)
     num_y: int
-        number of points in y (spanwise) direction for one wing because
+        number of panels in y (spanwise) direction for one wing because
         uses symmetry (scalar, dimensionless)
 surf_dict : dict
     Dictionary of OpenAeroStruct surface options; any options provided here
     will override the default ones; see the OpenAeroStruct documentation for more information.
     Because the geometry transformations are excluded in this model (to simplify the interface),
-    the <transformation>_cp options are not supported. The input ac|geom|wing|twist is the same
-    as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
-    is limited to adjusting the input parameters to this component.
+    the <transformation>_cp options are not supported. The t_over_c option is also removed since
+    it is provided instead as an input.
 
 Returns
 -------
@@ -469,7 +596,7 @@ def compute_training_data(inputs, surf_dict=None):
         ]
     ).T.tolist()
     inputs_to_send = {"surf_dict": surf_dict}
-    keys = ["TempIncrement", "S_ref", "AR", "taper", "c4sweep", "twist", "num_x", "num_y"]
+    keys = ["TempIncrement", "mesh", "toverc", "num_x", "num_y"]
     for key in keys:
         inputs_to_send[key] = inputs[key]
     for row in test_points:
@@ -486,31 +613,22 @@ def compute_training_data(inputs, surf_dict=None):
     CL = np.zeros(inputs["Mach_number_grid"].shape)
     CD = np.zeros(inputs["Mach_number_grid"].shape)
     jac_num_rows = inputs["Mach_number_grid"].size  # product of array dimensions
+    mesh_jac_num_cols = inputs["mesh"].size
+    num_y_panels = inputs["mesh"].shape[1] - 1
     of = ["CL_train", "CD_train"]
-    wrt = [
-        "ac|geom|wing|S_ref",
-        "ac|geom|wing|AR",
-        "ac|geom|wing|taper",
-        "ac|geom|wing|c4sweep",
-        "ac|geom|wing|twist",
-        "fltcond|TempIncrement",
-    ]
     partials = {}
     for f in of:
-        for u in wrt:
-            if u == "ac|geom|wing|twist":
-                partials[f, u] = np.zeros((jac_num_rows, inputs["twist"].size))
-            else:
-                partials[f, u] = np.zeros((jac_num_rows, 1))
+        partials[f, "ac|geom|wing|OAS_mesh"] = np.zeros((jac_num_rows, mesh_jac_num_cols))
+        partials[f, "ac|geom|wing|toverc"] = np.zeros((jac_num_rows, num_y_panels))
+        partials[f, "fltcond|TempIncrement"] = np.zeros((jac_num_rows, 1))
     data = {"CL": CL, "CD": CD, "partials": partials}
 
     # Transfer data into output data structure the proper format
     for i in range(len(out)):
         data["CL"][np.unravel_index(i, inputs["Mach_number_grid"].shape)] = out[i]["CL"]
         data["CD"][np.unravel_index(i, inputs["Mach_number_grid"].shape)] = out[i]["CD"]
-        for f in of:
-            for u in wrt:
-                data["partials"][f, u][i] = out[i]["partials"][f, u]
+        for key in data["partials"].keys():
+            data["partials"][key][i] = out[i]["partials"][key]
 
     print(f"        ...done in {time() - t_start} sec\n")
 
@@ -530,21 +648,17 @@ def compute_aerodynamic_data(point):
         VLM(
             num_x=inputs["num_x"],
             num_y=inputs["num_y"],
-            num_twist=inputs["twist"].size,
             surf_options=inputs["surf_dict"],
         ),
         promotes=["*"],
     )
 
-    # Set design variables
-    p.model.set_input_defaults("fltcond|TempIncrement", val=inputs["TempIncrement"], units="degC")
-    p.model.set_input_defaults("ac|geom|wing|S_ref", val=inputs["S_ref"], units="m**2")
-    p.model.set_input_defaults("ac|geom|wing|AR", val=inputs["AR"])
-    p.model.set_input_defaults("ac|geom|wing|taper", val=inputs["taper"])
-    p.model.set_input_defaults("ac|geom|wing|c4sweep", val=inputs["c4sweep"], units="deg")
-    p.model.set_input_defaults("ac|geom|wing|twist", val=inputs["twist"], units="deg")
-    p.setup()
+    p.setup(mode="rev")
 
+    # Set variables
+    p.set_val("fltcond|TempIncrement", val=inputs["TempIncrement"], units="degC")
+    p.set_val("ac|geom|wing|OAS_mesh", val=inputs["mesh"], units="m")
+    p.set_val("ac|geom|wing|toverc", val=inputs["toverc"])
     p.set_val("fltcond|M", point[0])
     p.set_val("fltcond|alpha", point[1], units="deg")
     p.set_val("fltcond|h", point[2], units="m")
@@ -556,15 +670,10 @@ def compute_aerodynamic_data(point):
     # Compute derivatives
     of = ["fltcond|CL", "fltcond|CD"]
     of_out = ["CL_train", "CD_train"]
-    wrt = [
-        "ac|geom|wing|S_ref",
-        "ac|geom|wing|AR",
-        "ac|geom|wing|taper",
-        "ac|geom|wing|c4sweep",
-        "ac|geom|wing|twist",
-        "fltcond|TempIncrement",
-    ]
+    wrt = ["ac|geom|wing|OAS_mesh", "ac|geom|wing|toverc", "fltcond|TempIncrement"]
+
     deriv = p.compute_totals(of, wrt)
+
     for n, f in enumerate(of):
         for u in wrt:
             output["partials"][of_out[n], u] = np.copy(deriv[f, u])
@@ -574,12 +683,12 @@ def compute_aerodynamic_data(point):
 
 class VLM(om.Group):
     """
-    Computes lift and drag using OpenAeroStruct's vortex lattice implementation.
+    Computes lift, drag, and other forces using OpenAeroStruct's vortex lattice implementation.
+    This group contains a Reynolds number calculation that uses a linear approximation of dynamic
+    viscosity. It is accurate up through ~33k ft and probably ok up to 40k ft, but not much further.
 
-    Notes
-    -----
-    Twist is ordered starting at the tip and moving to the root; a twist
-    of [-1, 0, 1] would have a tip twist of -1 deg and root twist of 1 deg
+    Thickness to chord ratio of the airfoils is taken from the input, not the value in
+    the surf_options dict (which is ignored).
 
     Inputs
     ------
@@ -591,17 +700,12 @@ class VLM(om.Group):
         Altitude (scalar, m)
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
-    ac|geom|wing|S_ref : float
-        Wing planform area (scalar, m^2)
-    ac|geom|wing|AR : float
-        Wing aspect ratio (scalar, dimensionless)
-    ac|geom|wing|taper : float
-        Wing taper ratio (scalar, dimensionless)
-    ac|geom|wing|c4sweep : float
-        Wing sweep measured at quarter chord (scalar, degrees)
-    ac|geom|wing|twist : float
-        List of twist angles at control points of spline (vector, degrees)
-        NOTE: length of vector is num_twist (set in options)
+    ac|geom|wing|OAS_mesh: float
+        OpenAeroStruct 3D mesh (num_x + 1 x num_y + 1 x 3 vector, m)
+    ac|geom|wing|toverc : float
+        Thickness to chord ratio of each streamwise strip of panels ordered from wing
+        tip to wing root; used for the viscous and wave drag calculations
+        (vector of length num_y, dimensionless)
 
     Outputs
     -------
@@ -609,23 +713,30 @@ class VLM(om.Group):
         Lift coefficient of wing (scalar, dimensionless)
     fltcond|CD : float
         Drag coefficient of wing (scalar, dimensionless)
+    fltcond|CDi : float
+        Induced drag component (scalar, dimensionless)
+    fltcond|CDv : float
+        Viscous drag component (scalar, dimensionless)
+    fltcond|CDw : float
+        Wave drag component (scalar, dimensionless)
+    sectional_CL : float
+        Sectional lift coefficient for each chordwise panel strip (vector of length num_y, dimensionless)
+    panel_forces : float
+        Force from VLM for each panel (vector of size (num_x x num_y x 3), N)
 
     Options
     -------
     num_x : int
-        Number of points in x (streamwise) direction (scalar, dimensionless)
+        Number of panels in x (streamwise) direction (scalar, dimensionless)
     num_y : int
-        Number of points in y (spanwise) direction for one wing because
+        Number of panels in y (spanwise) direction for one wing because
         uses symmetry (scalar, dimensionless)
-    num_twist : int
-        Number of spline control points for twist (scalar, dimensionless)
     surf_options : dict
         Dictionary of OpenAeroStruct surface options; any options provided here
         will override the default ones; see the OpenAeroStruct documentation for more information.
         Because the geometry transformations are excluded in this model (to simplify the interface),
-        the <transformation>_cp options are not supported. The input ac|geom|wing|twist is the same
-        as modifying the twist_cp option in the surface dictionary. The mesh geometry modification
-        is limited to adjusting the input parameters to this component.
+        the <transformation>_cp options are not supported. The t_over_c option is also removed since
+        it is provided instead as an input.
     """
 
     def __init__(self, **kwargs):
@@ -633,45 +744,14 @@ class VLM(om.Group):
         self.cite = CITATION
 
     def initialize(self):
-        self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
-        self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
-        self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
+        self.options.declare("num_x", default=2, desc="Number of streamwise mesh panels")
+        self.options.declare("num_y", default=6, desc="Number of spanwise (half wing) mesh panels")
         self.options.declare("surf_options", default=None, desc="Dictionary of OpenAeroStruct surface options")
 
     def setup(self):
-        nx = int(self.options["num_x"])
-        ny = int(self.options["num_y"])
-        n_twist = int(self.options["num_twist"])
-
-        # =================================================================
-        #                            Set up mesh
-        # =================================================================
-        self.add_subsystem(
-            "mesh",
-            PlanformMesh(num_x=nx, num_y=ny),
-            promotes_inputs=[
-                ("S", "ac|geom|wing|S_ref"),
-                ("AR", "ac|geom|wing|AR"),
-                ("taper", "ac|geom|wing|taper"),
-                ("sweep", "ac|geom|wing|c4sweep"),
-            ],
-        )
-
-        # Add bspline component for twist
-        x_interp = np.linspace(0.0, 1.0, ny)
-        comp = self.add_subsystem(
-            "twist_bsp",
-            om.SplineComp(
-                method="bsplines", x_interp_val=x_interp, num_cp=n_twist, interp_options={"order": min(n_twist, 4)}
-            ),
-            promotes_inputs=[("twist_cp", "ac|geom|wing|twist")],
-        )
-        comp.add_spline(y_cp_name="twist_cp", y_interp_name="twist", y_units="deg")
-
-        # Apply twist spline to mesh
-        self.add_subsystem("twist_mesh", Rotate(val=np.zeros(ny), mesh_shape=(nx, ny, 3), symmetry=True))
-        self.connect("twist_bsp.twist", "twist_mesh.twist")
-        self.connect("mesh.mesh", "twist_mesh.in_mesh")
+        # Number of coordinates is one more than the number of panels
+        nx = int(self.options["num_x"]) + 1
+        ny = int(self.options["num_y"]) + 1
 
         # =================================================================
         #              Compute atmospheric and fluid properties
@@ -716,7 +796,7 @@ class VLM(om.Group):
             np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij"
         )
 
-        surf_dict = {
+        self.surf_dict = {
             "name": "wing",
             "mesh": dummy_mesh,  # this must be defined
             # because the VLMGeometry component uses the shape of the mesh in this
@@ -746,185 +826,45 @@ class VLM(om.Group):
         # Overwrite any options in the surface dict with those provided in the options
         if self.options["surf_options"] is not None:
             for key in self.options["surf_options"]:
-                surf_dict[key] = self.options["surf_options"][key]
+                self.surf_dict[key] = self.options["surf_options"][key]
 
         self.add_subsystem(
             "aero_point",
-            AeroPoint(surfaces=[surf_dict]),
-            promotes_inputs=[("Mach_number", "fltcond|M"), ("alpha", "fltcond|alpha")],
-            promotes_outputs=[
-                (f"{surf_dict['name']}_perf.CD", "fltcond|CD"),
-                (f"{surf_dict['name']}_perf.CL", "fltcond|CL"),
+            AeroPoint(surfaces=[self.surf_dict]),
+            promotes_inputs=[
+                ("Mach_number", "fltcond|M"),
+                ("alpha", "fltcond|alpha"),
+                (f"{self.surf_dict['name']}_perf.t_over_c", "ac|geom|wing|toverc"),
             ],
-        )
-        self.connect(
-            "twist_mesh.mesh",
-            [f"aero_point.{surf_dict['name']}.def_mesh", f"aero_point.aero_states.{surf_dict['name']}_def_mesh"],
+            promotes_outputs=[
+                (f"{self.surf_dict['name']}_perf.CD", "fltcond|CD"),
+                (f"{self.surf_dict['name']}_perf.CL", "fltcond|CL"),
+                (f"{self.surf_dict['name']}_perf.CDi", "fltcond|CDi"),
+                (f"{self.surf_dict['name']}_perf.CDv", "fltcond|CDv"),
+                (f"{self.surf_dict['name']}_perf.CDw", "fltcond|CDw"),
+                (f"{self.surf_dict['name']}_perf.Cl", "sectional_CL"),
+                (f"aero_states.{self.surf_dict['name']}_sec_forces", "panel_forces"),
+            ],
         )
         self.connect("airspeed.Utrue", "aero_point.v")
         self.connect("density.fltcond|rho", "aero_point.rho")
         self.connect("Re_calc.re", "aero_point.re")
 
+        # Promote the mesh from within OpenAeroStruct
+        self.promotes(
+            subsys_name="aero_point",
+            inputs=[(f"{self.surf_dict['name']}.def_mesh", "ac|geom|wing|OAS_mesh")],
+        )
+        self.promotes(
+            subsys_name="aero_point",
+            inputs=[(f"aero_states.{self.surf_dict['name']}_def_mesh", "ac|geom|wing|OAS_mesh")],
+        )
+
         # Set input defaults for inputs that go to multiple locations
         self.set_input_defaults("fltcond|M", 0.1)
-        self.set_input_defaults("fltcond|alpha", 0.0)
-
-        # Set the thickness to chord ratio for wave and viscous drag calculation.
-        # It must have a thickness to chord ratio for each panel, so there must be
-        # ny-1 elements. Allow either one value (and duplicate it ny-1 times) or
-        # an array of length ny-1, but nothing else.
-        # NOTE: for aerostructural cases, this should be a design variable with control points over a spline
-        if isinstance(surf_dict["t_over_c"], (int, float)) or surf_dict["t_over_c"].size == 1:
-            self.set_input_defaults(
-                f"aero_point.{surf_dict['name']}_perf.t_over_c", val=surf_dict["t_over_c"] * np.ones(ny - 1)
-            )
-        elif surf_dict["t_over_c"].size == ny - 1:
-            self.set_input_defaults(f"aero_point.{surf_dict['name']}_perf.t_over_c", val=surf_dict["t_over_c"])
-        else:
-            raise ValueError(
-                f"t_over_c in the surface dict must be either a number or an ndarray "
-                f"with either one or ny-1 elements, not {surf_dict['t_over_c']}"
-            )
-
-
-class PlanformMesh(om.ExplicitComponent):
-    """
-    Generate an OpenAeroStruct mesh based on basic wing design parameters.
-    Resulting mesh is for a half wing (meant to use with OpenAeroStruct symmetry),
-    but the input reference area is for the full wing.
-
-    Inputs
-    ------
-    S: float
-        full planform area (scalar, m^2)
-    AR: float
-        aspect ratio (scalar, dimensionless)
-    taper: float
-        taper ratio (must be >0 and <=1); tip chord / root chord (scalar, dimensionless)
-    sweep: float
-        quarter chord sweep angle (scalar, degrees)
-
-    Outputs
-    -------
-    mesh: ndarray
-        OpenAeroStruct 3D mesh (num_x x num_y x 3 ndarray, m)
-
-    Options
-    -------
-    num_x: int
-        number of points in x (streamwise) direction (scalar, dimensionless)
-    num_y: int
-        number of points in y (spanwise) direction (scalar, dimensionless)
-    """
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.cite = CITATION
-
-    def initialize(self):
-        self.options.declare("num_x", default=3, desc="Number of streamwise mesh points")
-        self.options.declare("num_y", default=7, desc="Number of spanwise (half wing) mesh points")
-
-    def setup(self):
-        nx = int(self.options["num_x"])
-        ny = int(self.options["num_y"])
-
-        # Generate default mesh
-        x, y = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
-        y *= 5
-        mesh = np.zeros((nx, ny, 3))
-        mesh[:, :, 0] = x
-        mesh[:, :, 1] = y
-
-        self.add_input("S", val=10, units="m**2")
-        self.add_input("AR", val=10)
-        self.add_input("taper", val=1.0)
-        self.add_input("sweep", val=10, units="deg")
-
-        self.add_output("mesh", val=mesh, shape=(nx, ny, 3), units="m")
-
-        self.declare_partials("mesh", "*")
-
-    def compute(self, inputs, outputs):
-        S = inputs["S"]
-        AR = inputs["AR"]
-        taper = inputs["taper"]
-        sweep = inputs["sweep"]
-        nx = int(self.options["num_x"])
-        ny = int(self.options["num_y"])
-
-        # Compute absolute dimensions from wing geometry spec
-        half_span = np.sqrt(AR * S) / 2
-        c_root = S / (half_span * (1 + taper))
-
-        # Create baseline square mesh from 0 to 1 in each direction
-        x_mesh, y_mesh = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
-
-        # Morph the mesh to fit the desired wing shape
-        x_mesh *= c_root
-        y_mesh *= half_span  # rectangular wing with correct root chord and wingspan
-        x_mesh *= np.linspace(taper, 1, ny).reshape(1, ny)  # taper wing
-        x_mesh -= np.linspace(c_root * taper, c_root, ny).reshape(1, ny) / 4  # shift to quarter chord at x=0
-        x_mesh += np.linspace(half_span, 0, ny).reshape(1, ny) * np.tan(
-            np.deg2rad(sweep)
-        )  # sweep wing at quarter chord
-
-        mesh = np.zeros((nx, ny, 3))
-        mesh[:, :, 0] = x_mesh
-        mesh[:, :, 1] = y_mesh
-
-        outputs["mesh"] = mesh
-
-    def compute_partials(self, inputs, J):
-        S = inputs["S"]
-        AR = inputs["AR"]
-        taper = inputs["taper"]
-        sweep = inputs["sweep"]
-        nx = int(self.options["num_x"])
-        ny = int(self.options["num_y"])
-
-        # Compute absolute dimensions from wing geometry spec
-        half_span = np.sqrt(AR * S) / 2
-        c_root = S / (half_span * (1 + taper))
-
-        # Create baseline square mesh from 0 to 1 in each direction
-        x_mesh, y_mesh = np.meshgrid(np.linspace(0, 1, nx), np.linspace(-1, 0, ny), indexing="ij")
-
-        # Compute derivatives in a way analogous to forward AD
-        db_dS = AR / (4 * np.sqrt(AR * S))
-        db_dAR = S / (4 * np.sqrt(AR * S))
-        dcroot_dS = 1 / (half_span * (1 + taper)) - S / (half_span**2 * (1 + taper)) * db_dS
-        dcroot_dAR = -S / (half_span**2 * (1 + taper)) * db_dAR
-        dcroot_dtaper = -S / (half_span * (1 + taper) ** 2)
-
-        dy_dS = y_mesh * db_dS
-        dy_dAR = y_mesh * db_dAR
-
-        dx_dS = x_mesh * np.linspace(taper, 1, ny).reshape(1, ny) * dcroot_dS
-        dx_dS -= np.linspace(dcroot_dS * taper, dcroot_dS, ny).reshape(1, ny) / 4
-        dx_dS += np.linspace(db_dS, 0, ny).reshape(1, ny) * np.tan(np.deg2rad(sweep))
-
-        dx_dAR = x_mesh * np.linspace(taper, 1, ny).reshape(1, ny) * dcroot_dAR
-        dx_dAR -= np.linspace(dcroot_dAR * taper, dcroot_dAR, ny).reshape(1, ny) / 4
-        dx_dAR += np.linspace(db_dAR, 0, ny).reshape(1, ny) * np.tan(np.deg2rad(sweep))
-
-        dx_dtaper = (
-            x_mesh * c_root * np.linspace(1, 0, ny).reshape(1, ny)
-            + x_mesh * np.linspace(taper, 1, ny).reshape(1, ny) * dcroot_dtaper
-        )
-        dx_dtaper -= (
-            np.linspace(c_root, 0, ny).reshape(1, ny) / 4
-            + np.linspace(dcroot_dtaper * taper, dcroot_dtaper, ny).reshape(1, ny) / 4
-        )
-
-        dx_dsweep = (
-            0 * x_mesh + np.linspace(half_span, 0, ny).reshape(1, ny) / np.cos(np.deg2rad(sweep)) ** 2 * np.pi / 180.0
-        )
-
-        J["mesh", "S"] = np.dstack((dx_dS, dy_dS, np.zeros((nx, ny)))).flatten()
-        J["mesh", "AR"] = np.dstack((dx_dAR, dy_dAR, np.zeros((nx, ny)))).flatten()
-        J["mesh", "taper"] = np.dstack((dx_dtaper, np.zeros((nx, ny)), np.zeros((nx, ny)))).flatten()
-        J["mesh", "sweep"] = np.dstack((dx_dsweep, np.zeros((nx, ny)), np.zeros((nx, ny)))).flatten()
+        self.set_input_defaults("fltcond|alpha", 0.0, units="deg")
+        self.set_input_defaults("ac|geom|wing|OAS_mesh", dummy_mesh, units="m")
+        self.set_input_defaults("ac|geom|wing|toverc", np.full(ny - 1, 0.12))  # 12% airfoil thickness by default
 
 
 # Example usage of the drag polar that compares
@@ -933,8 +873,8 @@ class PlanformMesh(om.ExplicitComponent):
 def example_usage():
     # Define parameters
     nn = 1
-    num_x = 3
-    num_y = 5
+    num_x = 2
+    num_y = 4
     S = 427.8  # m^2
     AR = 9.82
     taper = 0.149
@@ -988,17 +928,12 @@ def example_usage():
 
     # Call OpenAeroStruct at the same flight condition to compare
     prob = om.Problem()
-    prob.model.add_subsystem("model", VLM(num_x=num_x, num_y=num_y, num_twist=n_twist), promotes=["*"])
+    prob.model.add_subsystem("model", VLM(num_x=num_x, num_y=num_y), promotes=["*"])
 
     prob.setup()
 
-    # Set values
-    # Geometry
-    prob.set_val("ac|geom|wing|S_ref", S, units="m**2")
-    prob.set_val("ac|geom|wing|AR", AR)
-    prob.set_val("ac|geom|wing|taper", taper)
-    prob.set_val("ac|geom|wing|c4sweep", sweep, units="deg")
-    prob.set_val("ac|geom|wing|twist", twist, units="deg")
+    # Set mesh value
+    prob.set_val("ac|geom|wing|OAS_mesh", p.get_val("twisted_mesh", units="m"), units="m")
 
     # Flight condition
     prob.set_val("fltcond|M", M)

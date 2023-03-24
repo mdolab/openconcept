@@ -7,11 +7,11 @@ import openmdao.api as om
 try:
     from openaerostruct.geometry.geometry_group import Geometry
     from openaerostruct.aerodynamics.aero_groups import AeroPoint
+    from openconcept.aerodynamics.openaerostruct import TrapezoidalPlanformMesh
     from openconcept.aerodynamics.openaerostruct.drag_polar import (
         VLMDataGen,
         VLM,
         VLMDragPolar,
-        PlanformMesh,
         example_usage,
     )
 
@@ -34,24 +34,11 @@ class VLMDragPolarTestCase(unittest.TestCase):
     def test(self):
         twist = np.array([-1, -0.5, 2])
 
-        # Generate mesh to pass to OpenAeroStruct
-        mesh = om.Problem(VLM(num_x=3, num_y=5, num_twist=twist.size))
-        mesh.setup()
-        mesh.set_val("ac|geom|wing|S_ref", 100, units="m**2")
-        mesh.set_val("ac|geom|wing|AR", 10)
-        mesh.set_val("ac|geom|wing|taper", 0.1)
-        mesh.set_val("ac|geom|wing|c4sweep", 20, units="deg")
-        mesh.set_val("ac|geom|wing|twist", twist, units="deg")
-        mesh.set_val("fltcond|M", 0.45)
-        mesh.set_val("fltcond|h", 7.5e3, units="m")
-        mesh.set_val("fltcond|alpha", 2, units="deg")
-        mesh.run_model()
-
         p = om.Problem(
             VLMDragPolar(
                 num_nodes=1,
-                num_x=3,
-                num_y=5,
+                num_x=2,
+                num_y=4,
                 num_twist=twist.size,
                 Mach_train=np.linspace(0.1, 0.8, 3),
                 alpha_train=np.linspace(-11, 15, 3),
@@ -67,10 +54,23 @@ class VLMDragPolarTestCase(unittest.TestCase):
         p.set_val("ac|geom|wing|taper", 0.1)
         p.set_val("ac|geom|wing|c4sweep", 20, units="deg")
         p.set_val("ac|geom|wing|twist", twist, units="deg")
+        p.set_val("ac|geom|wing|toverc", [0.07, 0.12])
         p.set_val("ac|aero|CD_nonwing", 0.01)
         p.set_val("fltcond|q", 5e3, units="Pa")
         p.set_val("fltcond|M", 0.45)
         p.set_val("fltcond|h", 7.5e3, units="m")
+        p.run_model()
+
+        # Generate mesh to pass to OpenAeroStruct
+        mesh = om.Problem(VLM(num_x=2, num_y=4))
+        mesh.setup()
+        mesh.set_val("ac|geom|wing|OAS_mesh", p.get_val("twisted_mesh"))
+        mesh.set_val("ac|geom|wing|toverc", p.get_val("t_over_c_interp.panel_toverc"))
+        mesh.set_val("fltcond|M", 0.45)
+        mesh.set_val("fltcond|h", 7.5e3, units="m")
+        mesh.set_val("fltcond|alpha", 2, units="deg")
+        mesh.run_model()
+
         p.set_val("fltcond|CL", mesh.get_val("fltcond|CL"))
         p.run_model()
 
@@ -106,8 +106,8 @@ class VLMDragPolarTestCase(unittest.TestCase):
         p = om.Problem(
             VLMDragPolar(
                 num_nodes=nn,
-                num_x=3,
-                num_y=5,
+                num_x=2,
+                num_y=4,
                 num_twist=twist.size,
                 Mach_train=np.linspace(0.1, 0.8, 2),
                 alpha_train=np.linspace(-11, 15, 2),
@@ -140,8 +140,8 @@ class VLMDragPolarTestCase(unittest.TestCase):
         p = om.Problem(
             VLMDragPolar(
                 num_nodes=nn,
-                num_x=3,
-                num_y=5,
+                num_x=2,
+                num_y=4,
                 num_twist=twist.size,
                 Mach_train=np.linspace(0.1, 0.8, 2),
                 alpha_train=np.linspace(-11, 15, 2),
@@ -167,6 +167,103 @@ class VLMDragPolarTestCase(unittest.TestCase):
         # Ensure they're all the same
         assert_near_equal(p.get_val("drag", units="N"), 37615.14285108 * np.ones(nn), tolerance=1e-10)
 
+    def test_section_geometry(self):
+        nn = 1
+        p = om.Problem(
+            VLMDragPolar(
+                num_nodes=nn,
+                num_x=1,
+                num_y=[2, 3],
+                num_sections=3,
+                geometry="section",
+                Mach_train=np.linspace(0.1, 0.11, 2),
+                alpha_train=np.linspace(1, 1.1, 2),
+                alt_train=np.linspace(0, 2, 2),
+            )
+        )
+        p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+        p.model.linear_solver = om.DirectSolver()
+        p.setup()
+        p.set_val("fltcond|TempIncrement", 0, units="degC")
+        p.set_val("ac|geom|wing|S_ref", 100, units="m**2")
+        p.set_val("ac|geom|wing|x_LE_sec", [1, 0.2, 0.0])
+        p.set_val("ac|geom|wing|y_sec", [-1, 0.6])
+        p.set_val("ac|geom|wing|chord_sec", [0.2, 0.3, 0.3])
+        p.set_val("ac|geom|wing|twist", [-1, 0, 1], units="deg")
+        p.set_val("ac|geom|wing|toverc", [0.1, 0.17, 0.2])
+        p.set_val("ac|aero|CD_nonwing", 0.01)
+        p.set_val("fltcond|q", 5e3, units="Pa")
+        p.set_val("fltcond|M", 0.105)
+        p.set_val("fltcond|h", 1, units="m")
+        p.set_val("fltcond|CL", 0.15579806)
+        p.run_model()
+
+        vlm = om.Problem(VLM(num_x=1, num_y=5))
+        vlm.setup()
+        vlm.set_val("ac|geom|wing|OAS_mesh", p.get_val("twisted_mesh", units="m"), units="m")
+        vlm.set_val("fltcond|alpha", 1.05, units="deg")
+        vlm.set_val("ac|geom|wing|toverc", p.get_val("t_over_c_interp.panel_toverc"))
+        vlm.set_val("fltcond|M", p.get_val("fltcond|M"))
+        vlm.set_val("fltcond|h", p.get_val("fltcond|h"))
+        vlm.run_model()
+
+        # Ensure they're all the same
+        assert_near_equal(vlm.get_val("fltcond|CL"), 0.15579806, tolerance=1e-3)
+        assert_near_equal(vlm.get_val("fltcond|CD") + 0.01, p.get_val("aero_surrogate.CD"), tolerance=1e-3)
+
+    def test_mesh_geometry_option(self):
+        nn = 1
+        p = om.Problem()
+        p.model.add_subsystem(
+            "mesher",
+            TrapezoidalPlanformMesh(num_x=1, num_y=2),
+            promotes=["*"],
+        )
+        p.model.add_subsystem(
+            "vlm",
+            VLMDragPolar(
+                num_nodes=nn,
+                num_x=1,
+                num_y=2,
+                geometry="mesh",
+                num_twist=3,
+                Mach_train=np.linspace(0.1, 0.11, 2),
+                alpha_train=np.linspace(1, 1.1, 2),
+                alt_train=np.linspace(0, 2, 2),
+            ),
+            promotes=["*"],
+        )
+        p.model.connect("mesh", "ac|geom|wing|OAS_mesh")
+        p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+        p.model.linear_solver = om.DirectSolver()
+        p.setup()
+
+        p.set_val("fltcond|TempIncrement", 0, units="degC")
+        p.set_val("S", 100, units="m**2")
+        p.set_val("AR", 100)
+        p.set_val("taper", 0.1)
+        p.set_val("sweep", 20, units="deg")
+        p.set_val("ac|aero|CD_nonwing", 0.001)
+        p.set_val("ac|geom|wing|toverc", [0.1, 0.17])
+        p.set_val("fltcond|q", 5e3, units="Pa")
+        p.set_val("fltcond|M", 0.105)
+        p.set_val("fltcond|h", 1, units="m")
+        p.set_val("fltcond|CL", 0.10634777)
+        p.run_model()
+
+        vlm = om.Problem(VLM(num_x=1, num_y=2))
+        vlm.setup()
+        vlm.set_val("ac|geom|wing|OAS_mesh", p.get_val("ac|geom|wing|OAS_mesh", units="m"), units="m")
+        vlm.set_val("fltcond|alpha", 1.05, units="deg")
+        vlm.set_val("ac|geom|wing|toverc", p.get_val("ac|geom|wing|toverc"))
+        vlm.set_val("fltcond|M", p.get_val("fltcond|M"))
+        vlm.set_val("fltcond|h", p.get_val("fltcond|h"))
+        vlm.run_model()
+
+        # Ensure they're all the same
+        assert_near_equal(vlm.get_val("fltcond|CL"), 0.10634777, tolerance=1e-6)
+        assert_near_equal(vlm.get_val("fltcond|CD") + 0.001, p.get_val("aero_surrogate.CD"), tolerance=1e-4)
+
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class VLMDataGenTestCase(unittest.TestCase):
@@ -181,38 +278,41 @@ class VLMDataGenTestCase(unittest.TestCase):
 
     def test_defaults(self):
         # Regression test
-        twist = np.array([-1, -0.5, 2])
         p = om.Problem()
+        p.model.add_subsystem(
+            "mesher",
+            TrapezoidalPlanformMesh(num_x=1, num_y=2),
+            promotes=["*"],
+        )
         p.model.add_subsystem(
             "comp",
             VLMDataGen(
-                num_x=3,
-                num_y=5,
-                num_twist=twist.size,
+                num_x=1,
+                num_y=2,
                 Mach_train=np.linspace(0.1, 0.85, 2),
                 alpha_train=np.linspace(-10, 15, 2),
                 alt_train=np.linspace(0, 15e3, 2),
             ),
             promotes=["*"],
         )
+        p.model.connect("mesh", "ac|geom|wing|OAS_mesh")
         p.setup()
         p.set_val("fltcond|TempIncrement", 0, units="degC")
-        p.set_val("ac|geom|wing|S_ref", 100, units="m**2")
-        p.set_val("ac|geom|wing|AR", 10)
-        p.set_val("ac|geom|wing|taper", 0.1)
-        p.set_val("ac|geom|wing|c4sweep", 20, units="deg")
-        p.set_val("ac|geom|wing|twist", twist, units="deg")
+        p.set_val("S", 100, units="m**2")
+        p.set_val("AR", 10)
+        p.set_val("taper", 0.1)
+        p.set_val("sweep", 20, units="deg")
         p.set_val("ac|aero|CD_nonwing", 0.01)
         p.run_model()
 
         CL = np.array(
             [
-                [[-0.79879583, -0.79879583], [1.31170126, 1.31170126]],
-                [[-0.79879583, -0.79879583], [1.31170126, 1.31170126]],
+                [[-0.86481567, -0.86481567], [1.28852469, 1.28852469]],
+                [[-0.86481567, -0.86481567], [1.28852469, 1.28852469]],
             ]
         )
         CD = np.array(
-            [[[0.03425776, 0.03647253], [0.06776208, 0.06997685]], [[0.03415836, 0.03597205], [0.20199504, 0.20380873]]]
+            [[[0.03547695, 0.03770253], [0.05900183, 0.0612274]], [[0.03537478, 0.03719636], [0.18710518, 0.18892676]]]
         )
 
         assert_near_equal(CL, p.get_val("CL_train"), tolerance=1e-7)
@@ -249,25 +349,26 @@ class VLMDataGenTestCase(unittest.TestCase):
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class VLMTestCase(unittest.TestCase):
     def test_defaults(self):
-        twist = np.array([-1, -0.5, 2])
-        p = om.Problem(VLM(num_x=3, num_y=5, num_twist=twist.size))
+        p = om.Problem()
+        p.model.add_subsystem("mesh", TrapezoidalPlanformMesh(num_x=2, num_y=4), promotes=["*"])
+        p.model.add_subsystem("vlm", VLM(num_x=2, num_y=4), promotes=["*"])
+        p.model.connect("mesh", "ac|geom|wing|OAS_mesh")
         p.setup()
         p.set_val("fltcond|alpha", 2, units="deg")
         p.set_val("fltcond|M", 0.6)
         p.set_val("fltcond|h", 5e3, units="m")
         p.set_val("fltcond|TempIncrement", 0, units="degC")
-        p.set_val("ac|geom|wing|S_ref", 100, units="m**2")
-        p.set_val("ac|geom|wing|AR", 10)
-        p.set_val("ac|geom|wing|taper", 0.1)
-        p.set_val("ac|geom|wing|c4sweep", 20, units="deg")
-        p.set_val("ac|geom|wing|twist", twist, units="deg")
+        p.set_val("S", 100, units="m**2")
+        p.set_val("AR", 10)
+        p.set_val("taper", 0.1)
+        p.set_val("sweep", 20, units="deg")
 
         p.run_model()
 
         # Run OpenAeroStruct with the same inputs
         inputs = {}
-        inputs["mesh"] = p.get_val("mesh.mesh", units="m")
-        inputs["twist"] = twist
+        inputs["mesh"] = p.get_val("mesh", units="m")
+        inputs["twist"] = np.zeros(1)
         inputs["v"] = p.get_val("airspeed.Utrue", units="m/s")
         inputs["alpha"] = p.get_val("fltcond|alpha", units="deg")
         inputs["Mach_number"] = p.get_val("fltcond|M")
@@ -280,25 +381,26 @@ class VLMTestCase(unittest.TestCase):
         assert_near_equal(exact["CD"], p.get_val("fltcond|CD"))
 
     def test_wave_drag(self):
-        twist = np.array([-1, -0.5, 2])
-        p = om.Problem(VLM(num_x=3, num_y=5, num_twist=twist.size, surf_options={"with_wave": False}))
+        p = om.Problem()
+        p.model.add_subsystem("mesh", TrapezoidalPlanformMesh(num_x=2, num_y=4), promotes=["*"])
+        p.model.add_subsystem("vlm", VLM(num_x=2, num_y=4, surf_options={"with_wave": False}), promotes=["*"])
+        p.model.connect("mesh", "ac|geom|wing|OAS_mesh")
         p.setup()
         p.set_val("fltcond|alpha", 2, units="deg")
         p.set_val("fltcond|M", 0.85)
         p.set_val("fltcond|h", 5e3, units="m")
         p.set_val("fltcond|TempIncrement", 0, units="degC")
-        p.set_val("ac|geom|wing|S_ref", 100, units="m**2")
-        p.set_val("ac|geom|wing|AR", 10)
-        p.set_val("ac|geom|wing|taper", 0.1)
-        p.set_val("ac|geom|wing|c4sweep", 20, units="deg")
-        p.set_val("ac|geom|wing|twist", twist, units="deg")
+        p.set_val("S", 100, units="m**2")
+        p.set_val("AR", 10)
+        p.set_val("taper", 0.1)
+        p.set_val("sweep", 20, units="deg")
 
         p.run_model()
 
         # Run OpenAeroStruct with the same inputs
         inputs = {}
-        inputs["mesh"] = p.get_val("mesh.mesh", units="m")
-        inputs["twist"] = twist
+        inputs["mesh"] = p.get_val("mesh", units="m")
+        inputs["twist"] = np.zeros(1)
         inputs["v"] = p.get_val("airspeed.Utrue", units="m/s")
         inputs["alpha"] = p.get_val("fltcond|alpha", units="deg")
         inputs["Mach_number"] = p.get_val("fltcond|M")
@@ -311,25 +413,26 @@ class VLMTestCase(unittest.TestCase):
         assert_near_equal(exact["CD"], p.get_val("fltcond|CD"))
 
     def test_viscous_drag(self):
-        twist = np.array([-1, -0.5, 2])
-        p = om.Problem(VLM(num_x=3, num_y=5, num_twist=twist.size, surf_options={"with_viscous": False}))
+        p = om.Problem()
+        p.model.add_subsystem("mesh", TrapezoidalPlanformMesh(num_x=2, num_y=4), promotes=["*"])
+        p.model.add_subsystem("vlm", VLM(num_x=2, num_y=4, surf_options={"with_viscous": False}), promotes=["*"])
+        p.model.connect("mesh", "ac|geom|wing|OAS_mesh")
         p.setup()
         p.set_val("fltcond|alpha", 2, units="deg")
         p.set_val("fltcond|M", 0.85)
         p.set_val("fltcond|h", 5e3, units="m")
         p.set_val("fltcond|TempIncrement", 0, units="degC")
-        p.set_val("ac|geom|wing|S_ref", 100, units="m**2")
-        p.set_val("ac|geom|wing|AR", 10)
-        p.set_val("ac|geom|wing|taper", 0.1)
-        p.set_val("ac|geom|wing|c4sweep", 20, units="deg")
-        p.set_val("ac|geom|wing|twist", twist, units="deg")
+        p.set_val("S", 100, units="m**2")
+        p.set_val("AR", 10)
+        p.set_val("taper", 0.1)
+        p.set_val("sweep", 20, units="deg")
 
         p.run_model()
 
         # Run OpenAeroStruct with the same inputs
         inputs = {}
-        inputs["mesh"] = p.get_val("mesh.mesh", units="m")
-        inputs["twist"] = twist
+        inputs["mesh"] = p.get_val("mesh", units="m")
+        inputs["twist"] = np.zeros(1)
         inputs["v"] = p.get_val("airspeed.Utrue", units="m/s")
         inputs["alpha"] = p.get_val("fltcond|alpha", units="deg")
         inputs["Mach_number"] = p.get_val("fltcond|M")
@@ -342,25 +445,27 @@ class VLMTestCase(unittest.TestCase):
         assert_near_equal(exact["CD"], p.get_val("fltcond|CD"))
 
     def test_t_over_c(self):
-        twist = np.array([-1, -0.5, 2])
-        p = om.Problem(VLM(num_x=3, num_y=3, num_twist=twist.size, surf_options={"t_over_c": np.array([0.1, 0.2])}))
+        p = om.Problem()
+        p.model.add_subsystem("mesh", TrapezoidalPlanformMesh(num_x=2, num_y=2), promotes=["*"])
+        p.model.add_subsystem("vlm", VLM(num_x=2, num_y=2), promotes=["*"])
+        p.model.connect("mesh", "ac|geom|wing|OAS_mesh")
         p.setup()
         p.set_val("fltcond|alpha", 2, units="deg")
         p.set_val("fltcond|M", 0.85)
         p.set_val("fltcond|h", 5e3, units="m")
         p.set_val("fltcond|TempIncrement", 0, units="degC")
-        p.set_val("ac|geom|wing|S_ref", 100, units="m**2")
-        p.set_val("ac|geom|wing|AR", 10)
-        p.set_val("ac|geom|wing|taper", 0.1)
-        p.set_val("ac|geom|wing|c4sweep", 20, units="deg")
-        p.set_val("ac|geom|wing|twist", twist, units="deg")
+        p.set_val("S", 100, units="m**2")
+        p.set_val("AR", 10)
+        p.set_val("taper", 0.1)
+        p.set_val("sweep", 20, units="deg")
+        p.set_val("ac|geom|wing|toverc", np.array([0.1, 0.2]))
 
         p.run_model()
 
         # Run OpenAeroStruct with the same inputs
         inputs = {}
-        inputs["mesh"] = p.get_val("mesh.mesh", units="m")
-        inputs["twist"] = twist
+        inputs["mesh"] = p.get_val("mesh", units="m")
+        inputs["twist"] = np.zeros(1)
         inputs["v"] = p.get_val("airspeed.Utrue", units="m/s")
         inputs["alpha"] = p.get_val("fltcond|alpha", units="deg")
         inputs["Mach_number"] = p.get_val("fltcond|M")
@@ -371,156 +476,6 @@ class VLMTestCase(unittest.TestCase):
 
         assert_near_equal(exact["CL"], p.get_val("fltcond|CL"))
         assert_near_equal(exact["CD"], p.get_val("fltcond|CD"))
-
-
-@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
-class PlanformMeshTestCase(unittest.TestCase):
-    def test_easy(self):
-        nx = 3
-        ny = 5
-        p = om.Problem()
-        p.model.add_subsystem("comp", PlanformMesh(num_x=nx, num_y=ny), promotes=["*"])
-        p.setup()
-        p.set_val("S", 2, units="m**2")
-        p.set_val("AR", 2)
-        p.set_val("taper", 1.0)
-        p.set_val("sweep", 0.0, units="deg")
-        p.run_model()
-
-        mesh = np.zeros((nx, ny, 3))
-        mesh[:, :, 0], mesh[:, :, 1] = np.meshgrid(np.linspace(-0.25, 0.75, nx), np.linspace(-1, 0, ny), indexing="ij")
-
-        assert_near_equal(p.get_val("mesh", units="m"), mesh)
-
-        partials = p.check_partials(out_stream=None, compact_print=True, show_only_incorrect=True)
-        assert_check_partials(partials)
-
-    def test_S_AR(self):
-        nx = 3
-        ny = 5
-        p = om.Problem()
-        p.model.add_subsystem("comp", PlanformMesh(num_x=nx, num_y=ny), promotes=["*"])
-        p.setup(force_alloc_complex=True)
-        p.set_val("S", 48, units="m**2")
-        p.set_val("AR", 3)
-        p.set_val("taper", 1.0)
-        p.set_val("sweep", 0.0, units="deg")
-        p.run_model()
-
-        mesh = np.zeros((nx, ny, 3))
-        mesh[:, :, 0], mesh[:, :, 1] = np.meshgrid(np.linspace(-1, 3, nx), np.linspace(-6, 0, ny), indexing="ij")
-
-        assert_near_equal(p.get_val("mesh", units="m"), mesh)
-
-        partials = p.check_partials(out_stream=None, form="central")
-        assert_check_partials(partials)
-
-    def test_taper(self):
-        nx = 2
-        ny = 3
-        p = om.Problem()
-        p.model.add_subsystem("comp", PlanformMesh(num_x=nx, num_y=ny), promotes=["*"])
-        p.setup()
-        p.set_val("S", 1.3, units="m**2")
-        p.set_val("AR", 4 / 1.3)  # pick S and AR for half span and root chord of 1
-        p.set_val("taper", 0.3)
-        p.set_val("sweep", 0.0, units="deg")
-        p.run_model()
-
-        mesh = np.zeros((nx, ny, 3))
-        mesh[:, :, 0] = np.array([[-0.075, -0.1625, -0.25], [0.225, 0.4875, 0.75]])
-        mesh[:, :, 1] = np.array([[-1, -0.5, 0], [-1, -0.5, 0]])
-
-        assert_near_equal(p.get_val("mesh", units="m"), mesh)
-
-        partials = p.check_partials(out_stream=None, compact_print=True, show_only_incorrect=True)
-        assert_check_partials(partials)
-
-    def test_sweep(self):
-        nx = 3
-        ny = 3
-        p = om.Problem()
-        p.model.add_subsystem("comp", PlanformMesh(num_x=nx, num_y=ny), promotes=["*"])
-        p.setup()
-        p.set_val("S", 2, units="m**2")
-        p.set_val("AR", 2)
-        p.set_val("taper", 1.0)
-        p.set_val("sweep", 45.0, units="deg")
-        p.run_model()
-
-        mesh = np.zeros((nx, ny, 3))
-        mesh[:, :, 0], mesh[:, :, 1] = np.meshgrid(np.linspace(-0.25, 0.75, nx), np.linspace(-1, 0, ny), indexing="ij")
-
-        mesh[:, 0, 0] += 1
-        mesh[:, 1, 0] += 0.5
-
-        assert_near_equal(p.get_val("mesh", units="m"), mesh)
-
-        partials = p.check_partials(out_stream=None, compact_print=True, show_only_incorrect=True)
-        assert_check_partials(partials)
-
-    def test_taper_sweep(self):
-        nx = 2
-        ny = 3
-        p = om.Problem()
-        p.model.add_subsystem("comp", PlanformMesh(num_x=nx, num_y=ny), promotes=["*"])
-        p.setup()
-        p.set_val("S", 1.3, units="m**2")
-        p.set_val("AR", 4 / 1.3)  # pick S and AR for half span and root chord of 1
-        p.set_val("taper", 0.3)
-        p.set_val("sweep", 45.0, units="deg")
-        p.run_model()
-
-        mesh = np.zeros((nx, ny, 3))
-        mesh[:, :, 0] = np.array([[-0.075, -0.1625, -0.25], [0.225, 0.4875, 0.75]])
-        mesh[:, :, 1] = np.array([[-1, -0.5, 0], [-1, -0.5, 0]])
-        mesh[:, 0, 0] += 1
-        mesh[:, 1, 0] += 0.5
-
-        assert_near_equal(p.get_val("mesh", units="m"), mesh)
-
-        partials = p.check_partials(out_stream=None, compact_print=True, show_only_incorrect=True)
-        assert_check_partials(partials)
-
-    def test_777ish_regression(self):
-        nx = 3
-        ny = 4
-        p = om.Problem()
-        p.model.add_subsystem("comp", PlanformMesh(num_x=nx, num_y=ny), promotes=["*"])
-        p.setup()
-        p.set_val("S", 427.8, units="m**2")
-        p.set_val("AR", 9.82)
-        p.set_val("taper", 0.149)
-        p.set_val("sweep", 31.6, units="deg")
-        p.run_model()
-
-        mesh = np.array(
-            [
-                [
-                    [19.50929722, -32.40754542, 0.0],
-                    [12.04879827, -21.60503028, 0.0],
-                    [4.58829932, -10.80251514, 0.0],
-                    [-2.87219963, 0.0, 0.0],
-                ],
-                [
-                    [20.36521271, -32.40754542, 0.0],
-                    [14.53420835, -21.60503028, 0.0],
-                    [8.70320399, -10.80251514, 0.0],
-                    [2.87219963, 0.0, 0.0],
-                ],
-                [
-                    [21.2211282, -32.40754542, 0.0],
-                    [17.01961843, -21.60503028, 0.0],
-                    [12.81810866, -10.80251514, 0.0],
-                    [8.61659889, 0.0, 0.0],
-                ],
-            ]
-        )
-
-        assert_near_equal(p.get_val("mesh", units="m"), mesh, tolerance=1e-10)
-
-        partials = p.check_partials(out_stream=None, compact_print=True, show_only_incorrect=True)
-        assert_check_partials(partials, atol=2e-5)
 
 
 def run_OAS(inputs, with_viscous=True, with_wave=True, t_over_c=None):

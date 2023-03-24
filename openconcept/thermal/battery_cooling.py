@@ -169,6 +169,7 @@ class BandolierCoolingSystem(om.ExplicitComponent):
     t_channel : float
         Thickness (width) of the cooling channel in the bandolier
         (scalar, default 1mm)
+
     Outputs
     -------
     dTdt : float
