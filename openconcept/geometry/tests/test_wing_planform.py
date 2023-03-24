@@ -1,5 +1,4 @@
 import unittest
-import numpy as np
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openconcept.geometry import WingMACTrapezoidal, WingSpan
