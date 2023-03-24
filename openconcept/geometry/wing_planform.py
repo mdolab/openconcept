@@ -53,7 +53,7 @@ class WingMACTrapezoidal(om.ExplicitComponent):
 
         J["MAC", "S_ref"] = (dMAC_dcr + dMAC_dct * taper) * dcr_dS
         J["MAC", "AR"] = (dMAC_dcr + dMAC_dct * taper) * dcr_dAR
-        J["MAC", "taper"] = (dMAC_dcr + dMAC_dct * taper) * dcr_dtaper
+        J["MAC", "taper"] = (dMAC_dcr + dMAC_dct * taper) * dcr_dtaper + dMAC_dct * c_root
 
 
 # class WingRoot_LinearTaper(om.ExplicitComponent):

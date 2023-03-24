@@ -74,6 +74,8 @@ class ParasiteDragCoefficient_JetTransport(om.Group):
         Nacelle length (scalar, m)
     ac|geom|nacelle|S_wet : float
         Nacelle wetted area (scalar, sq m)
+    ac|propulsion|num_engines : float
+        Number of engines, multiplier on nacelle drag (scalar, dimensionless)
     ac|takeoff_flap_deg : float
         If configuration is \"takeoff\" (otherwise not an input), flap setting on takeoff (scalar, deg)
 
@@ -130,7 +132,7 @@ class ParasiteDragCoefficient_JetTransport(om.Group):
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of analysis points per phase")
-        self.options.declare("include_wing", default=True, types=[bool], desc="Include the wing drag")
+        self.options.declare("include_wing", default=True, types=bool, desc="Include the wing drag")
         self.options.declare("configuration", default="clean", values=["takeoff", "clean"])
         self.options.declare("drag_fudge_factor", default=1.0, desc="Multiplier on total drag coefficient")
         self.options.declare("FF_nacelle", default=1.25 * 1.2, desc="Nacelle form factor times interference factor")
@@ -237,19 +239,23 @@ class ParasiteDragCoefficient_JetTransport(om.Group):
                 "ac|geom|hstab|S_ref",
                 "ac|geom|vstab|S_ref",
                 "ac|geom|nacelle|S_wet",
-                "ac|geom|wing|S_ref",
+                "ac|propulsion|num_engines",
+                ("S_wing_1", "ac|geom|wing|S_ref"),  # This is a bit of a hack needed to
+                ("S_wing_2", "ac|geom|wing|S_ref"),  # allow multiple equations to share
+                ("S_wing_3", "ac|geom|wing|S_ref"),  # the same input
+                ("S_wing_4", "ac|geom|wing|S_ref"),
             ],
         )
         mult.add_equation(
             output_name="CD_fuselage",
-            input_names=["ac|geom|fuselage|S_wet", "FF_fuselage", "Cf_fuselage", "ac|geom|wing|S_ref"],
+            input_names=["ac|geom|fuselage|S_wet", "FF_fuselage", "Cf_fuselage", "S_wing_1"],
             vec_size=[1, 1, nn, 1],
             input_units=["m**2", None, None, "m**2"],
             divide=[False, False, False, True],
         )
         mult.add_equation(
             output_name="CD_hstab",
-            input_names=["ac|geom|hstab|S_ref", "FF_hstab", "Cf_hstab", "ac|geom|wing|S_ref"],
+            input_names=["ac|geom|hstab|S_ref", "FF_hstab", "Cf_hstab", "S_wing_2"],
             vec_size=[1, 1, nn, 1],
             input_units=["m**2", None, None, "m**2"],
             divide=[False, False, False, True],
@@ -257,7 +263,7 @@ class ParasiteDragCoefficient_JetTransport(om.Group):
         )  # scaling factor of two is since wetted area is ~2x reference area
         mult.add_equation(
             output_name="CD_vstab",
-            input_names=["ac|geom|vstab|S_ref", "FF_vstab", "Cf_vstab", "ac|geom|wing|S_ref"],
+            input_names=["ac|geom|vstab|S_ref", "FF_vstab", "Cf_vstab", "S_wing_3"],
             vec_size=[1, 1, nn, 1],
             input_units=["m**2", None, None, "m**2"],
             divide=[False, False, False, True],
@@ -265,10 +271,10 @@ class ParasiteDragCoefficient_JetTransport(om.Group):
         )  # scaling factor of two is since wetted area is ~2x reference area
         mult.add_equation(
             output_name="CD_nacelle",
-            input_names=["ac|geom|nacelle|S_wet", "FF_nacelle", "Cf_nacelle", "ac|geom|wing|S_ref"],
-            vec_size=[1, 1, nn, 1],
-            input_units=["m**2", None, None, "m**2"],
-            divide=[False, False, False, True],
+            input_names=["ac|geom|nacelle|S_wet", "FF_nacelle", "Cf_nacelle", "ac|propulsion|num_engines", "S_wing_4"],
+            vec_size=[1, 1, nn, 1, 1],
+            input_units=["m**2", None, None, None, "m**2"],
+            divide=[False, False, False, False, True],
         )
         if include_wing:
             mult.add_equation(
@@ -318,11 +324,12 @@ class ParasiteDragCoefficient_JetTransport(om.Group):
         iv.add_output("CD_landing_gear", val=0.0 if is_clean else 0.02)
 
         # ==============================================================================
-        # Sum the total drag coefficient
+        # Sum the total drag coefficients
         # ==============================================================================
-        drag_coeff_inputs = ["CD_fuselage", "CD_hstab", "CD_vstab", "CD_nacelle", "CD_flap", "CD_landing_gear"]
+        drag_coeff_inputs = ["CD_fuselage", "CD_hstab", "CD_vstab", "CD_nacelle"]
         if include_wing:
             drag_coeff_inputs.append("CD_wing")
+        drag_coeff_inputs += ["CD_flap", "CD_landing_gear"]
         self.add_subsystem(
             "sum_CD0",
             AddSubtractComp(
@@ -340,7 +347,7 @@ class ParasiteDragCoefficient_JetTransport(om.Group):
         self.connect("drag_coeffs.CD_nacelle", "sum_CD0.CD_nacelle")
         if include_wing:
             self.connect("drag_coeffs.CD_wing", "sum_CD0.CD_wing")
-        self.connect(CD_flap_source, "sum_CD0.CD_landing_gear")
+        self.connect(CD_flap_source, "sum_CD0.CD_flap")
         self.connect("iv.CD_landing_gear", "sum_CD0.CD_landing_gear")
 
 
@@ -481,7 +488,7 @@ class FlapDrag_JetTransport(om.ExplicitComponent):
         # Chapter 4, which shows the 2D drag increment of Fowler flaps as a function of
         # flap extension angle and cf/c, which I presume is flap chord over wing chord
         cf_c = self.options["flap_chord_frac"]
-        self.quadratic_coeff = 5.75e-4 * cf_c**4 - 7.45e-5 * cf_c + 1.23e-5
+        self.quadratic_coeff = 5.75e-4 * cf_c**2 - 7.45e-5 * cf_c + 1.23e-5
 
     def compute(self, inputs, outputs):
         delta = inputs["flap_extension"]
