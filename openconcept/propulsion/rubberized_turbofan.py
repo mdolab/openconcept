@@ -6,8 +6,8 @@ from openconcept.utilities import ElementMultiplyDivideComp
 class RubberizedTurbofan(om.Group):
     """
     Optimized N+3 GTF engine deck (can optionally be switched to CFM56)
-    generated as a surrogate of pyCycle data. This version adds the N_engines
-    input which is a multiplier on thrust and fuel flow to enable continuous
+    generated as a surrogate of pyCycle data. This version adds the rated thrust
+    input which adds a multiplier on thrust and fuel flow to enable continuous
     scaling of the engine power.
 
     This version of the engine can also be converted to hydrogen with the
@@ -28,10 +28,10 @@ class RubberizedTurbofan(om.Group):
     fltcond|M: float
         Mach number
         (vector, dimensionless)
-    N_engines : float
-        A multiplier on thrust and fuel flow outputs to
-        enable changing the "size" of the engine
-        (scalar, dimensionless)
+    ac|propulsion|engine|rating : float
+        Desired thrust rating (sea level static) of each engine; the CFM56 thrust
+        and fuel flow are scaled by this value divided by 27,300, while the N+3 thrust
+        and fuel flow are scaled by this value divided by 28,620 (scalar, lbf)
 
     Outputs
     -------
@@ -68,7 +68,15 @@ class RubberizedTurbofan(om.Group):
         # Scale the fuel flow by the ratio of LHV if hydrogen is specified, else leave as is
         LHV_ker = 43  # MJ/kg, Jet A-1 specific energy
         LHV_hy = 120.0  # Mj/kg, hydrogen specific energy
-        scale_fac = LHV_ker / LHV_hy if hy else 1.0
+        LHV_scale_fac = LHV_ker / LHV_hy if hy else 1.0
+
+        # Original rated SLS thrust of the engine to use in scaling factor
+        if eng == "N3":
+            # https://ntrs.nasa.gov/citations/20170005426
+            orig_rated_thrust = 28620  # lbf
+        elif eng == "CFM56":
+            # https://web.archive.org/web/20161220201436/http://www.safran-aircraft-engines.com/file/download/fiche_cfm56-7b_ang.pdf
+            orig_rated_thrust = 27300  # lbf
 
         # Engine deck
         if eng == "N3":
@@ -88,25 +96,33 @@ class RubberizedTurbofan(om.Group):
         else:
             raise ValueError(f"{eng} is not a recognized engine")
 
-        # Scale thrust and fuel flow by the number of engines
+        # Scale thrust and fuel flow by the engine thrust rating and then divide by
+        # the original sea level static rating of the engine
         scale = self.add_subsystem(
             "scale_engine",
             ElementMultiplyDivideComp(),
-            promotes_inputs=[("N_engines_thrust", "N_engines"), ("N_engines_fuel_flow", "N_engines")],
+            promotes_inputs=[
+                ("rating_thrust", "ac|propulsion|engine|rating"),
+                ("rating_fuel_flow", "ac|propulsion|engine|rating"),
+            ],
             promotes_outputs=["thrust", "fuel_flow"],
         )
         scale.add_equation(
             output_name="thrust",
-            input_names=["unit_thrust", "N_engines_thrust"],
-            vec_size=nn,
-            input_units=["lbf", None],
+            input_names=["unit_thrust", "rating_thrust", "orig_rating_thrust"],
+            vec_size=[nn, 1, 1],
+            input_units=["lbf", "lbf", "lbf"],
+            divide=[False, False, True],
         )
         scale.add_equation(
             output_name="fuel_flow",
-            input_names=["unit_fuel_flow", "N_engines_fuel_flow"],
-            vec_size=nn,
-            input_units=["lbm/s", None],
-            scaling_factor=scale_fac,
+            input_names=["unit_fuel_flow", "rating_fuel_flow", "orig_rating_fuel_flow"],
+            vec_size=[nn, 1, 1],
+            input_units=["lbm/s", "lbf", "lbf"],
+            divide=[False, False, True],
+            scaling_factor=LHV_scale_fac,
         )
+        self.set_input_defaults("scale_engine.orig_rating_thrust", orig_rated_thrust, units="lbf")
+        self.set_input_defaults("scale_engine.orig_rating_fuel_flow", orig_rated_thrust, units="lbf")
         self.connect("engine_deck.thrust", "scale_engine.unit_thrust")
         self.connect("engine_deck.fuel_flow", "scale_engine.unit_fuel_flow")
