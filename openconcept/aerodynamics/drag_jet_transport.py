@@ -86,7 +86,7 @@ class ParasiteDragCoefficient_JetTransport(om.Group):
 
     Options
     -------
-    num_nodes : float
+    num_nodes : int
         Number of analysis points per phase, by default 1
     include_wing : bool
         Include an estimate of the drag of the wing in the output drag estimate, by default True.
@@ -545,7 +545,7 @@ class SkinFrictionCoefficient_JetTransport(om.ExplicitComponent):
 
     Options
     -------
-    num_nodes : float
+    num_nodes : int
         Number of analysis points per phase, by default 1
     laminar_frac : float
         Fraction of total length that has a laminar boundary layer, by default 0.0
