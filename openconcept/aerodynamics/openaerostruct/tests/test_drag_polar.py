@@ -79,8 +79,8 @@ class VLMDragPolarTestCase(unittest.TestCase):
             mesh.get_val("fltcond|CL"), p.get_val("aero_surrogate.CL"), tolerance=1e-10
         )  # check convergence
         assert_near_equal(2, p.get_val("alpha_bal.alpha", units="deg"), tolerance=1e-7)
-        assert_near_equal(mesh.get_val("fltcond|CD") + 0.01, p.get_val("aero_surrogate.CD"), tolerance=2e-2)
-        assert_near_equal(p.get_val("drag", units="N"), p.get_val("aero_surrogate.CD") * 100 * 5e3, tolerance=2e-2)
+        assert_near_equal(mesh.get_val("fltcond|CD"), p.get_val("aero_surrogate.CD"), tolerance=3e-2)
+        assert_near_equal(p.get_val("drag", units="N"), (p.get_val("aero_surrogate.CD") + 0.01) * 100 * 5e3, tolerance=1e-7)
 
         # Test off training point
         mesh.set_val("fltcond|M", 0.3)
@@ -97,8 +97,8 @@ class VLMDragPolarTestCase(unittest.TestCase):
             mesh.get_val("fltcond|CL"), p.get_val("aero_surrogate.CL"), tolerance=1e-10
         )  # check convergence
         assert_near_equal(6, p.get_val("alpha_bal.alpha", units="deg"), tolerance=1e-2)
-        assert_near_equal(mesh.get_val("fltcond|CD") + 0.01, p.get_val("aero_surrogate.CD"), tolerance=6e-2)
-        assert_near_equal(p.get_val("drag", units="N"), p.get_val("aero_surrogate.CD") * 100 * 5e3, tolerance=5e-2)
+        assert_near_equal(mesh.get_val("fltcond|CD"), p.get_val("aero_surrogate.CD"), tolerance=6e-2)
+        assert_near_equal(p.get_val("drag", units="N"), (p.get_val("aero_surrogate.CD") + 0.01) * 100 * 5e3, tolerance=5e-2)
 
     def test_surf_options(self):
         nn = 1
@@ -135,7 +135,7 @@ class VLMDragPolarTestCase(unittest.TestCase):
         assert_near_equal(p.get_val("drag", units="N"), 34905.69308752 * np.ones(nn), tolerance=1e-10)
 
     def test_vectorized(self):
-        nn = 7
+        nn = 3
         twist = np.array([-1, 0, 1])
         p = om.Problem(
             VLMDragPolar(
@@ -143,6 +143,7 @@ class VLMDragPolarTestCase(unittest.TestCase):
                 num_x=2,
                 num_y=4,
                 num_twist=twist.size,
+                vec_CD_nonwing=True,
                 Mach_train=np.linspace(0.1, 0.8, 2),
                 alpha_train=np.linspace(-11, 15, 2),
                 alt_train=np.linspace(0, 15e3, 2),
@@ -157,7 +158,7 @@ class VLMDragPolarTestCase(unittest.TestCase):
         p.set_val("ac|geom|wing|taper", 0.1)
         p.set_val("ac|geom|wing|c4sweep", 20, units="deg")
         p.set_val("ac|geom|wing|twist", twist, units="deg")
-        p.set_val("ac|aero|CD_nonwing", 0.01)
+        p.set_val("ac|aero|CD_nonwing", np.linspace(0, 0.01, nn))
         p.set_val("fltcond|q", 5e3 * np.ones(nn), units="Pa")
         p.set_val("fltcond|M", 0.5 * np.ones(nn))
         p.set_val("fltcond|h", 7.5e3 * np.ones(nn), units="m")
@@ -165,7 +166,7 @@ class VLMDragPolarTestCase(unittest.TestCase):
         p.run_model()
 
         # Ensure they're all the same
-        assert_near_equal(p.get_val("drag", units="N"), 37615.14285108 * np.ones(nn), tolerance=1e-10)
+        assert_near_equal(p.get_val("drag", units="N"), [32615.14285108, 35115.14285108, 37615.14285108], tolerance=1e-10)
 
     def test_section_geometry(self):
         nn = 1
@@ -209,7 +210,7 @@ class VLMDragPolarTestCase(unittest.TestCase):
 
         # Ensure they're all the same
         assert_near_equal(vlm.get_val("fltcond|CL"), 0.15579806, tolerance=1e-3)
-        assert_near_equal(vlm.get_val("fltcond|CD") + 0.01, p.get_val("aero_surrogate.CD"), tolerance=1e-3)
+        assert_near_equal(vlm.get_val("fltcond|CD"), p.get_val("aero_surrogate.CD"), tolerance=2e-3)
 
     def test_mesh_geometry_option(self):
         nn = 1
@@ -262,7 +263,7 @@ class VLMDragPolarTestCase(unittest.TestCase):
 
         # Ensure they're all the same
         assert_near_equal(vlm.get_val("fltcond|CL"), 0.10634777, tolerance=1e-6)
-        assert_near_equal(vlm.get_val("fltcond|CD") + 0.001, p.get_val("aero_surrogate.CD"), tolerance=1e-4)
+        assert_near_equal(vlm.get_val("fltcond|CD"), p.get_val("aero_surrogate.CD"), tolerance=1e-4)
 
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
@@ -302,7 +303,6 @@ class VLMDataGenTestCase(unittest.TestCase):
         p.set_val("AR", 10)
         p.set_val("taper", 0.1)
         p.set_val("sweep", 20, units="deg")
-        p.set_val("ac|aero|CD_nonwing", 0.01)
         p.run_model()
 
         CL = np.array(
@@ -312,7 +312,7 @@ class VLMDataGenTestCase(unittest.TestCase):
             ]
         )
         CD = np.array(
-            [[[0.03547695, 0.03770253], [0.05900183, 0.0612274]], [[0.03537478, 0.03719636], [0.18710518, 0.18892676]]]
+            [[[0.02547695, 0.02770253], [0.04900183, 0.0512274]], [[0.02537478, 0.02719636], [0.17710518, 0.17892676]]]
         )
 
         assert_near_equal(CL, p.get_val("CL_train"), tolerance=1e-7)
