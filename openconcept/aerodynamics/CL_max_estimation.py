@@ -35,7 +35,7 @@ class CleanCLmax(om.ExplicitComponent):
 
     Outputs
     -------
-    ac|aero|CL_max_clean : float
+    CL_max_clean : float
         Maximum lift coefficient with no flaps or slats (scalar, dimensionless)
 
     Options
@@ -50,22 +50,22 @@ class CleanCLmax(om.ExplicitComponent):
     def setup(self):
         self.add_input("ac|aero|airfoil_Cl_max")
         self.add_input("ac|geom|wing|c4sweep", units="rad")
-        self.add_output("ac|aero|CL_max_clean")
-        self.declare_partials("ac|aero|CL_max_clean", "*")
+        self.add_output("CL_max_clean")
+        self.declare_partials("CL_max_clean", "*")
 
     def compute(self, inputs, outputs):
         Cl_max = inputs["ac|aero|airfoil_Cl_max"]
         sweep = inputs["ac|geom|wing|c4sweep"]
 
-        outputs["ac|aero|CL_max_clean"] = self.options["fudge_factor"] * 0.9 * Cl_max * np.cos(sweep)
+        outputs["CL_max_clean"] = self.options["fudge_factor"] * 0.9 * Cl_max * np.cos(sweep)
 
     def compute_partials(self, inputs, J):
         Cl_max = inputs["ac|aero|airfoil_Cl_max"]
         sweep = inputs["ac|geom|wing|c4sweep"]
         mult = self.options["fudge_factor"]
 
-        J["ac|aero|CL_max_clean", "ac|aero|airfoil_Cl_max"] = mult * 0.9 * np.cos(sweep)
-        J["ac|aero|CL_max_clean", "ac|geom|wing|c4sweep"] = -mult * 0.9 * Cl_max * np.sin(sweep)
+        J["CL_max_clean", "ac|aero|airfoil_Cl_max"] = mult * 0.9 * np.cos(sweep)
+        J["CL_max_clean", "ac|geom|wing|c4sweep"] = -mult * 0.9 * Cl_max * np.sin(sweep)
 
 
 class FlapCLmax(om.ExplicitComponent):
@@ -81,7 +81,7 @@ class FlapCLmax(om.ExplicitComponent):
         Wing sweep at 25% mean aerodynamic chord (scalar, radians)
     ac|geom|wing|toverc : float
         Wing thickness-to-chord ratio (scalar, dimensionless)
-    ac|aero|CL_max_clean : float
+    CL_max_clean : float
         Maximum lift coefficient with no flaps or slats (scalar, dimensionless)
 
     Outputs
@@ -116,13 +116,13 @@ class FlapCLmax(om.ExplicitComponent):
     def setup(self):
         self.add_input("flap_extension", units="deg")
         self.add_input("ac|geom|wing|c4sweep", units="rad")
-        self.add_input("ac|aero|CL_max_clean")
+        self.add_input("CL_max_clean")
         self.add_input("ac|geom|wing|toverc")
 
         self.add_output("CL_max_flap")
 
         self.declare_partials("CL_max_flap", ["flap_extension", "ac|geom|wing|c4sweep", "ac|geom|wing|toverc"])
-        self.declare_partials("CL_max_flap", "ac|aero|CL_max_clean", val=self.options["fudge_factor"])
+        self.declare_partials("CL_max_flap", "CL_max_clean", val=self.options["fudge_factor"])
 
     def compute(self, inputs, outputs):
         delta = inputs["flap_extension"]
@@ -153,7 +153,7 @@ class FlapCLmax(om.ExplicitComponent):
         )
 
         outputs["CL_max_flap"] = self.options["fudge_factor"] * (
-            inputs["ac|aero|CL_max_clean"] + delta_CL_max_flaps + delta_CL_max_slats
+            inputs["CL_max_clean"] + delta_CL_max_flaps + delta_CL_max_slats
         )
 
     def compute_partials(self, inputs, J):

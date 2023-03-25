@@ -18,7 +18,7 @@ class CleanCLmaxTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val("ac|aero|CL_max_clean"), 1.42743476, tolerance=1e-8)
+        assert_near_equal(p.get_val("CL_max_clean"), 1.42743476, tolerance=1e-8)
 
         p = p.check_partials(method="cs", out_stream=None)
         assert_check_partials(p)
@@ -33,7 +33,7 @@ class CleanCLmaxTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val("ac|aero|CL_max_clean"), 2 * 1.42743476, tolerance=1e-8)
+        assert_near_equal(p.get_val("CL_max_clean"), 2 * 1.42743476, tolerance=1e-8)
 
         p = p.check_partials(method="cs", out_stream=None)
         assert_check_partials(p)
@@ -50,7 +50,7 @@ class FlapCLmaxTestCase(unittest.TestCase):
 
         p.set_val("flap_extension", 40, units="deg")
         p.set_val("ac|geom|wing|c4sweep", 25, units="deg")
-        p.set_val("ac|aero|CL_max_clean", 1.42743476)
+        p.set_val("CL_max_clean", 1.42743476)
         p.set_val("ac|geom|wing|toverc", 0.12)
 
         p.run_model()
@@ -77,7 +77,7 @@ class FlapCLmaxTestCase(unittest.TestCase):
 
         p.set_val("flap_extension", 15, units="deg")
         p.set_val("ac|geom|wing|c4sweep", 25, units="deg")
-        p.set_val("ac|aero|CL_max_clean", 1.42743476)
+        p.set_val("CL_max_clean", 1.42743476)
         p.set_val("ac|geom|wing|toverc", 0.12)
 
         p.run_model()

@@ -606,7 +606,7 @@ class FullMissionWithReserve(TrajectoryGroup):
 
     def initialize(self):
         self.options.declare(
-            "num_nodes", default=9, desc="Number of points per segment. Needs to be 2N + 1 due to simpson's rule"
+            "num_nodes", default=9, desc="Number of points per phase. Needs to be 2N + 1 due to simpson's rule"
         )
         self.options.declare("aircraft_model", default=None, desc="OpenConcept-compliant airplane model")
         self.options.declare("transition_method", default="simplified", desc="Method to use for computing transition")
@@ -745,7 +745,7 @@ class FullMissionWithReserve(TrajectoryGroup):
         self.connect("takeoff|h", "descent.descentdt.takeoff|h")
         descent.connect("ode_integ_phase.fltcond|h_final", "descentdt.fltcond|h_final")
 
-        # add the climb, cruise, and descent segments for the reserve mission
+        # add the climb, cruise, and descent phases for the reserve mission
         reserve_climb = self.add_subsystem(
             "reserve_climb",
             SteadyFlightPhase(num_nodes=nn, aircraft_model=acmodelclass, flight_phase="reserve_climb"),
