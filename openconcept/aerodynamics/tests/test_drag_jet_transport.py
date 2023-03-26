@@ -111,8 +111,6 @@ class ParasiteDragCoefficient_JetTransportTestCase(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        om.n2(prob)
-
         # Check result is unchanged. Actual 737-800 takeoff CD0 is challenging to predict, but
         # estimates range between 0.03 (in B738 data file) and 0.08
         # (https://www.sesarju.eu/sites/default/files/documents/sid/2018/papers/SIDs_2018_paper_75.pdf),
