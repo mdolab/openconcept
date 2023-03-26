@@ -7,19 +7,20 @@ class CylinderSurfaceArea(om.ExplicitComponent):
     Compute the surface area of a cylinder. This can be
     used to estimate the wetted area of a fuselage or
     engine nacelle.
-    
+
     Inputs
     ------
     L : float
         Cylinder length (scalar, m)
     D : float
         Cylinder diameter (scalar, m)
-    
+
     Outputs
     -------
     A : float
         Cylinder surface area (scalar, sq m)
     """
+
     def setup(self):
         self.add_input("L", units="m")
         self.add_input("D", units="m")

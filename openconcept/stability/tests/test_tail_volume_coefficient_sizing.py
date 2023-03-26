@@ -3,6 +3,7 @@ import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openconcept.stability import HStabVolumeCoefficientSizing, VStabVolumeCoefficientSizing
 
+
 class HStabVolumeCoefficientSizingTestCase(unittest.TestCase):
     def test_jet_transport(self):
         S = 10.1
@@ -17,7 +18,7 @@ class HStabVolumeCoefficientSizingTestCase(unittest.TestCase):
         p.set_val("ac|geom|wing|S_ref", S, units="ft**2")
         p.set_val("ac|geom|wing|MAC", c, units="ft")
         p.set_val("ac|geom|hstab|c4_to_wing_c4", L, units="ft")
-        
+
         p.run_model()
 
         assert_near_equal(p.get_val("ac|geom|hstab|S_ref", units="ft**2"), K * c * S / L)
@@ -38,7 +39,7 @@ class HStabVolumeCoefficientSizingTestCase(unittest.TestCase):
         p.set_val("ac|geom|wing|S_ref", S, units="ft**2")
         p.set_val("ac|geom|wing|MAC", c, units="ft")
         p.set_val("ac|geom|hstab|c4_to_wing_c4", L, units="ft")
-        
+
         p.run_model()
 
         assert_near_equal(p.get_val("ac|geom|hstab|S_ref", units="ft**2"), K * c * S / L)
@@ -61,7 +62,7 @@ class VStabVolumeCoefficientSizingTestCase(unittest.TestCase):
         p.set_val("ac|geom|wing|S_ref", S, units="ft**2")
         p.set_val("ac|geom|wing|AR", AR)
         p.set_val("ac|geom|vstab|c4_to_wing_c4", L, units="ft")
-        
+
         p.run_model()
 
         span = (AR * S) ** 0.5
@@ -83,7 +84,7 @@ class VStabVolumeCoefficientSizingTestCase(unittest.TestCase):
         p.set_val("ac|geom|wing|S_ref", S, units="ft**2")
         p.set_val("ac|geom|wing|AR", AR)
         p.set_val("ac|geom|vstab|c4_to_wing_c4", L, units="ft")
-        
+
         p.run_model()
 
         span = (AR * S) ** 0.5
@@ -93,5 +94,5 @@ class VStabVolumeCoefficientSizingTestCase(unittest.TestCase):
         assert_check_partials(p)
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     unittest.main()

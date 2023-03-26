@@ -80,7 +80,9 @@ class VLMDragPolarTestCase(unittest.TestCase):
         )  # check convergence
         assert_near_equal(2, p.get_val("alpha_bal.alpha", units="deg"), tolerance=1e-7)
         assert_near_equal(mesh.get_val("fltcond|CD"), p.get_val("aero_surrogate.CD"), tolerance=3e-2)
-        assert_near_equal(p.get_val("drag", units="N"), (p.get_val("aero_surrogate.CD") + 0.01) * 100 * 5e3, tolerance=1e-7)
+        assert_near_equal(
+            p.get_val("drag", units="N"), (p.get_val("aero_surrogate.CD") + 0.01) * 100 * 5e3, tolerance=1e-7
+        )
 
         # Test off training point
         mesh.set_val("fltcond|M", 0.3)
@@ -98,7 +100,9 @@ class VLMDragPolarTestCase(unittest.TestCase):
         )  # check convergence
         assert_near_equal(6, p.get_val("alpha_bal.alpha", units="deg"), tolerance=1e-2)
         assert_near_equal(mesh.get_val("fltcond|CD"), p.get_val("aero_surrogate.CD"), tolerance=6e-2)
-        assert_near_equal(p.get_val("drag", units="N"), (p.get_val("aero_surrogate.CD") + 0.01) * 100 * 5e3, tolerance=5e-2)
+        assert_near_equal(
+            p.get_val("drag", units="N"), (p.get_val("aero_surrogate.CD") + 0.01) * 100 * 5e3, tolerance=5e-2
+        )
 
     def test_surf_options(self):
         nn = 1
@@ -166,7 +170,9 @@ class VLMDragPolarTestCase(unittest.TestCase):
         p.run_model()
 
         # Ensure they're all the same
-        assert_near_equal(p.get_val("drag", units="N"), [32615.14285108, 35115.14285108, 37615.14285108], tolerance=1e-10)
+        assert_near_equal(
+            p.get_val("drag", units="N"), [32615.14285108, 35115.14285108, 37615.14285108], tolerance=1e-10
+        )
 
     def test_section_geometry(self):
         nn = 1

@@ -15,7 +15,7 @@ data = {
         # Aerodynamics
         # ==============================================================================
         "aero": {
-            "polar" : {
+            "polar": {
                 "e": {"value": 0.801},  # estimate from B738 example
             },
             "Mach_max": {"value": 0.82},

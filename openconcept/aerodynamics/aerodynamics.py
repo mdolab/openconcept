@@ -54,9 +54,7 @@ class PolarDrag(ExplicitComponent):
         self.add_output("drag", units="N", shape=(nn,))
 
         self.declare_partials(["drag"], ["fltcond|CL", "fltcond|q"], rows=arange, cols=arange)
-        self.declare_partials(
-            ["drag"], ["ac|geom|wing|S_ref", "ac|geom|wing|AR", "e"], rows=arange, cols=np.zeros(nn)
-        )
+        self.declare_partials(["drag"], ["ac|geom|wing|S_ref", "ac|geom|wing|AR", "e"], rows=arange, cols=np.zeros(nn))
         self.declare_partials(["drag"], ["CD0"], rows=arange, cols=arange if vec_CD0 else np.zeros(nn))
 
     def compute(self, inputs, outputs):

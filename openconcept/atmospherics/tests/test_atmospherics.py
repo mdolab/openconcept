@@ -92,5 +92,5 @@ class ScalarAtmosTestCase(unittest.TestCase):
         assert_check_partials(partials)
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     unittest.main()

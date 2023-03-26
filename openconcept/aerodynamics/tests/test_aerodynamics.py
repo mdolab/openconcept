@@ -74,7 +74,7 @@ class VectorDragVectorCD0TestCase(unittest.TestCase):
 
         p.run_model()
 
-        drag = 10e3 * 100 * (np.linspace(0.01, 0.02, nn) + np.linspace(0, 1, nn)**2 / np.pi / 10 / 0.9)
+        drag = 10e3 * 100 * (np.linspace(0.01, 0.02, nn) + np.linspace(0, 1, nn) ** 2 / np.pi / 10 / 0.9)
 
         assert_near_equal(p.get_val("drag", units="N"), drag)
 
@@ -161,5 +161,5 @@ class StallSpeedTestCase(unittest.TestCase):
         assert_check_partials(partials)
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     unittest.main()

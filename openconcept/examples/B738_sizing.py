@@ -573,6 +573,8 @@ if __name__ == "__main__":
     print(f"CL max cruise: {p.get_val('ac|aero|CLmax_cruise').item():.3f}")
     print(f"CL max takeoff: {p.get_val('ac|aero|CLmax_TO').item():.3f}")
     print(f"Balanced field length (continue): {p.get_val('mission.bfl.distance_continue', units='ft').item():.1f} ft")
-    print(f"Balanced field length (abort): {p.get_val('mission.bfl.distance_abort', units='ft').item():.1f} ft (this should be the same as continue)")
+    print(
+        f"Balanced field length (abort): {p.get_val('mission.bfl.distance_abort', units='ft').item():.1f} ft (this should be the same as continue)"
+    )
 
     plot_results(p, filename="plot.pdf")

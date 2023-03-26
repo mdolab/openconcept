@@ -186,7 +186,9 @@ class VLMDragPolar(om.Group):
             "num_sections", default=2, types=int, desc="Number of sections along the half span to define"
         )
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
-        self.options.declare("vec_CD_nonwing", default=False, types=bool, desc="Take in CD_nonwing input as a vector of length num_nodes")
+        self.options.declare(
+            "vec_CD_nonwing", default=False, types=bool, desc="Take in CD_nonwing input as a vector of length num_nodes"
+        )
         self.options.declare(
             "Mach_train",
             default=np.array([0.1, 0.3, 0.45, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9]),

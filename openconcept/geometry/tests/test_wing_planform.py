@@ -3,6 +3,7 @@ import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openconcept.geometry import WingMACTrapezoidal, WingSpan
 
+
 class WingMACTrapezoidalTestCase(unittest.TestCase):
     def test_rectangular(self):
         """
@@ -18,7 +19,7 @@ class WingMACTrapezoidalTestCase(unittest.TestCase):
         p.set_val("S_ref", b * c, units="m**2")
         p.set_val("AR", b / c)
         p.set_val("taper", 1.0)
-        
+
         p.run_model()
 
         assert_near_equal(p.get_val("MAC", units="m"), c)
@@ -37,7 +38,7 @@ class WingMACTrapezoidalTestCase(unittest.TestCase):
         p.set_val("S_ref", 10, units="m**2")
         p.set_val("AR", 10)
         p.set_val("taper", 0.3)
-        
+
         p.run_model()
 
         assert_near_equal(p.get_val("MAC", units="m"), 1.09664694, tolerance=1e-8)
@@ -54,7 +55,7 @@ class WingSpanTestCase(unittest.TestCase):
 
         p.set_val("S_ref", 10, units="m**2")
         p.set_val("AR", 2.5)
-        
+
         p.run_model()
 
         assert_near_equal(p.get_val("span", units="m"), 5.0)
@@ -63,5 +64,5 @@ class WingSpanTestCase(unittest.TestCase):
         assert_check_partials(p)
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     unittest.main()
