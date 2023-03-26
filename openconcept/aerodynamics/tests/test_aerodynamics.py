@@ -58,6 +58,30 @@ class ScalarDragTestCase(unittest.TestCase):
         assert_check_partials(partials)
 
 
+class VectorDragVectorCD0TestCase(unittest.TestCase):
+    def test(self):
+        nn = 3
+        p = Problem()
+        p.model.add_subsystem("comp", PolarDrag(num_nodes=nn, vec_CD0=True), promotes=["*"])
+        p.setup(force_alloc_complex=True)
+
+        p.set_val("fltcond|CL", np.linspace(0, 1, nn))
+        p.set_val("fltcond|q", 10e3, units="Pa")
+        p.set_val("ac|geom|wing|S_ref", 100, units="m**2")
+        p.set_val("ac|geom|wing|AR", 10)
+        p.set_val("CD0", np.linspace(0.01, 0.02, nn))
+        p.set_val("e", 0.9)
+
+        p.run_model()
+
+        drag = 10e3 * 100 * (np.linspace(0.01, 0.02, nn) + np.linspace(0, 1, nn) ** 2 / np.pi / 10 / 0.9)
+
+        assert_near_equal(p.get_val("drag", units="N"), drag)
+
+        partials = p.check_partials(method="cs", out_stream=None)
+        assert_check_partials(partials)
+
+
 class LiftTestGroup(Group):
     """
     This is a simple analysis group for testing the lift component
@@ -135,3 +159,7 @@ class StallSpeedTestCase(unittest.TestCase):
     def test_partials(self):
         partials = self.prob.check_partials(method="cs", out_stream=None)
         assert_check_partials(partials)
+
+
+if __name__ == "__main__":
+    unittest.main()

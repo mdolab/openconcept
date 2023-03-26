@@ -489,6 +489,7 @@ class NusseltFromColburnJ(ExplicitComponent):
         Hydraulic diameter Nusselt number (vector, dimensionless)
     Nu_dh_hot : float
         Hydraulic diameter Nusselt number (vector, dimensionless
+
     Options
     -------
     num_nodes : int

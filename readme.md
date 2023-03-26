@@ -63,7 +63,7 @@ OpenConcept is tested regularly on builds with the oldest and latest supported p
 
 Please cite this software by reference to the [conference paper](https://www.researchgate.net/publication/326263660_Development_of_a_Conceptual_Design_Model_for_Aircraft_Electric_Propulsion_with_Efficient_Gradients):
 
-Benjamin J. Brelje and Joaquim R.R.A. Martins, "Development of a Conceptual Design Model for Aircraft Electric Propulsion with Efficient Gradients", 2018 AIAA/IEEE Electric Aircraft Technologies Symposium, AIAA Propulsion and Energy Forum, (AIAA 2018-4979) DOI: 10.2514/6.2018-4979
+Benjamin J. Brelje and Joaquim R. R. A. Martins, "Development of a Conceptual Design Model for Aircraft Electric Propulsion with Efficient Gradients", 2018 AIAA/IEEE Electric Aircraft Technologies Symposium, AIAA Propulsion and Energy Forum, (AIAA 2018-4979) DOI: 10.2514/6.2018-4979
 
 ```
 @inproceedings{Brelje2018a,
@@ -79,15 +79,17 @@ Benjamin J. Brelje and Joaquim R.R.A. Martins, "Development of a Conceptual Desi
 
 If using the integrated OpenAeroStruct VLM or aerostructural aerodynamic models, please cite the following [conference paper](https://www.researchgate.net/publication/357559489_Aerostructural_wing_design_optimization_considering_full_mission_analysis):
 
-Eytan J. Adler and Joaquim R.R.A. Martins, "Aerostructural wing design optimization considering full mission analysis", 2022 AIAA SciTech Forum, San Diego, CA, January 2022. DOI: 10.2514/6.2022-0382
+Eytan J. Adler and Joaquim R. R. A. Martins, "Efficient Aerostructural Wing Optimization Considering Mission Analysis", Journal of Aircraft, 2022. DOI: 10.2514/1.c037096
 
 ```
-@inproceedings{Adler2022a,
-	author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
-	title       = {Aerostructural wing design optimization considering full mission analysis},
-	booktitle   = {AIAA SciTech Forum},
-	doi         = {10.2514/6.2022-0382},
-	month       = {January},
-	year        = {2022}
+@article{Adler2022d,
+	author = {Adler, Eytan J. and Martins, Joaquim R. R. A.},
+	doi = {10.2514/1.c037096},
+	issn = {1533-3868},
+	journal = {Journal of Aircraft},
+	month = {December},
+	publisher = {American Institute of Aeronautics and Astronautics},
+	title = {Efficient Aerostructural Wing Optimization Considering Mission Analysis},
+	year = {2022}
 }
 ```

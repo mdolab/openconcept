@@ -1,466 +1,580 @@
-# Modified by Cody Karcher, March 2023
-# Original file written by Venkat Subramaniam
-#    Avaliable here:  https://github.com/vrsub/openconcept/blob/sizing/examples/B738_sizing.py
+"""
+@File    :   B738_sizing.py
+@Date    :   2023/03/25
+@Author  :   Eytan Adler
+@Description : Boeing 737-800 estimate using empirical weight and drag buildups
+"""
 
-# File does not run to completion, encounters an error.  OpenConcept has changed since original writing, bug unclear.
+# ==============================================================================
+# Standard Python modules
+# ==============================================================================
 
-# ==========================================================================================================================================================================================================================================
-# Standard Imports
-# ==========================================================================================================================================================================================================================================
-import sys
-import os
+# ==============================================================================
+# External Python modules
+# ==============================================================================
 import numpy as np
-
-sys.path.insert(0, os.getcwd())
 import openmdao.api as om
-from openconcept.mission import IntegratorGroup
-from openconcept.utilities import Integrator
-from openconcept.utilities import AddSubtractComp, DictIndepVarComp, plot_trajectory
 
-# imports for the airplane model itself
-from openconcept.aerodynamics import PolarDrag
-from openconcept.mission.profiles import (
-    # FullMissionWithReserve,
-    MissionWithReserve,
-    FullMissionAnalysis,
-    BasicMission,
-)
-from openconcept.propulsion import CFM56
-from openconcept.aerodynamics import VLMDragPolar
-
-# ==========================================================================================================================================================================================================================================
-# Experimental stuff
-# ==========================================================================================================================================================================================================================================
-from openconcept.mission import FullMissionWithReserve
-
-from openconcept.stability import (
-    HStabSizing_JetTransport,
-    VStabSizing_JetTransport,
-)
-
-from openconcept.geometry import (
-    WingMAC_Trapezoidal,
-    WingRoot_LinearTaper,
-    WingSpan,
-)
-
-# new aerodynamics sub-folder, need to be clear on aerodynamic analyses
-from openconcept.aerodynamics.sizing import Cd0_NonWing_JetTransport
-from openconcept.aerodynamics.sizing import CL_MAX_cruise
-
-from openconcept.weights import (
-    JetTransportEmptyWeight
-)
-
+# ==============================================================================
+# Extension modules
+# ==============================================================================
 from openconcept.examples.aircraft_data.B738_sizing import data as acdata
+from openconcept.aerodynamics import PolarDrag, ParasiteDragCoefficient_JetTransport, CleanCLmax, FlapCLmax
+from openconcept.propulsion import RubberizedTurbofan
+from openconcept.geometry import CylinderSurfaceArea, WingMACTrapezoidal
+from openconcept.stability import HStabVolumeCoefficientSizing, VStabVolumeCoefficientSizing
+from openconcept.weights import JetTransportEmptyWeight
+from openconcept.mission import FullMissionWithReserve
+from openconcept.utilities import Integrator, AddSubtractComp, ElementMultiplyDivideComp, DictIndepVarComp
 
 
-
-class B738AirplaneModel(IntegratorGroup):
+class B738AircraftModel(om.Group):
     """
-    A custom model specific to the Boeing 737-800 airplane.
-    This class will be passed in to the mission analysis code.
-
+    A Boeing 737-800 aircraft model group. Instead of using known weight
+    and drag estimates of the existing airplane, this group uses empirical
+    weight and drag buildups to enable the design of clean sheet aircraft.
     """
 
     def initialize(self):
-        self.options.declare("num_nodes", default=1)
-        self.options.declare("flight_phase", default=None)
+        self.options.declare("num_nodes", default=1, types=int, desc="Number of analysis points to run")
+        self.options.declare("flight_phase", default=None, types=str, desc="Phase of mission this group lives in")
 
     def setup(self):
         nn = self.options["num_nodes"]
-        flight_phase = self.options["flight_phase"]
+        phase = self.options["flight_phase"]
+        in_takeoff = phase in ["v0v1", "v1v0", "v1vr", "rotate"]
 
-        # a propulsion system needs to be defined in order to provide thrust
-        # information for the mission analysis code
-        propulsion_promotes_inputs = ["fltcond|*", "throttle"]
-
-        self.add_subsystem("propmodel", CFM56(num_nodes=nn, plot=False), promotes_inputs=propulsion_promotes_inputs)
-
-        # doubles outputs from propulsion model to scale for twin engine aircraft
-        doubler = om.ExecComp(
-            [
-                "thrust=thrust_in * (1 + propulsor_active) * (rating/27000)",
-                "fuel_flow=fuel_flow_in * (1 + propulsor_active) * (rating/27000)",
-            ],
-            thrust_in={"val": 1.0 * np.ones((nn,)), "units": "kN"},
-            thrust={"val": 1.0 * np.ones((nn,)), "units": "kN"},
-            fuel_flow={
-                "val": 1.0 * np.ones((nn,)),
-                "units": "kg/s",
-            },
-            propulsor_active={"val": 1.0 * np.ones((nn,))},
-            rating={"val": 27000, "units": "lbf"},
-            fuel_flow_in={"val": 1.0 * np.ones((nn,)), "units": "kg/s"},
-        )
-
+        # ==============================================================================
+        # Aerodynamics
+        # ==============================================================================
+        # -------------- Zero-lift drag coefficient buildup --------------
+        drag_buildup_promotes = [
+            "fltcond|Utrue",
+            "fltcond|rho",
+            "fltcond|T",
+            "ac|geom|fuselage|length",
+            "ac|geom|fuselage|height",
+            "ac|geom|fuselage|S_wet",
+            "ac|geom|hstab|S_ref",
+            "ac|geom|hstab|AR",
+            "ac|geom|hstab|taper",
+            "ac|geom|hstab|toverc",
+            "ac|geom|vstab|S_ref",
+            "ac|geom|vstab|AR",
+            "ac|geom|vstab|taper",
+            "ac|geom|vstab|toverc",
+            "ac|geom|wing|S_ref",
+            "ac|geom|wing|AR",
+            "ac|geom|wing|taper",
+            "ac|geom|wing|toverc",
+            "ac|geom|nacelle|length",
+            "ac|geom|nacelle|S_wet",
+            "ac|propulsion|num_engines",
+        ]
+        if in_takeoff:
+            drag_buildup_promotes += ["ac|aero|takeoff_flap_deg", "ac|geom|wing|c4sweep"]
         self.add_subsystem(
-            "doubler",
-            doubler,
-            promotes_inputs=["propulsor_active", ("rating", "ac|propulsion|engine|rating")],
-            promotes_outputs=["*"],
+            "zero_lift_drag",
+            ParasiteDragCoefficient_JetTransport(num_nodes=nn, configuration="takeoff" if in_takeoff else "clean"),
+            promotes_inputs=drag_buildup_promotes,
         )
-        self.connect("propmodel.thrust", "doubler.thrust_in")
-        self.connect("propmodel.fuel_flow", "doubler.fuel_flow_in")
 
-        intfuel = self.add_subsystem(
-            "intfuel",
-            Integrator(num_nodes=nn, method="simpson", diff_units="s", time_setup="duration"),
-            promotes_inputs=["*"],
-            promotes_outputs=["*"],
-        )
-        intfuel.add_integrand("fuel_used", rate_name="fuel_flow", val=1.0, units="kg")
-
-        # use a different drag coefficient for takeoff versus cruise
-        if flight_phase not in ["v0v1", "v1v0", "v1vr", "rotate"]:
-            # self.set_input_defaults('ac|aero|polar|CD0_cruise', 0.0145)
-            cd0_source = "ac|aero|polar|CD0_cruise"
-        else:
-            cd0_source = "ac|aero|polar|CD0_TO"
-
-        oas_surf_dict = {}  # options for OpenAeroStruct
-        oas_surf_dict["t_over_c"] = acdata["ac"]["geom"]["wing"]["toverc"]["value"]
+        # -------------- Drag polar --------------
         self.add_subsystem(
-            "drag",
-            VLMDragPolar(num_nodes=nn, num_x=4, num_y=10, num_twist=5, surf_options=oas_surf_dict), # OpenAeroStruct function call for VLM drag computation
+            "drag_polar",
+            PolarDrag(num_nodes=nn, vec_CD0=True),
             promotes_inputs=[
                 "fltcond|CL",
-                "fltcond|M",
-                "fltcond|h",
                 "fltcond|q",
-                "ac|geom|*",
-                ("ac|aero|CD_nonwing", cd0_source),
+                "ac|geom|wing|S_ref",
+                "ac|geom|wing|AR",
+                ("e", "ac|aero|polar|e"),
             ],
             promotes_outputs=["drag"],
         )
-        self.set_input_defaults("ac|geom|wing|twist", np.zeros(5), units="deg")
+        self.connect("zero_lift_drag.CD0", "drag_polar.CD0")
 
-        # compute aircraft weight over each flight segment
+        # ==============================================================================
+        # Propulsion
+        # ==============================================================================
+        # -------------- CFM56 engine surrogate model --------------
         self.add_subsystem(
-            "weight",
+            "CFM56",
+            RubberizedTurbofan(num_nodes=nn, engine="CFM56"),
+            promotes_inputs=["throttle", "fltcond|h", "fltcond|M", "ac|propulsion|engine|rating"],
+        )
+
+        # -------------- Multiply fuel flow and thrust by the number of active engines --------------
+        # propulsor_active is 0 if failed engine and 1 otherwise, so
+        # num active engines = num engines - 1 + propulsor_active
+        self.add_subsystem(
+            "num_engine_calc",
+            AddSubtractComp(
+                output_name="num_active_engines",
+                input_names=["num_engines", "propulsor_active", "one"],
+                vec_size=[1, nn, 1],
+                scaling_factors=[1, 1, -1],
+            ),
+            promotes_inputs=[("num_engines", "ac|propulsion|num_engines"), "propulsor_active"],
+        )
+        self.set_input_defaults("num_engine_calc.one", 1.0)
+
+        prop_mult = self.add_subsystem(
+            "propulsion_multiplier", ElementMultiplyDivideComp(), promotes_outputs=["thrust"]
+        )
+        prop_mult.add_equation(
+            output_name="thrust",
+            input_names=["thrust_per_engine", "num_active_engines_1"],
+            vec_size=nn,
+            input_units=["lbf", None],
+        )
+        prop_mult.add_equation(
+            output_name="fuel_flow",
+            input_names=["fuel_flow_per_engine", "num_active_engines_2"],
+            vec_size=nn,
+            input_units=["kg/s", None],
+        )
+        self.connect("CFM56.fuel_flow", "propulsion_multiplier.fuel_flow_per_engine")
+        self.connect("CFM56.thrust", "propulsion_multiplier.thrust_per_engine")
+
+        # This hacky thing is necessary to enable two equations to pull from the same input
+        self.connect(
+            "num_engine_calc.num_active_engines",
+            ["propulsion_multiplier.num_active_engines_1", "propulsion_multiplier.num_active_engines_2"],
+        )
+
+        # ==============================================================================
+        # Weight
+        # ==============================================================================
+        # -------------- Integrate fuel burn --------------
+        integ = self.add_subsystem(
+            "fuel_burn_integ", Integrator(num_nodes=nn, diff_units="s", method="simpson", time_setup="duration")
+        )
+        integ.add_integrand(
+            "fuel_burn",
+            rate_name="fuel_flow",
+            rate_units="kg/s",
+            lower=0.0,
+            upper=1e6,
+        )
+        self.connect("propulsion_multiplier.fuel_flow", "fuel_burn_integ.fuel_flow")
+
+        # -------------- Subtract fuel burn from takeoff weight --------------
+        self.add_subsystem(
+            "weight_calc",
             AddSubtractComp(
                 output_name="weight",
-                input_names=["ac|weights|MTOW", "fuel_used"],
-                units="kg",
-                vec_size=[1, nn],
+                input_names=["ac|weights|MTOW", "fuel_burn"],
                 scaling_factors=[1, -1],
+                vec_size=[1, nn],
+                units="kg",
             ),
-            promotes_inputs=["*"],
+            promotes_inputs=["ac|weights|MTOW"],
             promotes_outputs=["weight"],
         )
-
-        # computes the difference between flight CL and CL_max to ensure aircraft does not exceed CL_max
-        self.add_subsystem(
-            "Cl_diff",
-            AddSubtractComp(
-                output_name="CL_diff",
-                input_names=["ac|aero|CL_max", "fltcond|CL"],
-                vec_size=[1, nn],
-                scaling_factors=[1, -1],
-            ),
-            promotes_inputs=["*"],
-            promotes_outputs=["*"],
-        )
+        self.connect("fuel_burn_integ.fuel_burn", "weight_calc.fuel_burn")
 
 
+class B738MissionAnalysis(om.Group):
+    """
+    Group that performs mission analysis, geometry calculations, and operating empty weight estimate.
+    """
 
-class B738AnalysisGroup(om.Group):
+    def initialize(self):
+        self.options.declare("num_nodes", default=11, types=int, desc="Analysis points per mission phase")
+
     def setup(self):
-        # Define number of analysis points to run pers mission segment
-        nn = 11
+        nn = self.options["num_nodes"]
 
-        # Define a bunch of design varaiables and airplane-specific parameters
-        dv_comp = self.add_subsystem("dv_comp", DictIndepVarComp(acdata), promotes_outputs=["*"])
-        dv_comp.add_output_from_dict("ac|aero|CLmax_TO")
-        dv_comp.add_output_from_dict("ac|aero|polar|e")
-        dv_comp.add_output_from_dict("ac|aero|polar|CD0_TO")
-        dv_comp.add_output_from_dict("ac|aero|Vstall_land")
-        dv_comp.add_output_from_dict("ac|aero|Cl_max")
+        # ==============================================================================
+        # Variables from B738_sizing data file
+        # ==============================================================================
+        dv = self.add_subsystem("ac_vars", DictIndepVarComp(acdata), promotes_outputs=["*"])
+        dv_outputs = [
+            # -------------- Aero --------------
+            "ac|aero|polar|e",
+            "ac|aero|Mach_max",
+            "ac|aero|Vstall_land",
+            "ac|aero|airfoil_Cl_max",
+            "ac|aero|takeoff_flap_deg",
+            # -------------- Propulsion --------------
+            "ac|propulsion|engine|rating",
+            "ac|propulsion|num_engines",
+            # -------------- Geometry --------------
+            # Wing
+            "ac|geom|wing|S_ref",
+            "ac|geom|wing|AR",
+            "ac|geom|wing|c4sweep",
+            "ac|geom|wing|taper",
+            "ac|geom|wing|toverc",
+            # Horizontal stabilizer
+            "ac|geom|hstab|AR",
+            "ac|geom|hstab|c4sweep",
+            "ac|geom|hstab|taper",
+            "ac|geom|hstab|toverc",
+            # Vertical stabilizer
+            "ac|geom|vstab|AR",
+            "ac|geom|vstab|c4sweep",
+            "ac|geom|vstab|taper",
+            "ac|geom|vstab|toverc",
+            # Fuselage
+            "ac|geom|fuselage|length",
+            "ac|geom|fuselage|height",
+            # Nacelle
+            "ac|geom|nacelle|length",
+            "ac|geom|nacelle|diameter",
+            # Main gear
+            "ac|geom|maingear|length",
+            "ac|geom|maingear|num_wheels",
+            "ac|geom|maingear|num_shock_struts",
+            # Nose gear
+            "ac|geom|nosegear|length",
+            "ac|geom|nosegear|num_wheels",
+            # -------------- Weights --------------
+            "ac|weights|W_payload",
+            # -------------- Miscellaneous --------------
+            "ac|num_passengers_max",
+            "ac|num_flight_deck_crew",
+            "ac|num_cabin_crew",
+            "ac|cabin_pressure",
+        ]
+        for output_name in dv_outputs:
+            dv.add_output_from_dict(output_name)
 
-        dv_comp.add_output_from_dict("ac|geom|wing|S_ref")
-        dv_comp.add_output_from_dict("ac|geom|wing|AR")
-        dv_comp.add_output_from_dict("ac|geom|wing|c4sweep")
-        dv_comp.add_output_from_dict("ac|geom|wing|taper")
-        dv_comp.add_output_from_dict("ac|geom|wing|toverc")
-        dv_comp.add_output_from_dict("ac|geom|hstab|c4_to_wing_c4")
-        dv_comp.add_output_from_dict("ac|geom|hstab|AR")
-        dv_comp.add_output_from_dict("ac|geom|hstab|c4sweep")
-        dv_comp.add_output_from_dict("ac|geom|hstab|taper")
-        dv_comp.add_output_from_dict("ac|geom|vstab|AR")
-        dv_comp.add_output_from_dict("ac|geom|vstab|toverc")
-        dv_comp.add_output_from_dict("ac|geom|vstab|c4sweep")
-
-        dv_comp.add_output_from_dict("ac|geom|fuselage|S_wet")
-        dv_comp.add_output_from_dict("ac|geom|fuselage|length")
-        dv_comp.add_output_from_dict("ac|geom|fuselage|width")
-        dv_comp.add_output_from_dict("ac|geom|fuselage|height")
-
-        dv_comp.add_output_from_dict("ac|geom|nosegear|length")
-        dv_comp.add_output_from_dict("ac|geom|nosegear|num_wheels")
-        dv_comp.add_output_from_dict("ac|geom|maingear|length")
-        dv_comp.add_output_from_dict("ac|geom|maingear|num_wheels")
-        dv_comp.add_output_from_dict("ac|geom|maingear|num_shock_struts")
-
-        dv_comp.add_output_from_dict("ac|weights|MLW")
-
-        dv_comp.add_output_from_dict("ac|weights|max_payload")
-
-        dv_comp.add_output_from_dict("ac|propulsion|engine|rating")
-        dv_comp.add_output_from_dict("ac|propulsion|engine|BPR")
-        dv_comp.add_output_from_dict("ac|propulsion|num_engines")
-
-        dv_comp.add_output_from_dict("ac|num_passengers_max")
-        dv_comp.add_output_from_dict("ac|num_flight_deck_crew")
-        dv_comp.add_output_from_dict("ac|num_cabin_crew")
-        dv_comp.add_output_from_dict("ac|cabin_pressure")
-        dv_comp.add_output_from_dict("ac|q_cruise")
-
-        # The follow subsystems compute all geometry parameters that are dependent on wing area and other defined geometry
+        # ==============================================================================
+        # Geometry
+        # ==============================================================================
+        # -------------- Estimate wing to tail quarter chord as half fuselage length --------------
         self.add_subsystem(
-            "Wing_Root",
-            WingRoot_LinearTaper(),
-            promotes_inputs=["*"],
-            promotes_outputs=[("C_root", "ac|geom|wing|root_chord")],
+            "tail_lever_arm_estimate",
+            AddSubtractComp(
+                output_name="c4_to_wing_c4",
+                input_names=["fuselage_length"],
+                units="m",
+                scaling_factors=[0.5],
+            ),
+            promotes_inputs=[("fuselage_length", "ac|geom|fuselage|length")],
+        )
+        self.connect(
+            "tail_lever_arm_estimate.c4_to_wing_c4", ["ac|geom|hstab|c4_to_wing_c4", "ac|geom|vstab|c4_to_wing_c4"]
+        )
+
+        # -------------- Compute mean aerodynamic chord assuming trapezoidal wing --------------
+        self.add_subsystem(
+            "wing_MAC",
+            WingMACTrapezoidal(),
+            promotes_inputs=[
+                ("S_ref", "ac|geom|wing|S_ref"),
+                ("AR", "ac|geom|wing|AR"),
+                ("taper", "ac|geom|wing|taper"),
+            ],
+            promotes_outputs=[("MAC", "ac|geom|wing|MAC")],
+        )
+
+        # -------------- Vertical and horizontal tail area --------------
+        self.add_subsystem(
+            "vstab_area",
+            VStabVolumeCoefficientSizing(),
+            promotes_inputs=["ac|geom|wing|S_ref", "ac|geom|wing|AR", "ac|geom|vstab|c4_to_wing_c4"],
+            promotes_outputs=["ac|geom|vstab|S_ref"],
+        )
+        self.add_subsystem(
+            "hstab_area",
+            HStabVolumeCoefficientSizing(),
+            promotes_inputs=["ac|geom|wing|S_ref", "ac|geom|wing|MAC", "ac|geom|hstab|c4_to_wing_c4"],
+            promotes_outputs=["ac|geom|hstab|S_ref"],
+        )
+
+        # -------------- Compute the fuselage and nacelle wetted areas assuming a cylinder --------------
+        self.add_subsystem(
+            "nacelle_wetted_area",
+            CylinderSurfaceArea(),
+            promotes_inputs=[("L", "ac|geom|nacelle|length"), ("D", "ac|geom|nacelle|diameter")],
+            promotes_outputs=[("A", "ac|geom|nacelle|S_wet")],
+        )
+        self.add_subsystem(
+            "fuselage_wetted_area",
+            CylinderSurfaceArea(),
+            promotes_inputs=[("L", "ac|geom|fuselage|length"), ("D", "ac|geom|fuselage|height")],
+            promotes_outputs=[("A", "ac|geom|fuselage|S_wet")],
+        )
+
+        # ==============================================================================
+        # Operating empty weight
+        # ==============================================================================
+        # Estimate MLW as 80% of MTOW so it's not necessary to know apriori.
+        # MLW is used only for the landing gear weight estimate, so it's accuracy isn't hugely important.
+        self.add_subsystem(
+            "MLW_calc",
+            AddSubtractComp(
+                output_name="ac|weights|MLW",
+                input_names=["ac|weights|MTOW"],
+                units="kg",
+                scaling_factors=[0.8],
+            ),
+            promotes_inputs=["ac|weights|MTOW"],
+            promotes_outputs=["ac|weights|MLW"],
         )
 
         self.add_subsystem(
-            "Wing_MAC", WingMAC_Trapezoidal(), promotes_inputs=["*"], promotes_outputs=[("MAC", "ac|geom|wing|MAC")]
-        )
-
-        self.add_subsystem(
-            "HStab",
-            HStabSizing_JetTransport(),
-            promotes_inputs=["*"],
-            promotes_outputs=[("hstab_area", "ac|geom|hstab|S_ref")],
-        )
-
-        self.add_subsystem(
-            "VStab",
-            VStabSizing_JetTransport(),
-            promotes_inputs=["*"],
-            promotes_outputs=[("vstab_area", "ac|geom|vstab|S_ref")],
-        )
-
-        self.add_subsystem(
-            "wingspan", WingSpan(), promotes_inputs=["*"], promotes_outputs=[("span", "ac|geom|wing|span")]
-        )
-
-        self.add_subsystem(
-            "cd0_estimation",
-            Cd0_NonWing_JetTransport(),
-            promotes_inputs=["*"],
-            promotes_outputs=[("C_d0", "ac|aero|polar|CD0_cruise")],
-        )
-
-        # calls empty weight build up function to store operating empty weight
-        self.add_subsystem(
-            "OEW",
+            "empty_weight",
             JetTransportEmptyWeight(),
-            promotes_inputs=["*"],
+            promotes_inputs=[
+                "ac|num_passengers_max",
+                "ac|num_flight_deck_crew",
+                "ac|num_cabin_crew",
+                "ac|cabin_pressure",
+                "ac|aero|Mach_max",
+                "ac|aero|Vstall_land",
+                "ac|geom|wing|S_ref",
+                "ac|geom|wing|AR",
+                "ac|geom|wing|c4sweep",
+                "ac|geom|wing|taper",
+                "ac|geom|wing|toverc",
+                "ac|geom|hstab|S_ref",
+                "ac|geom|hstab|AR",
+                "ac|geom|hstab|c4sweep",
+                "ac|geom|hstab|c4_to_wing_c4",
+                "ac|geom|vstab|S_ref",
+                "ac|geom|vstab|AR",
+                "ac|geom|vstab|c4sweep",
+                "ac|geom|vstab|toverc",
+                "ac|geom|vstab|c4_to_wing_c4",
+                "ac|geom|fuselage|height",
+                "ac|geom|fuselage|length",
+                "ac|geom|fuselage|S_wet",
+                "ac|geom|maingear|length",
+                "ac|geom|maingear|num_wheels",
+                "ac|geom|maingear|num_shock_struts",
+                "ac|geom|nosegear|length",
+                "ac|geom|nosegear|num_wheels",
+                "ac|propulsion|engine|rating",
+                "ac|propulsion|num_engines",
+                "ac|weights|MTOW",
+                "ac|weights|MLW",
+            ],
             promotes_outputs=[("OEW", "ac|weights|OEW")],
         )
 
-        # computes aircraft MTOW in the top level model based on implicitly solved fuel burn
+        # ==============================================================================
+        # CL max in cruise and takeoff
+        # ==============================================================================
         self.add_subsystem(
-            "MTOW",
+            "CL_max_cruise",
+            CleanCLmax(),
+            promotes_inputs=["ac|aero|airfoil_Cl_max", "ac|geom|wing|c4sweep"],
+            promotes_outputs=[("CL_max_clean", "ac|aero|CLmax_cruise")],
+        )
+        self.add_subsystem(
+            "CL_max_takeoff",
+            FlapCLmax(),
+            promotes_inputs=[
+                ("flap_extension", "ac|aero|takeoff_flap_deg"),
+                "ac|geom|wing|c4sweep",
+                "ac|geom|wing|toverc",
+                ("CL_max_clean", "ac|aero|CLmax_cruise"),
+            ],
+            promotes_outputs=[("CL_max_flap", "ac|aero|CLmax_TO")],
+        )
+
+        # ==============================================================================
+        # Remaining misc stuff and input settings
+        # ==============================================================================
+        # -------------- Set MTOW to OEW + payload + fuel burn --------------
+        self.add_subsystem(
+            "MTOW_calc",
             AddSubtractComp(
-                output_name="ac|weights|MTOW",
-                input_names=["ac|weights|OEW", "ac|weights|W_fuel_max", "ac|weights|max_payload"],
+                output_name="MTOW",
+                input_names=["OEW", "W_payload", "W_fuel"],
                 units="kg",
-                vec_size=[1, 1, 1],
-                scaling_factors=[1, 1, 1],
-                lower=0,
+                lower=1e-6,
             ),
-            promotes_outputs=["ac|weights|MTOW"],
-            promotes_inputs=["*"],
+            promotes_inputs=[("OEW", "ac|weights|OEW"), ("W_payload", "ac|weights|W_payload")],
+            promotes_outputs=[("MTOW", "ac|weights|MTOW")],
+        )
+        self.connect(
+            "mission.loiter.fuel_burn_integ.fuel_burn_final",
+            ["MTOW_calc.W_fuel", "empty_weight.ac|weights|W_fuel_max"],
         )
 
-        # Run a full mission analysis including takeoff, reserve_, cruise,reserve_ and descereserve_n
+        # -------------- Initial guesses for important solver states for better performance --------------
+        self.set_input_defaults("ac|weights|MTOW", 50e3, units="kg")
+        for fuel_burn_var in ["MTOW_calc.W_fuel", "empty_weight.ac|weights|W_fuel_max"]:
+            self.set_input_defaults(fuel_burn_var, 30e3, units="kg")
 
-        self.connect("climb.duration", "mission_duration.climb")
-        self.connect("cruise.duration", "mission_duration.cruise")
-        self.connect("descent.duration", "mission_duration.descent")
-
+        # ==============================================================================
+        # Mission analysis
+        # ==============================================================================
         self.add_subsystem(
-            "CL_max", CL_MAX_cruise(), promotes_inputs=["*"], promotes_outputs=[("Wing_CL_max", "ac|aero|CL_max")]
-        )
-
-        # Runs mission analysis for aircraft model
-        analysis = self.add_subsystem(
-            "analysis",
-            FullMissionWithReserve(num_nodes=nn, aircraft_model=B738AirplaneModel),
-            promotes_inputs=["*"],
-            promotes_outputs=["*"],
-        )
-
-        # the following sections compute cash operating cost
-        self.add_subsystem(
-            "mission_duration",
-            AddSubtractComp(
-                output_name="total_block_time",
-                input_names=["climb", "cruise", "descent"],
-                units="s",
-                vec_size=[1, 1, 1],
-                scaling_factors=[1, 1, 1],
-                lower=0,
-            ),
-            promotes_outputs=[("total_block_time", "block_time")],
-        )
-
-        # self.add_subsystem("COC", JetTransportCOC(), promotes_inputs=["*"], promotes_outputs=["*"])
-
-        self.connect("loiter.fuel_used_final", "ac|weights|W_fuel_max")
-        self.set_input_defaults(
-            "ac|weights|MTOW", acdata["ac"]["weights"]["MTOW"]["value"], units=acdata["ac"]["weights"]["MTOW"]["units"]
-        )
-        self.set_input_defaults(
-            "ac|weights|W_fuel_max",
-            acdata["ac"]["weights"]["W_fuel_max"]["value"],
-            units=acdata["ac"]["weights"]["W_fuel_max"]["units"],
+            "mission",
+            FullMissionWithReserve(num_nodes=nn, aircraft_model=B738AircraftModel),
+            promotes_inputs=["ac|*"],
         )
 
 
-def configure_problem():
-    prob = om.Problem()
-    prob.model = B738AnalysisGroup()
-    prob.model.nonlinear_solver = om.NewtonSolver(iprint=2, solve_subsystems=True)
-    prob.model.linear_solver = om.DirectSolver()
-    prob.model.nonlinear_solver.options["maxiter"] = 20
-    prob.model.nonlinear_solver.options["atol"] = 1e-6
-    prob.model.nonlinear_solver.options["rtol"] = 1e-6
-    # prob.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement="scalar", print_bound_enforce=False, iprint=2)
-    prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement="scalar", print_bound_enforce=False)
+def get_problem(num_nodes=11):
+    """
+    Get the Boeing 737-800 mission analysis OpenMDAO Problem with necessary solvers added.
+    The Problem has not been setup yet.
 
-    # declare optimization driver and history files
-    # prob.driver = om.pyOptSparseDriver(optimizer="IPOPT")
-    prob.driver = om.ScipyOptimizeDriver()
-    prob.driver.options['optimizer'] = 'SLSQP'
+    Parameters
+    ----------
+    num_nodes : int (optional)
+        Number of analysis points per phase of the mission, by default 11
 
-    # prob.driver.opt_settings["limited_memory_max_history"] = 1000
-    # prob.driver.opt_settings["tol"] = 1e-5
-    # prob.driver.opt_settings["constr_viol_tol"] = 1e-9
-    # prob.driver.hist_file = "B738_fullsizing_highCl_BFL_COC.hst"
-    
-    # define design variables
-    prob.model.add_design_var("ac|geom|wing|S_ref", lower=100, upper=200, units="m**2")
-    prob.model.add_design_var("ac|propulsion|engine|rating", lower=20000, upper=35000, units="lbf")
-    prob.model.add_design_var("ac|geom|wing|AR", lower=5, upper=15)
-    prob.model.add_design_var(
-        "ac|geom|wing|twist", lower=np.array([0, -5, -5, -5, -5]), upper=np.array([0, 5, 5, 5, 5]), units="deg", ref=1
-    )
-    prob.model.add_design_var("ac|geom|wing|c4sweep", lower=-2, upper=50, units="deg", ref=1)
-    prob.model.add_design_var("ac|geom|wing|taper", lower=0, upper=1, ref=1)
-    
-    # define objective functions
-    # prob.model.add_objective("COC")
-    prob.model.add_objective("descent.fuel_used_final")
+    Returns
+    -------
+    OpenMDAO Problem
+        Problem with B378MissionAnalysis as model and solvers defined
+    """
+    p = om.Problem()
+    p.model = B738MissionAnalysis(num_nodes=num_nodes)
 
-    # define constraints for optimizer
-    prob.model.add_constraint("ac|geom|wing|span", upper=36, units="m")
-    prob.model.add_constraint("climb.throttle", upper=1.0)  # these constraints limit throttle
-    prob.model.add_constraint("cruise.throttle", upper=1.0)
-    prob.model.add_constraint("descent.throttle", upper=1.0)
-    prob.model.add_constraint("reserve_climb.throttle", upper=1.0)  # these constraints limit throttle
-    prob.model.add_constraint("reserve_cruise.throttle", upper=1.0)
-    prob.model.add_constraint("reserve_descent.throttle", upper=1.0)
-    prob.model.add_constraint("loiter.throttle", upper=1.0)
+    # -------------- Add solvers --------------
+    p.model.nonlinear_solver = om.NewtonSolver()
+    p.model.nonlinear_solver.options["iprint"] = 2
+    p.model.nonlinear_solver.options["solve_subsystems"] = True
+    p.model.nonlinear_solver.options["maxiter"] = 20
+    p.model.nonlinear_solver.options["atol"] = 1e-9
+    p.model.nonlinear_solver.options["rtol"] = 1e-9
 
-    prob.model.add_constraint("climb.CL_diff", lower=0)
-    prob.model.add_constraint("cruise.CL_diff", lower=0)
-    prob.model.add_constraint("descent.CL_diff", lower=0)
-    prob.model.add_constraint("reserve_climb.CL_diff", lower=0)
-    prob.model.add_constraint("reserve_cruise.CL_diff", lower=0)
-    prob.model.add_constraint("reserve_descent.CL_diff", lower=0)
-    prob.model.add_constraint("loiter.CL_diff", lower=0)
+    p.model.linear_solver = om.DirectSolver()
 
-    prob.model.add_constraint("rotate.range_final", upper=6000)
-    prob.model.add_constraint("v1v0.range_final", upper=6000)
+    p.model.nonlinear_solver.linesearch = om.BoundsEnforceLS()
+    p.model.nonlinear_solver.linesearch.options["print_bound_enforce"] = False
 
-    prob.driver.options["debug_print"] = ["desvars", "objs", "nl_cons"]
-
-    return prob
+    return p
 
 
-def set_values(prob, num_nodes):
-    # set some (required) mission parameters. Each pahse needs a vertical and air-speed
-    # the entire mission needs a cruise altitude and range
-    prob.set_val("climb.fltcond|vs", np.linspace(2300.0, 400.0, num_nodes), units="ft/min")
-    prob.set_val("climb.fltcond|Ueas", np.linspace(230, 230, num_nodes), units="kn")
-    prob.set_val("cruise.fltcond|vs", np.ones((num_nodes,)) * 4.0, units="ft/min")
-    prob.set_val("cruise.fltcond|Ueas", np.linspace(265, 258, num_nodes), units="kn")
-    prob.set_val("descent.fltcond|vs", np.linspace(-500, -150, num_nodes), units="ft/min")  # set this in optimizer
-    prob.set_val("descent.fltcond|Ueas", np.ones((num_nodes,)) * 250, units="kn")
-    prob.set_val("reserve_climb.fltcond|vs", np.linspace(3000.0, 2300.0, num_nodes), units="ft/min")
-    prob.set_val("reserve_climb.fltcond|Ueas", np.linspace(230, 230, num_nodes), units="kn")
-    prob.set_val("reserve_cruise.fltcond|vs", np.ones((num_nodes,)) * 4.0, units="ft/min")
-    prob.set_val("reserve_cruise.fltcond|Ueas", np.linspace(250, 250, num_nodes), units="kn")
-    prob.set_val("reserve_descent.fltcond|vs", np.linspace(-800, -800, num_nodes), units="ft/min")
-    prob.set_val("reserve_descent.fltcond|Ueas", np.ones((num_nodes,)) * 250, units="kn")
-    prob.set_val("loiter.fltcond|vs", np.linspace(0.0, 0.0, num_nodes), units="ft/min")
-    prob.set_val("loiter.fltcond|Ueas", np.ones((num_nodes,)) * 200, units="kn")
-    prob.set_val("cruise|h0", 33000.0, units="ft")
-    prob.set_val("reserve|h0", 15000.0, units="ft")
-    prob.set_val("mission_range", 2050, units="NM")
+def set_mission_profile(prob):
+    """
+    Set the parameters in the OpenMDAO problem that define the mission profile.
 
-    prob.set_val("v0v1.fltcond|Utrue", np.ones((num_nodes)) * 50, units="kn")
-    prob.set_val("v1vr.fltcond|Utrue", np.ones((num_nodes)) * 100, units="kn")
-    prob.set_val("v1v0.fltcond|Utrue", np.ones((num_nodes)) * 100, units="kn")
+    Parameters
+    ----------
+    prob : OpenMDAO Problem
+        Problem with B378MissionAnalysis as model in which to set values
+    """
+    # Get the number of nodes in the mission
+    nn = prob.model.options["num_nodes"]
 
+    # ==============================================================================
+    # Basic mission phases
+    # ==============================================================================
+    # -------------- Climb --------------
+    prob.set_val("mission.climb.fltcond|vs", np.linspace(2300.0, 400.0, nn), units="ft/min")
+    prob.set_val("mission.climb.fltcond|Ueas", np.linspace(230, 252, nn), units="kn")
 
-def show_outputs(prob):
-    # print some outputs
-    vars_list = ["descent.fuel_used_final"]#, "COC"]
-    units = ["lb", "USD"]
-    nice_print_names = ["Block fuel"]#, "Mission Cash Operating Cost"]
-    print("=======================================================================")
-    for i, thing in enumerate(vars_list):
-        print(nice_print_names[i] + ": " + str(prob.get_val(thing, units=units[i])[0]) + " " + units[i])
+    # -------------- Cruise --------------
+    prob.set_val("mission.cruise.fltcond|vs", np.full((nn,), 0.0), units="ft/min")
+    prob.set_val("mission.cruise.fltcond|Ueas", np.linspace(252, 252, nn), units="kn")
 
-    # plot some stuff
-    plots = True
-    if plots:
-        x_var = "range"
-        x_unit = "NM"
-        y_vars = ["fltcond|h", "fltcond|Ueas", "fuel_used", "throttle", "fltcond|vs", "fltcond|M", "fltcond|CL"]
-        y_units = ["ft", "kn", "lbm", None, "ft/min", None, None]
-        x_label = "Range (nmi)"
-        y_labels = [
-            "Altitude (ft)",
-            "Veas airspeed (knots)",
-            "Fuel used (lb)",
-            "Throttle setting",
-            "Vertical speed (ft/min)",
-            "Mach number",
-            "CL",
-        ]
-        phases = ["climb", "cruise", "descent", "reserve_climb", "reserve_cruise", "reserve_descent", "loiter"]
-        plot_trajectory(
-            prob,
-            x_var,
-            x_unit,
-            y_vars,
-            y_units,
-            phases,
-            x_label=x_label,
-            y_labels=y_labels,
-            marker="-",
-            plot_title="737-800 Mission Profile",
-        )
+    # -------------- Descent --------------
+    prob.set_val("mission.descent.fltcond|vs", np.linspace(-1300, -800, nn), units="ft/min")
+    prob.set_val("mission.descent.fltcond|Ueas", np.linspace(252, 250, nn), units="kn")
+
+    # ==============================================================================
+    # Reserve mission phases
+    # ==============================================================================
+    # -------------- Reserve climb --------------
+    prob.set_val("mission.reserve_climb.fltcond|vs", np.linspace(3000.0, 2300.0, nn), units="ft/min")
+    prob.set_val("mission.reserve_climb.fltcond|Ueas", np.linspace(230, 230, nn), units="kn")
+
+    # -------------- Reserve cruise --------------
+    prob.set_val("mission.reserve_cruise.fltcond|vs", np.full((nn,), 0.0), units="ft/min")
+    prob.set_val("mission.reserve_cruise.fltcond|Ueas", np.linspace(250, 250, nn), units="kn")
+
+    # -------------- Reserve descent --------------
+    prob.set_val("mission.reserve_descent.fltcond|vs", np.linspace(-800, -800, nn), units="ft/min")
+    prob.set_val("mission.reserve_descent.fltcond|Ueas", np.full((nn,), 250.0), units="kn")
+
+    # -------------- Loiter --------------
+    prob.set_val("mission.loiter.fltcond|vs", np.linspace(0.0, 0.0, nn), units="ft/min")
+    prob.set_val("mission.loiter.fltcond|Ueas", np.full((nn,), 250.0), units="kn")
+
+    # ==============================================================================
+    # Other parameters
+    # ==============================================================================
+    prob.set_val("mission.cruise|h0", 35000.0, units="ft")
+    prob.set_val("mission.reserve|h0", 15000.0, units="ft")
+    prob.set_val("mission.mission_range", 2800, units="nmi")
+
+    # -------------- Set takeoff speed guesses to improve solver performance --------------
+    prob.set_val("mission.v0v1.fltcond|Utrue", np.full((nn,), 100.0), units="kn")
+    prob.set_val("mission.v1vr.fltcond|Utrue", np.full((nn,), 100.0), units="kn")
+    prob.set_val("mission.v1v0.fltcond|Utrue", np.full((nn,), 100.0), units="kn")
 
 
-def run_738_analysis(plots=True):
-    num_nodes = 11
-    prob = configure_problem()
-    prob.setup(check=True, mode="fwd")
-    set_values(prob, num_nodes)
-    prob.run_model()
-    # prob.run_driver()
-    prob.model.list_outputs()
-    om.n2(prob, outfile="B738_fullsizing_originaldesign.html")
-    if plots:
-        show_outputs(prob)
-    return prob
+def plot_results(prob, filename=None):
+    """
+    Make a plot with the results of the mission analysis.
+
+    Parameters
+    ----------
+    prob : OpenMDAO Problem
+        Problem with B738MissionAnalysis model that has been run
+    filename : str (optional)
+        Filename to save to, by default will show plot
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import FuncFormatter
+
+    fig, axs = plt.subplots(2, 3, figsize=(11, 6))
+    axs = axs.flatten()
+
+    for phase in ["climb", "cruise", "descent", "reserve_climb", "reserve_cruise", "reserve_descent", "loiter"]:
+        dist = prob.get_val(f"mission.{phase}.range", units="nmi")
+
+        axs[0].plot(dist, prob.get_val(f"mission.{phase}.fltcond|h", units="ft"), color="tab:blue")
+        axs[1].plot(dist, prob.get_val(f"mission.{phase}.fltcond|M"), color="tab:blue")
+        axs[2].plot(dist, prob.get_val(f"mission.{phase}.fltcond|vs", units="ft/min"), color="tab:blue")
+        axs[3].plot(dist, prob.get_val(f"mission.{phase}.weight", units="lb"), color="tab:blue")
+        axs[4].plot(dist, prob.get_val(f"mission.{phase}.drag", units="lbf"), color="tab:blue")
+        axs[4].plot(dist, prob.get_val(f"mission.{phase}.thrust", units="lbf"), color="tab:orange")
+        axs[5].plot(dist, prob.get_val(f"mission.{phase}.throttle") * 100, color="tab:blue")
+
+    axs[0].set_ylabel("Altitude (ft)")
+    axs[1].set_ylabel("Mach number")
+    axs[2].set_ylabel("Vertical speed (ft/min)")
+    axs[3].set_ylabel("Weight (lb)")
+    axs[4].set_ylabel("Longitudinal force (lb)")
+    axs[5].set_ylabel("Throttle (%)")
+    axs[4].legend(["Drag", "Thrust"])
+    for i in range(6):
+        axs[i].set_xlabel("Distance flown (nmi)")
+        axs[i].spines[["right", "top"]].set_visible(False)
+        if i != 1:
+            axs[i].get_yaxis().set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ",")))
+        axs[i].get_xaxis().set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ",")))
+
+    plt.tight_layout()
+
+    if filename is None:
+        plt.show()
+    else:
+        fig.savefig(filename)
 
 
 if __name__ == "__main__":
-    run_738_analysis(plots=True)
+    nn = 21
+    p = get_problem(num_nodes=nn)
+    p.setup()
+    set_mission_profile(p)
+    p.run_model()
+
+    om.n2(p, show_browser=False)
+
+    # Print some useful numbers
+    print("\n\n================= Computed values =================")
+    print(f"MTOW: {p.get_val('ac|weights|MTOW', units='lb').item():.1f} lb")
+    print(f"Payload weight: {p.get_val('ac|weights|W_payload', units='lb').item()} lb")
+    print(f"OEW: {p.get_val('ac|weights|OEW', units='lb').item():.1f} lb")
+    print(f"Fuel burned: {p.get_val('mission.descent.fuel_burn_integ.fuel_burn_final', units='lb').item():.1f} lb")
+    print(f"CL max cruise: {p.get_val('ac|aero|CLmax_cruise').item():.3f}")
+    print(f"CL max takeoff: {p.get_val('ac|aero|CLmax_TO').item():.3f}")
+    print(f"Balanced field length (continue): {p.get_val('mission.bfl.distance_continue', units='ft').item():.1f} ft")
+    print(
+        f"Balanced field length (abort): {p.get_val('mission.bfl.distance_abort', units='ft').item():.1f} ft (this should be the same as continue)"
+    )
+
+    plot_results(p, filename="plot.pdf")

@@ -2,17 +2,19 @@
 This work was the basis of the following paper.
 Please cite it if you use this for your own publication!
 
-@InProceedings{Adler2022a,
-    author      = {Eytan J. Adler and Joaquim R. R. A. Martins},
-    title       = {Aerostructural wing design optimization considering full mission analysis},
-    booktitle   = {AIAA SciTech Forum},
-    doi         = {10.2514/6.2022-0382},
-    month       = {January},
-    year        = {2022}
+@article{Adler2022d,
+    author = {Adler, Eytan J. and Martins, Joaquim R. R. A.},
+    doi = {10.2514/1.c037096},
+    issn = {1533-3868},
+    journal = {Journal of Aircraft},
+    month = {December},
+    publisher = {American Institute of Aeronautics and Astronautics},
+    title = {Efficient Aerostructural Wing Optimization Considering Mission Analysis},
+    year = {2022}
 }
 
 Eytan Adler (Jan 2022)
-"""
+"""  # noqa
 
 import numpy as np
 
@@ -160,8 +162,8 @@ class B738AirplaneModel(IntegratorGroup):
 class B738AnalysisGroup(om.Group):
     def initialize(self):
         self.options.declare("num_nodes", default=11, desc="Number of analysis points per flight segment")
-        self.options.declare("num_x", default=3, desc="Aerostructural chordwise nodes")
-        self.options.declare("num_y", default=7, desc="Aerostructural halfspan nodes")
+        self.options.declare("num_x", default=2, desc="Aerostructural chordwise nodes")
+        self.options.declare("num_y", default=6, desc="Aerostructural halfspan nodes")
         self.options.declare("num_twist", default=3, desc="Number of twist control points")
         self.options.declare("num_toverc", default=3, desc="Number of t/c control points")
         self.options.declare("num_skin", default=3, desc="Number of skin control points")
@@ -410,8 +412,8 @@ def show_outputs(prob, plots=True):
 def run_738_analysis(plots=False):
     num_nodes = 11
     global NUM_X, NUM_Y
-    NUM_X = 3
-    NUM_Y = 7
+    NUM_X = 2
+    NUM_Y = 6
     prob = configure_problem(num_nodes)
     prob.setup(check=False, mode="fwd")
     set_values(prob, num_nodes)
@@ -430,8 +432,8 @@ def run_738_analysis(plots=False):
 def run_738_optimization(plots=False):
     num_nodes = 11
     global NUM_X, NUM_Y
-    NUM_X = 3
-    NUM_Y = 7
+    NUM_X = 2
+    NUM_Y = 6
     prob = configure_problem(num_nodes)
     prob.setup(check=True, mode="fwd")
     set_values(prob, num_nodes)
