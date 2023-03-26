@@ -464,7 +464,7 @@ class FullMissionAnalysis(TrajectoryGroup):
         # v0v1 - from a rolling start to v1 speed
         # v1vr - from the decision speed to rotation
         # rotate - in the air following rotation in 2DOF
-        # v1vr - emergency stopping from v1 to a stop.
+        # v1v0 - emergency stopping from v1 to a stop.
 
         mp = self.add_subsystem("missionparams", om.IndepVarComp(), promotes_outputs=["*"])
         mp.add_output("takeoff|h", val=0.0, units="ft")
@@ -620,7 +620,7 @@ class FullMissionWithReserve(TrajectoryGroup):
         # v0v1 - from a rolling start to v1 speed
         # v1vr - from the decision speed to rotation
         # rotate - in the air following rotation in 2DOF
-        # v1vr - emergency stopping from v1 to a stop.
+        # v1v0 - emergency stopping from v1 to a stop.
 
         mp = self.add_subsystem("missionparams", om.IndepVarComp(), promotes_outputs=["*"])
         mp.add_output("takeoff|h", val=0.0, units="ft")

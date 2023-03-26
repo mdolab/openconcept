@@ -97,7 +97,7 @@ class ParasiteDragCoefficient_JetTransportTestCase(unittest.TestCase):
 
         dvs.add_output("ac|propulsion|num_engines", 2)
 
-        dvs.add_output("ac|takeoff_flap_deg", 15, units="deg")
+        dvs.add_output("ac|aero|takeoff_flap_deg", 15, units="deg")
 
         # Flight conditions at 37k ft Mach 0.875 cruise (ISA)
         dvs.add_output("fltcond|Utrue", np.full(nn, 100), units="kn")

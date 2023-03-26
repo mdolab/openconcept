@@ -76,7 +76,7 @@ class ParasiteDragCoefficient_JetTransport(om.Group):
         Nacelle wetted area (scalar, sq m)
     ac|propulsion|num_engines : float
         Number of engines, multiplier on nacelle drag (scalar, dimensionless)
-    ac|takeoff_flap_deg : float
+    ac|aero|takeoff_flap_deg : float
         If configuration is \"takeoff\" (otherwise not an input), flap setting on takeoff (scalar, deg)
 
     Outputs
@@ -315,7 +315,7 @@ class ParasiteDragCoefficient_JetTransport(om.Group):
                     Q_flap=self.options["Q_flap"],
                     wing_area_flapped_frac=self.options["wing_area_flapped_frac"],
                 ),
-                promotes_inputs=[("flap_extension", "ac|takeoff_flap_deg"), "ac|geom|wing|c4sweep"],
+                promotes_inputs=[("flap_extension", "ac|aero|takeoff_flap_deg"), "ac|geom|wing|c4sweep"],
             )
 
         # -------------- Landing gear --------------
