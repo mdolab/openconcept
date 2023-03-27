@@ -25,7 +25,7 @@ class WingMACTrapezoidal(om.ExplicitComponent):
         self.add_input("S_ref", units="m**2")
         self.add_input("AR")
         self.add_input("taper")
-        self.add_output("MAC", units="m")
+        self.add_output("MAC", lower=1e-6, units="m")
         self.declare_partials("MAC", "*")
 
     def compute(self, inputs, outputs):
