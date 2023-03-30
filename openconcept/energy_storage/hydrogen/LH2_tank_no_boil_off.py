@@ -189,6 +189,11 @@ class InitialLH2MassModification(om.ExplicitComponent):
 
     Inputs
     ------
+    radius : float
+        Inner radius of the cylinder and hemispherical end caps. This value
+        does not include the insulation (scalar, m).
+    length : float
+        Length of JUST THE CYLIDRICAL part of the tank (scalar, m)
     delta_m_liq : float
         Change in mass of liquid hydrogen in the tank since the beginning of the mission (vector, kg)
 
