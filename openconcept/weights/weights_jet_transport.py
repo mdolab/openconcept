@@ -132,6 +132,9 @@ class JetTransportEmptyWeight(om.Group):
     total_fudge : float
         Multiplier on the final operating empty weight estimate. Structural components have both the
         structural fudge and total fudge factors applied. By default 1.15 (scalar, dimensionless)
+    wing_weight_multiplier : float
+        Multiplier on wing weight. This can be used as a very rough way of increasing wing weight
+        due to lack of inertial load relief from the fuel. By default 1.0 (scalar, dimensionless)
     n_ult : float
         Ultimate load factor, 1.5 x limit load factor, by default 1.5 x 2.5 (scalar, dimensionless)
     n_land_ult : float
@@ -181,6 +184,7 @@ class JetTransportEmptyWeight(om.Group):
     def initialize(self):
         self.options.declare("structural_fudge", default=1.2, desc="Fudge factor on structural weights")
         self.options.declare("total_fudge", default=1.15, desc="Fudge factor applied to the final OEW value")
+        self.options.declare("wing_weight_multiplier", default=1.0, desc="Multiplier on wing weight")
         self.options.declare("n_ult", default=2.5 * 1.5, desc="Ultimate load factor (dimensionless)")
         self.options.declare("n_land_ult", default=2.8 * 1.5, desc="ultimate landing load factor")
         self.options.declare(
@@ -436,12 +440,14 @@ class JetTransportEmptyWeight(om.Group):
         # Multiply structural weights by fudge factor
         # ==============================================================================
         structure_weight_outputs = ["W_wing", "W_hstab", "W_vstab", "W_fuselage", "W_mlg", "W_nlg", "W_nacelle"]
+        scaling_factors = [self.options["structural_fudge"]] * len(structure_weight_outputs)
+        scaling_factors[0] *= self.options["wing_weight_multiplier"]
         self.add_subsystem(
             "structural_adjustment",
             AddSubtractComp(
                 output_name="W_structure",
                 input_names=structure_weight_outputs,
-                scaling_factors=[self.options["structural_fudge"]] * len(structure_weight_outputs),
+                scaling_factors=scaling_factors,
                 units="lb",
             ),
             promotes_inputs=["*"],
