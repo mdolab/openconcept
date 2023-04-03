@@ -427,7 +427,6 @@ class JetTransportEmptyWeight(om.Group):
             EquipmentWeight_JetTransport(
                 coeff_fc=self.options["coeff_fc"],
                 coeff_avionics=self.options["coeff_avionics"],
-                cabin_length_frac=self.options["cabin_length_frac"],
                 APU_weight_frac=self.options["APU_weight_frac"],
             ),
             promotes_inputs=[
@@ -1708,8 +1707,6 @@ class EquipmentWeight_JetTransport(om.ExplicitComponent):
         Roskam notes that the avionics weight estimates are probably conservative for modern computer-based
         flight management and navigation systems. This coefficient is multiplied by the Roskam estimate to
         account for this. By default 0.5.
-    cabin_length_frac : float
-        The length of the passenger cabin divided by the total fuselage length, by default 0.75.
     APU_weight_frac : float
         APU weight divided by maximum takeoff weight, by deafult 0.0085.
     """
@@ -1717,7 +1714,6 @@ class EquipmentWeight_JetTransport(om.ExplicitComponent):
     def initialize(self):
         self.options.declare("coeff_fc", default=1.2 * 0.64, desc="Coefficient on flight control system weight")
         self.options.declare("coeff_avionics", default=0.5, desc="Coefficient on avionics weight")
-        self.options.declare("cabin_length_frac", default=0.75, desc="Cabin length / fuselage length")
         self.options.declare("APU_weight_frac", default=0.0085, desc="APU weight / MTOW")
 
     def setup(self):
