@@ -408,6 +408,20 @@ class JetTransportEmptyWeight(om.Group):
         # ==============================================================================
         # Other equipment
         # ==============================================================================
+        # Estimate the volume of the passenger cabin by treating it as a cylinder with
+        # the fuselage diameter and length of fuselage length times a constant factor
+        # (by default 0.75)
+        self.add_subsystem(
+            "cabin_volume",
+            om.ExecComp(
+                "V_pressurized = pi * 0.25 * fus_height * fus_height * fus_length * cabin_frac",
+                V_pressurized={"units": "ft**3", "val": 1},
+                fus_height={"units": "ft", "val": 1},
+                fus_length={"units": "ft", "val": 1},
+                cabin_frac={"val": self.options["cabin_length_frac"]},
+            ),
+            promotes_inputs=[("fus_height", "ac|geom|fuselage|height"), ("fus_length", "ac|geom|fuselage|length")],
+        )
         self.add_subsystem(
             "equipment",
             EquipmentWeight_JetTransport(
@@ -422,8 +436,6 @@ class JetTransportEmptyWeight(om.Group):
                 "ac|num_cabin_crew",
                 "ac|num_flight_deck_crew",
                 "ac|propulsion|num_engines",
-                "ac|geom|fuselage|length",
-                "ac|geom|fuselage|height",
                 "W_fuelsystem",
             ],
             promotes_outputs=[
@@ -435,6 +447,7 @@ class JetTransportEmptyWeight(om.Group):
                 "W_APU",
             ],
         )
+        self.connect("cabin_volume.V_pressurized", "equipment.ac|geom|V_pressurized")
 
         # ==============================================================================
         # Multiply structural weights by fudge factor
@@ -1665,10 +1678,8 @@ class EquipmentWeight_JetTransport(om.ExplicitComponent):
         the same value for modern aircraft (scalar, dimensionless)
     ac|propulsion|num_engines : float
         Number of engines (scalar, dimensionless)
-    ac|geom|fuselage|length : float
-        Fuselage structural length (scalar, ft)
-    ac|geom|fuselage|height : float
-        Fuselage height (scalar, ft)
+    ac|geom|V_pressurized : float
+        Pressurized cabin volume (scalar, cubic ft)
     W_fuelsystem : float
         Fuel system weight (scalar, lb)
 
@@ -1715,8 +1726,7 @@ class EquipmentWeight_JetTransport(om.ExplicitComponent):
         self.add_input("ac|num_cabin_crew")
         self.add_input("ac|num_flight_deck_crew")
         self.add_input("ac|propulsion|num_engines")
-        self.add_input("ac|geom|fuselage|length", units="ft")
-        self.add_input("ac|geom|fuselage|height", units="ft")
+        self.add_input("ac|geom|V_pressurized", units="ft**3")
         self.add_input("W_fuelsystem", units="lb")
 
         self.add_output("W_flight_controls", units="lb")
@@ -1737,8 +1747,7 @@ class EquipmentWeight_JetTransport(om.ExplicitComponent):
                 "ac|num_flight_deck_crew",
                 "ac|num_cabin_crew",
                 "ac|num_passengers_max",
-                "ac|geom|fuselage|length",
-                "ac|geom|fuselage|height",
+                "ac|geom|V_pressurized",
             ],
         )
         self.declare_partials("W_oxygen", ["ac|num_flight_deck_crew", "ac|num_cabin_crew", "ac|num_passengers_max"])
@@ -1761,17 +1770,9 @@ class EquipmentWeight_JetTransport(om.ExplicitComponent):
         outputs["W_electrical"] = 1163 * (1e-3 * (inputs["W_fuelsystem"] + outputs["W_avionics"])) ** 0.506
 
         # Air conditioning, pressurization, and anti-icing systems from General Dynamics method from
-        # Roskam Part V 1989 Chapter 7 Equation 7.29. Estimate the volume of the passenger cabin by
-        # treating it as a cylinder with the fuselage diameter and length of fuselage length times
-        # a constant factor (by default 0.75).
-        V_pax = (
-            np.pi
-            * (inputs["ac|geom|fuselage|height"] / 2) ** 2
-            * inputs["ac|geom|fuselage|length"]
-            * self.options["cabin_length_frac"]
-        )
+        # Roskam Part V 1989 Chapter 7 Equation 7.29
         n_people = inputs["ac|num_flight_deck_crew"] + inputs["ac|num_cabin_crew"] + inputs["ac|num_passengers_max"]
-        outputs["W_ac_pressurize_antiice"] = 469 * (1e-4 * V_pax * n_people) ** 0.419
+        outputs["W_ac_pressurize_antiice"] = 469 * (1e-4 * inputs["ac|geom|V_pressurized"] * n_people) ** 0.419
 
         # General Dynamics method from Roskam Part V 1989 Chapter 7 Equation 7.35
         outputs["W_oxygen"] = 7 * n_people**0.702
@@ -1809,30 +1810,20 @@ class EquipmentWeight_JetTransport(om.ExplicitComponent):
         )
         J["W_electrical", "ac|weights|MTOW"] = delectrical_davionics * J["W_avionics", "ac|weights|MTOW"]
 
-        V_pax = (
-            np.pi
-            * (inputs["ac|geom|fuselage|height"] / 2) ** 2
-            * inputs["ac|geom|fuselage|length"]
-            * self.options["cabin_length_frac"]
-        )
         n_people = inputs["ac|num_flight_deck_crew"] + inputs["ac|num_cabin_crew"] + inputs["ac|num_passengers_max"]
         J["W_ac_pressurize_antiice", "ac|num_flight_deck_crew"] = (
-            469 * 0.419 * (1e-4 * V_pax * n_people) ** (0.419 - 1) * 1e-4 * V_pax
+            469
+            * 0.419
+            * (1e-4 * inputs["ac|geom|V_pressurized"] * n_people) ** (0.419 - 1)
+            * 1e-4
+            * inputs["ac|geom|V_pressurized"]
         )
         J["W_ac_pressurize_antiice", "ac|num_cabin_crew"][:] = J["W_ac_pressurize_antiice", "ac|num_flight_deck_crew"]
         J["W_ac_pressurize_antiice", "ac|num_passengers_max"][:] = J[
             "W_ac_pressurize_antiice", "ac|num_flight_deck_crew"
         ]
-        dW_dV = 469 * 0.419 * (1e-4 * V_pax * n_people) ** (0.419 - 1) * 1e-4 * n_people
-        J["W_ac_pressurize_antiice", "ac|geom|fuselage|height"] = dW_dV * (
-            np.pi
-            * inputs["ac|geom|fuselage|height"]
-            * 0.5
-            * inputs["ac|geom|fuselage|length"]
-            * self.options["cabin_length_frac"]
-        )
-        J["W_ac_pressurize_antiice", "ac|geom|fuselage|length"] = dW_dV * (
-            np.pi * (inputs["ac|geom|fuselage|height"] / 2) ** 2 * self.options["cabin_length_frac"]
+        J["W_ac_pressurize_antiice", "ac|geom|V_pressurized"] = (
+            469 * 0.419 * (1e-4 * inputs["ac|geom|V_pressurized"] * n_people) ** (0.419 - 1) * 1e-4 * n_people
         )
 
         J["W_oxygen", "ac|num_flight_deck_crew"] = 7 * 0.702 * n_people ** (0.702 - 1)
