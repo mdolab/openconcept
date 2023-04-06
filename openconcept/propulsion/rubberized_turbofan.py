@@ -15,6 +15,9 @@ class RubberizedTurbofan(om.Group):
     jet fuel and hydrogen to deliver the same energy to the engine. This
     maintains the same thrust-specific energy consumption.
 
+    NOTE: The CFM56 and N3 engine models only include data Mach 0.2 to 0.8
+          and up to 35,000 ft. Outside that range, the model is unreliable.
+
     Inputs
     ------
     throttle: float

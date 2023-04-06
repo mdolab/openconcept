@@ -1,5 +1,5 @@
 """
-@File    :   drag__jet_transport.py
+@File    :   drag_jet_transport.py
 @Date    :   2023/03/23
 @Author  :   Eytan Adler
 @Description : Zero lift drag coefficient buildup for tube-and-wing jet transport aircraft

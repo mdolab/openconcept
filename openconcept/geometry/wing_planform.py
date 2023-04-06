@@ -25,7 +25,7 @@ class WingMACTrapezoidal(om.ExplicitComponent):
         self.add_input("S_ref", units="m**2")
         self.add_input("AR")
         self.add_input("taper")
-        self.add_output("MAC", units="m")
+        self.add_output("MAC", lower=1e-6, units="m")
         self.declare_partials("MAC", "*")
 
     def compute(self, inputs, outputs):
@@ -88,3 +88,193 @@ class WingSpan(om.ExplicitComponent):
     def compute_partials(self, inputs, J):
         J["span", "S_ref"] = 0.5 * inputs["S_ref"] ** (0.5 - 1) * inputs["AR"] ** 0.5
         J["span", "AR"] = inputs["S_ref"] ** 0.5 * 0.5 * inputs["AR"] ** (0.5 - 1)
+
+
+class WingAspectRatio(om.ExplicitComponent):
+    """
+    Compute the aspect ratio from span and wing area.
+
+    Inputs
+    ------
+    S_ref : float
+        Planform area (scalar, sq m)
+    span : float
+        Wing span (scalar, m)
+
+    Outputs
+    -------
+    AR : float
+        Aspect ratio, weighted by section areas (scalar, deg)
+    """
+
+    def setup(self):
+        self.add_input("S_ref", units="m**2")
+        self.add_input("span", units="m")
+        self.add_output("AR", val=10.0, lower=1e-6)
+        self.declare_partials("*", "*")
+
+    def compute(self, inputs, outputs):
+        outputs["AR"] = inputs["span"] ** 2 / inputs["S_ref"]
+
+    def compute_partials(self, inputs, J):
+        J["AR", "span"] = 2 * inputs["span"] / inputs["S_ref"]
+        J["AR", "S_ref"] = -inputs["span"] ** 2 / inputs["S_ref"] ** 2
+
+
+class WingSweepFromSections(om.ExplicitComponent):
+    """
+    Compute the average quarter chord sweep angle weighted by section areas
+    by taking in sectional parameters as they would be defined for a
+    sectional OpenAeroStruct mesh.
+
+    Inputs
+    ------
+    x_LE_sec : float
+        Streamwise offset of the section's leading edge, starting with the outboard
+        section (wing tip) and moving inboard toward the root (vector of length
+        num_sections, m)
+    y_sec : float
+        Spanwise location of each section, starting with the outboard section (wing
+        tip) at the MOST NEGATIVE y value and moving inboard (increasing y value)
+        toward the root; the user does not provide a value for the root because it
+        is always 0.0 (vector of length num_sections - 1, m)
+    chord_sec : float
+        Chord of each section, starting with the outboard section (wing tip) and
+        moving inboard toward the root (vector of length num_sections, m)
+
+    Outputs
+    -------
+    c4sweep : float
+        Average quarter chord sweep, weighted by section areas (scalar, deg)
+
+    Options
+    -------
+    num_sections : int
+        Number of spanwise sections to define planform shape (scalar, dimensionless)
+    idx_sec_start : float
+        Index in the inputs to begin the average sweep calculation (negative indices not
+        accepted), inclusive, by default 0
+    idx_sec_end : float
+        Index in the inputs to end the average sweep calculation (negative indices not
+        accepted), inclusive, by default num_sections - 1
+    """
+
+    def initialize(self):
+        self.options.declare(
+            "num_sections", default=2, types=int, desc="Number of sections along the half span to define"
+        )
+        self.options.declare("idx_sec_start", default=0)
+        self.options.declare("idx_sec_end", default=None)
+
+    def setup(self):
+        self.n_sec = self.options["num_sections"]
+        self.i_start = self.options["idx_sec_start"]
+        self.i_end = self.options["idx_sec_end"]
+        if self.i_end is None:
+            self.i_end = self.n_sec
+        else:
+            self.i_end += 1  # make it exclusive
+
+        self.add_input("x_LE_sec", shape=(self.n_sec,), units="m")
+        self.add_input("y_sec", shape=(self.n_sec - 1,), units="m")
+        self.add_input("chord_sec", shape=(self.n_sec,), units="m")
+
+        self.add_output("c4sweep", units="deg")
+
+        self.declare_partials("*", "*", method="cs")
+
+    def compute(self, inputs, outputs):
+        # Extract out the ones we care about
+        LE_sec = inputs["x_LE_sec"][self.i_start : self.i_end]
+        chord_sec = inputs["chord_sec"][self.i_start : self.i_end]
+        y_sec = np.hstack((inputs["y_sec"], [0.0]))[self.i_start : self.i_end]
+
+        # Compute the c4sweep for each section
+        x_c4 = LE_sec + chord_sec * 0.25
+        widths = y_sec[1:] - y_sec[:-1]  # section width in y direction
+        setback = x_c4[:-1] - x_c4[1:]  # relative offset of sections in streamwise direction
+        c4sweep_sec = np.arctan(setback / widths) * 180 / np.pi
+
+        # Perform a weighted average with panel areas as weights
+        A_sec = 0.5 * (chord_sec[:-1] + chord_sec[1:]) * widths
+        outputs["c4sweep"] = np.sum(c4sweep_sec * A_sec) / np.sum(A_sec)
+
+
+class WingAreaFromSections(om.ExplicitComponent):
+    """
+    Compute the planform area of a specified portion of the wing
+    by taking in sectional parameters as they would be defined for a
+    sectional OpenAeroStruct mesh.
+
+    NOTE: The area from this component is valid only if the scale_area
+          option of mesh_gen is set to False! Otherwise, the area computed
+          here will be off by a factor.
+
+    Inputs
+    ------
+    y_sec : float
+        Spanwise location of each section, starting with the outboard section (wing
+        tip) at the MOST NEGATIVE y value and moving inboard (increasing y value)
+        toward the root; the user does not provide a value for the root because it
+        is always 0.0 (vector of length num_sections - 1, m)
+    chord_sec : float
+        Chord of each section, starting with the outboard section (wing tip) and
+        moving inboard toward the root (vector of length num_sections, m)
+
+    Outputs
+    -------
+    S : float
+        Planform area of the specified region (scalar, sq m)
+
+    Options
+    -------
+    num_sections : int
+        Number of spanwise sections to define planform shape (scalar, dimensionless)
+    idx_sec_start : float
+        Index in the inputs to begin the average sweep calculation (negative indices not
+        accepted), inclusive, by default 0
+    idx_sec_end : float
+        Index in the inputs to end the average sweep calculation (negative indices not
+        accepted), inclusive, by default num_sections - 1
+    chord_frac_start : float
+        Fraction of the chord (streamwise direction) at which to begin the computed area, by default 0.0
+    chord_frac_end : float
+        Fraction of the chord (streamwise direction) at which to end the computed area, by default 1.0
+    """
+
+    def initialize(self):
+        self.options.declare(
+            "num_sections", default=2, types=int, desc="Number of sections along the half span to define"
+        )
+        self.options.declare("idx_sec_start", default=0)
+        self.options.declare("idx_sec_end", default=None)
+        self.options.declare("chord_frac_start", default=0.0, desc="Fraction of chord to begin area computation")
+        self.options.declare("chord_frac_end", default=1.0, desc="Fraction of chord to end area computation")
+
+    def setup(self):
+        self.n_sec = self.options["num_sections"]
+        self.i_start = self.options["idx_sec_start"]
+        self.i_end = self.options["idx_sec_end"]
+        if self.i_end is None:
+            self.i_end = self.n_sec
+        else:
+            self.i_end += 1  # make it exclusive
+
+        self.add_input("y_sec", shape=(self.n_sec - 1,), units="m")
+        self.add_input("chord_sec", shape=(self.n_sec,), units="m")
+
+        self.add_output("S", units="m**2")
+
+        self.declare_partials("*", "*", method="cs")
+
+    def compute(self, inputs, outputs):
+        # Extract out the ones we care about
+        chord_sec = inputs["chord_sec"][self.i_start : self.i_end]
+        y_sec = np.hstack((inputs["y_sec"], [0.0]))[self.i_start : self.i_end]
+
+        # Compute the area
+        avg_chord = (
+            0.5 * (chord_sec[:-1] + chord_sec[1:]) * (self.options["chord_frac_end"] - self.options["chord_frac_start"])
+        )
+        widths = y_sec[1:] - y_sec[:-1]
+        outputs["S"] = 2 * np.sum(avg_chord * widths)

@@ -27,3 +27,9 @@ from .weights_jet_transport import (
     EquipmentWeight_JetTransport,
     JetTransportEmptyWeight,
 )
+
+from .weights_BWB import (
+    CabinWeight_BWB,
+    AftbodyWeight_BWB,
+    BWBEmptyWeight,
+)
