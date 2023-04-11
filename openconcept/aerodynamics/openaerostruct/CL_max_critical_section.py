@@ -76,6 +76,9 @@ class CLmaxCriticalSectionVLM(om.Group):
         self.options.declare("rho", default=200, types=(float, int), desc="Sectional CL aggregation factor")
 
     def setup(self):
+        # TODO: Extend the method to accept different maximum sectional
+        # lift coefficient methods across the span of the wing
+
         # -------------- Simulate the wing in OpenAeroStruct --------------
         self.add_subsystem(
             "VLM",
