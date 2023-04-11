@@ -105,4 +105,3 @@ class CLmaxCriticalSectionVLM(om.Group):
         )
         self.connect("max_sectional_CL.KS", "sectional_CL_balance.sec_CL_max_VLM")
         self.connect("sectional_CL_balance.alpha", "VLM.fltcond|alpha")
-
