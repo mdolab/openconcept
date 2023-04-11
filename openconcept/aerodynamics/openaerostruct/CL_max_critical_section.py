@@ -9,18 +9,15 @@
 # Standard Python modules
 # ==============================================================================
 
-
 # ==============================================================================
 # External Python modules
 # ==============================================================================
-import numpy as np
 import openmdao.api as om
 
 # ==============================================================================
 # Extension modules
 # ==============================================================================
 from openconcept.aerodynamics.openaerostruct import VLM
-from openconcept.utilities import AddSubtractComp
 
 
 class CLmaxCriticalSectionVLM(om.Group):
