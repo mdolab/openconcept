@@ -35,7 +35,7 @@ class CLmaxCriticalSectionVLMTestCase(unittest.TestCase):
             promotes_inputs=["*"],
             promotes_outputs=[("mesh", "ac|geom|wing|OAS_mesh")],
         )
-        p.model.add_subsystem("CL_max", CLmaxCriticalSectionVLM(num_x=nx, num_y=ny), promotes=["*"])
+        p.model.add_subsystem("CL_max_comp", CLmaxCriticalSectionVLM(num_x=nx, num_y=ny), promotes=["*"])
 
         p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, iprint=2, maxiter=10)
         p.model.linear_solver = om.DirectSolver()

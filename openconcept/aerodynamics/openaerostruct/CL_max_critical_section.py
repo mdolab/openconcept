@@ -89,6 +89,7 @@ class CLmaxCriticalSectionVLM(om.Group):
             ],
             promotes_outputs=[("fltcond|CL", "CL_max")],
         )
+        self.set_input_defaults("VLM.fltcond|alpha", 5, units="deg")
 
         # -------------- Aggregate the sectional lift coefficients to find the max --------------
         self.add_subsystem("max_sectional_CL", om.KSComp(width=self.options["num_y"], rho=self.options["rho"]))
