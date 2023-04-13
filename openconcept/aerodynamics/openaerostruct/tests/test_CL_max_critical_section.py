@@ -37,6 +37,7 @@ class CLmaxCriticalSectionVLMTestCase(unittest.TestCase):
         )
         p.model.add_subsystem("CL_max_comp", CLmaxCriticalSectionVLM(num_x=nx, num_y=ny), promotes=["*"])
 
+        # Top level solver needed if NonlinearSchurSolver isn't available
         p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, iprint=2, maxiter=10)
         p.model.linear_solver = om.DirectSolver()
 

@@ -8,6 +8,7 @@
 # ==============================================================================
 # Standard Python modules
 # ==============================================================================
+import warnings
 
 # ==============================================================================
 # External Python modules
@@ -77,7 +78,8 @@ class CLmaxCriticalSectionVLM(om.Group):
         # lift coefficient methods across the span of the wing
 
         # -------------- Simulate the wing in OpenAeroStruct --------------
-        self.add_subsystem(
+        aero = om.Group()
+        aero.add_subsystem(
             "VLM",
             VLM(num_x=self.options["num_x"], num_y=self.options["num_y"], surf_options=self.options["surf_options"]),
             promotes_inputs=[
@@ -89,11 +91,13 @@ class CLmaxCriticalSectionVLM(om.Group):
             ],
             promotes_outputs=[("fltcond|CL", "CL_max")],
         )
-        self.set_input_defaults("VLM.fltcond|alpha", 5, units="deg")
+        aero.set_input_defaults("VLM.fltcond|alpha", 5, units="deg")
 
         # -------------- Aggregate the sectional lift coefficients to find the max --------------
-        self.add_subsystem("max_sectional_CL", om.KSComp(width=self.options["num_y"], rho=self.options["rho"]))
-        self.connect("VLM.sectional_CL", "max_sectional_CL.g")
+        aero.add_subsystem("max_sectional_CL", om.KSComp(width=self.options["num_y"], rho=self.options["rho"]))
+        aero.connect("VLM.sectional_CL", "max_sectional_CL.g")
+
+        self.add_subsystem("aero", aero, promotes=["*"])
 
         # -------------- Solve for the angle of attack --------------
         self.add_subsystem(
@@ -103,3 +107,13 @@ class CLmaxCriticalSectionVLM(om.Group):
         )
         self.connect("max_sectional_CL.KS", "sectional_CL_balance.sec_CL_max_VLM")
         self.connect("sectional_CL_balance.alpha", "VLM.fltcond|alpha")
+
+        # -------------- Solver setup --------------
+        # Use the Schur solver if it's available, otherwise this will be very expensive
+        try:
+            self.nonlinear_solver = om.NonlinearSchurSolver(
+                groupNames=["aero", "sectional_CL_balance"], iprint=2, solve_subsystems=True
+            )
+            self.linear_solver = om.DirectSolver()
+        except AttributeError:
+            warnings.warn("OpenMDAO NonlinearSchurSolver is not available, CLmaxCriticalSectionVLM will be very slow!")
