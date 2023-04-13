@@ -163,7 +163,9 @@ class ParasiteDragCoefficient_BWB(om.Group):
         # -------------- Landing gear --------------
         # Raymer suggests adding 0.02 to the zero-lift drag coefficient when retractable
         # landing gear are in the down position. See Section 5.3, page 99 in the 1992 edition.
-        iv.add_output("CD_landing_gear", val=0.0 if is_clean else 0.02)
+        # For BWBs, this value has been halved because the wing area has roughly doubled from
+        # a comparable tube-and-wing configuration (assuming same drag force for gear).
+        iv.add_output("CD_landing_gear", val=0.0 if is_clean else 0.01)
 
         # ==============================================================================
         # Sum the total drag coefficients
