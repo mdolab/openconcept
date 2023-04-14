@@ -2,7 +2,14 @@ import unittest
 import numpy as np
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
-from openconcept.geometry import WingMACTrapezoidal, WingSpan, WingAspectRatio, WingSweepFromSections, WingAreaFromSections
+from openconcept.geometry import (
+    WingMACTrapezoidal,
+    WingSpan,
+    WingAspectRatio,
+    WingSweepFromSections,
+    WingAreaFromSections,
+    WingMACFromSections,
+)
 
 
 class WingMACTrapezoidalTestCase(unittest.TestCase):
@@ -178,7 +185,11 @@ class WingAreaFromSectionsTestCase(unittest.TestCase):
     def test_indices(self):
         p = om.Problem()
         p.model.add_subsystem(
-            "comp", WingAreaFromSections(num_sections=4, idx_sec_start=1, idx_sec_end=2, chord_frac_start=0.1, chord_frac_end=0.3), promotes=["*"]
+            "comp",
+            WingAreaFromSections(
+                num_sections=4, idx_sec_start=1, idx_sec_end=2, chord_frac_start=0.1, chord_frac_end=0.3
+            ),
+            promotes=["*"],
         )
         p.setup(force_alloc_complex=True)
 
@@ -188,6 +199,96 @@ class WingAreaFromSectionsTestCase(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val("S", units="m**2"), 0.4)
+
+
+class WingMACFromSectionsTestCase(unittest.TestCase):
+    def test_rectangular(self):
+        """
+        MAC of rectangular wing is just chord and quarter MAC is at quarter chord.
+        """
+        p = om.Problem()
+        p.model.add_subsystem("comp", WingMACFromSections(num_sections=2), promotes=["*"])
+        p.setup(force_alloc_complex=True)
+
+        p.set_val("x_LE_sec", [0, 0], units="m")
+        p.set_val("y_sec", -1.0, units="m")
+        p.set_val("chord_sec", [1.0, 1.0], units="m")
+
+        p.run_model()
+
+        assert_near_equal(p.get_val("MAC", units="m"), 1.0)
+        assert_near_equal(p.get_val("x_c4MAC", units="m"), 0.25)
+
+    def test_tapered(self):
+        p = om.Problem()
+        p.model.add_subsystem("comp", WingMACFromSections(num_sections=2), promotes=["*"])
+        p.setup(force_alloc_complex=True)
+
+        Cr = 1.0
+        taper = 0.5
+        b = 4
+
+        p.set_val("x_LE_sec", [Cr * taper / 2, 0], units="m")
+        p.set_val("y_sec", -b / 2, units="m")
+        p.set_val("chord_sec", [Cr * taper, Cr], units="m")
+
+        p.run_model()
+
+        # Test against equation for trapezoidal wing MAC
+        MAC = 2 / 3 * Cr * (1 + taper + taper**2) / (1 + taper)
+        y_MAC = b / 6 * (1 + 2 * taper) / (1 + taper)
+        x_c4MAC = (y_MAC / (b / 2)) * (Cr * taper / 2) + 0.25 * MAC
+
+        assert_near_equal(p.get_val("MAC", units="m"), MAC)
+        assert_near_equal(p.get_val("x_c4MAC", units="m"), x_c4MAC)
+
+    def test_tapered_swept(self):
+        p = om.Problem()
+        p.model.add_subsystem("comp", WingMACFromSections(num_sections=2), promotes=["*"])
+        p.setup(force_alloc_complex=True)
+
+        Cr = 1.5
+        taper = 0.5
+        b = 4
+
+        p.set_val("x_LE_sec", [Cr, 0], units="m")
+        p.set_val("y_sec", -b / 2, units="m")
+        p.set_val("chord_sec", [Cr * taper, Cr], units="m")
+
+        p.run_model()
+
+        # Test against equation for trapezoidal wing MAC
+        MAC = 2 / 3 * Cr * (1 + taper + taper**2) / (1 + taper)
+        y_MAC = b / 6 * (1 + 2 * taper) / (1 + taper)
+        x_c4MAC = (y_MAC / (b / 2)) * (Cr) + 0.25 * MAC
+
+        assert_near_equal(p.get_val("MAC", units="m"), MAC)
+        assert_near_equal(p.get_val("x_c4MAC", units="m"), x_c4MAC)
+
+    def test_indices(self):
+        p = om.Problem()
+        p.model.add_subsystem(
+            "comp", WingMACFromSections(num_sections=4, idx_sec_start=1, idx_sec_end=2), promotes=["*"]
+        )
+        p.setup(force_alloc_complex=True)
+
+        Cr = 1.5
+        taper = 0.5
+        b = 4
+
+        p.set_val("x_LE_sec", [-10, Cr, 0, 4], units="m")
+        p.set_val("y_sec", [-2 * b, -b, -b / 2], units="m")
+        p.set_val("chord_sec", [5, Cr * taper, Cr, 0.1], units="m")
+
+        p.run_model()
+
+        # Test against equation for trapezoidal wing MAC
+        MAC = 2 / 3 * Cr * (1 + taper + taper**2) / (1 + taper)
+        y_MAC = b / 6 * (1 + 2 * taper) / (1 + taper)
+        x_c4MAC = (y_MAC / (b / 2)) * (Cr) + 0.25 * MAC
+
+        assert_near_equal(p.get_val("MAC", units="m"), MAC)
+        assert_near_equal(p.get_val("x_c4MAC", units="m"), x_c4MAC)
 
 
 if __name__ == "__main__":
