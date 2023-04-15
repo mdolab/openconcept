@@ -379,7 +379,7 @@ class WingMACFromSections(om.ExplicitComponent):
         #         % Longitudinal position of MAC quarter chord from x = 0
         #         xqw = simplify(1 / Sw * int(c * xq, y, y1, y2))
         #
-        outputs["MAC"] = (y2 - y1) * (c1**2 + c1 * c2 + c2**2) / (3 * S)
-        outputs["x_c4MAC"] = (
+        outputs["MAC"] = np.sum((y2 - y1) * (c1**2 + c1 * c2 + c2**2) / (3 * S))
+        outputs["x_c4MAC"] = np.sum(
             (y2 - y1) * (c1 * c2 + 4 * c1 * x1 + 2 * c1 * x2 + 2 * c2 * x1 + 4 * c2 * x2 + c1**2 + c2**2) / (12 * S)
         )
