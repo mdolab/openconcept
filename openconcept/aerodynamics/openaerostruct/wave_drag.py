@@ -119,7 +119,7 @@ class WaveDragFromSections(om.ExplicitComponent):
         chord_sec = inputs["chord_sec"][self.i_start : self.i_end]
         toverc_sec = inputs["toverc_sec"][self.i_start : self.i_end]
         y_sec = np.hstack((inputs["y_sec"], [0.0]))[self.i_start : self.i_end]
-        cos_sweep = np.cos(np.deg2rad(inputs["c4sweep"]))
+        cos_sweep = np.cos(inputs["c4sweep"] * np.pi / 180)
         M = inputs["fltcond|M"]
         CL = inputs["fltcond|CL"]
 

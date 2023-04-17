@@ -15,7 +15,7 @@ import unittest
 # ==============================================================================
 import numpy as np
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 # ==============================================================================
 # Extension modules
@@ -44,6 +44,9 @@ class WaveDragFromSectionsTestCase(unittest.TestCase):
 
         assert_near_equal(p.get_val("CD_wave"), 0.001520816219023791, tolerance=1e-3)
 
+        partials = p.check_partials(method="fd", out_stream=None)
+        assert_check_partials(partials, atol=1e-4, rtol=1e-4)
+
     def test_indices(self):
         """
         Test the indices by adding a section to the beginning and end of the previous test but ignore them using the indices.
@@ -65,6 +68,9 @@ class WaveDragFromSectionsTestCase(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val("CD_wave"), 0.001520816219023791, tolerance=1e-3)
+
+        partials = p.check_partials(method="fd", out_stream=None)
+        assert_check_partials(partials, atol=1e-4, rtol=1e-4)
 
     def test_area_norm(self):
         """
@@ -88,6 +94,9 @@ class WaveDragFromSectionsTestCase(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val("CD_wave"), 0.001520816219023791 * S_new / S_orig, tolerance=1e-3)
+
+        partials = p.check_partials(method="fd", out_stream=None)
+        assert_check_partials(partials, atol=1e-4, rtol=1e-4)
 
 
 if __name__ == "__main__":
