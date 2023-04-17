@@ -151,10 +151,10 @@ class WingSweepFromSections(om.ExplicitComponent):
     -------
     num_sections : int
         Number of spanwise sections to define planform shape (scalar, dimensionless)
-    idx_sec_start : float
+    idx_sec_start : int
         Index in the inputs to begin the average sweep calculation (negative indices not
         accepted), inclusive, by default 0
-    idx_sec_end : float
+    idx_sec_end : int
         Index in the inputs to end the average sweep calculation (negative indices not
         accepted), inclusive, by default num_sections - 1
     """
@@ -230,10 +230,10 @@ class WingAreaFromSections(om.ExplicitComponent):
     -------
     num_sections : int
         Number of spanwise sections to define planform shape (scalar, dimensionless)
-    idx_sec_start : float
+    idx_sec_start : int
         Index in the inputs to begin the average sweep calculation (negative indices not
         accepted), inclusive, by default 0
-    idx_sec_end : float
+    idx_sec_end : int
         Index in the inputs to end the average sweep calculation (negative indices not
         accepted), inclusive, by default num_sections - 1
     chord_frac_start : float
@@ -310,10 +310,10 @@ class WingMACFromSections(om.ExplicitComponent):
     -------
     num_sections : int
         Number of spanwise sections to define planform shape (scalar, dimensionless)
-    idx_sec_start : float
+    idx_sec_start : int
         Index in the inputs to begin the average sweep calculation (negative indices not
         accepted), inclusive, by default 0
-    idx_sec_end : float
+    idx_sec_end : int
         Index in the inputs to end the average sweep calculation (negative indices not
         accepted), inclusive, by default num_sections - 1
     """
