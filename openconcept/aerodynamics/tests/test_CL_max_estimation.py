@@ -55,7 +55,7 @@ class FlapCLmaxTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val("CL_max_flap"), 2.45708573, tolerance=1e-8)
+        assert_near_equal(p.get_val("CL_max_flap"), 2.65255284, tolerance=1e-8)
 
         p = p.check_partials(method="cs", out_stream=None)
         assert_check_partials(p)
@@ -82,7 +82,7 @@ class FlapCLmaxTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val("CL_max_flap"), 2.04054114, tolerance=1e-8)
+        assert_near_equal(p.get_val("CL_max_flap"), 2.17133794, tolerance=1e-8)
 
         p = p.check_partials(method="cs", out_stream=None)
         assert_check_partials(p)
