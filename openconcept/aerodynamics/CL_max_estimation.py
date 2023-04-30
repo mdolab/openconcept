@@ -131,8 +131,8 @@ class FlapCLmax(om.ExplicitComponent):
 
         # -------------- Compute the increase in 2D airfoil lift coefficient from flaps --------------
         # See Roskam 1989 Part VI Chapter 8 Equation 8.18
-        delta_cl_max_base = 0.991 + 0.0233 * tc - 7.79e-3 * tc**2 + 1.12e-3 * tc**3 - 3.43e-5 * tc**4
-        k1 = 1.2 / 0.28 * self.options["flap_chord_frac"]
+        delta_cl_max_base = 1 + 2.33 * tc - 77.9 * tc**2 + 1120 * tc**3 - 3430 * tc**4
+        k1 = 4 * self.options["flap_chord_frac"]
         k2 = 0.4 + 0.0234 * delta - 2.04e-4 * delta**2
         k3 = 1.36 * k2 - 0.389 * k2**2
         delta_cl_max = delta_cl_max_base * k1 * k2 * k3
@@ -163,13 +163,13 @@ class FlapCLmax(om.ExplicitComponent):
 
         # -------------- Compute the increase in 2D airfoil lift coefficient from flaps --------------
         # See Roskam 1989 Part VI Chapter 8 Equation 8.18
-        delta_cl_max_base = 0.991 + 0.0233 * tc - 7.79e-3 * tc**2 + 1.12e-3 * tc**3 - 3.43e-5 * tc**4
-        k1 = 1.2 / 0.28 * self.options["flap_chord_frac"]
+        delta_cl_max_base = 1 + 2.33 * tc - 77.9 * tc**2 + 1120 * tc**3 - 3430 * tc**4
+        k1 = 4 * self.options["flap_chord_frac"]
         k2 = 0.4 + 0.0234 * delta - 2.04e-4 * delta**2
         k3 = 1.36 * k2 - 0.389 * k2**2
         delta_cl_max = delta_cl_max_base * k1 * k2 * k3
 
-        ddclmax_dtc = k1 * k2 * k3 * (0.0233 - 2 * 7.79e-3 * tc + 3 * 1.12e-3 * tc**2 - 4 * 3.43e-5 * tc**3)
+        ddclmax_dtc = k1 * k2 * k3 * (2.33 - 2 * 77.9 * tc + 3 * 1120 * tc**2 - 4 * 3430 * tc**3)
         dk2_ddelta = 0.0234 - 2 * 2.04e-4 * delta
         dk3_ddelta = (1.36 - 2 * 0.389 * k2) * dk2_ddelta
         ddclmax_ddelta = delta_cl_max_base * k1 * (k2 * dk3_ddelta + dk2_ddelta * k3)

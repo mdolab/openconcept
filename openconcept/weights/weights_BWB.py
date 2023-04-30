@@ -90,7 +90,46 @@ class BWBEmptyWeight(om.Group):
 
     Outputs
     -------
-
+    OEW : float
+        Total operating empty weight (scalar, lb)
+    W_cabin : float
+        Weight of the pressurized cabin region of the BWB without structural fudge factor multiplier (scalar, lb)
+    W_aftbody : float
+        Weight of the centerbody region aft of the pressurized cabin without structural fudge factor multiplier (scalar, lb)
+    W_wing : float
+        Estimated outboard wing weight without structural fudge factor multiplier (scalar, lb)
+    W_mlg : float
+        Main landing gear weight without structural fudge factor multiplier (scalar, lb)
+    W_nlg : float
+        Nose landing gear weight without structural fudge factor multiplier (scalar, lb)
+    W_nacelle : float
+        Weight of the nacelles (scalar, lb)
+    W_structure : float
+        Total structural weight = fudge factor * (W_cabin + W_aftbody + W_wing + W_mlg + W_nlg + W_nacelle) (scalar, lb)
+    W_engines : float
+        Total dry engine weight (scalar, lb)
+    W_thrust_rev : float
+        Total thrust reverser weight (scalar, lb)
+    W_eng_control : float
+        Total engine control weight (scalar, lb)
+    W_fuelsystem : float
+        Total fuel system weight including tanks and plumbing (scalar, lb)
+    W_eng_start : float
+        Total engine starter weight (scalar, lb)
+    W_furnishings : float
+        Weight estimate of seats, galleys, lavatories, and other furnishings (scalar, lb)
+    W_flight_controls : float
+        Flight control system weight (scalar, lb)
+    W_avionics : float
+        Intrumentation, avionics, and electronics weight (scalar, lb)
+    W_electrical : float
+        Electrical system weight (scalar, lb)
+    W_ac_pressurize_antiice : float
+        Air conditioning, pressurization, and anti-icing system weight (scalar, lb)
+    W_oxygen : float
+        Oxygen system weight (scalar, lb)
+    W_APU : float
+        Auxiliary power unit weight (scalar, lb)
 
     Options
     -------
