@@ -35,7 +35,7 @@ jobs:
       run:
         shell: bash -l {0}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Setup Python ${{ matrix.PYTHON_VERSION_OLDEST }}
       if: ${{ matrix.dep-versions == 'oldest' }}
       uses: conda-incubator/setup-miniconda@v2
