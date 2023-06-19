@@ -54,7 +54,8 @@ jobs:
       if: ${{ matrix.dep-versions == 'oldest' }}
       run: |
         conda config --set always_yes yes
-        pip install pip==${{ matrix.PIP_VERSION_OLDEST }} --upgrade wheel
+        which python
+        python -m pip install pip==${{ matrix.PIP_VERSION_OLDEST }} --upgrade wheel
         pip install numpy==${{ matrix.NUMPY_VERSION_OLDEST }} scipy==${{ matrix.SCIPY_VERSION_OLDEST }} openmdao==${{ matrix.OPENMDAO_VERSION_OLDEST }}
     - name: Install dependencies (latest versions)
       if: ${{ matrix.dep-versions == 'latest' }}
