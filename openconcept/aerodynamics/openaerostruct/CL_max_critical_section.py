@@ -14,6 +14,7 @@ import warnings
 # External Python modules
 # ==============================================================================
 import openmdao.api as om
+from openconcept.utilities import AddSubtractComp
 
 # ==============================================================================
 # Extension modules
@@ -31,7 +32,8 @@ class CLmaxCriticalSectionVLM(om.Group):
     Inputs
     ------
     ac|aero|airfoil_Cl_max : float
-        Maximum 2D lift coefficient of the wing airfoil (scalar, dimensionless)
+        Maximum 2D lift coefficient of the wing airfoil (scalar or, if vec_Cl_max is set
+        to true, vector of length num_y, dimensionless)
     fltcond|M : float
         Mach number for maximum CL calculation (scalar, dimensionless)
     fltcond|h : float
@@ -57,6 +59,13 @@ class CLmaxCriticalSectionVLM(om.Group):
     num_y : int
         Number of panels in y (spanwise) direction for one wing because
         uses symmetry (scalar, dimensionless)
+    vec_Cl_max : bool
+        Make the input ac|aero|airfoil_Cl_max a vector of length num_y where each item in the vector is
+        a spanwise panel's local maximum lift coefficient, ordered from wing tip to root. This enables
+        specification of a varying maximum sectional lift coefficient along the span, which can be used
+        to model high lift devices on only a portion of the wing. If this option is False,
+        ac|aero|airfoil_Cl_max is a scalar, which represents the maximum airfoil lift coefficient across
+        the entire span of the wing, by default False
     surf_options : dict
         Dictionary of OpenAeroStruct surface options; any options provided here
         will override the default ones; see the OpenAeroStruct documentation for more information.
@@ -70,12 +79,12 @@ class CLmaxCriticalSectionVLM(om.Group):
     def initialize(self):
         self.options.declare("num_x", default=2, desc="Number of streamwise mesh panels")
         self.options.declare("num_y", default=6, desc="Number of spanwise (half wing) mesh panels")
+        self.options.declare("vec_Cl_max", default=False, types=bool, desc="Make ac|aero|airfoil_Cl_max input a vector")
         self.options.declare("surf_options", default=None, desc="Dictionary of OpenAeroStruct surface options")
         self.options.declare("rho", default=200, types=(float, int), desc="Sectional CL aggregation factor")
 
     def setup(self):
-        # TODO: Extend the method to accept different maximum sectional
-        # lift coefficient methods across the span of the wing
+        Cl_max_shape = self.options["num_y"] if self.options["vec_Cl_max"] else 1
 
         # -------------- Simulate the wing in OpenAeroStruct --------------
         aero = om.Group()
@@ -93,19 +102,30 @@ class CLmaxCriticalSectionVLM(om.Group):
         )
         aero.set_input_defaults("VLM.fltcond|alpha", 5, units="deg")
 
-        # -------------- Aggregate the sectional lift coefficients to find the max --------------
-        aero.add_subsystem("max_sectional_CL", om.KSComp(width=self.options["num_y"], rho=self.options["rho"]))
-        aero.connect("VLM.sectional_CL", "max_sectional_CL.g")
+        # -------------- Compute and aggregate Cl - Clmax across the span (Cl - Clmax should be <= 0) --------------
+        aero.add_subsystem(
+            "Cl_max_limit",
+            AddSubtractComp(
+                output_name="Cl_limit_vec",
+                input_names=["Cl", "Cl_max"],
+                vec_size=[self.options["num_y"], Cl_max_shape],
+                scaling_factors=[1, -1],
+            ),
+            promotes_inputs=[("Cl_max", "ac|aero|airfoil_Cl_max")],
+        )
+        aero.connect("VLM.sectional_CL", "Cl_max_limit.Cl")
+
+        aero.add_subsystem("max_limit", om.KSComp(width=self.options["num_y"], rho=self.options["rho"]))
+        aero.connect("Cl_max_limit.Cl_limit_vec", "max_limit.g")
 
         self.add_subsystem("aero", aero, promotes=["*"])
 
-        # -------------- Solve for the angle of attack --------------
+        # -------------- Solve for the angle of attack that makes max(Cl - Clmax) = 0 --------------
         self.add_subsystem(
             "sectional_CL_balance",
-            om.BalanceComp("alpha", lhs_name="sec_CL_max_VLM", rhs_name="airfoil_CL_max", val=5, units="deg"),
-            promotes_inputs=[("airfoil_CL_max", "ac|aero|airfoil_Cl_max")],
+            om.BalanceComp("alpha", lhs_name="max_Cl_limit_VLM", rhs_val=0.0, val=5, units="deg"),
         )
-        self.connect("max_sectional_CL.KS", "sectional_CL_balance.sec_CL_max_VLM")
+        self.connect("max_limit.KS", "sectional_CL_balance.max_Cl_limit_VLM")
         self.connect("sectional_CL_balance.alpha", "VLM.fltcond|alpha")
 
         # -------------- Solver setup --------------
