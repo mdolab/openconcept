@@ -44,12 +44,12 @@ class HeatTransferVacuumTank(om.Group):
         Number of analysis points to run (scalar, dimensionless)
     heat_multiplier : float
         Multiplier on the output heat to account for heat through supports
-        and other connections, by default 1.3 (scalar, dimensionless)
+        and other connections, by default 1.2 (scalar, dimensionless)
     """
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of design points to run")
-        self.options.declare("heat_multiplier", default=1.3, desc="Multiplier on heat leak")
+        self.options.declare("heat_multiplier", default=1.2, desc="Multiplier on heat leak")
 
     def setup(self):
         nn = self.options["num_nodes"]
@@ -74,10 +74,18 @@ class HeatTransferVacuumTank(om.Group):
             promotes_outputs=["Q_liq", "Q_gas"],
         )
         mult.add_equation(
-            output_name="Q_liq", input_names=["flux_liq", "A_wet"], vec_size=nn, input_units=["W/m**2", "m**2"]
+            output_name="Q_liq",
+            input_names=["flux_liq", "A_wet"],
+            vec_size=nn,
+            input_units=["W/m**2", "m**2"],
+            scaling_factor=self.options["heat_multiplier"],
         )
         mult.add_equation(
-            output_name="Q_gas", input_names=["flux_gas", "A_dry"], vec_size=nn, input_units=["W/m**2", "m**2"]
+            output_name="Q_gas",
+            input_names=["flux_gas", "A_dry"],
+            vec_size=nn,
+            input_units=["W/m**2", "m**2"],
+            scaling_factor=self.options["heat_multiplier"],
         )
         self.connect("mli_heat_liq.heat_flux", "scale_by_area.flux_liq")
         self.connect("mli_heat_gas.heat_flux", "scale_by_area.flux_gas")
