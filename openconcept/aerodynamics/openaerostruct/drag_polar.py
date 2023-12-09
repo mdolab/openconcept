@@ -642,7 +642,7 @@ def compute_aerodynamic_data(point):
     inputs = point[3]
 
     # Set up OpenAeroStruct problem
-    p = om.Problem()
+    p = om.Problem(reports=False)
     p.model.add_subsystem(
         "aero_analysis",
         VLM(

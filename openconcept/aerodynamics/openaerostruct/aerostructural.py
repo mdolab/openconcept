@@ -686,7 +686,7 @@ def compute_aerodynamic_data(point):
     compute_W_wing = point[4]
 
     # Set up OpenAeroStruct problem
-    p = om.Problem()
+    p = om.Problem(reports=False)
     p.model.add_subsystem(
         "aero_analysis",
         Aerostruct(
