@@ -7,8 +7,8 @@ import warnings
 try:
     import pycycle
 
-    pyc_version = float(pycycle.__version__)
-    if pyc_version >= 3.0:
+    pyc_major_version = int(pycycle.__version__.split(".")[0])
+    if pyc_major_version >= 4:
         HAS_PYCYCLE = True
         import pycycle.api as pyc
 
@@ -114,9 +114,6 @@ try:
 
         class MPDuct(pyc.MPCycle):
             def setup(self):
-                self.options["thermo_method"] = "CEA"
-                self.options["thermo_data"] = pyc.species_data.janaf
-
                 self.pyc_add_pnt("design", PyCycleDuct(design=True, thermo_method="CEA"))
 
                 # define the off-design conditions we want to run

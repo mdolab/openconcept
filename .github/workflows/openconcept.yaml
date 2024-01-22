@@ -56,12 +56,12 @@ jobs:
       run: |
         conda config --set always_yes yes
         python -m pip install pip==${{ matrix.PIP_VERSION_OLDEST }} setuptools==${{ matrix.SETUPTOOLS_VERSION_OLDEST }} --upgrade wheel
-        pip install numpy==${{ matrix.NUMPY_VERSION_OLDEST }} scipy==${{ matrix.SCIPY_VERSION_OLDEST }} openmdao==${{ matrix.OPENMDAO_VERSION_OLDEST }}
+        pip install numpy==${{ matrix.NUMPY_VERSION_OLDEST }} scipy==${{ matrix.SCIPY_VERSION_OLDEST }} openmdao==${{ matrix.OPENMDAO_VERSION_OLDEST }} om-pycycle
     - name: Install dependencies (latest versions)
       if: ${{ matrix.dep-versions == 'latest' }}
       run: |
         conda config --set always_yes yes
-        pip install numpy scipy openmdao
+        pip install numpy scipy openmdao om-pycycle
 
     - name: Install OpenConcept
       run: |
