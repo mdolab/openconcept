@@ -968,6 +968,7 @@ class ImplicitCompressibleDuct(Group):
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of analysis points")
+        self.options.declare("cfg", default=0.98, desc="Gross thrust coefficient")
 
     def setup(self):
         nn = self.options["num_nodes"]
@@ -981,6 +982,7 @@ class ImplicitCompressibleDuct(Group):
         iv.add_output("delta_p_1", val=np.zeros((nn,)), units="Pa")
         iv.add_output("heat_in_1", val=np.zeros((nn,)), units="W")
         iv.add_output("pressure_recovery_1", val=np.ones((nn,)))
+        iv.add_output("loss_factor_1", val=0.0)
 
         iv.add_output("delta_p_2", val=np.ones((nn,)) * 0.0, units="Pa")
         iv.add_output("heat_in_2", val=np.ones((nn,)) * 0.0, units="W")
@@ -990,6 +992,8 @@ class ImplicitCompressibleDuct(Group):
 
         iv.add_output("area_nozzle", val=58 * np.ones((nn,)), units="inch**2")
         iv.add_output("convergence_hack", val=-20, units="Pa")
+
+        self.add_subsystem("mdotguess", FlowMatcher(num_nodes=nn), promotes=["*"])
 
         self.add_subsystem("inlet", Inlet(num_nodes=nn), promotes_inputs=[("p", "p_inf"), ("T", "T_inf"), "Utrue"])
 
@@ -1007,6 +1011,7 @@ class ImplicitCompressibleDuct(Group):
         )
         self.connect("inlet.pt", "sta1.pt_in")
         self.connect("inlet.Tt", "sta1.Tt_in")
+        self.connect("loss_factor_1", "sta1.dynamic_pressure_loss_factor")
 
         self.add_subsystem(
             "sta2",
@@ -1059,14 +1064,16 @@ class ImplicitCompressibleDuct(Group):
         self.add_subsystem(
             "nozzle",
             OutletNozzle(num_nodes=nn),
-            promotes_inputs=["p_exit", ("area", "area_nozzle")],
-            promotes_outputs=["mdot"],
+            promotes_inputs=["mdot", "p_exit", ("area", "area_nozzle")],
+            promotes_outputs=["mdot_actual"],
         )
-        self.connect("sta3.pt_out", "nozzle.pt")
+        self.connect("sta3.pt_out", "nozzle.pt_in")
         self.connect("sta3.Tt_out", "nozzle.Tt")
 
         self.add_subsystem(
-            "force", NetForce(num_nodes=nn), promotes_inputs=["mdot", "p_inf", ("Utrue_inf", "Utrue"), "area_nozzle"]
+            "force",
+            NetForce(num_nodes=nn, cfg=self.options["cfg"]),
+            promotes_inputs=["mdot", "p_inf", ("Utrue_inf", "Utrue"), "area_nozzle"],
         )
         self.connect("nozzle.p", "force.p_nozzle")
         self.connect("nozzle.rho", "force.rho_nozzle")
