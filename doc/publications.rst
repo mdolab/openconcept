@@ -4,6 +4,29 @@
 Publications
 ************
 
+2024
+====
+
+Eytan J. Adler and Joaquim R.R.A. Martins,
+*Blended Wing Body Configuration for Hydrogen-Powered Aviation*,
+Journal of Aircraft, 2024
+DOI: `10.2514/1.c037582 <https://doi.org/10.2514/1.c037582>`_.
+PDF is available `here <https://www.researchgate.net/profile/Eytan-Adler/publication/377749153_Blended_wing_body_configuration_for_hydrogen-powered_aviation/links/65b5a5f81e1ec12eff5180e3/Blended-wing-body-configuration-for-hydrogen-powered-aviation.pdf>`__.
+
+.. code-block:: bibtex
+
+	@article{Adler2024,
+		author      = {Adler, Eytan J. and Martins, Joaquim R. R. A.},
+		title       = {Blended Wing Body Configuration for Hydrogen-Powered Aviation},
+		doi         = {10.2514/1.C037582},
+		issn        = {1533-3868},
+		journal     = {Journal of Aircraft},
+		month       = {January},
+		publisher   = {American Institute of Aeronautics and Astronautics},
+		year        = {2024}
+	}
+
+
 2022
 ====
 
