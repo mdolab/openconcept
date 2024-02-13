@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
-from openmdao.api import IndepVarComp, Group, Problem
+from openmdao.api import IndepVarComp, Group, Problem, AnalysisError
 from openconcept.thermal.heat_exchanger import (
     OffsetStripFinGeometry,
     HydraulicDiameterReynoldsNumber,
@@ -82,6 +82,32 @@ class OSFGeometryTestGroup(Group):
         )
         self.add_subsystem("t_out", OutletTemperatures(num_nodes=nn), promotes_inputs=["*"], promotes_outputs=["*"])
         self.add_subsystem("delta_p", PressureDrop(num_nodes=nn), promotes_inputs=["*"], promotes_outputs=["*"])
+
+
+class AnalysisErrorChecks(unittest.TestCase):
+    def test_OSFdata(self):
+        prob = Problem()
+        prob.model.add_subsystem("OSFData", OffsetStripFinData(), promotes_inputs=["*"], promotes_outputs=["*"])
+        prob.setup()
+        prob.set_val("Re_dh_cold", val=-1.0)
+        with self.assertRaises(AnalysisError):
+            prob.run_model()
+
+    def test_Conv_coeff(self):
+        prob = Problem()
+        prob.model.add_subsystem("Conv_coeff", ConvectiveCoefficient(), promotes_inputs=["*"], promotes_outputs=["*"])
+        prob.setup()
+        prob.set_val("Nu_dh_cold", val=-1.0)
+        with self.assertRaises(AnalysisError):
+            prob.run_model()
+
+    def test_Fin_eff(self):
+        prob = Problem()
+        prob.model.add_subsystem("Fin_eff", FinEfficiency(), promotes_inputs=["*"], promotes_outputs=["*"])
+        prob.setup()
+        prob.set_val("h_conv_cold", val=-1.0)
+        with self.assertRaises(AnalysisError):
+            prob.run_model()
 
 
 class OSFGeometryTestCase(unittest.TestCase):
@@ -360,9 +386,7 @@ class TestHXByHand(unittest.TestCase):
         xs_area_hot = n_hot_wide * n_cold_tall * w_h * h_h
         assert_near_equal(prob["osfgeometry.xs_area_hot"], xs_area_hot / 1000**2, tolerance=1e-6)
         heat_transfer_area_hot = 2 * (w_h + h_h) * n_cold_tall * n_hot_wide * width_overall
-        assert_near_equal(
-            prob["osfgeometry.heat_transfer_area_hot"], heat_transfer_area_hot / 1000**2, tolerance=1e-6
-        )
+        assert_near_equal(prob["osfgeometry.heat_transfer_area_hot"], heat_transfer_area_hot / 1000**2, tolerance=1e-6)
         dh_hot = 2 * w_h * h_h / (w_h + h_h)
         assert_near_equal(prob["osfgeometry.dh_hot"], dh_hot / 1000, tolerance=1e-6)
         fin_area_ratio_hot = h_h / (h_h + w_h)
@@ -395,8 +419,7 @@ class TestHXByHand(unittest.TestCase):
             * alpha_cold**-0.1541
             * delta_cold**0.1499
             * gamma_cold**-0.0678
-            * (1 + 5.269e-5 * redh_cold**1.340 * alpha_cold**0.504 * delta_cold**0.456 * gamma_cold**-1.055)
-            ** 0.1
+            * (1 + 5.269e-5 * redh_cold**1.340 * alpha_cold**0.504 * delta_cold**0.456 * gamma_cold**-1.055) ** 0.1
         )
         j_hot = (
             0.6522
@@ -414,8 +437,7 @@ class TestHXByHand(unittest.TestCase):
             * alpha_cold**-0.1856
             * delta_cold**0.3053
             * gamma_cold**-0.2659
-            * (1 + 7.669e-8 * redh_cold**4.429 * alpha_cold**0.920 * delta_cold**3.767 * gamma_cold**0.236)
-            ** 0.1
+            * (1 + 7.669e-8 * redh_cold**4.429 * alpha_cold**0.920 * delta_cold**3.767 * gamma_cold**0.236) ** 0.1
         )
         f_hot = (
             9.6243

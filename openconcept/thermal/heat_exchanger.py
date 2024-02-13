@@ -264,7 +264,7 @@ class OffsetStripFinData(ExplicitComponent):
         fc_1 = inputs["alpha_cold"] ** -0.1856 * inputs["delta_cold"] ** 0.3053 * inputs["gamma_cold"] ** -0.2659
         fc_2 = inputs["alpha_cold"] ** 0.92 * inputs["delta_cold"] ** 3.767 * inputs["gamma_cold"] ** 0.236
         if np.min(inputs["Re_dh_cold"]) <= 0.0:
-            raise AnalysisError(f"One of the Re numbers in {inputs["Re_dh_cold"]} is negative", msginfo=self.msginfo)
+            raise AnalysisError(f"One of the Re numbers in {inputs['Re_dh_cold']} is negative", msginfo=self.msginfo)
         outputs["j_cold"] = (
             0.6522
             * inputs["Re_dh_cold"] ** -0.5403
@@ -682,7 +682,9 @@ class ConvectiveCoefficient(ExplicitComponent):
         outputs["h_conv_cold"] = inputs["Nu_dh_cold"] * inputs["k_cold"] / inputs["dh_cold"]
         outputs["h_conv_hot"] = inputs["Nu_dh_hot"] * inputs["k_hot"] / inputs["dh_hot"]
         if np.min(outputs["h_conv_cold"]) <= 0.0:
-            raise AnalysisError(f"One of the heat tranfer coeffcients in {outputs["h_conv_cold"]} is negative", msginfo=self.msginfo)
+            raise AnalysisError(
+                f"One of the heat tranfer coeffcients in {outputs['h_conv_cold']} is negative", msginfo=self.msginfo
+            )
 
     def compute_partials(self, inputs, J):
         J["h_conv_cold", "Nu_dh_cold"] = inputs["k_cold"] / inputs["dh_cold"]
@@ -777,7 +779,9 @@ class FinEfficiency(ExplicitComponent):
 
         m_cold = np.sqrt(2 * h_c / k / t_f)
         if np.min(h_c) <= 0.0:
-            raise AnalysisError(f"One of the heat tranfer coeffcients in {inputs["h_conv_cold"]} is negative", msginfo=self.msginfo)
+            raise AnalysisError(
+                f"One of the heat tranfer coeffcients in {inputs['h_conv_cold']} is negative", msginfo=self.msginfo
+            )
         eta_f_cold = 2 * np.tanh(m_cold * l_f_c / 2) / m_cold / l_f_c
         outputs["eta_overall_cold"] = 1 - inputs["fin_area_ratio_cold"] * (1 - eta_f_cold)
 
