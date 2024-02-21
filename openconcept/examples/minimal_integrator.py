@@ -57,6 +57,7 @@ class AircraftWithFuelBurn(om.Group):
                 fuel_flow={"units": "kg/s", "shape": nn},
                 TSFC={"units": "kg/N/s", "shape": 1},
                 thrust={"units": "N", "shape": nn},
+                has_diag_partials=True,
             ),
             promotes_inputs=[("TSFC", "ac|propulsion|TSFC"), "thrust"],
         )
@@ -82,6 +83,7 @@ class AircraftWithFuelBurn(om.Group):
                 weight={"shape": nn},
                 TOW={"shape": 1},
                 fuel_burned={"shape": nn},
+                has_diag_partials=True,
             ),
             promotes_inputs=[("TOW", "ac|weights|TOW")],
             promotes_outputs=["weight"],
