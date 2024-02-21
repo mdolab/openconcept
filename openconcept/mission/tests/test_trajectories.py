@@ -165,6 +165,7 @@ class IntegratorGroupTestBase(IntegratorGroup):
                     "tags": ["integrate", "state_name:f", "state_units:kg"],
                 },
                 x={"val": 1.0 * np.ones((nn,)), "units": "s"},
+                has_diag_partials=True,
             ),
         )
         self.connect("iv.x", "ec.x")
@@ -215,6 +216,7 @@ class IntegratorTestMultipleOutputs(IntegratorGroupTestBase):
                     "tags": ["integrate", "state_name:f2", "state_units:J"],
                 },
                 x={"val": 1.0 * np.ones((nn,)), "units": "s"},
+                has_diag_partials=True,
             ),
         )
         self.connect("iv.x", "ec2.x")
@@ -269,6 +271,7 @@ class IntegratorTestPromotes(IntegratorGroupTestBase):
                     "tags": ["integrate", "state_name:f2", "state_units:J", "state_promotes:True"],
                 },
                 x={"val": 1.0 * np.ones((nn,)), "units": "s"},
+                has_diag_partials=True,
             ),
         )
         self.connect("iv.x", "ec2.x")
@@ -330,6 +333,7 @@ class IntegratorTestValLimits(IntegratorGroupTestBase):
                     ],
                 },
                 x={"val": 1.0 * np.ones((nn,)), "units": "s"},
+                has_diag_partials=True,
             ),
         )
         self.connect("iv.x", "ec2.x")
@@ -378,6 +382,7 @@ class IntegratorTestDuplicateRateNames(IntegratorGroupTestBase):
                 ["df = 5.1*x**3 +0.5*x-7.2"],
                 df={"val": 1.0 * np.ones((nn,)), "units": "W", "tags": ["integrate", "state_name:f2", "state_units:J"]},
                 x={"val": 1.0 * np.ones((nn,)), "units": "s"},
+                has_diag_partials=True,
             ),
         )
         self.connect("iv.x", "ec2.x")
@@ -413,6 +418,7 @@ class IntegratorTestDuplicateStateNames(IntegratorGroupTestBase):
                 ["df2 = 5.1*x**3 +0.5*x-7.2"],
                 df2={"val": 1.0 * np.ones((nn,)), "units": "W", "tags": ["integrate", "state_name:f", "state_units:J"]},
                 x={"val": 1.0 * np.ones((nn,)), "units": "s"},
+                has_diag_partials=True,
             ),
         )
         self.connect("iv.x", "ec2.x")
@@ -521,6 +527,7 @@ class IntegratorGroupTestPromotedRate(IntegratorGroup):
                     "tags": ["integrate", "state_name:f", "state_units:kg"],
                 },
                 x={"val": 1.0 * np.ones((nn,)), "units": "s"},
+                has_diag_partials=True,
             ),
             promotes_outputs=["df"],
         )
