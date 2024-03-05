@@ -1,8 +1,13 @@
 import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
-from openmdao.api import IndepVarComp, Group, Problem
-from openconcept.thermal.heat_exchanger import HXGroup
+from openmdao.api import IndepVarComp, Group, Problem, AnalysisError
+from openconcept.thermal.heat_exchanger import (
+    OffsetStripFinData,
+    ConvectiveCoefficient,
+    FinEfficiency,
+    HXGroup,
+)
 
 
 class OSFGeometryTestGroup(Group):
@@ -50,6 +55,32 @@ class OSFGeometryTestGroup(Group):
         iv.add_output("mu_hot", val=1.68e-3, units="kg/m/s")
 
         self.add_subsystem("hx", HXGroup(), promotes=["*"])
+
+
+class AnalysisErrorChecks(unittest.TestCase):
+    def test_OSFdata(self):
+        prob = Problem()
+        prob.model.add_subsystem("OSFData", OffsetStripFinData(), promotes_inputs=["*"], promotes_outputs=["*"])
+        prob.setup()
+        prob.set_val("Re_dh_cold", val=-1.0)
+        with self.assertRaises(AnalysisError):
+            prob.run_model()
+
+    def test_Conv_coeff(self):
+        prob = Problem()
+        prob.model.add_subsystem("Conv_coeff", ConvectiveCoefficient(), promotes_inputs=["*"], promotes_outputs=["*"])
+        prob.setup()
+        prob.set_val("Nu_dh_cold", val=-1.0)
+        with self.assertRaises(AnalysisError):
+            prob.run_model()
+
+    def test_Fin_eff(self):
+        prob = Problem()
+        prob.model.add_subsystem("Fin_eff", FinEfficiency(), promotes_inputs=["*"], promotes_outputs=["*"])
+        prob.setup()
+        prob.set_val("h_conv_cold", val=-1.0)
+        with self.assertRaises(AnalysisError):
+            prob.run_model()
 
 
 class OSFGeometryTestCase(unittest.TestCase):
