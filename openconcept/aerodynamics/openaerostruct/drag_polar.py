@@ -356,6 +356,7 @@ class VLMDragPolar(om.Group):
                 q={"units": "Pa", "shape": (nn,)},
                 S={"units": "m**2"},
                 CD={"shape": (nn,)},
+                has_diag_partials=True,
             ),
             promotes_inputs=[("q", "fltcond|q"), ("S", "ac|geom|wing|S_ref")],
             promotes_outputs=["drag"],
