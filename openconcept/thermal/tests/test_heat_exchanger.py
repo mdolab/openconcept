@@ -83,32 +83,6 @@ class AnalysisErrorChecks(unittest.TestCase):
             prob.run_model()
 
 
-class AnalysisErrorChecks(unittest.TestCase):
-    def test_OSFdata(self):
-        prob = Problem()
-        prob.model.add_subsystem("OSFData", OffsetStripFinData(), promotes_inputs=["*"], promotes_outputs=["*"])
-        prob.setup()
-        prob.set_val("Re_dh_cold", val=-1.0)
-        with self.assertRaises(AnalysisError):
-            prob.run_model()
-
-    def test_Conv_coeff(self):
-        prob = Problem()
-        prob.model.add_subsystem("Conv_coeff", ConvectiveCoefficient(), promotes_inputs=["*"], promotes_outputs=["*"])
-        prob.setup()
-        prob.set_val("Nu_dh_cold", val=-1.0)
-        with self.assertRaises(AnalysisError):
-            prob.run_model()
-
-    def test_Fin_eff(self):
-        prob = Problem()
-        prob.model.add_subsystem("Fin_eff", FinEfficiency(), promotes_inputs=["*"], promotes_outputs=["*"])
-        prob.setup()
-        prob.set_val("h_conv_cold", val=-1.0)
-        with self.assertRaises(AnalysisError):
-            prob.run_model()
-
-
 class OSFGeometryTestCase(unittest.TestCase):
     def test_default_settings(self):
         prob = Problem(OSFGeometryTestGroup(num_nodes=1))
