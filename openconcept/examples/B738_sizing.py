@@ -505,6 +505,26 @@ def set_mission_profile(prob):
     prob.set_val("mission.v1v0.fltcond|Utrue", np.full((nn,), 100.0), units="kn")
 
 
+    # Converge the model first with an easier mission profile and work up to the intended
+    # mission profile. This is needed to help the Newton solver converge the actual mission.
+    prob.set_val("mission.descent.fltcond|vs", np.linspace(-800, -800, nn), units="ft/min")
+    prob.set_val("mission.cruise|h0", 5000.0, units="ft")
+    prob.set_val("mission.reserve|h0", 1000.0, units="ft")
+    prob.set_val("mission.mission_range", 500, units="nmi")
+    prob.set_val("mission.reserve_range", 100, units="nmi")
+    prob.run_model()
+
+    # Almost there, just not quite with descent rate
+    prob.set_val("mission.cruise|h0", 35000.0, units="ft")
+    prob.set_val("mission.reserve|h0", 15000.0, units="ft")
+    prob.set_val("mission.mission_range", 2800, units="nmi")
+    prob.set_val("mission.reserve_range", 200, units="nmi")
+    prob.run_model()
+
+    # Finally, set the descent rate we want
+    prob.set_val("mission.descent.fltcond|vs", np.linspace(-1300, -800, nn), units="ft/min")
+
+
 def plot_results(prob, filename=None):
     """
     Make a plot with the results of the mission analysis.
@@ -555,13 +575,16 @@ def plot_results(prob, filename=None):
         fig.savefig(filename)
 
 
-if __name__ == "__main__":
-    nn = 21
-    p = get_problem(num_nodes=nn)
+def run_738_sizing_analysis(num_nodes=21):
+    p = get_problem(num_nodes=num_nodes)
     p.setup()
     set_mission_profile(p)
     p.run_model()
+    return p
 
+
+if __name__ == "__main__":
+    p = run_738_sizing_analysis()
     om.n2(p, show_browser=False)
 
     # Print some useful numbers
