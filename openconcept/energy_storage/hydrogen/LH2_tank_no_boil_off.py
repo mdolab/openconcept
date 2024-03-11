@@ -18,14 +18,16 @@ class LH2TankNoBoilOff(om.Group):
     the fill level to be greater than zero (or slightly more), since the integrator
     is perfectly happy with negative fill levels.
 
-          |--- length ---|
-         . -------------- .         ---
-      ,'                    `.       | radius
-     /                        \      |
-    |                          |    ---
-     \                        /
-      `.                    ,'
-         ` -------------- '
+    .. code-block:: text
+
+              |--- length ---|
+             . -------------- .         ---
+          ,'                    `.       | radius
+         /                        \      |
+        |                          |    ---
+         \                        /
+          `.                    ,'
+             ` -------------- '
 
     WARNING: Do not modify or connect anything to the initial integrated delta state value
              "integ.delta_m_liq_initial". It must remain zero for the initial tank state to be

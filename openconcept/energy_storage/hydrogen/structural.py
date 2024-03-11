@@ -8,14 +8,16 @@ class VacuumTankWeight(om.Group):
     Sizes the structure and computes the weight of the tank's vacuum walls.
     This includes the weight of MLI.
 
-          |--- length ---|
-         . -------------- .         ---
-      ,'                    `.       | radius
-     /                        \      |
-    |                          |    ---
-     \                        /
-      `.                    ,'
-         ` -------------- '
+    .. code-block:: text
+
+              |--- length ---|
+             . -------------- .         ---
+          ,'                    `.       | radius
+         /                        \      |
+        |                          |    ---
+         \                        /
+          `.                    ,'
+             ` -------------- '
 
     Inputs
     ------
@@ -151,14 +153,16 @@ class PressureVesselWallThickness(om.ExplicitComponent):
     it is valid to compute the weight as the product of the surface area, wall thickness,
     and material density.
 
-          |--- length ---|
-         . -------------- .         ---
-      ,'                    `.       | radius
-     /                        \      |
-    |                          |    ---
-     \                        /
-      `.                    ,'
-         ` -------------- '
+    .. code-block:: text
+
+              |--- length ---|
+             . -------------- .         ---
+          ,'                    `.       | radius
+         /                        \      |
+        |                          |    ---
+         \                        /
+          `.                    ,'
+             ` -------------- '
 
     Inputs
     ------
@@ -252,14 +256,16 @@ class VacuumWallThickness(om.ExplicitComponent):
 
     This component assumes that the wall is thin relative to the radius.
 
-          |--- length ---|
-         . -------------- .         ---
-      ,'                    `.       | radius
-     /                        \      |
-    |                          |    ---
-     \                        /
-      `.                    ,'
-         ` -------------- '
+    .. code-block:: text
+
+              |--- length ---|
+             . -------------- .         ---
+          ,'                    `.       | radius
+         /                        \      |
+        |                          |    ---
+         \                        /
+          `.                    ,'
+             ` -------------- '
 
     Inputs
     ------
