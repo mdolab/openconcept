@@ -137,8 +137,10 @@ Eytan J. Adler and Joaquim R.R.A. Martins, "Efficient Aerostructural Wing Optimi
    features/atmospherics.rst
    features/costs.rst
    features/energy_storage.rst
+   features/geometry.rst
    features/mission.rst
    features/propulsion.rst
+   features/stability.rst
    features/thermal.rst
    features/weights.rst
    features/utilities.rst

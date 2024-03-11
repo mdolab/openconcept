@@ -45,3 +45,4 @@ Other useful places to look
 ===========================
 
 The ``B738_VLM_drag.py`` and ``B738_aerostructural.py`` examples show how to use the OpenAeroStruct VLM and aerostructural models.
+The ``B738_sizing.py`` example demonstrates the use of the weight buildup, drag buildup, and :math:`C_{L, \text{max}}` estimate.

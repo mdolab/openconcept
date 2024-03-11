@@ -28,6 +28,22 @@ In run script, users should set the values for the following aircraft design par
       - Zero-lift drag coefficient
 
 
+Drag buildups
+=============
+A drag buildup can provide a first estimate of an aircraft's drag coefficient.
+It uses empirical estimates for the drag of individual components, such as the fuselage and engine, and sums them to predict the total drag.
+Empirical interference factors included in the summation account for drag caused by the interaction of components.
+
+In OpenConcept, the drag buildups return CD0, the zero-lift drag coefficient.
+Drag buildups for two configurations are included.
+For a conventional tube and wing configuration, use ``ParasiteDragCoefficient_JetTransport``.
+For a blended wing body configuration, use ``ParasiteDragCoefficient_JetTransport``.
+This value can then be used either with the simple drag polar (``PolarDrag``) or one of the OpenAeroStruct-based drag models to add in the lift-induced component of drag.
+OpenAeroStruct already includes the zero-lift drag of the wing.
+To prevent double counting this drag, the ``ParasiteDragCoefficient_JetTransport`` has an option called ``include_wing``, which should be set to ``False`` when using OpenAeroStruct for drag prediction.
+
+The source code describes details of the implementation, including sources for the individual empirical equations and constants.
+
 Using OpenAeroStruct
 ====================
 Instead of the simple drag polar model, you can use `OpenAeroStruct <https://github.com/mdolab/OpenAeroStruct>`_ to compute the drag.
@@ -95,6 +111,29 @@ The outputs of the surrogate models are CL and CD (and failure for ``AeroStructD
 
 For more details about the surrogate models, see our `paper <https://mdolab.engin.umich.edu/bibliography/Adler2022d>`_.
 
+:math:`C_{L, \text{max}}` estimates
+==================================
+Accurately predicting :math:`C_{L, \text{max}}`, the maximum lift coefficient, is a notoriously challenging task, but doing so is crucial for estimating stall speed and takeoff field length.
+
+Empirical fits
+--------------
+In conceptual design, empirical estimates are often used.
+OpenConcept's ``CleanCLmax`` uses a method from :footcite:t:`raymer2006aircraft` to model the maximum lift coefficient of a clean wing (without high lift devices extended).
+The ``FlapCLmax`` component adds a delta to the clean :math:`C_{L, \text{max}}` to account for flaps and slats, using fits of data from :footcite:t:`roskam1989VI`.
+
+With OpenAeroStruct
+-------------------
+An alternative way to predict :math:`C_{L, \text{max}}` is to use the critical section method with a panel code.
+In this method, the wing angle of attack is increased until the wing's sectional lift coefficient first hits the airfoil's :math:`C_{l, \text{max}}` at some point along the span.
+As with before, the sectional :math:`C_{l, \text{max}}` is often predicted using empirical estimates.
+
+OpenConcept includes a method to use OpenAeroStruct to carry out the critical section method.
+The first step is to perform an OpenAeroStruct analysis of the wing.
+Next, the difference between the spanwise sectional lift coefficient computed by OpenAeroStruct and the associated :math:`C_{l, \text{max}}` is aggregated to smoothly compute the nearest point to stall.
+Finally, a solver varies OpenAeroStruct's angle of attack to drive the aggregated :math:`\max(C_l - C_{l, \text{max}})` to zero.
+A Newton solver is capable of this system, but it is very slow because it needs to invert the whole system's Jacobian.
+A better method is to use OpenMDAO's ``NonlinearSchurSolver``, but it may not be available in your OpenMDAO distribution.
+
 Other models
 ============
 
@@ -102,3 +141,5 @@ The aerodynamics module also includes a couple components that may be useful:
 
   - ``StallSpeed``, which uses :math:`C_{L, \text{max}}`, aircraft weight, and wing area to compute the stall speed
   - ``Lift``, which computes lift force using lift coefficient, wing area, and dynamic pressure
+
+.. footbibliography::
