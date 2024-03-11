@@ -1,5 +1,4 @@
 import unittest
-import numpy
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
 from openconcept.propulsion import RubberizedTurbofan

@@ -116,7 +116,7 @@ class WingSweepFromSectionsTestCase(unittest.TestCase):
 
         assert_near_equal(p.get_val("c4sweep", units="deg"), np.rad2deg(np.arctan(0.875)))
 
-    def test_sweep(self):
+    def test_sweep_three_sections(self):
         p = om.Problem()
         p.model.add_subsystem("comp", WingSweepFromSections(num_sections=3), promotes=["*"])
         p.setup(force_alloc_complex=True)

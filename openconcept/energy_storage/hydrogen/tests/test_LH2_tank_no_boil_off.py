@@ -1,7 +1,8 @@
 import unittest
+import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 import openmdao.api as om
-from openconcept.energy_storage.hydrogen.LH2_tank_no_boil_off import *
+from openconcept.energy_storage.hydrogen.LH2_tank_no_boil_off import LH2TankNoBoilOff, InitialLH2MassModification
 
 
 class LH2TankTestCase(unittest.TestCase):

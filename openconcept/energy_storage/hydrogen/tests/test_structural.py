@@ -2,7 +2,12 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 import openmdao.api as om
-from openconcept.energy_storage.hydrogen.structural import *
+from openconcept.energy_storage.hydrogen.structural import (
+    VacuumTankWeight,
+    VacuumWallThickness,
+    PressureVesselWallThickness,
+    MLIWeight,
+)
 
 
 class VacuumTankWeightTestCase(unittest.TestCase):
