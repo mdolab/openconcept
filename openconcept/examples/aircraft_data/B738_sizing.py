@@ -3,9 +3,9 @@
 @Date    :   2023/03/25
 @Author  :   Eytan Adler
 @Description : Data needed B738_sizing OpenConcept example. The data is from a combination of:
-               - Technical site: http://www.b737.org.uk/techspecsdetailed.htm
-               - Wikipedia: https://en.wikipedia.org/wiki/Boeing_737#Specifications
-               - OpenConcept B738 model
+- Technical site: http://www.b737.org.uk/techspecsdetailed.htm
+- Wikipedia: https://en.wikipedia.org/wiki/Boeing_737#Specifications
+- OpenConcept B738 model
 """
 
 
