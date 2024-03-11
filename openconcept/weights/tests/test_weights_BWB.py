@@ -48,7 +48,7 @@ class BWBEmptyWeightTestCase(unittest.TestCase):
         dvs.add_output("ac|weights|MLW", 400e3, units="lb")
         dvs.add_output("ac|weights|W_fuel_max", 200e3, units="lb")
 
-        prob.model.add_subsystem("OEW", BWBEmptyWeight(), promotes_inputs=["*"])
+        prob.model.add_subsystem("OEW", BWBEmptyWeight(structural_fudge=1.2, total_fudge=1.15), promotes_inputs=["*"])
 
         prob.setup(force_alloc_complex=True)
         prob.run_model()
