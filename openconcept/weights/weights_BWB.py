@@ -501,10 +501,17 @@ class AftbodyWeight_BWB(om.ExplicitComponent):
             * (inputs["ac|geom|centerbody|taper_aftbody"] + 0.5)
         )
         J["W_aftbody", "ac|geom|centerbody|taper_aftbody"] = (
-            0.53 * (1 + 0.05 * inputs["ac|propulsion|num_engines"]) * inputs["ac|geom|centerbody|S_aftbody"] * inputs["ac|weights|MTOW"] ** 0.2
+            0.53
+            * (1 + 0.05 * inputs["ac|propulsion|num_engines"])
+            * inputs["ac|geom|centerbody|S_aftbody"]
+            * inputs["ac|weights|MTOW"] ** 0.2
         )
         J["W_aftbody", "ac|propulsion|num_engines"] = (
-            0.53 * 0.05 * inputs["ac|geom|centerbody|S_aftbody"] * inputs["ac|weights|MTOW"] ** 0.2 * (inputs["ac|geom|centerbody|taper_aftbody"] + 0.5)
+            0.53
+            * 0.05
+            * inputs["ac|geom|centerbody|S_aftbody"]
+            * inputs["ac|weights|MTOW"] ** 0.2
+            * (inputs["ac|geom|centerbody|taper_aftbody"] + 0.5)
         )
         J["W_aftbody", "ac|weights|MTOW"] = (
             0.53

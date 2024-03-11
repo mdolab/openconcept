@@ -131,7 +131,13 @@ class ParasiteDragCoefficient_BWB(om.Group):
         )
         mult.add_equation(
             output_name="CD_nacelle",
-            input_names=["ac|geom|nacelle|S_wet", "FF_nacelle", "Cf_nacelle", "ac|propulsion|num_engines", "ac|geom|wing|S_ref"],
+            input_names=[
+                "ac|geom|nacelle|S_wet",
+                "FF_nacelle",
+                "Cf_nacelle",
+                "ac|propulsion|num_engines",
+                "ac|geom|wing|S_ref",
+            ],
             vec_size=[1, 1, nn, 1, 1],
             input_units=["m**2", None, None, None, "m**2"],
             divide=[False, False, False, False, True],

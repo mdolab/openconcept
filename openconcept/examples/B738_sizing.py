@@ -504,7 +504,6 @@ def set_mission_profile(prob):
     prob.set_val("mission.v1vr.fltcond|Utrue", np.full((nn,), 100.0), units="kn")
     prob.set_val("mission.v1v0.fltcond|Utrue", np.full((nn,), 100.0), units="kn")
 
-
     # Converge the model first with an easier mission profile and work up to the intended
     # mission profile. This is needed to help the Newton solver converge the actual mission.
     prob.set_val("mission.descent.fltcond|vs", np.linspace(-800, -800, nn), units="ft/min")

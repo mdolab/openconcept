@@ -161,9 +161,17 @@ class B738SizingTestCase(unittest.TestCase):
     def test_values_B738(self):
         prob = self.prob
         # block fuel
-        assert_near_equal(prob.get_val("mission.descent.fuel_burn_integ.fuel_burn_final", units="lbm"), 35213.7673772348, tolerance=1e-4)
+        assert_near_equal(
+            prob.get_val("mission.descent.fuel_burn_integ.fuel_burn_final", units="lbm"),
+            35213.7673772348,
+            tolerance=1e-4,
+        )
         # total fuel
-        assert_near_equal(prob.get_val("mission.loiter.fuel_burn_integ.fuel_burn_final", units="lbm"), 40991.187944303405, tolerance=1e-4)
+        assert_near_equal(
+            prob.get_val("mission.loiter.fuel_burn_integ.fuel_burn_final", units="lbm"),
+            40991.187944303405,
+            tolerance=1e-4,
+        )
         # MTOW
         assert_near_equal(prob.get_val("ac|weights|MTOW", units="lbm"), 172711.3034007032, tolerance=1e-4)
 
