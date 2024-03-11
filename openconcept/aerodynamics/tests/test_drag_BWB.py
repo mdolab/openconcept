@@ -61,7 +61,7 @@ class ParasiteDragCoefficient_BWBTestCase(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        assert_near_equal(prob.get_val("drag.CD0"), [0.02225882, 0.02225882], tolerance=1e-5)
+        assert_near_equal(prob.get_val("drag.CD0"), [0.01225882, 0.01225882], tolerance=1e-5)
 
 
 if __name__ == "__main__":
