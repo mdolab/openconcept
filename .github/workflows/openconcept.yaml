@@ -25,6 +25,8 @@ jobs:
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Set versions to test here ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         PYTHON_VERSION_OLDEST: ['3.8']
         PYTHON_VERSION_LATEST: ['3.11']
+        PIP_VERSION_OLDEST: ['23.0.1']  # pip>=23.1 cannot build the oldest OpenMDAO
+        SETUPTOOLS_VERSION_OLDEST: ['66.0.0']  # setuptools >= 67.0.0 can't build the oldest OpenMDAO
         NUMPY_VERSION_OLDEST: ['1.20']  # latest is most recent on PyPI
         SCIPY_VERSION_OLDEST: ['1.6.0']  # latest is most recent on PyPI
         OPENMDAO_VERSION_OLDEST: ['3.10']  # latest is most recent on PyPI
@@ -35,7 +37,7 @@ jobs:
       run:
         shell: bash -l {0}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Setup Python ${{ matrix.PYTHON_VERSION_OLDEST }}
       if: ${{ matrix.dep-versions == 'oldest' }}
       uses: conda-incubator/setup-miniconda@v2
@@ -53,12 +55,13 @@ jobs:
       if: ${{ matrix.dep-versions == 'oldest' }}
       run: |
         conda config --set always_yes yes
-        pip install numpy==${{ matrix.NUMPY_VERSION_OLDEST }} scipy==${{ matrix.SCIPY_VERSION_OLDEST }} openmdao==${{ matrix.OPENMDAO_VERSION_OLDEST }}
+        python -m pip install pip==${{ matrix.PIP_VERSION_OLDEST }} setuptools==${{ matrix.SETUPTOOLS_VERSION_OLDEST }} --upgrade wheel
+        pip install numpy==${{ matrix.NUMPY_VERSION_OLDEST }} scipy==${{ matrix.SCIPY_VERSION_OLDEST }} openmdao==${{ matrix.OPENMDAO_VERSION_OLDEST }} om-pycycle
     - name: Install dependencies (latest versions)
       if: ${{ matrix.dep-versions == 'latest' }}
       run: |
         conda config --set always_yes yes
-        pip install numpy scipy openmdao
+        pip install numpy scipy openmdao om-pycycle
 
     - name: Install OpenConcept
       run: |
@@ -86,7 +89,7 @@ jobs:
 
     - name: Upload coverage to Codecov
       if: ${{ matrix.os == 'ubuntu-latest' }}
-      uses: codecov/codecov-action@v2
+      uses: codecov/codecov-action@v3
       with:
         fail_ci_if_error: true
         token: ${{ secrets.CODECOV_TOKEN }}

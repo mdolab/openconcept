@@ -365,6 +365,7 @@ class VLMDragPolar(om.Group):
                 S={"units": "m**2"},
                 CD_wing={"shape": (nn,)},
                 CD_nonwing={"shape": (CD_nw_size,), "val": np.zeros(CD_nw_size)},
+                has_diag_partials=True,
             ),
             promotes_inputs=[("q", "fltcond|q"), ("S", "ac|geom|wing|S_ref"), ("CD_nonwing", "ac|aero|CD_nonwing")],
             promotes_outputs=["drag"],
@@ -644,7 +645,7 @@ def compute_aerodynamic_data(point):
     inputs = point[3]
 
     # Set up OpenAeroStruct problem
-    p = om.Problem()
+    p = om.Problem(reports=False)
     p.model.add_subsystem(
         "aero_analysis",
         VLM(

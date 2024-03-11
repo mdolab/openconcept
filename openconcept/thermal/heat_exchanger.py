@@ -1,5 +1,5 @@
 import numpy as np
-from openmdao.api import ExplicitComponent, IndepVarComp, Group
+from openmdao.api import ExplicitComponent, Group, AnalysisError
 from openconcept.utilities import DVLabel
 
 
@@ -264,7 +264,7 @@ class OffsetStripFinData(ExplicitComponent):
         fc_1 = inputs["alpha_cold"] ** -0.1856 * inputs["delta_cold"] ** 0.3053 * inputs["gamma_cold"] ** -0.2659
         fc_2 = inputs["alpha_cold"] ** 0.92 * inputs["delta_cold"] ** 3.767 * inputs["gamma_cold"] ** 0.236
         if np.min(inputs["Re_dh_cold"]) <= 0.0:
-            raise ValueError(self.msginfo, inputs["Re_dh_cold"])
+            raise AnalysisError(f"One of the Re numbers in {inputs['Re_dh_cold']} is negative", msginfo=self.msginfo)
         outputs["j_cold"] = (
             0.6522
             * inputs["Re_dh_cold"] ** -0.5403
@@ -682,7 +682,9 @@ class ConvectiveCoefficient(ExplicitComponent):
         outputs["h_conv_cold"] = inputs["Nu_dh_cold"] * inputs["k_cold"] / inputs["dh_cold"]
         outputs["h_conv_hot"] = inputs["Nu_dh_hot"] * inputs["k_hot"] / inputs["dh_hot"]
         if np.min(outputs["h_conv_cold"]) <= 0.0:
-            raise ValueError(self.msginfo)
+            raise AnalysisError(
+                f"One of the heat tranfer coeffcients in {outputs['h_conv_cold']} is negative", msginfo=self.msginfo
+            )
 
     def compute_partials(self, inputs, J):
         J["h_conv_cold", "Nu_dh_cold"] = inputs["k_cold"] / inputs["dh_cold"]
@@ -777,7 +779,9 @@ class FinEfficiency(ExplicitComponent):
 
         m_cold = np.sqrt(2 * h_c / k / t_f)
         if np.min(h_c) <= 0.0:
-            raise ValueError(self.msginfo)
+            raise AnalysisError(
+                f"One of the heat tranfer coeffcients in {inputs['h_conv_cold']} is negative", msginfo=self.msginfo
+            )
         eta_f_cold = 2 * np.tanh(m_cold * l_f_c / 2) / m_cold / l_f_c
         outputs["eta_overall_cold"] = 1 - inputs["fin_area_ratio_cold"] * (1 - eta_f_cold)
 
@@ -1393,37 +1397,37 @@ class HXGroup(Group):
     def setup(self):
         nn = self.options["num_nodes"]
 
-        iv = self.add_subsystem("dv", IndepVarComp(), promotes_outputs=["*"])
-        iv.add_output("case_thickness", val=2.0, units="mm")
-        iv.add_output("fin_thickness", val=0.102, units="mm")
-        iv.add_output("plate_thickness", val=0.2, units="mm")
-        iv.add_output("material_k", val=190, units="W/m/K")
-        iv.add_output("material_rho", val=2700, units="kg/m**3")
+        # Set the default values for promoted variables
+        self.set_input_defaults("case_thickness", val=2.0, units="mm")
+        self.set_input_defaults("fin_thickness", val=0.102, units="mm")
+        self.set_input_defaults("plate_thickness", val=0.2, units="mm")
+        self.set_input_defaults("material_k", val=190, units="W/m/K")
+        self.set_input_defaults("material_rho", val=2700, units="kg/m**3")
 
-        # iv.add_output('mdot_cold', val=np.ones(nn)*1.5, units='kg/s')
-        # iv.add_output('rho_cold', val=np.ones(nn)*0.5, units='kg/m**3')
-        # iv.add_output('mdot_hot', val=0.075*np.ones(nn), units='kg/s')
-        # iv.add_output('rho_hot', val=np.ones(nn)*1020.2, units='kg/m**3')
+        # self.set_input_defaults('mdot_cold', val=np.ones(nn)*1.5, units='kg/s')
+        # self.set_input_defaults('rho_cold', val=np.ones(nn)*0.5, units='kg/m**3')
+        # self.set_input_defaults('mdot_hot', val=0.075*np.ones(nn), units='kg/s')
+        # self.set_input_defaults('rho_hot', val=np.ones(nn)*1020.2, units='kg/m**3')
 
-        # iv.add_output('T_in_cold', val=np.ones(nn)*45, units='degC')
-        # iv.add_output('T_in_hot', val=np.ones(nn)*90, units='degC')
-        # iv.add_output('n_long_cold', val=3)
-        # iv.add_output('n_wide_cold', val=430)
-        # iv.add_output('n_tall', val=19)
+        # self.set_input_defaults('T_in_cold', val=np.ones(nn)*45, units='degC')
+        # self.set_input_defaults('T_in_hot', val=np.ones(nn)*90, units='degC')
+        # self.set_input_defaults('n_long_cold', val=3)
+        # self.set_input_defaults('n_wide_cold', val=430)
+        # self.set_input_defaults('n_tall', val=19)
 
-        iv.add_output("channel_height_cold", val=14, units="mm")
-        iv.add_output("channel_width_cold", val=1.35, units="mm")
-        iv.add_output("fin_length_cold", val=6, units="mm")
-        iv.add_output("cp_cold", val=1005, units="J/kg/K")
-        iv.add_output("k_cold", val=0.02596, units="W/m/K")
-        iv.add_output("mu_cold", val=1.789e-5, units="kg/m/s")
+        self.set_input_defaults("channel_height_cold", val=14, units="mm")
+        self.set_input_defaults("channel_width_cold", val=1.35, units="mm")
+        self.set_input_defaults("fin_length_cold", val=6, units="mm")
+        self.set_input_defaults("cp_cold", val=1005, units="J/kg/K")
+        self.set_input_defaults("k_cold", val=0.02596, units="W/m/K")
+        self.set_input_defaults("mu_cold", val=1.789e-5, units="kg/m/s")
 
-        iv.add_output("channel_height_hot", val=1, units="mm")
-        iv.add_output("channel_width_hot", val=1, units="mm")
-        iv.add_output("fin_length_hot", val=6, units="mm")
-        iv.add_output("cp_hot", val=3801, units="J/kg/K")
-        iv.add_output("k_hot", val=0.405, units="W/m/K")
-        iv.add_output("mu_hot", val=1.68e-3, units="kg/m/s")
+        self.set_input_defaults("channel_height_hot", val=1, units="mm")
+        self.set_input_defaults("channel_width_hot", val=1, units="mm")
+        self.set_input_defaults("fin_length_hot", val=6, units="mm")
+        self.set_input_defaults("cp_hot", val=3801, units="J/kg/K")
+        self.set_input_defaults("k_hot", val=0.405, units="W/m/K")
+        self.set_input_defaults("mu_hot", val=1.68e-3, units="kg/m/s")
 
         dvlist = [
             ["ac|propulsion|thermal|hx|n_wide_cold", "n_wide_cold", 430, None],
