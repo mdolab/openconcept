@@ -9,8 +9,8 @@ class JetTransportEmptyWeightTestCase(unittest.TestCase):
         """
         737-200 validation case. This is useful since Roskam has the component weight
         breakdown in the appendix. Parameter data from a combination of:
-            - Technical site: http://www.b737.org.uk/techspecsdetailed.htm
-            - Wikipedia: https://en.wikipedia.org/wiki/Boeing_737#Specifications
+        - Technical site: http://www.b737.org.uk/techspecsdetailed.htm
+        - Wikipedia: https://en.wikipedia.org/wiki/Boeing_737#Specifications
         """
         prob = om.Problem()
         prob.model = om.Group()

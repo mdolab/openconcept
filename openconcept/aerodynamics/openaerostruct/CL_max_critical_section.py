@@ -136,4 +136,7 @@ class CLmaxCriticalSectionVLM(om.Group):
             )
             self.linear_solver = om.DirectSolver()
         except AttributeError:
-            warnings.warn("OpenMDAO NonlinearSchurSolver is not available, CLmaxCriticalSectionVLM will be very slow!")
+            warnings.warn(
+                "OpenMDAO NonlinearSchurSolver is not available, CLmaxCriticalSectionVLM will be very slow!",
+                stacklevel=2,
+            )
