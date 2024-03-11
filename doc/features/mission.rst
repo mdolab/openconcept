@@ -65,7 +65,7 @@ Additional variables you need to set in the run script are
 - reserve range ``reserve_range`` and altitude ``reserve|h0``.
 - loiter duration ``loiter_duration`` and loiter altitude ``loiter|h0``.
 
-Full mission with reserve: ``MissionWithReserve``
+Full mission with reserve: ``FullMissionWithReserve``
 --------------------------------------------
 This mission combines ``FullMissionAnalysis`` and ``MissionWithReserve``, so it includes takeoff phases, climb, cruise, descent, and a reserve mission.
 Refer to the documentation for ``FullMissionAnalysis`` and ``MissionWithReserve`` to determine which parameters must be set.

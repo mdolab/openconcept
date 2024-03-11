@@ -34,7 +34,7 @@ A drag buildup can provide a first estimate of an aircraft's drag coefficient.
 It uses empirical estimates for the drag of individual components, such as the fuselage and engine, and sums them to predict the total drag.
 Empirical interference factors included in the summation account for drag caused by the interaction of components.
 
-In OpenConcept, the drag buildups return CD0, the zero-lift drag coefficient.
+In OpenConcept, the drag buildups return :math:`C_{D, 0}`, the zero-lift drag coefficient.
 Drag buildups for two configurations are included.
 For a conventional tube and wing configuration, use ``ParasiteDragCoefficient_JetTransport``.
 For a blended wing body configuration, use ``ParasiteDragCoefficient_JetTransport``.

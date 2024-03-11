@@ -35,9 +35,13 @@ This component computes the planform area of a wing defined in linearly-varying 
     Otherwise, the resulting wing area will be off by a factor.
 
 ``WingMACFromSections``
--------------------------
+------------------------
 This component computes the mean aerodynamic chord of a wing defined in linearly-varying piecewise sections in the spanwise direction.
 It returns both the mean aerodynamic chord and the longitudinal position of the mean aerodynamic chord's quarter chord.
 
 Other quantities
 ================
+
+``CylinderSurfaceArea``
+-----------------------
+Computes the surface area of a cylinder, which can be used to estimate, for example, the wetted area of a fuselage or engine nacelle.
