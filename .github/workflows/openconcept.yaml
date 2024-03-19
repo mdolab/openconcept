@@ -29,7 +29,7 @@ jobs:
         SETUPTOOLS_VERSION_OLDEST: ['66.0.0']  # setuptools >= 67.0.0 can't build the oldest OpenMDAO
         NUMPY_VERSION_OLDEST: ['1.20']  # latest is most recent on PyPI
         SCIPY_VERSION_OLDEST: ['1.6.0']  # latest is most recent on PyPI
-        OPENMDAO_VERSION_OLDEST: ['3.16']  # latest is most recent on PyPI
+        OPENMDAO_VERSION_OLDEST: ['3.17']  # latest is most recent on PyPI
       fail-fast: false
     env:
       OMP_NUM_THREADS: 1
