@@ -42,7 +42,7 @@ setup(
         # and the index.rst file in the docs when you change these
         "numpy>=1.20",
         "scipy>=1.6.0",
-        "openmdao >=3.10 <= 3.30",
+        "openmdao >=3.10, <=3.30",
     ],
     extras_require={
         "testing": ["pytest", "pytest-cov", "coverage", "openaerostruct", "parameterized"],
