@@ -37,7 +37,7 @@ Empirical interference factors included in the summation account for drag caused
 In OpenConcept, the drag buildups return :math:`C_{D, 0}`, the zero-lift drag coefficient.
 Drag buildups for two configurations are included.
 For a conventional tube and wing configuration, use ``ParasiteDragCoefficient_JetTransport``.
-For a blended wing body configuration, use ``ParasiteDragCoefficient_JetTransport``.
+For a blended wing body configuration, use ``ParasiteDragCoefficient_BWB`` (the BWB version **requires** the use of OpenAeroStruct to predict the wing and centerbody drag).
 This value can then be used either with the simple drag polar (``PolarDrag``) or one of the OpenAeroStruct-based drag models to add in the lift-induced component of drag.
 OpenAeroStruct already includes the zero-lift drag of the wing.
 To prevent double counting this drag, the ``ParasiteDragCoefficient_JetTransport`` has an option called ``include_wing``, which should be set to ``False`` when using OpenAeroStruct for drag prediction.
@@ -73,7 +73,7 @@ The aerodynamic mesh can be defined in one of three ways:
 
 More details on the inputs, outputs, and options are available in the source code documentation.
 
-Aerostructural model: ``AeroStructDragPolar``
+Aerostructural model: ``AerostructDragPolar``
 -----------------------------------------------------
 This model is similar to the VLM-based aerodynamic model, but it performs aerostructural analysis (that couples VLM and structural FEM) instead of aerodynamic analysis (just FEM).
 This means that we now consider the wing deformation due to aerodynamic loads, which is important for high aspect ratio wings.
@@ -107,7 +107,7 @@ Understanding the surrogate modeling
 
 OpenConcept uses surrogate models based on OpenAeroStruct analyses to reduce the computational cost for mission analysis.
 The surrogate models are trained in the 3D input space of Mach number, angle of attack, and altitude.
-The outputs of the surrogate models are CL and CD (and failure for ``AeroStructDragPolar``).
+The outputs of the surrogate models are CL and CD (and failure for ``AerostructDragPolar``).
 
 For more details about the surrogate models, see our `paper <https://mdolab.engin.umich.edu/bibliography/Adler2022d>`_.
 
@@ -132,7 +132,8 @@ The first step is to perform an OpenAeroStruct analysis of the wing.
 Next, the difference between the spanwise sectional lift coefficient computed by OpenAeroStruct and the associated :math:`C_{l, \text{max}}` is aggregated to smoothly compute the nearest point to stall.
 Finally, a solver varies OpenAeroStruct's angle of attack to drive the aggregated :math:`\max(C_l - C_{l, \text{max}})` to zero.
 A Newton solver is capable of this system, but it is very slow because it needs to invert the whole system's Jacobian.
-A better method is to use OpenMDAO's ``NonlinearSchurSolver``, but it may not be available in your OpenMDAO distribution.
+A better method is to use OpenMDAO's ``NonlinearSchurSolver``.
+At the time of writing this, it is available on `this OpenMDAO branch <https://github.com/ArshSaja/OpenMDAO/tree/Schur_solver_new>`_, but not in the main OpenMDAO repository.
 
 Other models
 ============

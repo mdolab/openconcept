@@ -134,9 +134,13 @@ class CLmaxCriticalSectionVLM(om.Group):
             self.nonlinear_solver = om.NonlinearSchurSolver(
                 groupNames=["aero", "sectional_CL_balance"], iprint=2, solve_subsystems=True
             )
-            self.linear_solver = om.DirectSolver()
+            self.linear_solver = om.LinearSchur()
         except AttributeError:
             warnings.warn(
                 "OpenMDAO NonlinearSchurSolver is not available, CLmaxCriticalSectionVLM will be very slow!",
                 stacklevel=2,
             )
+
+            # Add the Newton solver
+            self.nonlinear_solver = om.NewtonSolver(solve_subsystems=True, iprint=2, maxiter=10)
+            self.linear_solver = om.DirectSolver()

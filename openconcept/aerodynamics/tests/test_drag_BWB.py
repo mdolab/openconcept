@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openconcept.aerodynamics import ParasiteDragCoefficient_BWB
 
 
@@ -33,6 +33,9 @@ class ParasiteDragCoefficient_BWBTestCase(unittest.TestCase):
         # This does not include the wing so it shouldn't be a shock that it's a low
         assert_near_equal(prob.get_val("drag.CD0"), [0.00211192, 0.00211192], tolerance=1e-5)
 
+        partials = prob.check_partials(method="cs", compact_print=True, show_only_incorrect=False)
+        assert_check_partials(partials)
+
     def test_BWB_takeoff(self):
         prob = om.Problem()
         prob.model = om.Group()
@@ -62,6 +65,9 @@ class ParasiteDragCoefficient_BWBTestCase(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob.get_val("drag.CD0"), [0.01225882, 0.01225882], tolerance=1e-5)
+
+        partials = prob.check_partials(method="cs", compact_print=True, show_only_incorrect=False)
+        assert_check_partials(partials)
 
 
 if __name__ == "__main__":

@@ -418,7 +418,7 @@ class JetTransportEmptyWeight(om.Group):
                 V_pressurized={"units": "ft**3", "val": 1},
                 fus_height={"units": "ft", "val": 1},
                 fus_length={"units": "ft", "val": 1},
-                cabin_frac={"val": self.options["cabin_length_frac"]},
+                cabin_frac={"val": self.options["cabin_length_frac"], "constant": True},
             ),
             promotes_inputs=[("fus_height", "ac|geom|fuselage|height"), ("fus_length", "ac|geom|fuselage|length")],
         )

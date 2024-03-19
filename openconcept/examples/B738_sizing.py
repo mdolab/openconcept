@@ -175,7 +175,7 @@ class B738AircraftModel(om.Group):
         self.connect("fuel_burn_integ.fuel_burn", "weight_calc.fuel_burn")
 
 
-class B738MissionAnalysis(om.Group):
+class B738SizingMissionAnalysis(om.Group):
     """
     Group that performs mission analysis, geometry calculations, and operating empty weight estimate.
     """
@@ -412,40 +412,6 @@ class B738MissionAnalysis(om.Group):
         )
 
 
-def get_problem(num_nodes=11):
-    """
-    Get the Boeing 737-800 mission analysis OpenMDAO Problem with necessary solvers added.
-    The Problem has not been setup yet.
-
-    Parameters
-    ----------
-    num_nodes : int (optional)
-        Number of analysis points per phase of the mission, by default 11
-
-    Returns
-    -------
-    OpenMDAO Problem
-        Problem with B378MissionAnalysis as model and solvers defined
-    """
-    p = om.Problem()
-    p.model = B738MissionAnalysis(num_nodes=num_nodes)
-
-    # -------------- Add solvers --------------
-    p.model.nonlinear_solver = om.NewtonSolver()
-    p.model.nonlinear_solver.options["iprint"] = 2
-    p.model.nonlinear_solver.options["solve_subsystems"] = True
-    p.model.nonlinear_solver.options["maxiter"] = 20
-    p.model.nonlinear_solver.options["atol"] = 1e-9
-    p.model.nonlinear_solver.options["rtol"] = 1e-9
-
-    p.model.linear_solver = om.DirectSolver()
-
-    p.model.nonlinear_solver.linesearch = om.BoundsEnforceLS()
-    p.model.nonlinear_solver.linesearch.options["print_bound_enforce"] = False
-
-    return p
-
-
 def set_mission_profile(prob):
     """
     Set the parameters in the OpenMDAO problem that define the mission profile.
@@ -531,7 +497,7 @@ def plot_results(prob, filename=None):
     Parameters
     ----------
     prob : OpenMDAO Problem
-        Problem with B738MissionAnalysis model that has been run
+        Problem with B738SizingMissionAnalysis model that has been run
     filename : str (optional)
         Filename to save to, by default will show plot
     """
@@ -575,10 +541,28 @@ def plot_results(prob, filename=None):
 
 
 def run_738_sizing_analysis(num_nodes=21):
-    p = get_problem(num_nodes=num_nodes)
+    p = om.Problem()
+    p.model = B738SizingMissionAnalysis(num_nodes=num_nodes)
+
+    # -------------- Add solvers --------------
+    p.model.nonlinear_solver = om.NewtonSolver()
+    p.model.nonlinear_solver.options["iprint"] = 2
+    p.model.nonlinear_solver.options["solve_subsystems"] = True
+    p.model.nonlinear_solver.options["maxiter"] = 20
+    p.model.nonlinear_solver.options["atol"] = 1e-9
+    p.model.nonlinear_solver.options["rtol"] = 1e-9
+
+    p.model.linear_solver = om.DirectSolver()
+
+    p.model.nonlinear_solver.linesearch = om.BoundsEnforceLS()
+    p.model.nonlinear_solver.linesearch.options["print_bound_enforce"] = False
+
     p.setup()
+
     set_mission_profile(p)
+
     p.run_model()
+
     return p
 
 

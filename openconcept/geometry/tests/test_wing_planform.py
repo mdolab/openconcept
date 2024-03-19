@@ -103,6 +103,9 @@ class WingSweepFromSectionsTestCase(unittest.TestCase):
 
         assert_near_equal(p.get_val("c4sweep", units="deg"), 0.0)
 
+        partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
+        assert_check_partials(partials)
+
     def test_sweep(self):
         p = om.Problem()
         p.model.add_subsystem("comp", WingSweepFromSections(num_sections=2), promotes=["*"])
@@ -116,6 +119,9 @@ class WingSweepFromSectionsTestCase(unittest.TestCase):
 
         assert_near_equal(p.get_val("c4sweep", units="deg"), np.rad2deg(np.arctan(0.875)))
 
+        partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
+        assert_check_partials(partials)
+
     def test_sweep_three_sections(self):
         p = om.Problem()
         p.model.add_subsystem("comp", WingSweepFromSections(num_sections=3), promotes=["*"])
@@ -128,6 +134,9 @@ class WingSweepFromSectionsTestCase(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val("c4sweep", units="deg"), 15.78242912, tolerance=1e-8)
+
+        partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
+        assert_check_partials(partials)
 
     def test_indices(self):
         p = om.Problem()
@@ -144,6 +153,9 @@ class WingSweepFromSectionsTestCase(unittest.TestCase):
 
         assert_near_equal(p.get_val("c4sweep", units="deg"), -45)
 
+        partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
+        assert_check_partials(partials)
+
 
 class WingAreaFromSectionsTestCase(unittest.TestCase):
     def test_no_sweep(self):
@@ -158,6 +170,9 @@ class WingAreaFromSectionsTestCase(unittest.TestCase):
 
         assert_near_equal(p.get_val("S", units="m**2"), 2.0)
 
+        partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
+        assert_check_partials(partials)
+
     def test_sweep(self):
         p = om.Problem()
         p.model.add_subsystem("comp", WingAreaFromSections(num_sections=2), promotes=["*"])
@@ -170,6 +185,9 @@ class WingAreaFromSectionsTestCase(unittest.TestCase):
 
         assert_near_equal(p.get_val("S", units="m**2"), 1.5)
 
+        partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
+        assert_check_partials(partials)
+
     def test_sweep_three_sections(self):
         p = om.Problem()
         p.model.add_subsystem("comp", WingAreaFromSections(num_sections=3), promotes=["*"])
@@ -181,6 +199,9 @@ class WingAreaFromSectionsTestCase(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val("S", units="m**2"), 2.1)
+
+        partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
+        assert_check_partials(partials)
 
     def test_indices(self):
         p = om.Problem()
@@ -200,6 +221,9 @@ class WingAreaFromSectionsTestCase(unittest.TestCase):
 
         assert_near_equal(p.get_val("S", units="m**2"), 0.4)
 
+        partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
+        assert_check_partials(partials)
+
 
 class WingMACFromSectionsTestCase(unittest.TestCase):
     def test_rectangular(self):
@@ -218,6 +242,9 @@ class WingMACFromSectionsTestCase(unittest.TestCase):
 
         assert_near_equal(p.get_val("MAC", units="m"), 1.0)
         assert_near_equal(p.get_val("x_c4MAC", units="m"), 0.25)
+
+        partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
+        assert_check_partials(partials)
 
     def test_tapered(self):
         p = om.Problem()
@@ -242,6 +269,9 @@ class WingMACFromSectionsTestCase(unittest.TestCase):
         assert_near_equal(p.get_val("MAC", units="m"), MAC)
         assert_near_equal(p.get_val("x_c4MAC", units="m"), x_c4MAC)
 
+        partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
+        assert_check_partials(partials)
+
     def test_tapered_swept(self):
         p = om.Problem()
         p.model.add_subsystem("comp", WingMACFromSections(num_sections=2), promotes=["*"])
@@ -264,6 +294,9 @@ class WingMACFromSectionsTestCase(unittest.TestCase):
 
         assert_near_equal(p.get_val("MAC", units="m"), MAC)
         assert_near_equal(p.get_val("x_c4MAC", units="m"), x_c4MAC)
+
+        partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
+        assert_check_partials(partials)
 
     def test_indices(self):
         p = om.Problem()
@@ -289,6 +322,9 @@ class WingMACFromSectionsTestCase(unittest.TestCase):
 
         assert_near_equal(p.get_val("MAC", units="m"), MAC)
         assert_near_equal(p.get_val("x_c4MAC", units="m"), x_c4MAC)
+
+        partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
+        assert_check_partials(partials)
 
 
 if __name__ == "__main__":
