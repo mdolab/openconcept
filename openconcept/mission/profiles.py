@@ -452,4 +452,3 @@ class FullMissionAnalysis(FullMissionWithReserve):
 
     def __init__(self, **kwargs):
         super().__init__(include_takeoff=True, include_reserve=False, **kwargs)
-
