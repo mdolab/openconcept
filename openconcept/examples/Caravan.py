@@ -144,8 +144,8 @@ def run_caravan_analysis():
     prob.model.nonlinear_solver = om.NewtonSolver(iprint=2, solve_subsystems=True)
     prob.model.linear_solver = om.DirectSolver()
     prob.model.nonlinear_solver.options["maxiter"] = 20
-    prob.model.nonlinear_solver.options["atol"] = 1e-6
-    prob.model.nonlinear_solver.options["rtol"] = 1e-6
+    prob.model.nonlinear_solver.options["atol"] = 1e-10
+    prob.model.nonlinear_solver.options["rtol"] = 1e-10
     prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement="scalar", print_bound_enforce=False)
     prob.setup(check=True, mode="fwd")
 
