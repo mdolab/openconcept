@@ -125,7 +125,10 @@ class WingSweepFromSections(om.ExplicitComponent):
     """
     Compute the average quarter chord sweep angle weighted by section areas
     by taking in sectional parameters as they would be defined for a
-    sectional OpenAeroStruct mesh.
+    sectional OpenAeroStruct mesh. The actual average is of the cosine of
+    the sweep angle, rather than the angle itself. This means that it will
+    always return a positive sweep angle (because it does an arccos), even
+    if the wing is forward swept.
 
     Inputs
     ------
@@ -145,7 +148,10 @@ class WingSweepFromSections(om.ExplicitComponent):
     Outputs
     -------
     c4sweep : float
-        Average quarter chord sweep, weighted by section areas (scalar, deg)
+        Average quarter chord sweep, computed as the weighted average of
+        cos(section sweep angle) by section areas and then arccos of the
+        resulting quantity. This means it does not discriminate between
+        forward and backward sweep angles (scalar, deg)
 
     Options
     -------
@@ -193,11 +199,14 @@ class WingSweepFromSections(om.ExplicitComponent):
         x_c4 = LE_sec + chord_sec * 0.25
         widths = y_sec[1:] - y_sec[:-1]  # section width in y direction
         setback = x_c4[:-1] - x_c4[1:]  # relative offset of sections in streamwise direction
-        c4sweep_sec = np.arctan(setback / widths) * 180 / np.pi
+        to_rad = np.pi / 180
+        c4sweep_sec = np.arctan(setback / widths) / to_rad
 
-        # Perform a weighted average with panel areas as weights
+        # Perform a weighted average with panel areas as weights. Do the weighted average
+        # on the cosine of the sweep angle rather than the angle itself.
+        # This is consistent with OpenAeroStruct.
         A_sec = 0.5 * (chord_sec[:-1] + chord_sec[1:]) * widths
-        outputs["c4sweep"] = np.sum(c4sweep_sec * A_sec) / np.sum(A_sec)
+        outputs["c4sweep"] = np.arccos(np.sum(np.cos(c4sweep_sec * to_rad) * A_sec) / np.sum(A_sec)) / to_rad
 
 
 class WingAreaFromSections(om.ExplicitComponent):

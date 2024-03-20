@@ -133,7 +133,7 @@ class WingSweepFromSectionsTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val("c4sweep", units="deg"), 15.78242912, tolerance=1e-8)
+        assert_near_equal(p.get_val("c4sweep", units="deg"), 43.1348109, tolerance=1e-8)
 
         partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
         assert_check_partials(partials)
@@ -151,7 +151,7 @@ class WingSweepFromSectionsTestCase(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(p.get_val("c4sweep", units="deg"), -45)
+        assert_near_equal(p.get_val("c4sweep", units="deg"), 45)
 
         partials = p.check_partials(method="cs", step=1e-125, out_stream=None)
         assert_check_partials(partials)
