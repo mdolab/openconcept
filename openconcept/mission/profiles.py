@@ -43,6 +43,7 @@ class FullMissionWithReserve(TrajectoryGroup):
         acmodelclass = self.options["aircraft_model"]
 
         mp = self.add_subsystem("missionparams", om.IndepVarComp(), promotes_outputs=["*"])
+        # WARNING! takeoff|h does not work correctly. Best to leave it at 0.
         mp.add_output("takeoff|h", val=0.0, units="ft")
         mp.add_output("cruise|h0", val=28000.0, units="ft")
         mp.add_output("mission_range", val=1250.0, units="NM")
@@ -55,7 +56,6 @@ class FullMissionWithReserve(TrajectoryGroup):
         if not self.include_reserve and not self.include_takeoff:  # BasicMission
             mp.add_output("takeoff|v2", val=150.0, units="kn")
 
-        # TODO: Connect takeoff|h to the fltcond|h input of the takeoff phases
         if self.include_takeoff:
             # add the four balanced field length takeoff phases and the implicit v1 solver
             # v0v1 - from a rolling start to v1 speed
@@ -329,7 +329,9 @@ class MissionWithReserve(FullMissionWithReserve):
     ac|* : various
         All relevant airplane design variables to pass to the airplane model
     takeoff|h : float
-        Takeoff obstacle clearance height (default 50 ft)
+        Takeoff altitude. WARNING: This does not work as you might expect, look at the source
+        code to make sure it does what you want if you plan to vary it. It is usually the
+        altitude and the beginning and end of the mission.
     cruise|h0 : float
         Initial cruise altitude (default 28000 ft)
     payload : float
@@ -375,7 +377,9 @@ class BasicMission(FullMissionWithReserve):
     ac|* : various
         All relevant airplane design variables to pass to the airplane model
     takeoff|h : float
-        Takeoff obstacle clearance height (default 50 ft)
+        Takeoff altitude. WARNING: This does not work as you might expect, look at the source
+        code to make sure it does what you want if you plan to vary it. It is usually the
+        altitude and the beginning and end of the mission.
     cruise|h0 : float
         Initial cruise altitude (default 28000 ft)
     payload : float
@@ -425,7 +429,10 @@ class FullMissionAnalysis(FullMissionWithReserve):
     ac|* : various
         All relevant airplane design variables to pass to the airplane model
     takeoff|h : float
-        Takeoff obstacle clearance height (default 50 ft)
+        Takeoff altitude. WARNING: This does not work as you might expect, look at the source
+        code to make sure it does what you want if you plan to vary it. It is the
+        altitude and the beginning and end of the mission, but if you change it it might
+        mess up the altitudes in the rotation phase.
     cruise|h0 : float
         Initial cruise altitude (default 28000 ft)
     payload : float

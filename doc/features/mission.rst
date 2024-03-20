@@ -24,7 +24,6 @@ This is a basic climb-cruise-descent mission for a fixed-wing aircraft.
 
 For this mission, users should specify the following variables in the run script:
 
-- takeoff altitude ``takeoff|h0``, default is 0 ft.
 - cruise altitude ``cruise|h0``.
 - mission range ``mission_range``.
 - payload weight ``payload``.
