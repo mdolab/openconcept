@@ -20,6 +20,7 @@ class FullMissionWithReserve(TrajectoryGroup):
     This acts as the main group that includes all the features of FullMissionAnalysis, BasicMission, and
     MissionWithReserve profiles so that those can inherit from this without duplicating code.
     """
+
     def __init__(self, include_takeoff=True, include_reserve=True, **kwargs):
         self.include_takeoff = include_takeoff  # include flight phases associated with takeoff
         self.include_reserve = include_reserve  # include flight phases associated with reserve mission
@@ -31,7 +32,9 @@ class FullMissionWithReserve(TrajectoryGroup):
         )
         self.options.declare("aircraft_model", default=None, desc="OpenConcept-compliant airplane model")
         if self.include_takeoff:
-            self.options.declare("transition_method", default="simplified", desc="Method to use for computing transition")
+            self.options.declare(
+                "transition_method", default="simplified", desc="Method to use for computing transition"
+            )
         if not self.include_reserve and not self.include_takeoff:  # BasicMission
             self.options.declare("include_ground_roll", default=False, desc="Whether to include groundroll phase")
 
@@ -449,3 +452,4 @@ class FullMissionAnalysis(FullMissionWithReserve):
 
     def __init__(self, **kwargs):
         super().__init__(include_takeoff=True, include_reserve=False, **kwargs)
+
