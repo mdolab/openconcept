@@ -88,4 +88,11 @@ It uses either a fractional or fixed split method where fractional splits the in
 The efficiency can be changed from the default of 100%, which results in some heat being generated.
 Cost and weight are modeled as linear functions of the power rating.
 
+Rubber turbofan: ``RubberizedTurbofan``
+---------------------------------------
+
+This model enables the pyCycle-based CFM56 and N+3 turbofan models to be scaled to different thrust ratings.
+The scaling is done by multiplying thrust and fuel flow by the same value.
+The model also has an option to use hydrogen, which scales the fuel flow to maintain the same thrust-specific energy consumption (see :footcite:t:`Adler2023` for a definition) as the kerosene-powered CFM56 and N+3 engine models.
+
 .. footbibliography::

@@ -80,7 +80,8 @@ class VLMDragPolar(om.Group):
     ac|aero|CD_nonwing : float
         Drag coefficient of components other than the wing; e.g. fuselage,
         tail, interference drag, etc.; this value is simply added to the
-        drag coefficient computed by OpenAeroStruct (scalar, dimensionless)
+        drag coefficient computed by OpenAeroStruct (vector if vec_CD_nonwing
+        option is set to True and scalar otherwise, dimensionless)
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
         NOTE: fltcond|TempIncrement is a scalar in this component but a vector in OC. \
@@ -148,6 +149,9 @@ class VLMDragPolar(om.Group):
         Number of spline control points for twist, only used if geometry is set to \"trapezoidal\" because
         \"mesh\" linearly interpolates twist between sections and \"mesh\" does not provide twist
         functionality (scalar, dimensionless)
+    vec_CD_nonwing : bool
+        Set to True if ac|aero|CD_nonwing is passed in as a vector of length num_nodes, otherwise
+        set to False and it will be set as a scalar value, by default False
     alpha_train : list or ndarray
         List of angle of attack values at which to train the model (ndarray, degrees)
     Mach_train : list or ndarray
@@ -182,6 +186,9 @@ class VLMDragPolar(om.Group):
             "num_sections", default=2, types=int, desc="Number of sections along the half span to define"
         )
         self.options.declare("num_twist", default=4, desc="Number of twist spline control points")
+        self.options.declare(
+            "vec_CD_nonwing", default=False, types=bool, desc="Take in CD_nonwing input as a vector of length num_nodes"
+        )
         self.options.declare(
             "Mach_train",
             default=np.array([0.1, 0.3, 0.45, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9]),
@@ -302,7 +309,7 @@ class VLMDragPolar(om.Group):
 
         # Inputs to promote from the calls to OpenAeroStruct (if geometry is "mesh",
         # promote the thickness-to-chord ratio directly)
-        VLM_promote_inputs = ["ac|aero|CD_nonwing", "fltcond|TempIncrement"]
+        VLM_promote_inputs = ["fltcond|TempIncrement"]
         if geo == "mesh":
             VLM_promote_inputs += ["ac|geom|wing|toverc", "ac|geom|wing|OAS_mesh"]
         else:
@@ -348,20 +355,22 @@ class VLMDragPolar(om.Group):
         self.connect("aero_surrogate.CL", "alpha_bal.CL_VLM")
 
         # Compute drag force from drag coefficient
+        CD_nw_size = nn if self.options["vec_CD_nonwing"] else 1
         self.add_subsystem(
             "drag_calc",
             om.ExecComp(
-                "drag = q * S * CD",
+                "drag = q * S * (CD_wing + CD_nonwing)",
                 drag={"units": "N", "shape": (nn,)},
                 q={"units": "Pa", "shape": (nn,)},
                 S={"units": "m**2"},
-                CD={"shape": (nn,)},
+                CD_wing={"shape": (nn,)},
+                CD_nonwing={"shape": (CD_nw_size,), "val": np.zeros(CD_nw_size)},
                 has_diag_partials=True,
             ),
-            promotes_inputs=[("q", "fltcond|q"), ("S", "ac|geom|wing|S_ref")],
+            promotes_inputs=[("q", "fltcond|q"), ("S", "ac|geom|wing|S_ref"), ("CD_nonwing", "ac|aero|CD_nonwing")],
             promotes_outputs=["drag"],
         )
-        self.connect("aero_surrogate.CD", "drag_calc.CD")
+        self.connect("aero_surrogate.CD", "drag_calc.CD_wing")
 
         # Set input defaults for inputs promoted from different places with different values
         self.set_input_defaults("ac|geom|wing|S_ref", 1.0, units="m**2")
@@ -383,10 +392,6 @@ class VLMDataGen(om.ExplicitComponent):
         Thickness to chord ratio of each streamwise strip of panels ordered from wing
         tip to wing root; used for the viscous and wave drag calculations
         (vector of length num_y, dimensionless)
-    ac|aero|CD_nonwing : float
-        Drag coefficient of components other than the wing; e.g. fuselage,
-        tail, interference drag, etc.; this value is simply added to the
-        drag coefficient computed by OpenAeroStruct (scalar, dimensionless)
     fltcond|TempIncrement : float
         Temperature increment for non-standard day (scalar, degC)
 
@@ -444,7 +449,6 @@ class VLMDataGen(om.ExplicitComponent):
 
         self.add_input("ac|geom|wing|OAS_mesh", units="m", shape=(nx + 1, ny + 1, 3))
         self.add_input("ac|geom|wing|toverc", shape=(ny,), val=0.12)
-        self.add_input("ac|aero|CD_nonwing", val=0.0)
         self.add_input("fltcond|TempIncrement", val=0.0, units="degC")
 
         n_Mach = self.options["Mach_train"].size
@@ -490,7 +494,6 @@ class VLMDataGen(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         mesh = inputs["ac|geom|wing|OAS_mesh"]
         toverc = inputs["ac|geom|wing|toverc"]
-        CD_nonwing = inputs["ac|aero|CD_nonwing"]
         temp_incr = inputs["fltcond|TempIncrement"]
 
         # If the inputs are unchaged, use the previously calculated values
@@ -501,7 +504,7 @@ class VLMDataGen(om.ExplicitComponent):
             and np.abs(temp_incr - VLMDataGen.temp_incr) < tol
         ):
             outputs["CL_train"] = VLMDataGen.CL
-            outputs["CD_train"] = VLMDataGen.CD + CD_nonwing
+            outputs["CD_train"] = VLMDataGen.CD
             return
 
         # Copy new values to cached ones
@@ -525,14 +528,13 @@ class VLMDataGen(om.ExplicitComponent):
         VLMDataGen.CD[:] = data["CD"]
         VLMDataGen.partials = copy(data["partials"])
         outputs["CL_train"] = VLMDataGen.CL
-        outputs["CD_train"] = VLMDataGen.CD + CD_nonwing
+        outputs["CD_train"] = VLMDataGen.CD
 
     def compute_partials(self, inputs, partials):
         # Compute partials if they haven't been already and return them
         self.compute(inputs, {})
         for key, value in VLMDataGen.partials.items():
             partials[key][:] = value
-        partials["CD_train", "ac|aero|CD_nonwing"] = np.ones(VLMDataGen.CD.shape)
 
 
 """

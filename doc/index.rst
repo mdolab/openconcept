@@ -64,8 +64,8 @@ OpenConcept is tested regularly on builds with the oldest and latest supported p
      - 3.8
      - 3.11
    * - OpenMDAO
-     - 3.10
-     - latest
+     - 3.21
+     - 3.30
    * - NumPy
      - 1.20
      - latest
@@ -137,8 +137,10 @@ Eytan J. Adler and Joaquim R.R.A. Martins, "Efficient Aerostructural Wing Optimi
    features/atmospherics.rst
    features/costs.rst
    features/energy_storage.rst
+   features/geometry.rst
    features/mission.rst
    features/propulsion.rst
+   features/stability.rst
    features/thermal.rst
    features/weights.rst
    features/utilities.rst

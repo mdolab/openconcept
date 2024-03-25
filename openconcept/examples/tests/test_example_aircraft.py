@@ -11,6 +11,7 @@ from openconcept.examples.ElectricSinglewithThermal import run_electricsingle_an
 from openconcept.examples.N3_HybridSingleAisle_Refrig import run_hybrid_sa_analysis
 from openconcept.examples.minimal import setup_problem as setup_minimal_problem
 from openconcept.examples.minimal_integrator import MissionAnalysisWithFuelBurn as MinimalIntegratorMissionAnalysis
+from openconcept.examples.B738_sizing import run_738_sizing_analysis
 
 try:
     from openconcept.examples.B738_VLM_drag import run_738_analysis as run_738VLM_analysis
@@ -151,6 +152,28 @@ class B738TestCase(unittest.TestCase):
         # total fuel
         assert_near_equal(prob.get_val("loiter.fuel_used_final", units="lbm"), 34424.68533072, tolerance=3e-4)
         # changelog: 9/2020 - previously 34555.313, updated CFM surrogate model to reject spurious high Mach, low altitude points
+
+
+class B738SizingTestCase(unittest.TestCase):
+    def setUp(self):
+        self.prob = run_738_sizing_analysis(num_nodes=5)
+
+    def test_values_B738(self):
+        prob = self.prob
+        # block fuel
+        assert_near_equal(
+            prob.get_val("mission.descent.fuel_burn_integ.fuel_burn_final", units="lbm"),
+            35213.7673772348,
+            tolerance=1e-4,
+        )
+        # total fuel
+        assert_near_equal(
+            prob.get_val("mission.loiter.fuel_burn_integ.fuel_burn_final", units="lbm"),
+            40991.187944303405,
+            tolerance=1e-4,
+        )
+        # MTOW
+        assert_near_equal(prob.get_val("ac|weights|MTOW", units="lbm"), 172711.3034007032, tolerance=1e-4)
 
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")

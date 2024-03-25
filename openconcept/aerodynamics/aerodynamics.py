@@ -32,26 +32,30 @@ class PolarDrag(ExplicitComponent):
     -------
     num_nodes : int
         Number of analysis points to run (sets vec length) (default 1)
+    vec_CD0 : bool
+        Take in zero-lift drag coefficient as a vector of length num_nodes,
+        otherwise take in as a scalar; by default False
     """
 
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of nodes to compute")
+        self.options.declare("vec_CD0", default=False, types=bool, desc="Take CD0 in as a vector")
 
     def setup(self):
         nn = self.options["num_nodes"]
+        vec_CD0 = self.options["vec_CD0"]
         arange = np.arange(0, nn)
         self.add_input("fltcond|CL", shape=(nn,))
         self.add_input("fltcond|q", units="N * m**-2", shape=(nn,))
         self.add_input("ac|geom|wing|S_ref", units="m **2")
-        self.add_input("CD0")
+        self.add_input("CD0", shape=(nn,) if vec_CD0 else (1,))
         self.add_input("e")
         self.add_input("ac|geom|wing|AR")
         self.add_output("drag", units="N", shape=(nn,))
 
         self.declare_partials(["drag"], ["fltcond|CL", "fltcond|q"], rows=arange, cols=arange)
-        self.declare_partials(
-            ["drag"], ["ac|geom|wing|S_ref", "ac|geom|wing|AR", "CD0", "e"], rows=arange, cols=np.zeros(nn)
-        )
+        self.declare_partials(["drag"], ["ac|geom|wing|S_ref", "ac|geom|wing|AR", "e"], rows=arange, cols=np.zeros(nn))
+        self.declare_partials(["drag"], ["CD0"], rows=arange, cols=arange if vec_CD0 else np.zeros(nn))
 
     def compute(self, inputs, outputs):
         outputs["drag"] = (

@@ -324,8 +324,8 @@ def configure_problem(num_nodes):
     prob.model.nonlinear_solver = om.NewtonSolver(iprint=2, solve_subsystems=True)
     prob.model.linear_solver = om.DirectSolver()
     prob.model.nonlinear_solver.options["maxiter"] = 10
-    prob.model.nonlinear_solver.options["atol"] = 1e-6
-    prob.model.nonlinear_solver.options["rtol"] = 1e-6
+    prob.model.nonlinear_solver.options["atol"] = 1e-10
+    prob.model.nonlinear_solver.options["rtol"] = 1e-10
     prob.model.nonlinear_solver.options["err_on_non_converge"] = True
     prob.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement="scalar", print_bound_enforce=True)
 

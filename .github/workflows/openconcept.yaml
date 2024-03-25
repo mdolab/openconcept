@@ -29,7 +29,7 @@ jobs:
         SETUPTOOLS_VERSION_OLDEST: ['66.0.0']  # setuptools >= 67.0.0 can't build the oldest OpenMDAO
         NUMPY_VERSION_OLDEST: ['1.20']  # latest is most recent on PyPI
         SCIPY_VERSION_OLDEST: ['1.6.0']  # latest is most recent on PyPI
-        OPENMDAO_VERSION_OLDEST: ['3.10']  # latest is most recent on PyPI
+        OPENMDAO_VERSION_OLDEST: ['3.21']  # latest is most recent on PyPI
       fail-fast: false
     env:
       OMP_NUM_THREADS: 1
@@ -56,7 +56,7 @@ jobs:
       run: |
         conda config --set always_yes yes
         python -m pip install pip==${{ matrix.PIP_VERSION_OLDEST }} setuptools==${{ matrix.SETUPTOOLS_VERSION_OLDEST }} --upgrade wheel
-        pip install numpy==${{ matrix.NUMPY_VERSION_OLDEST }} scipy==${{ matrix.SCIPY_VERSION_OLDEST }} openmdao==${{ matrix.OPENMDAO_VERSION_OLDEST }} om-pycycle
+        pip install numpy==${{ matrix.NUMPY_VERSION_OLDEST }} scipy==${{ matrix.SCIPY_VERSION_OLDEST }} om-pycycle
     - name: Install dependencies (latest versions)
       if: ${{ matrix.dep-versions == 'latest' }}
       run: |
@@ -67,6 +67,11 @@ jobs:
       run: |
         pip install -e .[testing]
         pip install -e .[docs]
+
+    - name: Install oldest OpenMDAO versions
+      if: ${{ matrix.dep-versions == 'oldest' }}
+      run: |
+        pip install openmdao==${{ matrix.OPENMDAO_VERSION_OLDEST }}
 
     - name: List Python and package info
       run: |

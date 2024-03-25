@@ -5,7 +5,6 @@ Energy Storage
 **************
 
 This module contains components that can store energy.
-For now this consists only of battery models, but hydrogen tanks would go here too, for example.
 
 Battery models
 ==============
@@ -26,3 +25,13 @@ This is not automatically forced to be less than one, so the user is responsible
 
 This component uses the same model as the ``SimpleBattery``, but adds an integrator to compute the state of charge (from 0.0 to 1.0).
 By default, it starts at a state of charge of 1.0 (100% charge).
+
+Hydrogen tank model
+===================
+
+``LH2TankNoBoilOff``
+--------------------
+
+This provides a physics-based structural weight model of a liquid hydrogen tank.
+It includes an integrator for computing the current mass of LH2 inside the tank.
+For details, see the source code.

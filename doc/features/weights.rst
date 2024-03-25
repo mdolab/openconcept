@@ -5,8 +5,41 @@ Weights
 *******
 
 This module provides empty weight approximations using mostly empirical textbook methods.
-For now there are only models for small turboprop-sized aircraft, but more may be added in the future.
 Component positions within the aircraft are not considered; all masses are accumulated into a single number.
+
+Conventional jet transport aircraft OEW: ``JetTransportEmptyWeight``
+====================================================================
+
+This model combines estimates from :footcite:t:`raymer2006aircraft`, :footcite:t:`roskam2019airplane`, and others to estimate the operating empty weight of a jet transport aircraft.
+The model includes two correction factor options: ``structural_fudge`` that multiplies structural weights and another ``total_fudge`` which multiplies the final total weight.
+A complete list of the required inputs and outputs can be found in OpenConcept's API documentation, and more details are available in the source code.
+
+This model uses the following components from the `openconcept.weights` module to estimate the total empty weight:
+
+- ``WingWeight_JetTransport``
+- ``HstabConst_JetTransport``
+- ``HstabWeight_JetTransport``
+- ``VstabWeight_JetTransport``
+- ``FuselageKws_JetTransport``
+- ``FuselageWeight_JetTransport``
+- ``MainLandingGearWeight_JetTransport``
+- ``NoseLandingGearWeight_JetTransport``
+- ``EngineWeight_JetTransport``
+- ``EngineSystemsWeight_JetTransport``
+- ``NacelleWeight_JetTransport``
+- ``FurnishingWeight_JetTransport``
+- ``EquipmentWeight_JetTransport``
+
+Blended wing body jet OEW: ``BWBEmptyWeight``
+=============================================
+
+This blended wing body empty weight model is a modified version of the ``JetTransportEmptyWeight`` buildup.
+It contains the following changes from the conventional configuration jet transport empty weight buildup:
+
+- Separate model for the weight of the pressurized portion of the centerbody for passengers or cargo (``CabinWeight_BWB`` component)
+- Separate model for the weight of the unpressurized portion of the centerbody behind the passengers or cargo (``AftbodyWeight_BWB`` component)
+- Removed fuselage and tail weights
+
 
 Single-engine turboprop OEW: ``SingleTurboPropEmptyWeight``
 ===========================================================

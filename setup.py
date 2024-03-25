@@ -42,10 +42,10 @@ setup(
         # and the index.rst file in the docs when you change these
         "numpy>=1.20",
         "scipy>=1.6.0",
-        "openmdao>=3.10",
+        "openmdao >=3.21, <=3.30",
     ],
     extras_require={
-        "testing": ["pytest", "pytest-cov", "coverage", "openaerostruct"],
+        "testing": ["pytest", "pytest-cov", "coverage", "openaerostruct", "parameterized"],
         "docs": ["sphinx_mdolab_theme", "openaerostruct"],
         "plot": ["matplotlib"],
     },
