@@ -57,7 +57,7 @@ jobs:
         conda config --set always_yes yes
         python -m pip install pip==${{ matrix.PIP_VERSION_OLDEST }} setuptools==${{ matrix.SETUPTOOLS_VERSION_OLDEST }} --upgrade wheel
         conda install -c conda-forge numpy=${{ matrix.NUMPY_VERSION_OLDEST }}
-        pip install scipy=${{ matrix.SCIPY_VERSION_OLDEST }} om-pycycle
+        pip install scipy==${{ matrix.SCIPY_VERSION_OLDEST }} om-pycycle
     - name: Install dependencies (latest versions)
       if: ${{ matrix.dep-versions == 'latest' }}
       run: |
