@@ -28,7 +28,7 @@ jobs:
         PIP_VERSION_OLDEST: ['23.0.1']  # pip>=23.1 cannot build the oldest OpenMDAO
         SETUPTOOLS_VERSION_OLDEST: ['66.0.0']  # setuptools >= 67.0.0 can't build the oldest OpenMDAO
         NUMPY_VERSION_OLDEST: ['1.20']  # latest is most recent on PyPI
-        SCIPY_VERSION_OLDEST: ['1.6.0']  # latest is most recent on PyPI
+        SCIPY_VERSION_OLDEST: ['1.7.0']  # latest is most recent on PyPI
         OPENMDAO_VERSION_OLDEST: ['3.21']  # latest is most recent on PyPI
       fail-fast: false
     env:
@@ -51,13 +51,11 @@ jobs:
         auto-update-conda: true
         python-version: ${{ matrix.PYTHON_VERSION_LATEST }}
 
-    # include the nomkl when installing from conda since it seems that MKL does not work on the ARM Mac environments
     - name: Install dependencies (oldest versions)
       if: ${{ matrix.dep-versions == 'oldest' }}
       run: |
         conda config --set always_yes yes
         python -m pip install pip==${{ matrix.PIP_VERSION_OLDEST }} setuptools==${{ matrix.SETUPTOOLS_VERSION_OLDEST }} --upgrade wheel
-        conda install nomkl
         conda install -c conda-forge numpy=${{ matrix.NUMPY_VERSION_OLDEST }} scipy=${{ matrix.SCIPY_VERSION_OLDEST }}
         pip install om-pycycle
     - name: Install dependencies (latest versions)
