@@ -41,7 +41,7 @@ setup(
         # Update the oldest package versions in the GitHub Actions build file, the readme,
         # and the index.rst file in the docs when you change these
         "numpy>=1.20",
-        "scipy>=1.6.0",
+        "scipy>=1.7.0",
         "openmdao >=3.21, <=3.30",
     ],
     extras_require={
