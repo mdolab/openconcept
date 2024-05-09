@@ -51,11 +51,13 @@ jobs:
         auto-update-conda: true
         python-version: ${{ matrix.PYTHON_VERSION_LATEST }}
 
+    # include the nomkl when installing from conda since it seems that MKL does not work on the ARM Mac environments
     - name: Install dependencies (oldest versions)
       if: ${{ matrix.dep-versions == 'oldest' }}
       run: |
         conda config --set always_yes yes
         python -m pip install pip==${{ matrix.PIP_VERSION_OLDEST }} setuptools==${{ matrix.SETUPTOOLS_VERSION_OLDEST }} --upgrade wheel
+        conda install nomkl
         conda install -c conda-forge numpy=${{ matrix.NUMPY_VERSION_OLDEST }} scipy=${{ matrix.SCIPY_VERSION_OLDEST }}
         pip install om-pycycle
     - name: Install dependencies (latest versions)
