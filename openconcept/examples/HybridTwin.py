@@ -322,7 +322,6 @@ def show_outputs(prob):
             phases,
             x_label=x_label,
             y_labels=y_labels,
-            marker="-",
             plot_title="Takeoff Profile",
         )
 

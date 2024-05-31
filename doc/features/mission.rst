@@ -42,7 +42,7 @@ The additional takeoff phases are:
 - ``v0v1``: from a standstill to decision speed (v1). An instance of ``GroundRollPhase``.
 - ``v1vr``: from v1 to rotation. An instance of ``GroundRollPhase``.
 - ``rotate``: rotation in the air before steady climb. An instance of ``RotationPhase`` or ``RobustRotationPhase``.
-- ``v1vr``: energency stopping from v1 to a stop. An instance of ``GroundRollPhase``.
+- ``v1v0``: energency stopping from v1 to a stop. An instance of ``GroundRollPhase``.
 
 We use ``BLIImplicitSolve`` to solve for the decision speed ``v1`` where the one-engine-out takeoff distance is equal to the braking distance for rejected takeoff.
 
