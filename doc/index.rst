@@ -68,7 +68,7 @@ OpenConcept is tested regularly on builds with the oldest and latest supported p
      - 3.30
    * - NumPy
      - 1.20
-     - latest
+     - 1.26
    * - SciPy
      - 1.7.0
      - latest
