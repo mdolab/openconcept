@@ -40,9 +40,9 @@ setup(
     install_requires=[
         # Update the oldest package versions in the GitHub Actions build file, the readme,
         # and the index.rst file in the docs when you change these
-        "numpy >=1.20, <=1.26",  # OpenMDAO is not compatible with NumPy v2
+        "numpy >=1.20",
         "scipy>=1.7.0",
-        "openmdao >=3.21, <=3.30",
+        "openmdao >=3.21",
     ],
     extras_require={
         "testing": ["pytest", "pytest-cov", "coverage", "openaerostruct", "parameterized"],
