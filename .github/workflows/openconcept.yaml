@@ -24,7 +24,7 @@ jobs:
         dep-versions: ["oldest", "latest"]
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Set versions to test here ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         PYTHON_VERSION_OLDEST: ['3.8']
-        PYTHON_VERSION_LATEST: ['3.12']
+        PYTHON_VERSION_LATEST: ['3.11']
         PIP_VERSION_OLDEST: ['23.0.1']  # pip>=23.1 cannot build the oldest OpenMDAO
         SETUPTOOLS_VERSION_OLDEST: ['66.0.0']  # setuptools >= 67.0.0 can't build the oldest OpenMDAO
         NUMPY_VERSION_OLDEST: ['1.21']  # latest is most recent on PyPI
