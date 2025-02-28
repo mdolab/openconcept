@@ -46,13 +46,6 @@ class PhaseGroup(om.Group):
     def initialize(self):
         self.options.declare("num_nodes", default=1, types=int, lower=0)
 
-    # def _setup_procs(self, pathname, comm, mode, prob_meta):
-    #     ### raise RuntimeError('setup procs called in IntegratorGroup')
-    #     # need to pass down the name of the duration variable via prob_meta
-    #     prob_meta.update({"oc_time_var": self._oc_time_var_name})
-    #     prob_meta.update({"oc_num_nodes": self._oc_num_nodes})
-    #     super(PhaseGroup, self)._setup_procs(pathname, comm, mode, prob_meta)
-
     def configure(self):
         # check child subsys for variables to be integrated and add them all
         timevars = []
@@ -195,26 +188,6 @@ class IntegratorGroup(om.Group):
         # Call om.Group's _setup_procs which does a lot of things as an initial phase of setup.
         # We pass *args because the signature of this method varies depending on the OM version.
         super(IntegratorGroup, self)._setup_procs(*args)
-
-        ### raise RuntimeError('setup procs called in IntegratorGroup')
-        # time_units = self._oc_time_units
-        # self._under_dymos = False
-        # self._under_openconcept = False
-        # try:
-        #     num_nodes = prob_meta["oc_num_nodes"]
-        #     self._under_openconcept = True
-        # except KeyError:
-        #     # TODO test_if_under_dymos
-        #     if not self._under_dymos:
-        #         raise NameError("Integrator group must be created within an OpenConcept phase or Dymos trajectory")
-
-        # if self._under_openconcept:
-        #     self.add_subsystem(
-        #         "ode_integ",
-        #         Integrator(time_setup="duration", method="simpson", diff_units=time_units, num_nodes=num_nodes),
-        #     )
-
-        # super(IntegratorGroup, self)._setup_procs(pathname, comm, mode, prob_meta)
 
     def configure(self):
         self._setup_var_data()
