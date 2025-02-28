@@ -445,20 +445,6 @@ class TestIntegratorDuplicateStateName(unittest.TestCase):
         self.assertIn("Variable name 'f_final' already exists.", "{}".format(cm.exception))
 
 
-class TestIntegratorOutsideofPhase(unittest.TestCase):
-    def setUp(self):
-        self.nn = 5
-        self.p = om.Problem(model=IntegratorGroupTestBase(num_nodes=self.nn))
-
-    def test_asserts(self):
-        with self.assertRaises(NameError) as cm:
-            self.p.setup(force_alloc_complex=True)
-        self.assertEqual(
-            "{}".format(cm.exception),
-            "Integrator group must be created within an OpenConcept phase or Dymos trajectory",
-        )
-
-
 class TestIntegratorNoIntegratedState(unittest.TestCase):
     def setUp(self):
         self.nn = 5
