@@ -73,8 +73,8 @@ OpenConcept is tested regularly on builds with the oldest and latest supported p
      - 1.7.0
      - latest
    * - OpenAeroStruct
-     - latest
-     - latest
+     - 2.7.1
+     - 2.7.1
 
 ---------------
 Please Cite Us!

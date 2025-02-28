@@ -46,7 +46,7 @@ setup(
     ],
     extras_require={
         "testing": ["pytest", "pytest-cov", "coverage", "openaerostruct", "parameterized"],
-        "docs": ["sphinx_mdolab_theme", "openaerostruct"],
+        "docs": ["sphinx_mdolab_theme", "openaerostruct<=2.7.1"],
         "plot": ["matplotlib"],
     },
 )
