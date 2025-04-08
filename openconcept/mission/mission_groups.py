@@ -6,8 +6,11 @@ import warnings
 
 
 # OpenConcept PhaseGroup will be used to hold analysis phases with time integration
-def find_integrators_in_model(system, abs_namespace, timevars, states):
-    durationvar = system._problem_meta["oc_time_var"]
+def find_integrators_in_model(system, abs_namespace, timevars, states, durationvar):
+    """
+    Recursively find integration-related variables (time, states, and duration) under this system
+    and put them in imtevars and states lists.
+    """
 
     # check if we are a group or not
     if isinstance(system, om.Group):
@@ -16,7 +19,7 @@ def find_integrators_in_model(system, abs_namespace, timevars, states):
                 next_namespace = subsys.name
             else:
                 next_namespace = abs_namespace + "." + subsys.name
-            find_integrators_in_model(subsys, next_namespace, timevars, states)
+            find_integrators_in_model(subsys, next_namespace, timevars, states, durationvar)
     else:
         # if the duration variable shows up we need to add its absolute path to timevars
         if isinstance(system, Integrator):
@@ -35,7 +38,6 @@ def find_integrators_in_model(system, abs_namespace, timevars, states):
 
 class PhaseGroup(om.Group):
     def __init__(self, **kwargs):
-        # BB what if user isn't passing num_nodes to the phases?
         num_nodes = kwargs.get("num_nodes", 1)
         super(PhaseGroup, self).__init__(**kwargs)
         self._oc_time_var_name = "duration"
@@ -44,17 +46,11 @@ class PhaseGroup(om.Group):
     def initialize(self):
         self.options.declare("num_nodes", default=1, types=int, lower=0)
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
-        # need to pass down the name of the duration variable via prob_meta
-        prob_meta.update({"oc_time_var": self._oc_time_var_name})
-        prob_meta.update({"oc_num_nodes": self._oc_num_nodes})
-        super(PhaseGroup, self)._setup_procs(pathname, comm, mode, prob_meta)
-
     def configure(self):
         # check child subsys for variables to be integrated and add them all
         timevars = []
         states = []
-        find_integrators_in_model(self, "", timevars, states)
+        find_integrators_in_model(self, "", timevars, states, self._oc_time_var_name)
         self._setup_var_data()
 
         # make connections from duration to integrated vars automatically
@@ -74,11 +70,13 @@ class PhaseGroup(om.Group):
 
 class IntegratorGroup(om.Group):
     def __init__(self, **kwargs):
-        # BB what if user isn't passing num_nodes to the phases?
         time_units = kwargs.pop("time_units", "s")
         super(IntegratorGroup, self).__init__(**kwargs)
         self._oc_time_units = time_units
         self._n_auto_comps = 0
+
+    def initialize(self):
+        self.options.declare("num_nodes", default=1, types=int, lower=0)
 
     def promote_add(
         self,
@@ -175,25 +173,21 @@ class IntegratorGroup(om.Group):
         self.add_subsystem(mult_name, mult, promotes_outputs=["*"])
         self.connect(source, mult_name + "._temp")
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
+    def _setup_procs(self, *args):
+        # We use this hidden method to always add "ode_integ" subsystem to the group that inherets from
+        # this class (e.g. aircraft model). We cannot use `setup` method here because the user will define
+        # `setup` in their user-defined (aircraft model) class that inherits from this class.
+        # (This IntegratorGroup is never added directly to the OM model)
         time_units = self._oc_time_units
-        self._under_dymos = False
-        self._under_openconcept = False
-        try:
-            num_nodes = prob_meta["oc_num_nodes"]
-            self._under_openconcept = True
-        except KeyError:
-            # TODO test_if_under_dymos
-            if not self._under_dymos:
-                raise NameError("Integrator group must be created within an OpenConcept phase or Dymos trajectory")
+        num_nodes = self.options["num_nodes"]
+        self.add_subsystem(
+            "ode_integ",
+            Integrator(time_setup="duration", method="simpson", diff_units=time_units, num_nodes=num_nodes),
+        )
 
-        if self._under_openconcept:
-            self.add_subsystem(
-                "ode_integ",
-                Integrator(time_setup="duration", method="simpson", diff_units=time_units, num_nodes=num_nodes),
-            )
-
-        super(IntegratorGroup, self)._setup_procs(pathname, comm, mode, prob_meta)
+        # Call om.Group's _setup_procs which does a lot of things as an initial phase of setup.
+        # We pass *args because the signature of this method varies depending on the OM version.
+        super(IntegratorGroup, self)._setup_procs(*args)
 
     def configure(self):
         self._setup_var_data()
