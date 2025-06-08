@@ -573,7 +573,7 @@ class TestPhaseNoTime(unittest.TestCase):
         version_split = om_version.split(".")
         minor = int(version_split[1])
         if minor == 38 or minor == 39:
-            exc = None  # OM 3.38 and 3.39 do not raise an error for invalid connections
+            return  # OM 3.38 and 3.39 do not raise an error for invalid connections
         elif minor >= 22:
             exc = RuntimeError  # OM 3.22 - 3.37
         else:
