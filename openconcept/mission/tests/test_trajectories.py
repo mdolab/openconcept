@@ -572,15 +572,14 @@ class TestPhaseNoTime(unittest.TestCase):
         om_version = openmdao.__version__
         version_split = om_version.split(".")
         minor = int(version_split[1])
-        if minor == 38 or minor == 39:
-            return  # OM 3.38 and 3.39 do not raise an error for invalid connections
-        elif minor >= 22:
-            exc = RuntimeError  # OM 3.22 - 3.37
+        if minor >= 22:
+            exc = RuntimeError  # OM >=3.22
         else:
             exc = NameError  # OM < 3.22
 
         with self.assertRaises(exc):
             self.p.setup()
+            self.p.final_setup()
 
 
 class TestPhaseMultipleIntegrators(unittest.TestCase):
