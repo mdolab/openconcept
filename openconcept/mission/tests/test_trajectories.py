@@ -564,20 +564,22 @@ class TestPhaseNoTime(unittest.TestCase):
         self.p = om.Problem(model=phase)
 
     def test_raises_error(self):
+        # Check if OM raises an error for invalid connections of non-existent `duration` variable
+
         # Exception type changed from NameError to RuntimeError in OpenMDAO 3.22.0
         import openmdao
 
         om_version = openmdao.__version__
         version_split = om_version.split(".")
-        major = int(version_split[0])
         minor = int(version_split[1])
-        if major > 3 or (major == 3 and minor >= 22):
-            exc = RuntimeError
+        if minor >= 22:
+            exc = RuntimeError  # OM >=3.22
         else:
-            exc = NameError
+            exc = NameError  # OM < 3.22
 
         with self.assertRaises(exc):
             self.p.setup()
+            self.p.final_setup()
 
 
 class TestPhaseMultipleIntegrators(unittest.TestCase):
