@@ -204,6 +204,10 @@ class HeatPumpWithIntegratedCoolantLoop(om.Group):
         Bypass value (in range 0-1) at end used for linear interpolation,
         0 is full refrigerator and 1 is full bypass; must access via
         control component (i.e. with "control.bypass_end") (scalar, None)
+    bypass : ndarray
+        Bypass value (in range 0-1) at each node (vector, None)
+        If nonlinear_bypass_control is True, this is the bypass control input
+        instead of the control.bypass_start and control.bypass_end.
 
     Outputs
     -------
@@ -227,19 +231,26 @@ class HeatPumpWithIntegratedCoolantLoop(om.Group):
     def initialize(self):
         self.options.declare("num_nodes", default=1, desc="Number of analysis points")
         self.options.declare("specific_heat", default=3801.0, desc="Specific heat in J/kg/K")
+        self.options.declare(
+            "nonlinear_bypass_control",
+            default=False,
+            desc="If True, control bypass at each node directly; if False, use linear interp between bypass_start/end.",
+        )
 
     def setup(self):
         nn = self.options["num_nodes"]
         nn_ones = np.ones((nn,))
         spec_heat = self.options["specific_heat"]
 
-        iv = self.add_subsystem("control", om.IndepVarComp())
-        iv.add_output("bypass_start", val=1.0)
-        iv.add_output("bypass_end", val=1.0)
+        if not self.options["nonlinear_bypass_control"]:
+            iv = self.add_subsystem("control", om.IndepVarComp())
+            iv.add_output("bypass_start", val=1.0)
+            iv.add_output("bypass_end", val=1.0)
 
-        self.add_subsystem("li", LinearInterpolator(num_nodes=nn, units=None), promotes_outputs=[("vec", "bypass")])
-        self.connect("control.bypass_start", "li.start_val")
-        self.connect("control.bypass_end", "li.end_val")
+            self.add_subsystem("li", LinearInterpolator(num_nodes=nn, units=None), promotes_outputs=[("vec", "bypass")])
+            self.connect("control.bypass_start", "li.start_val")
+            self.connect("control.bypass_end", "li.end_val")
+
         self.add_subsystem(
             "weightpower",
             HeatPumpWeight(),
@@ -272,12 +283,11 @@ class HeatPumpWithIntegratedCoolantLoop(om.Group):
         self.add_subsystem(
             "bypass_comp",
             LinearSelector(num_nodes=nn),
-            promotes_inputs=["T_in_cold", "T_in_hot", "power_rating"],
+            promotes_inputs=["T_in_cold", "T_in_hot", "power_rating", "bypass"],
             promotes_outputs=["T_out_cold", "T_out_hot", "elec_load"],
         )
         self.connect("hot_side.T_out", "bypass_comp.T_out_refrig_hot")
         self.connect("cold_side.T_out", "bypass_comp.T_out_refrig_cold")
-        self.connect("bypass", "bypass_comp.bypass")
 
 
 class COPExplicit(om.ExplicitComponent):
