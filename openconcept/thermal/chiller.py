@@ -250,7 +250,7 @@ class HeatPumpWithIntegratedCoolantLoop(om.Group):
             self.add_subsystem("li", LinearInterpolator(num_nodes=nn, units=None), promotes_outputs=[("vec", "bypass")])
             self.connect("control.bypass_start", "li.start_val")
             self.connect("control.bypass_end", "li.end_val")
-        
+
         self.add_subsystem(
             "weightpower",
             HeatPumpWeight(),
