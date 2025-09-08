@@ -25,3 +25,4 @@ scratch/
 *.npy
 .DS_Store
 .flake8
+.pre-commit-config.yaml
