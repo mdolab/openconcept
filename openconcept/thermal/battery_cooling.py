@@ -220,6 +220,10 @@ class BandolierCoolingSystem(om.ExplicitComponent):
         self.options.declare("cell_specific_heat", default=875.0)
         self.options.declare("battery_weight_fraction", default=0.65)
 
+        # Set this to True to not add the tags to dT/dt outputs. This allows this component to be used by Dymos/Aviary.
+        # This should be set to False when using this component under OpenConcept mission integrator.
+        self.options.declare("exclude_tags", default=False)
+
     def setup(self):
         nn = self.options["num_nodes"]
         self.add_input("q_in", shape=(nn,), units="W", val=0.0)
@@ -230,12 +234,11 @@ class BandolierCoolingSystem(om.ExplicitComponent):
         self.add_input("n_cpb", units=None, val=82.0)
         self.add_input("t_channel", units="m", val=0.0005)
 
-        self.add_output(
-            "dTdt",
-            shape=(nn,),
-            units="K/s",
-            tags=["integrate", "state_name:T_battery", "state_units:K", "state_val:300.0", "state_promotes:True"],
-        )
+        if not self.options["exclude_tags"]:
+            tags = ["integrate", "state_name:T_battery", "state_units:K", "state_val:300.0", "state_promotes:True"]
+        else:
+            tags = []  # for external integration by Dymos/Aviary
+        self.add_output("dTdt", shape=(nn,), units="K/s", tags=tags)
         self.add_output("T_surface", shape=(nn,), units="K", lower=1e-10)
         self.add_output("T_core", shape=(nn,), units="K", lower=1e-10)
         self.add_output("q", shape=(nn,), units="W")

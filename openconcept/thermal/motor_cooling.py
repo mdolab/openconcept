@@ -177,6 +177,10 @@ class MotorCoolingJacket(om.ExplicitComponent):
             "motor_specific_heat", default=921, desc="Specific heat in J/kg/K - default 921 for aluminum"
         )
 
+        # Set this to True to not add the tags to dT/dt outputs. This allows this component to be used by Dymos/Aviary.
+        # This should be set to False when using this component under OpenConcept mission integrator.
+        self.options.declare("exclude_tags", default=False)
+
     def setup(self):
         nn = self.options["num_nodes"]
         arange = np.arange(nn)
@@ -188,12 +192,11 @@ class MotorCoolingJacket(om.ExplicitComponent):
         self.add_input("motor_weight", units="kg", val=100)
         self.add_output("q", shape=(nn,), units="W")
         self.add_output("T_out", shape=(nn,), units="K", val=300, lower=1e-10)
-        self.add_output(
-            "dTdt",
-            shape=(nn,),
-            units="K/s",
-            tags=["integrate", "state_name:T_motor", "state_units:K", "state_val:300.0", "state_promotes:True"],
-        )
+        if not self.options["exclude_tags"]:
+            tags = ["integrate", "state_name:T_motor", "state_units:K", "state_val:300.0", "state_promotes:True"]
+        else:
+            tags = []  # for external integration by Dymos/Aviary
+        self.add_output("dTdt", shape=(nn,), units="K/s", tags=tags)
 
         self.declare_partials(["T_out", "q", "dTdt"], ["power_rating"], rows=arange, cols=np.zeros((nn,)))
         self.declare_partials(["dTdt"], ["motor_weight"], rows=arange, cols=np.zeros((nn,)))

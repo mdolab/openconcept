@@ -405,12 +405,17 @@ if generate_srcdocs:
         "aerodynamics",
         "aerodynamics.openaerostruct",
         "atmospherics",
+        "costs",
         "energy_storage",
+        "energy_storage.hydrogen",
+        "geometry",
         "mission",
         "propulsion",
         "propulsion.systems",
+        "stability",
         "thermal",
         "utilities",
         "utilities.math",
+        "weights",
     ]
     generate_src_docs(".", "../openconcept", packages)
