@@ -31,8 +31,8 @@ For this mission, users should specify the following variables in the run script
 - vertical speed ``<climb, cruise, descent>.fltcond|vs`` for each phase.
 - airspeed ``<climb, cruise, descent>.fltcond|Ueas`` for each phase.
 - (optional) ``takeoff|v2`` if you include a ground roll phase before climb. The ground roll phase is not included by default.
-  
-The duration of each phase is automatically set given the cruise altitude and mission range.  
+
+The duration of each phase is automatically set given the cruise altitude and mission range.
 
 Full mission including takeoff: ``FullMissionAnalysis``
 -------------------------------------------------------
