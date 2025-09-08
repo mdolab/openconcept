@@ -176,7 +176,7 @@ class AddSubtractComp(ExplicitComponent):
         Use add_equation instead of add_output to define equation systems.
         """
         raise NotImplementedError(
-            "Use add_equation method, not add_output methodto create an addition/subtraction relation"
+            "Use add_equation method, not add_output method to create an addition/subtraction relation"
         )
 
     def setup(self):
