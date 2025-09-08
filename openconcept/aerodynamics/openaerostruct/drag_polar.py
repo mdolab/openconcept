@@ -25,8 +25,8 @@ except ImportError:
 try:
     from openaerostruct.geometry.geometry_mesh_transformations import Rotate
     from openaerostruct.aerodynamics.aero_groups import AeroPoint
-except ImportError:
-    raise ImportError("OpenAeroStruct must be installed to use the VLMDragPolar component")
+except ImportError as err:
+    raise ImportError("OpenAeroStruct must be installed to use the VLMDragPolar component") from err
 
 CITATION = """
 @article{Adler2022d,
