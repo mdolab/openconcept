@@ -325,9 +325,7 @@ class OffsetStripFinData(ExplicitComponent):
             * fc_1
             * 0.1
             * (1 + 7.669e-8 * inputs["Re_dh_cold"] ** 4.429 * fc_2) ** -0.9
-        ) * 7.669e-8 * 4.429 * inputs[
-            "Re_dh_cold"
-        ] ** 3.429 * fc_2
+        ) * 7.669e-8 * 4.429 * inputs["Re_dh_cold"] ** 3.429 * fc_2
 
         jh_1 = inputs["alpha_hot"] ** -0.1541 * inputs["delta_hot"] ** 0.1499 * inputs["gamma_hot"] ** -0.0678
         jh_2 = inputs["alpha_hot"] ** 0.504 * inputs["delta_hot"] ** 0.456 * inputs["gamma_hot"] ** -1.055
@@ -363,9 +361,7 @@ class OffsetStripFinData(ExplicitComponent):
             * fh_1
             * 0.1
             * (1 + 7.669e-8 * inputs["Re_dh_hot"] ** 4.429 * fh_2) ** -0.9
-        ) * 7.669e-8 * 4.429 * inputs[
-            "Re_dh_hot"
-        ] ** 3.429 * fh_2
+        ) * 7.669e-8 * 4.429 * inputs["Re_dh_hot"] ** 3.429 * fh_2
 
 
 class HydraulicDiameterReynoldsNumber(ExplicitComponent):

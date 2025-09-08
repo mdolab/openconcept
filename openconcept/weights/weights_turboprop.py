@@ -569,11 +569,7 @@ class EquipmentWeight_SmallTurboprop(ExplicitComponent):
 
         # pressurization and air conditioning from Roskam
         Wapi = (
-            0.265
-            * inputs["ac|weights|MTOW"] ** 0.52
-            * inputs["ac|num_passengers_max"] ** 0.68
-            * Wavionics**0.17
-            * 0.95
+            0.265 * inputs["ac|weights|MTOW"] ** 0.52 * inputs["ac|num_passengers_max"] ** 0.68 * Wavionics**0.17 * 0.95
         )
         Woxygen = 30 + 1.2 * inputs["ac|num_passengers_max"]
         # furnishings (Cessna method)
