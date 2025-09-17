@@ -26,3 +26,4 @@ scratch/
 .DS_Store
 .flake8
 .pre-commit-config.yaml
+ruff.toml
