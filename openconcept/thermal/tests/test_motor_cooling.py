@@ -97,7 +97,7 @@ class UnsteadyMotorCoolingTestCase(unittest.TestCase):
                 )
 
         class TrajectoryPhase(PhaseGroup):
-            "An OpenConcept Phase comprises part of a time-based TrajectoryGroup and always needs to have a 'duration' defined"
+            """An OpenConcept Phase comprises part of a time-based TrajectoryGroup and always needs to have a 'duration' defined"""
 
             def setup(self):
                 self.add_subsystem(
@@ -106,7 +106,7 @@ class UnsteadyMotorCoolingTestCase(unittest.TestCase):
                 self.add_subsystem("vm", VehicleModel(num_nodes=self.options["num_nodes"]))
 
         class Trajectory(TrajectoryGroup):
-            "An OpenConcept TrajectoryGroup consists of one or more phases that may be linked together. This will often be a top-level model"
+            """An OpenConcept TrajectoryGroup consists of one or more phases that may be linked together. This will often be a top-level model"""
 
             def setup(self):
                 self.add_subsystem("phase1", TrajectoryPhase(num_nodes=nn))

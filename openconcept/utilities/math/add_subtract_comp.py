@@ -86,7 +86,7 @@ class AddSubtractComp(ExplicitComponent):
         elif output_name is None:
             pass
         else:
-            raise ValueError("first argument to adder init must be either of type " "'str' or 'None'")
+            raise ValueError("first argument to adder init must be either of type 'str' or 'None'")
 
     def add_equation(
         self,
@@ -176,7 +176,7 @@ class AddSubtractComp(ExplicitComponent):
         Use add_equation instead of add_output to define equation systems.
         """
         raise NotImplementedError(
-            "Use add_equation method, not add_output method" "to create an addition/subtraction relation"
+            "Use add_equation method, not add_output method to create an addition/subtraction relation"
         )
 
     def setup(self):

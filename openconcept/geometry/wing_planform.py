@@ -118,7 +118,7 @@ class WingAspectRatio(om.ExplicitComponent):
 
     def compute_partials(self, inputs, J):
         J["AR", "span"] = 2 * inputs["span"] / inputs["S_ref"]
-        J["AR", "S_ref"] = -inputs["span"] ** 2 / inputs["S_ref"] ** 2
+        J["AR", "S_ref"] = -(inputs["span"] ** 2) / inputs["S_ref"] ** 2
 
 
 class WingSweepFromSections(om.ExplicitComponent):

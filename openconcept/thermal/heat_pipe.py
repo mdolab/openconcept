@@ -838,7 +838,7 @@ class QMaxWarning(ExplicitComponent):
         if np.any(q > q_warn * q_max):
             warnings.warn(
                 self.msginfo + f" Heat pipe is being asked to transfer "
-                f"{np.max(q/q_max)*100:2.1f}% of its maximum heat transfer capability. This is {(np.max(q/q_max) - q_warn)*100:2.1f}% over "
-                f"the warning threshold of {q_warn*100:2.1f}%.",
+                f"{np.max(q / q_max) * 100:2.1f}% of its maximum heat transfer capability. This is {(np.max(q / q_max) - q_warn) * 100:2.1f}% over "
+                f"the warning threshold of {q_warn * 100:2.1f}%.",
                 stacklevel=2,
             )

@@ -5,6 +5,7 @@ set up. This does not use OpenConcept's models for
 the aircraft propulsion and aerodynamics, but it
 does use the mission analysis methods.
 """
+
 # rst Imports (beg)
 import openmdao.api as om
 from openconcept.mission import BasicMission
