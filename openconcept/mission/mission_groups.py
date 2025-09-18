@@ -291,8 +291,8 @@ class TrajectoryGroup(om.Group):
                     state_prom_name = phase1_prom_name
                 phase1_end_prom_name = self._var_abs2prom["output"][phase1_end_abs_name]
                 phase2_start_prom_name = self._var_abs2prom["input"][phase2_start_abs_name]
-                if not (state_tuple[0] in states_to_skip):
-                    if not (state_prom_name in states_to_skip):
+                if state_tuple[0] not in states_to_skip:
+                    if state_prom_name not in states_to_skip:
                         self.connect(phase1_end_prom_name, phase2_start_prom_name)
 
     def link_phases(self, phase1, phase2, states_to_skip=[]):

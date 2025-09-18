@@ -26,8 +26,8 @@ try:
     from openaerostruct.structures.spatial_beam_setup import SpatialBeamSetup
     from openaerostruct.structures.wingbox_group import WingboxGroup
     from openconcept.aerodynamics.openaerostruct.mesh_gen import TrapezoidalPlanformMesh
-except ImportError:
-    raise ImportError("OpenAeroStruct must be installed to use the AerostructDragPolar component")
+except ImportError as err:
+    raise ImportError("OpenAeroStruct must be installed to use the AerostructDragPolar component") from err
 
 CITATION = """
 @article{Adler2022d,

@@ -58,12 +58,12 @@ class DictIndepVarComp(IndepVarComp):
         for sub_name in split_names:
             try:
                 data_dict_tmp = data_dict_tmp[sub_name]
-            except KeyError:
-                raise KeyError('"%s" does not exist in the data dictionary' % structured_name)
+            except KeyError as err:
+                raise KeyError('"%s" does not exist in the data dictionary' % structured_name) from err
         try:
             val = data_dict_tmp["value"]
-        except KeyError:
-            raise KeyError('Data dict entry "%s" must have a "value" key' % structured_name)
+        except KeyError as err:
+            raise KeyError('Data dict entry "%s" must have a "value" key' % structured_name) from err
         units = data_dict_tmp.get("units", None)
 
         if isinstance(val, numbers.Number):
@@ -117,12 +117,12 @@ class DymosDesignParamsFromDict:
         for sub_name in split_names:
             try:
                 data_dict_tmp = data_dict_tmp[sub_name]
-            except KeyError:
-                raise KeyError('"%s" does not exist in the data dictionary' % structured_name)
+            except KeyError as err:
+                raise KeyError('"%s" does not exist in the data dictionary' % structured_name) from err
         try:
             val = data_dict_tmp["value"]
-        except KeyError:
-            raise KeyError('Data dict entry "%s" must have a "value" key' % structured_name)
+        except KeyError as err:
+            raise KeyError('Data dict entry "%s" must have a "value" key' % structured_name) from err
         units = data_dict_tmp.get("units", None)
 
         if isinstance(val, numbers.Number):

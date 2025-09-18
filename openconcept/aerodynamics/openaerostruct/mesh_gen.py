@@ -422,9 +422,7 @@ class SectionPlanformMesh(om.ExplicitComponent):
             coeff = (S / A) ** 0.5
             for var in ["y_sec", "chord_sec", "x_LE_sec"]:
                 partials["mesh", var] *= coeff
-            partials["mesh", "y_sec"] += np.outer(
-                -0.5 * self.unscaled_flattened_mesh * S**0.5 * A ** (-1.5), dA_dysec
-            )
+            partials["mesh", "y_sec"] += np.outer(-0.5 * self.unscaled_flattened_mesh * S**0.5 * A ** (-1.5), dA_dysec)
             partials["mesh", "chord_sec"] += np.outer(
                 -0.5 * self.unscaled_flattened_mesh * S**0.5 * A ** (-1.5), dA_dcsec
             )

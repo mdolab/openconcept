@@ -84,7 +84,7 @@ try:
 
         def viewer(prob, pt):
             """
-            print a report of all the relevant cycle properties
+            Print a report of all the relevant cycle properties
             """
 
             fs_names = ["fc.Fl_O", "inlet.Fl_O", "duct.Fl_O", "nozz.Fl_O"]

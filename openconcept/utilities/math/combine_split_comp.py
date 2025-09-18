@@ -54,7 +54,7 @@ class VectorConcatenateComp(ExplicitComponent):
 
         if isinstance(output_name, str):
             if not isinstance(input_names, Iterable) or not isinstance(vec_sizes, Iterable):
-                raise ValueError("User must provide list of input name(s)" "and list of vec_sizes for each input")
+                raise ValueError("User must provide list of input name(s) and list of vec_sizes for each input")
 
             self._add_systems.append((output_name, input_names, vec_sizes, length, val, kwargs))
         elif isinstance(output_name, Iterable):
@@ -67,7 +67,7 @@ class VectorConcatenateComp(ExplicitComponent):
         elif output_name is None:
             pass
         else:
-            raise ValueError("First argument to init must be either of type " "'str' or 'None'")
+            raise ValueError("First argument to init must be either of type 'str' or 'None'")
 
     def add_relation(
         self,
@@ -142,7 +142,7 @@ class VectorConcatenateComp(ExplicitComponent):
         }
 
         if not isinstance(input_names, Iterable) or not isinstance(vec_sizes, Iterable):
-            raise ValueError("User must provide list of input name(s)" "and list of vec_sizes for each input")
+            raise ValueError("User must provide list of input name(s) and list of vec_sizes for each input")
 
         self._add_systems.append((output_name, input_names, vec_sizes, length, val, kwargs))
 
@@ -150,7 +150,7 @@ class VectorConcatenateComp(ExplicitComponent):
         """
         Use add_relation instead of add_output to define concatenate relations.
         """
-        raise NotImplementedError("Use add_relation method, not add_output method" "to create an concatenate relation")
+        raise NotImplementedError("Use add_relation method, not add_output method to create an concatenate relation")
 
     def setup(self):
         """
@@ -273,7 +273,7 @@ class VectorSplitComp(ExplicitComponent):
 
         if isinstance(input_name, str):
             if not isinstance(output_names, Iterable) or not isinstance(vec_sizes, Iterable):
-                raise ValueError("User must provide list of output name(s)" "and list of vec_sizes for each input")
+                raise ValueError("User must provide list of output name(s) and list of vec_sizes for each input")
 
             self._add_systems.append((output_names, input_name, vec_sizes, length, val, kwargs))
         elif isinstance(input_name, Iterable):
@@ -286,7 +286,7 @@ class VectorSplitComp(ExplicitComponent):
         elif input_name is None:
             pass
         else:
-            raise ValueError("input_name argument to init must be either of type " "'str' or 'None'")
+            raise ValueError("input_name argument to init must be either of type 'str' or 'None'")
 
     def add_relation(
         self,
@@ -361,7 +361,7 @@ class VectorSplitComp(ExplicitComponent):
         }
 
         if not isinstance(output_names, Iterable) or not isinstance(vec_sizes, Iterable):
-            raise ValueError("User must provide list of output name(s)" "and list of vec_sizes for each input")
+            raise ValueError("User must provide list of output name(s) and list of vec_sizes for each input")
 
         self._add_systems.append((output_names, input_name, vec_sizes, length, val, kwargs))
 
@@ -369,7 +369,7 @@ class VectorSplitComp(ExplicitComponent):
         """
         Use add_relation instead of add_output to define split relations.
         """
-        raise NotImplementedError("Use add_relation method, not add_output method" "to create a split relation")
+        raise NotImplementedError("Use add_relation method, not add_output method to create a split relation")
 
     def setup(self):
         """
