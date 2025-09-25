@@ -26,7 +26,7 @@ def get_prom_name(system, abs_name, iotype):
         if hasattr(system, "_resolver"):
             return system._resolver._abs2prom[iotype.lower()][abs_name][0]
         else:
-            return system._var_abs2prom[iotype.lower()]
+            return system._var_abs2prom[iotype.lower()][abs_name]
     except KeyError:
         return None
 
