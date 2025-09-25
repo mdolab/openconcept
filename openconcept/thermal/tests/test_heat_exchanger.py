@@ -375,8 +375,7 @@ class TestHXByHand(unittest.TestCase):
             * alpha_cold**-0.1541
             * delta_cold**0.1499
             * gamma_cold**-0.0678
-            * (1 + 5.269e-5 * redh_cold**1.340 * alpha_cold**0.504 * delta_cold**0.456 * gamma_cold**-1.055)
-            ** 0.1
+            * (1 + 5.269e-5 * redh_cold**1.340 * alpha_cold**0.504 * delta_cold**0.456 * gamma_cold**-1.055) ** 0.1
         )
         j_hot = (
             0.6522
@@ -394,8 +393,7 @@ class TestHXByHand(unittest.TestCase):
             * alpha_cold**-0.1856
             * delta_cold**0.3053
             * gamma_cold**-0.2659
-            * (1 + 7.669e-8 * redh_cold**4.429 * alpha_cold**0.920 * delta_cold**3.767 * gamma_cold**0.236)
-            ** 0.1
+            * (1 + 7.669e-8 * redh_cold**4.429 * alpha_cold**0.920 * delta_cold**3.767 * gamma_cold**0.236) ** 0.1
         )
         f_hot = (
             9.6243

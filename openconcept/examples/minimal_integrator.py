@@ -3,6 +3,7 @@ This example builds off the original minimal example,
 but adds a numerical integrator to integrate fuel burn
 and update the weight accordingly.
 """
+
 # rst Imports (beg)
 import openmdao.api as om
 from openconcept.examples.minimal import Aircraft, setup_problem  # build off this aircraft model

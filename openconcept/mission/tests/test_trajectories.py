@@ -45,7 +45,7 @@ class TestForDocs(unittest.TestCase):
         import numpy as np
 
         class NewtonSecondLaw(om.ExplicitComponent):
-            "A regular OpenMDAO component computing acceleration from mass and force"
+            """A regular OpenMDAO component computing acceleration from mass and force"""
 
             def initialize(self):
                 self.options.declare("num_nodes", default=1)
@@ -73,7 +73,7 @@ class TestForDocs(unittest.TestCase):
                 outputs["accel"] = inputs["force"] / inputs["mass"]
 
         class DragEquation(om.ExplicitComponent):
-            "Another regular OpenMDAO component that happens to take a state variable as input"
+            """Another regular OpenMDAO component that happens to take a state variable as input"""
 
             def initialize(self):
                 self.options.declare("num_nodes", default=1)
@@ -111,7 +111,7 @@ class TestForDocs(unittest.TestCase):
                 self.connect("drag.force", "nsl.force")
 
         class MyPhase(PhaseGroup):
-            "An OpenConcept Phase comprises part of a time-based TrajectoryGroup and always needs to have a 'duration' defined"
+            """An OpenConcept Phase comprises part of a time-based TrajectoryGroup and always needs to have a 'duration' defined"""
 
             def setup(self):
                 self.add_subsystem(
@@ -120,7 +120,7 @@ class TestForDocs(unittest.TestCase):
                 self.add_subsystem("vm", VehicleModel(time_units="min", num_nodes=self.options["num_nodes"]))
 
         class MyTraj(TrajectoryGroup):
-            "An OpenConcept TrajectoryGroup consists of one or more phases that may be linked together. This will often be a top-level model"
+            """An OpenConcept TrajectoryGroup consists of one or more phases that may be linked together. This will often be a top-level model"""
 
             def setup(self):
                 self.add_subsystem("phase1", MyPhase(num_nodes=11))

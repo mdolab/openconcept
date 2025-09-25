@@ -12,10 +12,6 @@ on:
     - cron: '23 19 9,24 * *'
 
 jobs:
-  black:
-    uses: mdolab/.github/.github/workflows/black.yaml@main
-  flake8:
-    uses: mdolab/.github/.github/workflows/flake8.yaml@main
   build:
     runs-on: ${{ matrix.os }}
     strategy:
