@@ -209,13 +209,19 @@ class IntegratorGroup(om.Group):
         # We use this hidden method to always add "ode_integ" subsystem to the group that inherets from
         # this class (e.g. aircraft model). We cannot use `setup` method here because the user will define
         # `setup` in their user-defined (aircraft model) class that inherits from this class.
-        # (This IntegratorGroup is never added directly to the OM model)
         time_units = self._oc_time_units
         num_nodes = self.options["num_nodes"]
-        self.add_subsystem(
-            "ode_integ",
-            Integrator(time_setup="duration", method="simpson", diff_units=time_units, num_nodes=num_nodes),
-        )
+        orig_static_mode = self._problem_meta["static_mode"]
+        try:
+            # We need to set `static_mode` to True, otherwise the Integrator subsystem we add below will be ignored by
+            # OpenMDAO, see https://github.com/OpenMDAO/OpenMDAO/issues/3621 for details.
+            self._problem_meta["static_mode"] = True
+            self.add_subsystem(
+                "ode_integ",
+                Integrator(time_setup="duration", method="simpson", diff_units=time_units, num_nodes=num_nodes),
+            )
+        finally:
+            self._problem_meta["static_mode"] = orig_static_mode
 
         # Call om.Group's _setup_procs which does a lot of things as an initial phase of setup.
         # We pass *args because the signature of this method varies depending on the OM version.
