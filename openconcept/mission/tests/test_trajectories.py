@@ -169,6 +169,7 @@ class IntegratorGroupTestBase(IntegratorGroup):
             ),
         )
         self.connect("iv.x", "ec.x")
+        self.set_order(["iv", "ec", "ode_integ"])
 
 
 class TestIntegratorSingleState(unittest.TestCase):
