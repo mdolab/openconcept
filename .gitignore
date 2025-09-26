@@ -1,3 +1,4 @@
+*.openmdao_out
 *.pyc
 *.env
 *.html
