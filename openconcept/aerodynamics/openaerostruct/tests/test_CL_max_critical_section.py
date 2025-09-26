@@ -20,9 +20,15 @@ from openmdao.utils.assert_utils import assert_near_equal
 # ==============================================================================
 # Extension modules
 # ==============================================================================
-from openconcept.aerodynamics.openaerostruct import CLmaxCriticalSectionVLM, TrapezoidalPlanformMesh
+try:
+    from openconcept.aerodynamics.openaerostruct import CLmaxCriticalSectionVLM, TrapezoidalPlanformMesh
+
+    OAS_installed = True
+except ImportError:
+    OAS_installed = False
 
 
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class CLmaxCriticalSectionVLMTestCase(unittest.TestCase):
     def test_scalar_Clmax(self):
         nx = 2

@@ -2,17 +2,24 @@ import unittest
 import numpy as np
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 import openmdao.api as om
-from openconcept.aerodynamics.openaerostruct.mesh_gen import (
-    TrapezoidalPlanformMesh,
-    SectionPlanformMesh,
-    ThicknessChordRatioInterp,
-    SectionLinearInterp,
-    cos_space,
-    cos_space_deriv_start,
-    cos_space_deriv_end,
-)
+
+try:
+    from openconcept.aerodynamics.openaerostruct.mesh_gen import (
+        TrapezoidalPlanformMesh,
+        SectionPlanformMesh,
+        ThicknessChordRatioInterp,
+        SectionLinearInterp,
+        cos_space,
+        cos_space_deriv_start,
+        cos_space_deriv_end,
+    )
+
+    OAS_installed = True
+except ImportError:
+    OAS_installed = False
 
 
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class TrapezoidalPlanformMeshTestCase(unittest.TestCase):
     def test_easy(self):
         nx = 3
@@ -162,6 +169,7 @@ class TrapezoidalPlanformMeshTestCase(unittest.TestCase):
         assert_check_partials(partials, atol=2e-5)
 
 
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class SectionPlanformMeshTestCase(unittest.TestCase):
     def test_hershey_bar(self):
         """
@@ -340,6 +348,7 @@ class SectionPlanformMeshTestCase(unittest.TestCase):
         assert_check_partials(partials)
 
 
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class ThicknessChordRatioInterpTestCase(unittest.TestCase):
     def test_simple(self):
         ny = 4
@@ -398,6 +407,7 @@ class ThicknessChordRatioInterpTestCase(unittest.TestCase):
         assert_check_partials(partials)
 
 
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class SectionLinearInterpTestCase(unittest.TestCase):
     def test_cos_spacing(self):
         ny = np.array([3, 2, 1])
@@ -438,6 +448,7 @@ class SectionLinearInterpTestCase(unittest.TestCase):
         assert_check_partials(partials)
 
 
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class CosSpacingTestCase(unittest.TestCase):
     def test_simple(self):
         num = 7

@@ -19,9 +19,15 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 # ==============================================================================
 # Extension modules
 # ==============================================================================
-from openconcept.aerodynamics.openaerostruct import WaveDragFromSections
+try:
+    from openconcept.aerodynamics.openaerostruct import WaveDragFromSections
+
+    OAS_installed = True
+except ImportError:
+    OAS_installed = False
 
 
+@unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
 class WaveDragFromSectionsTestCase(unittest.TestCase):
     def test_verify_OAS(self):
         """
