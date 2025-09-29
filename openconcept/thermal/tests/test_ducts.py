@@ -289,7 +289,7 @@ def run_problem(
 
     prob.set_val("oc.sta3.heat_in", val=heat_in, units="kW")
     if oc_use_dpqp:
-        prob.set_val("oc.sta3.pressure_recovery", val=(1 - dPqP), units=None)
+        prob.set_val("oc.sta3.totals.pressure_recovery", val=(1 - dPqP), units=None)
     else:
         if HAS_PYCYCLE:
             delta_p = prob.get_val("pyduct.design.inlet.Fl_O:tot:P", units="Pa") - prob.get_val(
@@ -326,10 +326,21 @@ def check_params_match_known(prob, known_vals):
     oc_stations = ["inlet", "sta1", "sta3", "nozzle"]
     state_units = ["K", "Pa", "kg/m**3", None, "m/s", "K", "Pa", "inch**2"]
     for oc_station in oc_stations:
-        if oc_station == "nozzle" or oc_station == "inlet":
-            oc_states = ["T", "p", "rho", "M", "a", "Tt", "pt", "area"]
+        if oc_station == "inlet":
+            oc_states = [
+                "freestreamtotaltemperature.T",
+                "freestreamtotalpressure.p",
+                "rho",
+                "M",
+                "a",
+                "Tt",
+                "pt",
+                "area",
+            ]
+        elif oc_station == "nozzle":
+            oc_states = ["T", "p", "rho", "M", "a", "Tt", "pt", "massflow.area"]
         else:
-            oc_states = ["T", "p", "rho", "M", "a", "Tt_out", "pt_out", "area"]
+            oc_states = ["T", "p", "rho", "M", "a", "Tt_out", "pt_out", "totals.area"]
         for j, oc_state in enumerate(oc_states):
             if oc_station == "inlet" and oc_state in ["rho", "area"]:
                 continue
