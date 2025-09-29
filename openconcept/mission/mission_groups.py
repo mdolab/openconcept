@@ -212,18 +212,10 @@ class IntegratorGroup(om.Group):
         # (This IntegratorGroup is never added directly to the OM model)
         time_units = self._oc_time_units
         num_nodes = self.options["num_nodes"]
-        try:
-            # In OM 3.40 and later, static_mode is no longer True when this method is called, which leads to any
-            # subsystems that are added here to later be erased. So here we force static_mode to True while we add the
-            # Integrator subsystem to get around the issue. See https://github.com/OpenMDAO/OpenMDAO/issues/3621 for
-            # more details
-            self._problem_meta['static_mode'] = True
-            self.add_subsystem(
-                "ode_integ",
-                Integrator(time_setup="duration", method="simpson", diff_units=time_units, num_nodes=num_nodes),
-            )
-        finally:
-            self._problem_meta['static_mode'] = False
+        self.add_subsystem(
+            "ode_integ",
+            Integrator(time_setup="duration", method="simpson", diff_units=time_units, num_nodes=num_nodes),
+        )
 
         # Call om.Group's _setup_procs which does a lot of things as an initial phase of setup.
         # We pass *args because the signature of this method varies depending on the OM version.
