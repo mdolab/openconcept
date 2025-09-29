@@ -5,11 +5,39 @@ from openconcept.utilities import Integrator, AddSubtractComp, ElementMultiplyDi
 import warnings
 
 
+def get_prom_name(system, abs_name, iotype):
+    """Get the promoted name of a input or output variable
+
+    Parameters
+    ----------
+    system : OpenMDAO System (e.g Group, component)
+        The system to search
+    abs_name : str
+        Absolute name of the variable
+    iotype : str
+        Variable type, either 'input' or 'output'
+
+    Returns
+    -------
+    str or None
+        Promoted name of the variable, or None if not found
+    """
+    try:
+        if hasattr(system, "_resolver"):
+            return system._resolver._abs2prom[iotype.lower()][abs_name][0]
+        else:
+            return system._var_abs2prom[iotype.lower()][abs_name]
+    except KeyError:
+        return None
+
+
 # OpenConcept PhaseGroup will be used to hold analysis phases with time integration
 def find_integrators_in_model(system, abs_namespace, timevars, states, durationvar):
     """
     Recursively find integration-related variables (time, states, and duration) under this system
     and put them in imtevars and states lists.
+
+    TODO: user-defined integrators are breaking things, and I suspect it is from here
     """
 
     # check if we are a group or not
@@ -58,7 +86,11 @@ class PhaseGroup(om.Group):
         for var_abs_address in timevars:
             if self.pathname:
                 var_abs_address = self.pathname + "." + var_abs_address
-            var_prom_address = self._var_abs2prom["input"][var_abs_address]
+
+            var_prom_address = get_prom_name(self, var_abs_address, "input")
+            if var_abs_address is None:
+                continue
+
             if (
                 var_prom_address != self._oc_time_var_name
                 and var_prom_address not in time_prom_addresses_already_connected
@@ -284,13 +316,13 @@ class TrajectoryGroup(om.Group):
                     phase1_end_abs_name = self.pathname + "." + phase1_end_abs_name
                     phase2_start_abs_name = self.pathname + "." + phase2_start_abs_name
 
-                phase1_prom_name = self._var_abs2prom["output"][phase1_abs_name]
+                phase1_prom_name = get_prom_name(self, phase1_abs_name, "output")
                 if phase1_prom_name.startswith(phase1.name):  # only modify the text if it starts with the prefix
                     state_prom_name = phase1_prom_name.replace(phase1.name + ".", "", 1)
                 else:
                     state_prom_name = phase1_prom_name
-                phase1_end_prom_name = self._var_abs2prom["output"][phase1_end_abs_name]
-                phase2_start_prom_name = self._var_abs2prom["input"][phase2_start_abs_name]
+                phase1_end_prom_name = get_prom_name(self, phase1_end_abs_name, "output")
+                phase2_start_prom_name = get_prom_name(self, phase2_start_abs_name, "input")
                 if state_tuple[0] not in states_to_skip:
                     if state_prom_name not in states_to_skip:
                         self.connect(phase1_end_prom_name, phase2_start_prom_name)
