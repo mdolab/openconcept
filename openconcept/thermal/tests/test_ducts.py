@@ -161,10 +161,21 @@ try:
                 oc_station = oc_stations[i]
                 if list_output:
                     print("--------" + pyc_station + "-------------")
-                if oc_station == "nozzle" or oc_station == "inlet":
-                    oc_states = ["T", "p", "rho", "M", "a", "Tt", "pt", "area"]
+                if oc_station == "inlet":
+                    oc_states = [
+                        "freestreamtotaltemperature.T",
+                        "freestreamtotalpressure.p",
+                        "rho",
+                        "M",
+                        "a",
+                        "Tt",
+                        "pt",
+                        "area",
+                    ]
+                elif oc_station == "nozzle":
+                    oc_states = ["T", "p", "rho", "M", "a", "Tt", "pt", "massflow.area"]
                 else:
-                    oc_states = ["T", "p", "rho", "M", "a", "Tt_out", "pt_out", "area"]
+                    oc_states = ["T", "p", "rho", "M", "a", "Tt_out", "pt_out", "totals.area"]
                 for j, pyc_state in enumerate(
                     ["stat:T", "stat:P", "stat:rho", "stat:MN", "stat:Vsonic", "tot:T", "tot:P", "stat:area"]
                 ):
