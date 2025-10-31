@@ -89,6 +89,22 @@ jobs:
       run: |
         python -m pytest --cov-config=.coveragerc --cov=openconcept --cov-report=xml
 
+    - name: Test if engine deck data is included in package
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        # Build the wheel and source distribution
+        python -m build
+
+        # Create a fresh venv to simulate a clean install
+        python -m venv venv_test_pkg
+        source venv_test_pkg/bin/activate
+
+        # Install the wheel, not in editable mode
+        pip install dist/openconcept-*.whl
+
+        # Check that the .npy files are installed
+        python -c "import importlib.resources as r, pathlib; files = list(pathlib.Path(r.files('openconcept.propulsion.empirical_data')).rglob('*.npy')); if not files: raise SystemExit('No .npy files found in installed package!'); print(f'Found {len(files)} .npy data files.')"
+
     - name: Upload coverage to Codecov
       if: ${{ matrix.os == 'ubuntu-latest' }}
       uses: codecov/codecov-action@v4
