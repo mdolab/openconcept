@@ -37,6 +37,11 @@ setup(
     download_url="https://github.com/mdolab/openconcept",
     license="MIT License",
     packages=find_packages(include=["openconcept*"]),
+    package_data={
+        # engine deck data
+        "openconcept.propulsion.empirical_data": ["**/*.npy"],
+    },
+    include_package_data=True,
     install_requires=[
         # Update the oldest package versions in the GitHub Actions build file, the readme,
         # and the index.rst file in the docs when you change these
