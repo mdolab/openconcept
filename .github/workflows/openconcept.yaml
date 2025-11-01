@@ -93,6 +93,7 @@ jobs:
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         # Build the wheel and source distribution
+        pip install build setuptools wheel
         python -m build
 
         # Create a fresh venv to simulate a clean install
