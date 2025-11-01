@@ -90,7 +90,7 @@ jobs:
         python -m pytest --cov-config=.coveragerc --cov=openconcept --cov-report=xml
 
     - name: Test if engine deck data is included in package
-      if: ${{ matrix.os == 'ubuntu-latest' }}
+      if: ${{ matrix.os == 'ubuntu-latest' && matrix.dep-versions == 'latest' }}
       run: |
         # Build the wheel and source distribution
         pip install build setuptools wheel
