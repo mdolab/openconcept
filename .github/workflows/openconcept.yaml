@@ -105,7 +105,15 @@ jobs:
         pip install dist/openconcept-*.whl
 
         # Check that the .npy files are installed
-        python -c "import importlib.resources as r, pathlib; files = list(pathlib.Path(r.files('openconcept.propulsion.empirical_data')).rglob('*.npy')); if not files: raise SystemExit('No .npy files found in installed package!'); print(f'Found {len(files)} .npy data files.')"
+        python - <<'PYCODE'
+        import importlib.resources as r
+        import pathlib
+
+        files = list(pathlib.Path(r.files('openconcept.propulsion.empirical_data')).rglob('*.npy'))
+        if not files:
+            raise SystemExit('No .npy files found in installed package!')
+        print(f'Found {len(files)} .npy data files.')
+        PYCODE
 
     - name: Upload coverage to Codecov
       if: ${{ matrix.os == 'ubuntu-latest' }}
