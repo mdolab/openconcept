@@ -329,7 +329,7 @@ class ElementMultiplyDivideComp(ExplicitComponent):
                 shape = (vec_out_size, length)
 
             if self.under_complex_step:
-                temp = np.ones(shape, dtype=np.complex128)
+                temp = np.ones(shape, dtype=np.complex_)
             else:
                 temp = np.ones(shape)
 

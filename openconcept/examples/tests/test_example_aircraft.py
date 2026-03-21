@@ -112,7 +112,7 @@ class HybridTwinTestCase(unittest.TestCase):
         assert_near_equal(prob.get_val("rotate.range_final", units="ft"), 4383.871458066499, tolerance=1e-5)
         assert_near_equal(prob.get_val("engineoutclimb.gamma", units="deg"), 1.7659046316724112, tolerance=1e-5)
         assert_near_equal(prob.get_val("descent.fuel_used_final", units="lb"), 854.8937776195904, tolerance=1e-5)
-        assert_near_equal(prob.get_val("descent.propmodel.batt1.SOC_final", units=None), -0.00030626412, tolerance=5e-5)
+        assert_near_equal(prob.get_val("descent.propmodel.batt1.SOC_final", units=None), -0.00030626412, tolerance=1e-5)
 
 
 class KingAirTestCase(unittest.TestCase):

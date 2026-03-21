@@ -95,7 +95,7 @@ class N3TestCase(unittest.TestCase):
 
         assert_near_equal(p.get_val("thrust", units="lbf"), 6902.32371562 * np.ones(1), tolerance=1e-6)
         assert_near_equal(p.get_val("fuel_flow", units="kg/s"), 0.35176628 * np.ones(1), tolerance=1e-6)
-        assert_near_equal(p.get_val("surge_margin"), 18.42447377 * np.ones(1), tolerance=5e-6)
+        assert_near_equal(p.get_val("surge_margin"), 18.42447377 * np.ones(1), tolerance=1e-6)
 
     def test_vectorized(self):
         nn = 5
