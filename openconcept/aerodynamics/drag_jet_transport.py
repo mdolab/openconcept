@@ -578,14 +578,6 @@ class SkinFrictionCoefficient_JetTransport(om.ExplicitComponent):
         # Reynolds number
         Re = inputs["fltcond|Utrue"] * inputs["L"] / visc_kin
 
-        # During Newton iterations, Utrue can temporarily go negative, making Re
-        # negative and causing log(negative) = NaN. Apply abs only for the real part so
-        # complex-step derivative checking still propagates the imaginary part correctly.
-        if np.isrealobj(Re):
-            Re = np.abs(Re)
-        else:
-            Re = np.where(np.real(Re) < 0, -Re, Re)
-
         # Skin friction coefficient assuming fully turbulent
         Cf = 0.523 / np.log(0.06 * Re) ** 2  # explicit fit of Spalding
 
@@ -611,15 +603,14 @@ class SkinFrictionCoefficient_JetTransport(om.ExplicitComponent):
         dvkin_dT = dvdyn_dT / inputs["fltcond|rho"]
         dvkin_drho = -visc_dyn / inputs["fltcond|rho"] ** 2
 
-        # Reynolds number (absolute value of velocity to handle negative Utrue during Newton iterations)
+        # Reynolds number
         U = inputs["fltcond|Utrue"]
-        absU = np.abs(U)
         L = inputs["L"]
-        Re = absU * L / visc_kin
-        dRe_dT = -absU * L / visc_kin**2 * dvkin_dT
-        dRe_drho = -absU * L / visc_kin**2 * dvkin_drho
-        dRe_dU = np.sign(U) * L / visc_kin
-        dRe_dL = absU / visc_kin
+        Re = U * L / visc_kin
+        dRe_dT = -U * L / visc_kin**2 * dvkin_dT
+        dRe_drho = -U * L / visc_kin**2 * dvkin_drho
+        dRe_dU = L / visc_kin
+        dRe_dL = U / visc_kin
 
         # Skin friction coefficient assuming fully turbulent
         Cf = 0.523 / np.log(0.06 * Re) ** 2  # explicit fit of Spalding
