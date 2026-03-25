@@ -148,47 +148,59 @@ class BFLImplicitSolve(ImplicitComponent):
     def setup(self):
         self.add_input("distance_continue", units="m")
         self.add_input("distance_abort", units="m")
-        self.add_input("takeoff|vr", units="m/s")
-        self.add_output("takeoff|v1", units="m/s", val=20, lower=10, upper=150)
+        self.add_input("takeoff|vr", units="m/s", val=30.0)
+        self.add_output("takeoff|v1", units="m/s", val=20.0, lower=10.0, upper=150.0)
         self.declare_partials("takeoff|v1", ["distance_continue", "distance_abort", "takeoff|v1", "takeoff|vr"])
 
-    def apply_nonlinear(self, inputs, outputs, residuals):
-        speedtol = 1e-1
-        disttol = 0
-        # force the decision speed to zero
-        if inputs["takeoff|vr"] < outputs["takeoff|v1"] + speedtol:
-            residuals["takeoff|v1"] = inputs["takeoff|vr"] - outputs["takeoff|v1"]
-        else:
-            residuals["takeoff|v1"] = inputs["distance_continue"] - inputs["distance_abort"]
+        self.speedtol = 1e-1
+        self.disttol = 0.0
 
-        # if you are within vtol on the correct side but the stopping distance bigger, use the regular mode
-        if (
-            inputs["takeoff|vr"] >= outputs["takeoff|v1"]
-            and inputs["takeoff|vr"] - outputs["takeoff|v1"] < speedtol
-            and (inputs["distance_abort"] - inputs["distance_continue"]) > disttol
-        ):
-            residuals["takeoff|v1"] = inputs["distance_continue"] - inputs["distance_abort"]
+    def useVRes(self, vr, v1, dist_continue, dist_abort):
+        """Determine whether to use the dist_continue - dist_abort or the vr - v1 residual.
+
+        If vr < v1 + speedtol then we use the vr - v1 residual, as long as dist_abort < dist_continue + disttol.
+
+        Parameters
+        ----------
+        vr : float
+            Rotation speed
+        v1 : float
+            Decision speed
+        dist_continue : float
+            engine-out takeoff distance
+        dist_abort : float
+            Rejected takeoff distance
+
+        Returns
+        -------
+        bool
+            True if the vr - v1 residual should be used, False if the dist_continue - dist_abort residual should be used.
+        """
+        return vr < v1 + self.speedtol and dist_abort < dist_continue + self.disttol
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        vr = inputs["takeoff|vr"]
+        v1 = outputs["takeoff|v1"]
+        dist_continue = inputs["distance_continue"]
+        dist_abort = inputs["distance_abort"]
+
+        if self.useVRes(vr, v1, dist_continue, dist_abort):
+            residuals["takeoff|v1"] = vr - v1
+        else:
+            residuals["takeoff|v1"] = dist_continue - dist_abort
 
     def linearize(self, inputs, outputs, partials):
-        speedtol = 1e-1
-        disttol = 0
+        vr = inputs["takeoff|vr"]
+        v1 = outputs["takeoff|v1"]
+        dist_continue = inputs["distance_continue"]
+        dist_abort = inputs["distance_abort"]
 
-        if inputs["takeoff|vr"] < outputs["takeoff|v1"] + speedtol:
+        if self.useVRes(vr, v1, dist_continue, dist_abort):
             partials["takeoff|v1", "distance_continue"] = 0
             partials["takeoff|v1", "distance_abort"] = 0
             partials["takeoff|v1", "takeoff|vr"] = 1
             partials["takeoff|v1", "takeoff|v1"] = -1
         else:
-            partials["takeoff|v1", "distance_continue"] = 1
-            partials["takeoff|v1", "distance_abort"] = -1
-            partials["takeoff|v1", "takeoff|vr"] = 0
-            partials["takeoff|v1", "takeoff|v1"] = 0
-
-        if (
-            inputs["takeoff|vr"] >= outputs["takeoff|v1"]
-            and inputs["takeoff|vr"] - outputs["takeoff|v1"] < speedtol
-            and (inputs["distance_abort"] - inputs["distance_continue"]) > disttol
-        ):
             partials["takeoff|v1", "distance_continue"] = 1
             partials["takeoff|v1", "distance_abort"] = -1
             partials["takeoff|v1", "takeoff|vr"] = 0
