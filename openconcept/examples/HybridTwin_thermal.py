@@ -61,7 +61,13 @@ class SeriesHybridTwinModel(Group):
         # any control variables other than throttle and braking need to be defined here
         controls = self.add_subsystem("controls", IndepVarComp(), promotes_outputs=["*"])
         controls.add_output("proprpm", val=np.ones((nn,)) * 2000, units="rpm")
-        controls.add_output("ac|propulsion|thermal|hx|mdot_coolant", val=0.1 * np.ones((nn,)), units="kg/s")
+        # mdot_coolant is a per-phase control vector of shape (nn,), where nn differs between
+        # phases (e.g. nn=11 for climb/cruise/descent, nn=1 for engineoutclimb). If this were
+        # promoted under its ac|propulsion|* name, all phases would expose the same promoted name
+        # at the parent analysis level with different shapes, which OpenMDAO 3.43+ rejects.
+        # Instead, give it a local name and wire it into the propulsion model via an explicit
+        # connect() below, keeping it entirely within this group's scope.
+        controls.add_output("phase_hx_mdot_coolant", val=0.1 * np.ones((nn,)), units="kg/s")
 
         # assume TO happens on battery backup
         if flight_phase in ["climb", "cruise", "descent"]:
@@ -76,9 +82,23 @@ class SeriesHybridTwinModel(Group):
         )
 
         propulsion_promotes_outputs = ["fuel_flow", "thrust", "ac|propulsion|thermal|duct|area_nozzle"]
+        # Explicitly list ac|propulsion|* inputs except mdot_coolant, which has a per-phase
+        # (nn,) shape and is connected directly below to avoid analysis-level shape conflicts.
         propulsion_promotes_inputs = [
             "fltcond|*",
-            "ac|propulsion|*",
+            "ac|propulsion|battery|specific_energy",
+            "ac|propulsion|engine|rating",
+            "ac|propulsion|generator|rating",
+            "ac|propulsion|motor|rating",
+            "ac|propulsion|propeller|diameter",
+            "ac|propulsion|thermal|hx|channel_height",
+            "ac|propulsion|thermal|hx|channel_length",
+            "ac|propulsion|thermal|hx|channel_width",
+            "ac|propulsion|thermal|hx|coolant_mass",
+            "ac|propulsion|thermal|hx|n_long_cold",
+            "ac|propulsion|thermal|hx|n_parallel",
+            "ac|propulsion|thermal|hx|n_tall",
+            "ac|propulsion|thermal|hx|n_wide_cold",
             "throttle",
             "propulsor_active",
             "ac|weights*",
@@ -93,6 +113,7 @@ class SeriesHybridTwinModel(Group):
         )
         self.connect("proprpm", ["propmodel.prop1.rpm", "propmodel.prop2.rpm"])
         self.connect("hybrid_factor.vec", "propmodel.hybrid_split.power_split_fraction")
+        self.connect("phase_hx_mdot_coolant", "propmodel.ac|propulsion|thermal|hx|mdot_coolant")
 
         # use a different drag coefficient for takeoff versus cruise
         if flight_phase not in ["v0v1", "v1v0", "v1vr", "rotate"]:

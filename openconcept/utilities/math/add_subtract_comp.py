@@ -268,7 +268,7 @@ class AddSubtractComp(ExplicitComponent):
                 shape = (vec_out_size, length)
 
             if self.under_complex_step:
-                temp = np.zeros(shape, dtype=np.complex_)
+                temp = np.zeros(shape, dtype=np.complex128)
             else:
                 temp = np.zeros(shape)
 

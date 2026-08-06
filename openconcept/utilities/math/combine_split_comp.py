@@ -210,13 +210,13 @@ class VectorConcatenateComp(ExplicitComponent):
                 input_names = [input_names]
 
             if self.under_complex_step:
-                dtype = np.complex_
+                dtype = np.complex128
             else:
                 dtype = np.float64
             if length == 1:
                 temp = np.array([], dtype=dtype)
             else:
-                temp = np.empty([0, length], dtype=np.dtype)
+                temp = np.empty([0, length], dtype=dtype)
 
             for input_name in input_names:
                 temp = np.concatenate((temp, inputs[input_name]))
