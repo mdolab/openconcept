@@ -45,13 +45,13 @@ setup(
     install_requires=[
         # Update the oldest package versions in the GitHub Actions build file, the readme,
         # and the index.rst file in the docs when you change these
-        "numpy >=1.20",
-        "scipy>=1.7.0",
-        "openmdao >=3.21",
+        "numpy >=1.25",
+        "scipy>=1.11.0",
+        "openmdao >=3.35",
     ],
     extras_require={
-        "testing": ["pytest", "pytest-cov", "coverage", "openaerostruct", "parameterized", "om-pycycle>=4.4.0"],
-        "docs": ["sphinx_mdolab_theme", "openaerostruct<=2.7.1"],
+        "testing": ["pytest", "pytest-cov", "coverage", "openaerostruct>=2.10", "parameterized", "om-pycycle>=4.4.0"],
+        "docs": ["sphinx_mdolab_theme", "openaerostruct>=2.10"],
         "plot": ["matplotlib"],
     },
 )

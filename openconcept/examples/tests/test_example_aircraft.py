@@ -219,7 +219,7 @@ class B738AerostructTestCase(unittest.TestCase):
     def test_values_B738(self):
         prob = self.prob
         # block fuel
-        assert_near_equal(prob.get_val("descent.fuel_used_final", units="lbm"), 33611.18277099, tolerance=1e-5)
+        assert_near_equal(prob.get_val("descent.fuel_used_final", units="lbm"), 33577.66613045, tolerance=1e-5)
 
 
 class N3HSATestCase(unittest.TestCase):

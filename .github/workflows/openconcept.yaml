@@ -25,7 +25,7 @@ jobs:
         SETUPTOOLS_VERSION_OLDEST: ['66.0.0']  # setuptools >= 67.0.0 can't build the oldest OpenMDAO
         NUMPY_VERSION_OLDEST: ['1.25']  # latest is most recent on PyPI
         SCIPY_VERSION_OLDEST: ['1.11.0']  # latest is most recent on PyPI
-        OPENMDAO_VERSION_OLDEST: ['3.21']  # latest is most recent on PyPI
+        OPENMDAO_VERSION_OLDEST: ['3.35']  # latest is most recent on PyPI
       fail-fast: false
     env:
       OMP_NUM_THREADS: 1
@@ -58,7 +58,8 @@ jobs:
       if: ${{ matrix.dep-versions == 'latest' }}
       run: |
         conda config --set always_yes yes
-        pip install numpy scipy openmdao om-pycycle
+        # pyCycle's NumPy 2 fixes have not been released yet, so install it from GitHub
+        pip install numpy scipy openmdao git+https://github.com/OpenMDAO/pyCycle.git
 
     - name: Install OpenConcept
       run: |

@@ -547,7 +547,6 @@ def run_OAS(inputs, with_viscous=True, with_wave=True, t_over_c=None):
         # Airfoil properties for viscous drag calculation
         "k_lam": 0.05,  # percentage of chord with laminar
         # flow, used for viscous drag
-        "t_over_c_cp": t_over_c,  # thickness over chord ratio (NACA0015)
         "c_max_t": 0.37,  # chordwise location of maximum (NACA0015)
         # thickness
         "with_viscous": with_viscous,  # if true, compute viscous drag
@@ -589,10 +588,10 @@ def run_OAS(inputs, with_viscous=True, with_wave=True, t_over_c=None):
     # Perform the connections with the modified names within the
     # 'aero_states' group.
     prob.model.connect(name + ".mesh", point_name + ".aero_states." + name + "_def_mesh")
-    prob.model.connect(name + ".t_over_c", point_name + "." + name + "_perf." + "t_over_c")
 
     # Set up and run the model
     prob.setup()
+    prob.set_val(point_name + "." + name + "_perf.t_over_c", t_over_c)
     prob.run_model()
     outputs = {}
     outputs["CL"] = prob["aero_point_0.wing_perf.CL"]

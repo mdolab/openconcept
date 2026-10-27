@@ -176,7 +176,7 @@ class AerostructDragPolarTestCase(unittest.TestCase):
         p.run_model()
 
         # Ensure they're all the same
-        assert_near_equal(p.get_val("drag", units="N"), 33058.43316461 * np.ones(nn), tolerance=1e-10)
+        assert_near_equal(p.get_val("drag", units="N"), 33030.70090531 * np.ones(nn), tolerance=1e-10)
 
     def test_vectorized(self):
         nn = 7
@@ -218,7 +218,7 @@ class AerostructDragPolarTestCase(unittest.TestCase):
         p.run_model()
 
         # Ensure they're all the same
-        assert_near_equal(p.get_val("drag", units="N"), 35692.26543182 * np.ones(nn), tolerance=1e-10)
+        assert_near_equal(p.get_val("drag", units="N"), 35663.60094349 * np.ones(nn), tolerance=1e-10)
 
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
@@ -270,12 +270,12 @@ class OASDataGenTestCase(unittest.TestCase):
         # Check that the values don't change
         CL = np.array(
             [
-                [[-0.79243052, -0.79557334], [1.30041913, 1.30407159]],
-                [[-0.62943499, -0.76690382], [1.08568083, 1.26980739]],
+                [[-0.79221114, -0.79538193], [1.30052052, 1.30422605]],
+                [[-0.62789273, -0.76644378], [1.0833501, 1.26944015]],
             ]
         )
         CD = np.array(
-            [[[0.04196198, 0.04421198], [0.07526711, 0.07758053]], [[0.03631444, 0.04259311], [0.11894307, 0.158035]]]
+            [[[0.04195311, 0.04420453], [0.07526994, 0.07758754]], [[0.03625953, 0.04257383], [0.11850694, 0.15794595]]]
         )
 
         assert_near_equal(p.get_val("CL_train"), CL, tolerance=1e-7)
@@ -340,30 +340,30 @@ class AerostructTestCase(unittest.TestCase):
         p.run_model()
 
         # Use values computed offline from an OAS wingbox case with the same inputs
-        assert_near_equal(p.get_val("fltcond|CL"), 0.22369546, tolerance=1e-6)
-        assert_near_equal(p.get_val("fltcond|CD"), 0.015608634462089457, tolerance=1e-6)
-        assert_near_equal(p.get_val("failure"), -0.64781499, tolerance=1e-6)
-        assert_near_equal(p.get_val("ac|weights|W_wing", units="kg"), 29322.10058108, tolerance=1e-6)
+        assert_near_equal(p.get_val("fltcond|CL"), 0.22227328, tolerance=1e-6)
+        assert_near_equal(p.get_val("fltcond|CD"), 0.015586327348725018, tolerance=1e-6)
+        assert_near_equal(p.get_val("failure"), -0.64118595, tolerance=1e-6)
+        assert_near_equal(p.get_val("ac|weights|W_wing", units="kg"), 28107.93565566, tolerance=1e-6)
 
     def test_wave_drag(self):
         p = self.get_prob(surf_dict={"with_wave": False})
         p.run_model()
 
         # Use values computed offline from an OAS wingbox case with the same inputs
-        assert_near_equal(p.get_val("fltcond|CL"), 0.22369546, tolerance=1e-6)
-        assert_near_equal(p.get_val("fltcond|CD"), 0.015457034121371742, tolerance=1e-6)
-        assert_near_equal(p.get_val("failure"), -0.64781499, tolerance=1e-6)
-        assert_near_equal(p.get_val("ac|weights|W_wing", units="kg"), 29322.10058108, tolerance=1e-6)
+        assert_near_equal(p.get_val("fltcond|CL"), 0.22227328, tolerance=1e-6)
+        assert_near_equal(p.get_val("fltcond|CD"), 0.015437850824484381, tolerance=1e-6)
+        assert_near_equal(p.get_val("failure"), -0.64118595, tolerance=1e-6)
+        assert_near_equal(p.get_val("ac|weights|W_wing", units="kg"), 28107.93565566, tolerance=1e-6)
 
     def test_viscous_drag(self):
         p = self.get_prob(surf_dict={"with_viscous": False})
         p.run_model()
 
         # Use values computed offline from an OAS wingbox case with the same inputs
-        assert_near_equal(p.get_val("fltcond|CL"), 0.22369546, tolerance=1e-6)
-        assert_near_equal(p.get_val("fltcond|CD"), 0.009647318876399, tolerance=1e-6)
-        assert_near_equal(p.get_val("failure"), -0.64781499, tolerance=1e-6)
-        assert_near_equal(p.get_val("ac|weights|W_wing", units="kg"), 29322.10058108, tolerance=1e-6)
+        assert_near_equal(p.get_val("fltcond|CL"), 0.22227328, tolerance=1e-6)
+        assert_near_equal(p.get_val("fltcond|CD"), 0.009625069482685574, tolerance=1e-6)
+        assert_near_equal(p.get_val("failure"), -0.64118595, tolerance=1e-6)
+        assert_near_equal(p.get_val("ac|weights|W_wing", units="kg"), 28107.93565566, tolerance=1e-6)
 
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
@@ -400,10 +400,10 @@ class AerostructDragPolarExactTestCase(unittest.TestCase):
         p.run_model()
 
         # Use values computed offline from an OAS wingbox case with the same inputs
-        CD = CD0 + np.array([0.014130134503259, 0.014710068221375, 0.015608634461878])
+        CD = CD0 + np.array([0.014128552670509, 0.014709473902479, 0.015609808630944])
         assert_near_equal(p.get_val("drag"), q * S * CD, tolerance=1e-6)
-        assert_near_equal(p.get_val("failure"), np.array([-0.89649433, -0.77578479, -0.64781499]), tolerance=1e-6)
-        assert_near_equal(p.get_val("ac|weights|W_wing", units="kg"), 29322.10058108, tolerance=1e-6)
+        assert_near_equal(p.get_val("failure"), np.array([-0.89214155, -0.76670856, -0.63834757]), tolerance=1e-6)
+        assert_near_equal(p.get_val("ac|weights|W_wing", units="kg"), 28107.93565566, tolerance=1e-6)
 
 
 @unittest.skipIf(not OAS_installed, "OpenAeroStruct is not installed")
