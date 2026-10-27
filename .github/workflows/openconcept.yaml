@@ -13,19 +13,23 @@ on:
 
 jobs:
   build:
+    name: ${{ matrix.os }}, Python ${{ matrix.PYTHON_VERSION }}, NumPy ${{ matrix.NUMPY_VERSION || 'latest' }}, SciPy ${{ matrix.SCIPY_VERSION || 'latest' }}, OpenMDAO ${{ matrix.OPENMDAO_VERSION || 'latest' }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
         dep-versions: ["oldest", "latest"]
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Set versions to test here ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        PYTHON_VERSION_OLDEST: ['3.11']
-        PYTHON_VERSION_LATEST: ['3.13']
-        PIP_VERSION_OLDEST: ['23.0.1']  # pip>=23.1 cannot build the oldest OpenMDAO
-        SETUPTOOLS_VERSION_OLDEST: ['66.0.0']  # setuptools >= 67.0.0 can't build the oldest OpenMDAO
-        NUMPY_VERSION_OLDEST: ['1.25']  # latest is most recent on PyPI
-        SCIPY_VERSION_OLDEST: ['1.11.0']  # latest is most recent on PyPI
-        OPENMDAO_VERSION_OLDEST: ['3.35']  # latest is most recent on PyPI
+        include:
+          - dep-versions: "oldest"
+            PYTHON_VERSION: "3.11"
+            PIP_VERSION: "23.0.1"  # pip>=23.1 cannot build the oldest OpenMDAO
+            SETUPTOOLS_VERSION: "66.0.0"  # setuptools >= 67.0.0 can't build the oldest OpenMDAO
+            NUMPY_VERSION: "1.25"
+            SCIPY_VERSION: "1.11.0"
+            OPENMDAO_VERSION: "3.35"
+          - dep-versions: "latest"
+            PYTHON_VERSION: "3.13"  # all other packages are the most recent on PyPI
       fail-fast: false
     env:
       OMP_NUM_THREADS: 1
@@ -38,14 +42,14 @@ jobs:
       uses: conda-incubator/setup-miniconda@v3
       with:
         auto-update-conda: true
-        python-version: ${{ matrix.dep-versions == 'oldest' && matrix.PYTHON_VERSION_OLDEST || matrix.PYTHON_VERSION_LATEST }}
+        python-version: ${{ matrix.PYTHON_VERSION }}
 
     - name: Install dependencies (oldest versions)
       if: ${{ matrix.dep-versions == 'oldest' }}
       run: |
-        python -m pip install pip==${{ matrix.PIP_VERSION_OLDEST }} setuptools==${{ matrix.SETUPTOOLS_VERSION_OLDEST }} --upgrade wheel
-        conda install -y -c conda-forge numpy=${{ matrix.NUMPY_VERSION_OLDEST }} scipy=${{ matrix.SCIPY_VERSION_OLDEST }}
-        pip install openmdao==${{ matrix.OPENMDAO_VERSION_OLDEST }}
+        python -m pip install pip==${{ matrix.PIP_VERSION }} setuptools==${{ matrix.SETUPTOOLS_VERSION }} --upgrade wheel
+        conda install -y -c conda-forge numpy=${{ matrix.NUMPY_VERSION }} scipy=${{ matrix.SCIPY_VERSION }}
+        pip install openmdao==${{ matrix.OPENMDAO_VERSION }}
     - name: Install dependencies (latest versions)
       if: ${{ matrix.dep-versions == 'latest' }}
       run: |
