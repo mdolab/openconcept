@@ -67,11 +67,6 @@ jobs:
         pip install -e .[testing]
         pip install -e .[docs]
 
-    - name: Install oldest OpenMDAO versions
-      if: ${{ matrix.dep-versions == 'oldest' }}
-      run: |
-        pip install openmdao==${{ matrix.OPENMDAO_VERSION_OLDEST }}
-
     - name: List Python and package info
       run: |
         python --version
