@@ -34,38 +34,27 @@ jobs:
         shell: bash -l {0}
     steps:
     - uses: actions/checkout@v3
-    - name: Setup Python ${{ matrix.PYTHON_VERSION_OLDEST }}
-      if: ${{ matrix.dep-versions == 'oldest' }}
+    - name: Setup Python
       uses: conda-incubator/setup-miniconda@v3
       with:
         auto-update-conda: true
-        python-version: ${{ matrix.PYTHON_VERSION_OLDEST }}
-    - name: Setup Python ${{ matrix.PYTHON_VERSION_LATEST }}
-      if: ${{ matrix.dep-versions == 'latest' }}
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-        auto-update-conda: true
-        python-version: ${{ matrix.PYTHON_VERSION_LATEST }}
+        python-version: ${{ matrix.dep-versions == 'oldest' && matrix.PYTHON_VERSION_OLDEST || matrix.PYTHON_VERSION_LATEST }}
 
     - name: Install dependencies (oldest versions)
       if: ${{ matrix.dep-versions == 'oldest' }}
       run: |
-        conda config --set always_yes yes
         python -m pip install pip==${{ matrix.PIP_VERSION_OLDEST }} setuptools==${{ matrix.SETUPTOOLS_VERSION_OLDEST }} --upgrade wheel
-        conda install -c conda-forge numpy=${{ matrix.NUMPY_VERSION_OLDEST }} scipy=${{ matrix.SCIPY_VERSION_OLDEST }}
-        # Pin OpenMDAO here too, otherwise pyCycle pulls in the latest OpenMDAO, which upgrades NumPy
-        pip install om-pycycle openmdao==${{ matrix.OPENMDAO_VERSION_OLDEST }}
+        conda install -y -c conda-forge numpy=${{ matrix.NUMPY_VERSION_OLDEST }} scipy=${{ matrix.SCIPY_VERSION_OLDEST }}
+        pip install openmdao==${{ matrix.OPENMDAO_VERSION_OLDEST }}
     - name: Install dependencies (latest versions)
       if: ${{ matrix.dep-versions == 'latest' }}
       run: |
-        conda config --set always_yes yes
         # pyCycle's NumPy 2 fixes have not been released yet, so install it from GitHub
-        pip install numpy scipy openmdao git+https://github.com/OpenMDAO/pyCycle.git
+        pip install git+https://github.com/OpenMDAO/pyCycle.git
 
     - name: Install OpenConcept
       run: |
-        pip install -e .[testing]
-        pip install -e .[docs]
+        pip install -e .[testing,docs]
 
     - name: List Python and package info
       run: |
