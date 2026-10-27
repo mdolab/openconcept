@@ -617,7 +617,7 @@ def compute_training_data(inputs, surf_dict=None):
     # Catch ComplexWarning from OpenAeroStruct runs since with a full
     # grid it'll come up 100s of times
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=np.ComplexWarning)
+        warnings.filterwarnings("ignore", category=np.exceptions.ComplexWarning)
 
         # Initialize the parallel pool and compute the OpenAeroStruct data
         with mp.Pool() as parallel_pool:
@@ -660,9 +660,9 @@ def compute_training_data(inputs, surf_dict=None):
 
     # Transfer data into output data structure the proper format
     for i in range(len(out)):
-        data["CL"][np.unravel_index(i, inputs["Mach_number_grid"].shape)] = out[i]["CL"]
-        data["CD"][np.unravel_index(i, inputs["Mach_number_grid"].shape)] = out[i]["CD"]
-        data["failure"][np.unravel_index(i, inputs["Mach_number_grid"].shape)] = out[i]["failure"]
+        data["CL"][np.unravel_index(i, inputs["Mach_number_grid"].shape)] = out[i]["CL"].item()
+        data["CD"][np.unravel_index(i, inputs["Mach_number_grid"].shape)] = out[i]["CD"].item()
+        data["failure"][np.unravel_index(i, inputs["Mach_number_grid"].shape)] = out[i]["failure"].item()
         for f in of:
             for u in wrt:
                 data["partials"][f, u][i] = out[i]["partials"][f, u]

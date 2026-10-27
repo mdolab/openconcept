@@ -628,8 +628,8 @@ def compute_training_data(inputs, surf_dict=None):
 
     # Transfer data into output data structure the proper format
     for i in range(len(out)):
-        data["CL"][np.unravel_index(i, inputs["Mach_number_grid"].shape)] = out[i]["CL"]
-        data["CD"][np.unravel_index(i, inputs["Mach_number_grid"].shape)] = out[i]["CD"]
+        data["CL"][np.unravel_index(i, inputs["Mach_number_grid"].shape)] = out[i]["CL"].item()
+        data["CD"][np.unravel_index(i, inputs["Mach_number_grid"].shape)] = out[i]["CD"].item()
         for key in data["partials"].keys():
             data["partials"][key][i] = out[i]["partials"][key]
 
