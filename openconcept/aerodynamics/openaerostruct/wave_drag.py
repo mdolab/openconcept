@@ -14,6 +14,7 @@
 # ==============================================================================
 import numpy as np
 import openmdao.api as om
+import scipy.integrate as integrate
 
 # ==============================================================================
 # Extension modules
@@ -131,7 +132,7 @@ class WaveDragFromSections(om.ExplicitComponent):
         toverc_interp = np.linspace(toverc_sec[:-1], toverc_sec[1:], n)
         chord_interp = np.linspace(chord_sec[:-1], chord_sec[1:], n)
         y_interp = np.linspace(y_sec[:-1], y_sec[1:], n)
-        panel_toverc = np.trapz((toverc_interp * chord_interp).T, x=y_interp.T) / panel_areas
+        panel_toverc = integrate.trapezoid((toverc_interp * chord_interp).T, x=y_interp.T) / panel_areas
         avg_toverc = np.sum(panel_toverc * panel_areas) / np.sum(panel_areas)
 
         MDD = self.options["airfoil_tech_level"] / cos_sweep - avg_toverc / cos_sweep**2 - CL / (10 * cos_sweep**3)

@@ -78,7 +78,21 @@ class SeriesHybridTwinModel(Group):
         propulsion_promotes_outputs = ["fuel_flow", "thrust", "ac|propulsion|thermal|duct|area_nozzle"]
         propulsion_promotes_inputs = [
             "fltcond|*",
-            "ac|propulsion|*",
+            # Every ac|propulsion|* input except the per-node mdot_coolant, which is connected below because promoting
+            # it up through phases with different numbers of nodes gives inputs of different shapes the same name
+            "ac|propulsion|battery|specific_energy",
+            "ac|propulsion|engine|rating",
+            "ac|propulsion|generator|rating",
+            "ac|propulsion|motor|rating",
+            "ac|propulsion|propeller|diameter",
+            "ac|propulsion|thermal|hx|channel_height",
+            "ac|propulsion|thermal|hx|channel_length",
+            "ac|propulsion|thermal|hx|channel_width",
+            "ac|propulsion|thermal|hx|coolant_mass",
+            "ac|propulsion|thermal|hx|n_long_cold",
+            "ac|propulsion|thermal|hx|n_parallel",
+            "ac|propulsion|thermal|hx|n_tall",
+            "ac|propulsion|thermal|hx|n_wide_cold",
             "throttle",
             "propulsor_active",
             "ac|weights*",
@@ -93,6 +107,7 @@ class SeriesHybridTwinModel(Group):
         )
         self.connect("proprpm", ["propmodel.prop1.rpm", "propmodel.prop2.rpm"])
         self.connect("hybrid_factor.vec", "propmodel.hybrid_split.power_split_fraction")
+        self.connect("ac|propulsion|thermal|hx|mdot_coolant", "propmodel.ac|propulsion|thermal|hx|mdot_coolant")
 
         # use a different drag coefficient for takeoff versus cruise
         if flight_phase not in ["v0v1", "v1v0", "v1vr", "rotate"]:

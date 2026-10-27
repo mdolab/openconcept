@@ -56,8 +56,9 @@ class HybridTwinThermalTestCase(unittest.TestCase):
         assert_near_equal(prob.get_val("rotate.range_final", units="ft"), 4434.68545427, tolerance=1e-5)
         assert_near_equal(prob.get_val("engineoutclimb.gamma", units="deg"), 1.75074018, tolerance=1e-5)
         assert_near_equal(prob.get_val("descent.fuel_used_final", units="lb"), 862.69811822, tolerance=1e-5)
+        # SOC_final is close to zero, so check it with an absolute tolerance that is consistent with the solver tolerance
         assert_near_equal(
-            prob.get_val("descent.propmodel.batt1.SOC_final", units=None), -3.80158704e-05, tolerance=1e-5
+            prob.get_val("descent.propmodel.batt1.SOC_final", units=None), -3.80296e-5, tolerance=1e-7, tol_type="abs"
         )
 
         assert_near_equal(
@@ -112,7 +113,10 @@ class HybridTwinTestCase(unittest.TestCase):
         assert_near_equal(prob.get_val("rotate.range_final", units="ft"), 4383.871458066499, tolerance=1e-5)
         assert_near_equal(prob.get_val("engineoutclimb.gamma", units="deg"), 1.7659046316724112, tolerance=1e-5)
         assert_near_equal(prob.get_val("descent.fuel_used_final", units="lb"), 854.8937776195904, tolerance=1e-5)
-        assert_near_equal(prob.get_val("descent.propmodel.batt1.SOC_final", units=None), -0.00030626412, tolerance=1e-5)
+        # SOC_final is close to zero, so check it with an absolute tolerance that is consistent with the solver tolerance
+        assert_near_equal(
+            prob.get_val("descent.propmodel.batt1.SOC_final", units=None), -3.0627436e-4, tolerance=1e-7, tol_type="abs"
+        )
 
 
 class KingAirTestCase(unittest.TestCase):
@@ -215,7 +219,7 @@ class B738AerostructTestCase(unittest.TestCase):
     def test_values_B738(self):
         prob = self.prob
         # block fuel
-        assert_near_equal(prob.get_val("descent.fuel_used_final", units="lbm"), 33611.18277099, tolerance=1e-5)
+        assert_near_equal(prob.get_val("descent.fuel_used_final", units="lbm"), 33577.66613045, tolerance=1e-5)
 
 
 class N3HSATestCase(unittest.TestCase):

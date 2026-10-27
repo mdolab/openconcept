@@ -575,8 +575,8 @@ class SkinFrictionCoefficient_JetTransport(om.ExplicitComponent):
         visc_dyn = beta * inputs["fltcond|T"] ** (3 / 2) / (inputs["fltcond|T"] + sutherlands_constant)
         visc_kin = visc_dyn / inputs["fltcond|rho"]
 
-        # Reynolds number
-        Re = inputs["fltcond|Utrue"] * inputs["L"] / visc_kin
+        # Reynolds number, using |U| (in a complex-step safe way) since U can go negative during Newton iterations
+        Re = inputs["fltcond|Utrue"] * np.sign(inputs["fltcond|Utrue"].real) * inputs["L"] / visc_kin
 
         # Skin friction coefficient assuming fully turbulent
         Cf = 0.523 / np.log(0.06 * Re) ** 2  # explicit fit of Spalding
@@ -603,13 +603,14 @@ class SkinFrictionCoefficient_JetTransport(om.ExplicitComponent):
         dvkin_dT = dvdyn_dT / inputs["fltcond|rho"]
         dvkin_drho = -visc_dyn / inputs["fltcond|rho"] ** 2
 
-        # Reynolds number
-        U = inputs["fltcond|Utrue"]
+        # Reynolds number, using |U| as in compute
+        sign_U = np.sign(inputs["fltcond|Utrue"])
+        U = inputs["fltcond|Utrue"] * sign_U
         L = inputs["L"]
         Re = U * L / visc_kin
         dRe_dT = -U * L / visc_kin**2 * dvkin_dT
         dRe_drho = -U * L / visc_kin**2 * dvkin_drho
-        dRe_dU = L / visc_kin
+        dRe_dU = sign_U * L / visc_kin
         dRe_dL = U / visc_kin
 
         # Skin friction coefficient assuming fully turbulent

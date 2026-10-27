@@ -116,7 +116,7 @@ class SimpleHose(om.ExplicitComponent):
         fake_inputs = dict()
         # make a perturbable, complex copy of the inputs
         for inp in cs_inp_list:
-            fake_inputs[inp] = inputs[inp].astype(np.complex_, copy=True)
+            fake_inputs[inp] = inputs[inp].astype(np.complex128, copy=True)
 
         for inp in cs_inp_list:
             arr_to_restore = fake_inputs[inp].copy()
