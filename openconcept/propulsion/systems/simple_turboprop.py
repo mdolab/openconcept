@@ -76,6 +76,80 @@ class TurbopropPropulsionSystem(Group):
         self.connect("eng1.shaft_power_out", "prop1.shaft_power_in")
 
 
+class PC12NGXPropulsionSystem(Group):
+    """
+    Propulsion system model adapted specifically for the Pilatus PC-12 NGX.
+    Consists of a Pratt & Whitney Canada PT6A-67P turboshaft engine 
+    and a 5-bladed Hartzell constant-speed propeller.
+
+    Inputs
+    ------
+    ac|propulsion|engine|rating : float
+        The maximum rated shaft power of the engine (scalar, default 1200 hp)
+    ac|propulsion|propeller|diameter : float
+        Diameter of the propeller (scalar, default 2.67 m / 105 inches)
+    throttle : float
+        Throttle for the turboshaft (vector)
+    fltcond|rho : float
+        Air density (vector, kg/m**3)
+    fltcond|Utrue : float
+        True airspeed (vector, m/s)
+
+    Outputs
+    -------
+    thrust : float
+        Thrust force (vector, N)
+    fuel_flow : float
+        Fuel mass flow rate (vector, kg/s)
+
+    Options
+    -------
+    num_nodes : float
+        Number of analysis points to run (default 1)
+    """
+
+    def initialize(self):
+        self.options.declare("num_nodes", default=1, desc="Number of mission analysis points to run")
+
+    def setup(self):
+        nn = self.options["num_nodes"]
+
+        # Rename incoming design variables and apply PC-12 NGX specific defaults
+        dvlist = [
+            ["ac|propulsion|engine|rating", "eng1_rating", 1200.0, "hp"],
+            ["ac|propulsion|propeller|diameter", "prop1_diameter", 2.67, "m"],
+        ]
+        self.add_subsystem("dvs", DVLabel(dvlist), promotes_inputs=["*"], promotes_outputs=["*"])
+
+        # PT6A-67P Turboshaft implementation
+        # weight_base adjusted to ~237 kg (approx. 522 lbs for dry engine weight)
+        self.add_subsystem(
+            "eng1",
+            SimpleTurboshaft(num_nodes=nn, weight_inc=0.14 / 1000, weight_base=237.0),
+            promotes_inputs=["throttle", ("shaft_power_rating", "ac|propulsion|engine|rating")],
+            promotes_outputs=["fuel_flow"],
+        )
+        
+        # 5-Bladed Hartzell Propeller implementation
+        self.add_subsystem(
+            "prop1",
+            SimplePropeller(num_nodes=nn, num_blades=5, design_J=2.2, design_cp=0.55),
+            promotes_inputs=[
+                "fltcond|*",
+                ("power_rating", "ac|propulsion|engine|rating"),
+                ("diameter", "ac|propulsion|propeller|diameter"),
+            ],
+            promotes_outputs=["thrust"],
+        )
+
+        # Set default values specific to PC-12 NGX geometry and powerplant
+        self.set_input_defaults("ac|propulsion|engine|rating", 1200.0, units="hp")
+        self.set_input_defaults("ac|propulsion|propeller|diameter", 2.67, units="m")
+
+        # Connect shaft power from turboshaft to propeller
+        self.connect("eng1.shaft_power_out", "prop1.shaft_power_in")
+
+
 class TwinTurbopropPropulsionSystem(Group):
     """
     This is an example model multiple constant-speed props and turboshafts.
